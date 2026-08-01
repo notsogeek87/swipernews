@@ -171,8 +171,8 @@
     </div>
   </div>
   <div class="modeswitch" role="tablist" aria-label="Choix du mode">
-    <button id="tabNews" class="active" role="tab"><span class="ic">📰</span> Actus</button>
-    <button id="tabLearn" role="tab"><span class="ic">🎓</span> Apprendre</button>
+    <button id="tabLearn" class="active" role="tab"><span class="ic">🎓</span> Apprendre</button>
+    <button id="tabNews" role="tab"><span class="ic">📰</span> Actus</button>
   </div>
   <div class="cats" id="cats" aria-label="Centres d'intérêt"></div>
 </header>
@@ -250,7 +250,7 @@ const LS_MODE="fluxswipe.mode.v1";
 const LS_CAT="fluxswipe.cat.v1";
 const LS_INT="fluxswipe.interests.v1";
 let feeds=load(),items=[];
-let mode=(()=>{try{return localStorage.getItem(LS_MODE)==="learn"?"learn":"news";}catch(e){return "news";}})();
+let mode=(()=>{try{return localStorage.getItem(LS_MODE)==="news"?"news":"learn";}catch(e){return "learn";}})();
 
 /* Centres d'intérêt (mode Apprendre). q = requête de recherche Wikipédia ; null = purement aléatoire.
    deepcategory:"X" cible les articles de la catégorie X et de ses sous-catégories. */
