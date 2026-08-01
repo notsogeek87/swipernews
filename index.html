@@ -476,12 +476,23 @@ const LEARN_SOURCES=[
   {key:"gallica",   label:"Gallica · BnF", fn:srcGallica, cats:"*"},
 ];
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
-/* Un lot mélangé, tiré des sources choisies par l'utilisateur ET pertinentes pour la catégorie */
+/* Catégories à interroger pour un lot : une seule si filtre précis ;
+   plusieurs intérêts (jusqu'à 3) en "Tous" pour un fil toujours fourni et varié. */
+function catKeysForBatch(){
+  if(cat!=="all")return [cat];
+  if(interests.length)return shuffle(interests.slice()).slice(0,3);
+  return ["random"];
+}
+/* Un lot mélangé, tiré des sources choisies × catégories retenues */
 async function fetchLearn(count=20){
-  const catKey=activeCatKey();
-  let fns=LEARN_SOURCES.filter(s=>sources.includes(s.key)&&(s.cats==="*"||s.cats.includes(catKey))).map(s=>s.fn);
-  if(!fns.length)fns=[srcWikipedia];                     // garde-fou : au moins Wikipédia
-  const results=await Promise.allSettled(fns.map(fn=>fn(catKey)));
+  const keys=catKeysForBatch();
+  const tasks=[];
+  keys.forEach(catKey=>{
+    LEARN_SOURCES.filter(s=>sources.includes(s.key)&&(s.cats==="*"||s.cats.includes(catKey)))
+      .forEach(s=>tasks.push(s.fn(catKey)));
+  });
+  if(!tasks.length)tasks.push(srcWikipedia(keys[0]||"random")); // garde-fou : au moins Wikipédia
+  const results=await Promise.allSettled(tasks);
   const seen=new Set();let out=[];
   results.forEach(r=>{if(r.status==="fulfilled")r.value.forEach(it=>{
     const k=(it.link||"")+"|"+it.title;
@@ -493,10 +504,11 @@ async function fetchLearn(count=20){
 
 /* ---------- Cache local : affichage instantané au lancement ---------- */
 const LS_CACHE="fluxswipe.cache.v1";
-function cacheSave(m){try{const all=JSON.parse(localStorage.getItem(LS_CACHE)||"{}");
+function cacheSave(m){try{if(!items||items.length<3)return; // on ne met pas en cache un lot trop maigre
+  const all=JSON.parse(localStorage.getItem(LS_CACHE)||"{}");
   all[m]={t:Date.now(),items:items.slice(0,40)};localStorage.setItem(LS_CACHE,JSON.stringify(all));}catch(e){}}
 function cacheLoad(m){try{const e=(JSON.parse(localStorage.getItem(LS_CACHE)||"{}"))[m];
-  if(e&&Array.isArray(e.items)&&e.items.length)return e.items;}catch(e){}return null;}
+  if(e&&Array.isArray(e.items)&&e.items.length>=3)return e.items;}catch(e){}return null;} // ignore un cache minuscule
 
 /* ---------- Chargement principal ---------- */
 async function loadFeeds(){
