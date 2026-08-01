@@ -61,6 +61,12 @@ essaie donc, dans l'ordre :
    avec parsing XML dans le navigateur ;
 3. **rss2json** (`api.rss2json.com`) en dernier repli.
 
+### Rapidité
+
+- Les proxys de secours sont interrogés **en parallèle** (le premier qui répond gagne), au lieu d'un par un.
+- Les derniers articles sont **mis en cache** (localStorage) : au lancement suivant, ils s'affichent instantanément pendant que le fil se rafraîchit en arrière-plan (et le cache est conservé si le réseau échoue).
+- En mode Apprendre, un **seul lot** d'articles est chargé au démarrage ; le scroll infini complète le reste.
+
 Si toutes les sources échouent, l'app **n'affiche plus de contenu de démo** : elle montre
 un message d'erreur avec les boutons *Réessayer* et *Ouvrir les sources*. Pour une fiabilité
 maximale (et pour ne dépendre d'aucun tiers), prévoir un petit backend qui récupère et
