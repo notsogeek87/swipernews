@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Flux — actus en swipe</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap');
+  :root{
+    --bg:#0a0a0f;--ink:#f5f3ef;--muted:#8a8a99;
+    --accent:#ff3b6b;--accent-2:#4ad9ff;
+    --sans:'Space Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--sans);overscroll-behavior:none}
+
+  #feed{height:100dvh;width:100%;overflow-y:scroll;scroll-snap-type:y mandatory;
+    scroll-behavior:smooth;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  #feed::-webkit-scrollbar{display:none}
+
+  .card{height:100dvh;width:100%;scroll-snap-align:start;scroll-snap-stop:always;
+    position:relative;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden}
+  .card__bg{position:absolute;inset:0;background-size:cover;background-position:center;transform:scale(1.08);filter:saturate(1.1)}
+  .card__bg::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(to top,rgba(6,6,10,.96) 0%,rgba(6,6,10,.82) 28%,rgba(6,6,10,.25) 60%,rgba(6,6,10,.55) 100%)}
+  .card__noimg{position:absolute;inset:0;
+    background:radial-gradient(120% 80% at 20% 10%,rgba(255,59,107,.28),transparent 60%),
+               radial-gradient(120% 80% at 90% 40%,rgba(74,217,255,.2),transparent 55%),var(--bg)}
+
+  .card__body{position:relative;z-index:2;padding:28px 22px calc(96px + env(safe-area-inset-bottom))}
+  .card__source{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;
+    letter-spacing:.08em;text-transform:uppercase;color:var(--accent-2);margin-bottom:14px}
+  .card__source .dot{width:6px;height:6px;border-radius:50%;background:var(--accent-2);box-shadow:0 0 12px var(--accent-2)}
+  .card__title{font-family:'Newsreader',serif;font-size:clamp(26px,7vw,40px);line-height:1.1;font-weight:500;letter-spacing:-.01em;margin-bottom:14px}
+  .card__desc{font-size:15px;line-height:1.5;color:#d6d4cf;max-width:46ch;
+    display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+  .card__meta{margin-top:16px;display:flex;align-items:center;gap:14px;color:var(--muted);font-size:13px}
+  .card__open{margin-top:20px;display:inline-flex;align-items:center;gap:10px;
+    background:var(--accent);color:#fff;border:none;font-family:var(--sans);font-weight:600;font-size:15px;
+    padding:14px 22px;border-radius:100px;text-decoration:none;box-shadow:0 8px 30px rgba(255,59,107,.45);cursor:pointer}
+  .card__open:active{transform:scale(.97)}
+
+  .rail{position:absolute;right:16px;bottom:calc(120px + env(safe-area-inset-bottom));z-index:3;
+    display:flex;flex-direction:column;gap:22px;align-items:center}
+  .rail button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink);
+    width:52px;height:52px;border-radius:50%;font-size:22px;cursor:pointer;backdrop-filter:blur(12px);
+    display:grid;place-items:center;transition:transform .15s,background .2s}
+  .rail button:active{transform:scale(.88)}
+  .rail button.on{background:var(--accent);border-color:var(--accent)}
+
+  .progress{position:fixed;left:0;top:0;height:100dvh;width:3px;z-index:20;pointer-events:none}
+  .progress__bar{width:100%;background:linear-gradient(var(--accent),var(--accent-2));border-radius:0 3px 3px 0;transition:height .2s}
+
+  .top{position:fixed;top:0;left:0;right:0;z-index:15;padding:calc(14px + env(safe-area-inset-top)) 18px 14px;
+    display:flex;align-items:center;justify-content:space-between;background:linear-gradient(rgba(6,6,10,.7),transparent)}
+  .brand{font-weight:700;font-size:18px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+  .brand .mark{color:var(--accent)}
+  .top .actions{display:flex;gap:8px}
+  .top button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink);
+    padding:9px 14px;border-radius:100px;font-family:var(--sans);font-weight:600;font-size:13px;cursor:pointer;backdrop-filter:blur(12px)}
+
+  .demobadge{position:fixed;top:calc(64px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:14;
+    background:rgba(74,217,255,.15);border:1px solid rgba(74,217,255,.35);color:var(--accent-2);
+    padding:6px 14px;border-radius:100px;font-size:12px;font-weight:600}
+  .demobadge.hidden{display:none}
+
+  .hint{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translateX(-50%);
+    z-index:14;color:var(--muted);font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;
+    animation:float 1.8s ease-in-out infinite;pointer-events:none;opacity:.9}
+  .hint .arrow{font-size:20px}
+  @keyframes float{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,-8px)}}
+
+  .sheet{position:fixed;inset:0;z-index:50;background:rgba(6,6,10,.6);backdrop-filter:blur(6px);display:none;align-items:flex-end}
+  .sheet.open{display:flex}
+  .sheet__panel{background:#111117;width:100%;border-radius:24px 24px 0 0;padding:22px 20px calc(28px + env(safe-area-inset-bottom));
+    max-height:82dvh;overflow-y:auto;border-top:1px solid rgba(255,255,255,.08)}
+  .sheet__grip{width:44px;height:5px;border-radius:5px;background:rgba(255,255,255,.18);margin:0 auto 20px}
+  .sheet h2{font-size:20px;margin-bottom:4px;letter-spacing:-.02em}
+  .sheet p.sub{color:var(--muted);font-size:14px;margin-bottom:18px}
+  .feedrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+  .feedrow input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent)}
+  .feedrow .name{font-weight:600;font-size:15px}
+  .feedrow .url{color:var(--muted);font-size:12px;word-break:break-all}
+  .feedrow .del{margin-left:auto;background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer}
+  .addbox{display:flex;gap:8px;margin:18px 0 8px}
+  .addbox input{flex:1;background:#1a1a22;border:1px solid rgba(255,255,255,.12);color:var(--ink);
+    padding:13px 14px;border-radius:12px;font-family:var(--sans);font-size:14px}
+  .addbox button,.applybtn{background:var(--accent);color:#fff;border:none;font-family:var(--sans);font-weight:600;
+    padding:13px 18px;border-radius:12px;cursor:pointer;font-size:14px}
+  .applybtn{width:100%;margin-top:16px;padding:15px;font-size:16px}
+  .iorow{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,.08)}
+  .iobtn{flex:1 1 auto;min-width:120px;background:#1a1a22;border:1px solid rgba(255,255,255,.12);color:var(--ink);
+    font-family:var(--sans);font-weight:600;font-size:13px;padding:12px 14px;border-radius:12px;cursor:pointer}
+  .iobtn:active{transform:scale(.97)}
+
+  .state{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:16px;padding:40px;text-align:center;color:var(--muted)}
+  .spinner{width:44px;height:44px;border:3px solid rgba(255,255,255,.15);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .state h3{color:var(--ink);font-size:18px}
+  .hidden{display:none!important}
+  .toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);
+    background:#1a1a22;border:1px solid rgba(255,255,255,.12);color:var(--ink);padding:12px 20px;border-radius:100px;
+    font-size:14px;z-index:60;opacity:0;transition:opacity .25s;pointer-events:none}
+  .toast.show{opacity:1}
+
+  .sharemenu{position:fixed;inset:0;z-index:70;background:rgba(6,6,10,.6);backdrop-filter:blur(6px);
+    display:flex;align-items:flex-end;opacity:0;transition:opacity .2s}
+  .sharemenu.open{opacity:1}
+  .sharemenu__panel{background:#111117;width:100%;border-radius:24px 24px 0 0;
+    padding:22px 20px calc(28px + env(safe-area-inset-bottom));border-top:1px solid rgba(255,255,255,.08);
+    transform:translateY(100%);transition:transform .25s}
+  .sharemenu.open .sharemenu__panel{transform:translateY(0)}
+  .sharemenu h2{font-size:20px;margin-bottom:4px;letter-spacing:-.02em}
+  .sharemenu .sub{color:var(--muted);font-size:14px;margin-bottom:18px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .sharegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+  .sharedest{display:flex;align-items:center;justify-content:center;text-align:center;text-decoration:none;
+    background:#1a1a22;border:1px solid rgba(255,255,255,.12);color:var(--ink);font-family:var(--sans);
+    font-weight:600;font-size:14px;padding:16px 12px;border-radius:14px;cursor:pointer}
+  .sharedest:active{transform:scale(.97)}
+</style>
+</head>
+<body>
+
+<div class="progress"><div class="progress__bar" id="pbar"></div></div>
+
+<header class="top">
+  <div class="brand"><span class="mark">◆</span> Flux</div>
+  <div class="actions">
+    <button id="installBtn" class="hidden" title="Installer l'app">⤓ Installer</button>
+    <button id="reloadBtn" title="Recharger">↻</button>
+    <button id="openSheet">Sources</button>
+  </div>
+</header>
+
+<div class="demobadge hidden" id="demobadge">Mode démo — hors-ligne</div>
+
+<div id="feed"></div>
+
+<div class="hint" id="hint"><span class="arrow">⌃</span><span>Swipe</span></div>
+
+<div class="state hidden" id="loading">
+  <div class="spinner"></div>
+  <p>Chargement des actus…</p>
+</div>
+
+<div class="sheet" id="sheet">
+  <div class="sheet__panel">
+    <div class="sheet__grip"></div>
+    <h2>Tes sources</h2>
+    <p class="sub">Coche les flux à afficher, ajoute ceux que tu veux.</p>
+    <div id="feedList"></div>
+    <div class="addbox">
+      <input id="newUrl" type="url" placeholder="https://exemple.com/rss" inputmode="url">
+      <button onclick="addFeed()">Ajouter</button>
+    </div>
+
+    <div class="iorow">
+      <button class="iobtn" onclick="exportFeeds('opml')">↓ Exporter (OPML)</button>
+      <button class="iobtn" onclick="exportFeeds('json')">↓ Exporter (JSON)</button>
+      <button class="iobtn" onclick="document.getElementById('importFile').click()">↑ Importer un fichier</button>
+    </div>
+    <input id="importFile" type="file" accept=".opml,.xml,.json,application/json,text/xml" style="display:none" onchange="importFromFile(event)">
+
+    <button class="applybtn" onclick="applyAndClose()">Voir mon fil</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- Articles de démo (fonctionnent sans réseau) ---------- */
+const DEMO_ITEMS = [
+  {source:"Le Monde", title:"L'accord climatique final adopté après deux nuits de négociations", desc:"Les délégations sont parvenues à un compromis sur le financement des pays vulnérables, malgré les réticences de plusieurs grandes puissances jusqu'à la dernière heure.", date:new Date(Date.now()-1800e3).toISOString(), img:"https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=1200&q=70", link:"#"},
+  {source:"Tech Daily", title:"Les puces neuromorphiques font leur entrée dans les smartphones grand public", desc:"Une nouvelle génération de processeurs imite le fonctionnement du cerveau pour réduire drastiquement la consommation d'énergie des tâches d'IA embarquée.", date:new Date(Date.now()-5400e3).toISOString(), img:"https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=70", link:"#"},
+  {source:"BBC World", title:"Deep-sea mission uncovers dozens of species never seen before", desc:"Researchers exploring a trench in the Pacific catalogued marine life thriving in total darkness, reshaping ideas about the limits of habitability.", date:new Date(Date.now()-9000e3).toISOString(), img:"https://images.unsplash.com/photo-1551244072-5d12893278ab?w=1200&q=70", link:"#"},
+  {source:"Culture", title:"Le festival transforme une gare désaffectée en cathédrale sonore", desc:"Pendant trois jours, des installations immersives réinventent l'espace industriel, attirant un public bien au-delà des amateurs habituels de musique expérimentale.", date:new Date(Date.now()-14400e3).toISOString(), img:"https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&q=70", link:"#"},
+  {source:"Sport", title:"Une remontée historique scelle le titre à la dernière seconde", desc:"Menée de quinze points à cinq minutes du terme, l'équipe a renversé le match dans une fin de rencontre que les commentateurs qualifient déjà de légendaire.", date:new Date(Date.now()-18000e3).toISOString(), img:"https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=1200&q=70", link:"#"},
+  {source:"Sciences", title:"Un vaccin universel contre la grippe passe la phase d'essais clés", desc:"Ciblant une partie stable du virus, le candidat pourrait éviter la reformulation annuelle et offrir une protection durable sur plusieurs saisons.", date:new Date(Date.now()-25200e3).toISOString(), img:"https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200&q=70", link:"#"},
+  {source:"Économie", title:"Les monnaies numériques de banques centrales entrent en phase pilote", desc:"Plusieurs pays testent grandeur nature des paiements instantanés, relançant le débat sur la vie privée et le rôle des liquidités traditionnelles.", date:new Date(Date.now()-32400e3).toISOString(), img:"https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=1200&q=70", link:"#"},
+  {source:"Hacker News", title:"A tiny language model runs entirely in the browser tab", desc:"The open-source project compiles to WebAssembly and needs no server, sparking a lively discussion about the future of on-device inference.", date:new Date(Date.now()-39600e3).toISOString(), img:"https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=1200&q=70", link:"#"},
+];
+
+/* ---------- Sources ---------- */
+const DEFAULT_FEEDS = [
+  {name:"Le Monde — Une", url:"https://www.lemonde.fr/rss/une.xml", on:true},
+  {name:"France Info", url:"https://www.francetvinfo.fr/titres.rss", on:true},
+  {name:"BBC World", url:"https://feeds.bbci.co.uk/news/world/rss.xml", on:true},
+  {name:"Hacker News", url:"https://hnrss.org/frontpage", on:true},
+  {name:"The Verge", url:"https://www.theverge.com/rss/index.xml", on:false},
+];
+const LS_KEY="fluxswipe.feeds.v1";
+let feeds=load(),items=[],liked=new Set();
+
+function load(){try{const s=localStorage.getItem(LS_KEY);if(s)return JSON.parse(s);}catch(e){}return structuredClone(DEFAULT_FEEDS);}
+function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(feeds));}catch(e){}}
+
+/* ---------- Récupération avec plusieurs proxys de secours ---------- */
+const PROXIES=[
+  u=>"https://api.allorigins.win/raw?url="+encodeURIComponent(u),
+  u=>"https://corsproxy.io/?url="+encodeURIComponent(u),
+  u=>"https://thingproxy.freeboard.io/fetch/"+u,
+];
+async function fetchText(url){
+  for(const make of PROXIES){
+    try{
+      const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),8000);
+      const res=await fetch(make(url),{cache:"no-store",signal:ctl.signal});
+      clearTimeout(t);
+      if(res.ok){const txt=await res.text();if(txt&&txt.length>200)return txt;}
+    }catch(e){/* proxy suivant */}
+  }
+  throw new Error("no-proxy");
+}
+async function fetchFeed(feed){
+  const text=await fetchText(feed.url);
+  const doc=new DOMParser().parseFromString(text,"text/xml");
+  const nodes=[...doc.querySelectorAll("item, entry")];
+  return nodes.map(n=>{
+    const get=sel=>n.querySelector(sel)?.textContent?.trim()||"";
+    let link=get("link");if(!link){const l=n.querySelector("link");link=l?.getAttribute("href")||"";}
+    const raw=get("description")||get("summary")||get("content");
+    return {source:feed.name,title:get("title"),desc:stripHtml(raw),link,img:findImage(n,raw),
+      date:get("pubDate")||get("published")||get("updated")};
+  }).filter(i=>i.title);
+}
+function stripHtml(html){const d=document.createElement("div");d.innerHTML=html;return (d.textContent||"").replace(/\s+/g," ").trim();}
+function findImage(node,raw){
+  const m=node.querySelector("enclosure[url], content[url], thumbnail, [medium='image']");
+  if(m){const u=m.getAttribute("url");if(u)return u;}
+  const g=raw&&raw.match(/<img[^>]+src=["']([^"']+)["']/i);return g?g[1]:"";
+}
+function relTime(dateStr){const t=Date.parse(dateStr);if(isNaN(t))return "";
+  const d=(Date.now()-t)/1000;if(d<3600)return Math.max(1,Math.round(d/60))+" min";
+  if(d<86400)return Math.round(d/3600)+" h";return Math.round(d/86400)+" j";}
+
+/* ---------- Chargement principal ---------- */
+async function loadFeeds(){
+  show("loading");demobadge(false);
+  const active=feeds.filter(f=>f.on);
+  try{
+    if(!active.length) throw new Error("empty");
+    const results=await Promise.allSettled(active.map(fetchFeed));
+    let all=[];results.forEach(r=>{if(r.status==="fulfilled")all=all.concat(r.value);});
+    if(!all.length) throw new Error("no-items");
+    all.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
+    items=all.slice(0,120);demobadge(false);
+  }catch(e){
+    items=structuredClone(DEMO_ITEMS);demobadge(true);
+  }
+  render();hideStates();
+}
+
+/* ---------- Rendu ---------- */
+const feedEl=document.getElementById("feed");
+function render(){
+  feedEl.innerHTML=items.map((it,i)=>cardHTML(it,i)).join("");
+  feedEl.scrollTop=0;
+  document.getElementById("hint").classList.toggle("hidden",items.length===0);
+  attachRail();updateProgress();
+}
+function cardHTML(it,i){
+  const bg=it.img?`<div class="card__bg" style="background-image:url('${escAttr(it.img)}')"></div>`:`<div class="card__noimg"></div>`;
+  const hasLink=it.link&&it.link!=="#";
+  return `<article class="card" data-i="${i}">
+    ${bg}
+    <div class="rail">
+      <button class="likeBtn" data-i="${i}">♥</button>
+      <button class="shareBtn" data-i="${i}">↗</button>
+    </div>
+    <div class="card__body">
+      <span class="card__source"><span class="dot"></span>${esc(it.source)}</span>
+      <h1 class="card__title">${esc(it.title)}</h1>
+      ${it.desc?`<p class="card__desc">${esc(it.desc)}</p>`:""}
+      <div class="card__meta">${it.date?`<span>${relTime(it.date)}</span>`:""}</div>
+      ${hasLink?`<a class="card__open" href="${escAttr(it.link)}" target="_blank" rel="noopener">Lire l'article →</a>`:`<span class="card__open" style="background:rgba(255,255,255,.1);box-shadow:none">Article de démo</span>`}
+    </div>
+  </article>`;
+}
+function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function escAttr(s){return (s||"").replace(/["'&<>]/g,c=>({'"':"&quot;","'":"&#39;","&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function attachRail(){
+  document.querySelectorAll(".likeBtn").forEach(b=>b.onclick=e=>{e.stopPropagation();
+    if(liked.has(+b.dataset.i)){liked.delete(+b.dataset.i);b.classList.remove("on");}
+    else{liked.add(+b.dataset.i);b.classList.add("on");toast("Ajouté aux favoris");}});
+  document.querySelectorAll(".shareBtn").forEach(b=>b.onclick=async e=>{e.stopPropagation();
+    shareItem(items[+b.dataset.i]);});
+}
+
+async function shareItem(it){
+  const url=it.link&&it.link!=="#"?it.link:location.href;
+  const shareData={title:it.title,text:it.title,url};
+  // 1) partage natif (ouvre la feuille de partage du téléphone : Messages, WhatsApp, Mail…)
+  if(navigator.share){
+    try{await navigator.share(shareData);return;}catch(err){if(err&&err.name==="AbortError")return;}
+  }
+  // 2) repli : menu maison avec destinations courantes
+  openShareMenu(it,url);
+}
+
+/* Menu de partage de repli (desktop ou si le partage natif est absent) */
+function openShareMenu(it,url){
+  const enc=encodeURIComponent, t=enc(it.title), u=enc(url);
+  const targets=[
+    {label:"WhatsApp", href:`https://wa.me/?text=${t}%20${u}`},
+    {label:"Telegram", href:`https://t.me/share/url?url=${u}&text=${t}`},
+    {label:"E-mail",   href:`mailto:?subject=${t}&body=${t}%0A${u}`},
+    {label:"X (Twitter)", href:`https://twitter.com/intent/tweet?text=${t}&url=${u}`},
+    {label:"Facebook", href:`https://www.facebook.com/sharer/sharer.php?u=${u}`},
+  ];
+  const back=document.createElement("div");
+  back.className="sharemenu";
+  back.innerHTML=`<div class="sharemenu__panel">
+    <div class="sheet__grip"></div>
+    <h2>Partager</h2>
+    <p class="sub">${esc(it.title)}</p>
+    <div class="sharegrid">
+      ${targets.map(x=>`<a class="sharedest" href="${escAttr(x.href)}" target="_blank" rel="noopener">${x.label}</a>`).join("")}
+      <button class="sharedest" id="copyLink">Copier le lien</button>
+    </div>
+  </div>`;
+  document.body.appendChild(back);
+  requestAnimationFrame(()=>back.classList.add("open"));
+  const close=()=>{back.classList.remove("open");setTimeout(()=>back.remove(),200);};
+  back.onclick=e=>{if(e.target===back)close();};
+  back.querySelectorAll("a.sharedest").forEach(a=>a.addEventListener("click",close));
+  back.querySelector("#copyLink").onclick=async()=>{
+    try{await navigator.clipboard.writeText(url);toast("Lien copié");}catch(_){toast("Copie impossible");}
+    close();
+  };
+}
+
+const pbar=document.getElementById("pbar");
+feedEl.addEventListener("scroll",()=>{updateProgress();if(feedEl.scrollTop>50)document.getElementById("hint").classList.add("hidden");});
+function updateProgress(){const max=feedEl.scrollHeight-feedEl.clientHeight;pbar.style.height=(max>0?feedEl.scrollTop/max*100:0)+"%";}
+document.addEventListener("keydown",e=>{const h=feedEl.clientHeight;
+  if(e.key==="ArrowDown"||e.key===" ")feedEl.scrollBy({top:h,behavior:"smooth"});
+  if(e.key==="ArrowUp")feedEl.scrollBy({top:-h,behavior:"smooth"});});
+
+/* ---------- Sheet ---------- */
+const sheet=document.getElementById("sheet");
+document.getElementById("openSheet").onclick=()=>{renderList();sheet.classList.add("open");};
+document.getElementById("reloadBtn").onclick=()=>loadFeeds();
+sheet.onclick=e=>{if(e.target===sheet)sheet.classList.remove("open");};
+function renderList(){document.getElementById("feedList").innerHTML=feeds.map((f,i)=>`
+  <div class="feedrow"><input type="checkbox" ${f.on?"checked":""} onchange="toggleFeed(${i})">
+    <div><div class="name">${esc(f.name)}</div><div class="url">${esc(f.url)}</div></div>
+    <button class="del" onclick="delFeed(${i})">✕</button></div>`).join("");}
+function toggleFeed(i){feeds[i].on=!feeds[i].on;save();}
+function delFeed(i){feeds.splice(i,1);save();renderList();}
+function addFeed(){const inp=document.getElementById("newUrl");const url=inp.value.trim();
+  if(!/^https?:\/\//.test(url)){toast("URL invalide");return;}
+  let name=url;try{name=new URL(url).hostname.replace("www.","");}catch(_){}
+  feeds.push({name,url,on:true});save();inp.value="";renderList();}
+function applyAndClose(){sheet.classList.remove("open");loadFeeds();}
+
+/* ---------- Import / Export des sources ---------- */
+function download(filename,content,mime){
+  const blob=new Blob([content],{type:mime});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;a.download=filename;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function exportFeeds(format){
+  if(!feeds.length){toast("Aucune source à exporter");return;}
+  const stamp=new Date().toISOString().slice(0,10);
+  if(format==="json"){
+    download(`flux-sources-${stamp}.json`,JSON.stringify(feeds,null,2),"application/json");
+  }else{
+    const rows=feeds.map(f=>
+      `    <outline type="rss" text="${escAttr(f.name)}" title="${escAttr(f.name)}" xmlUrl="${escAttr(f.url)}"/>`
+    ).join("\n");
+    const opml=`<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head><title>Flux — mes sources</title></head>
+  <body>
+${rows}
+  </body>
+</opml>`;
+    download(`flux-sources-${stamp}.opml`,opml,"text/xml");
+  }
+  toast("Sources exportées");
+}
+function importFromFile(ev){
+  const file=ev.target.files&&ev.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const text=String(reader.result||"");
+      const parsed=text.trim().startsWith("{")||text.trim().startsWith("[")
+        ? parseJsonFeeds(text) : parseOpmlFeeds(text);
+      if(!parsed.length){toast("Aucune source trouvée dans le fichier");return;}
+      mergeFeeds(parsed);
+    }catch(e){toast("Fichier illisible");}
+    finally{ev.target.value="";}
+  };
+  reader.readAsText(file);
+}
+function parseJsonFeeds(text){
+  const data=JSON.parse(text);
+  const arr=Array.isArray(data)?data:(data.feeds||[]);
+  return arr.filter(f=>f&&f.url).map(f=>({
+    name:f.name||hostOf(f.url),url:String(f.url),on:f.on!==false
+  }));
+}
+function parseOpmlFeeds(text){
+  const doc=new DOMParser().parseFromString(text,"text/xml");
+  return [...doc.querySelectorAll("outline[xmlUrl]")].map(o=>{
+    const url=o.getAttribute("xmlUrl");
+    const name=o.getAttribute("text")||o.getAttribute("title")||hostOf(url);
+    return {name,url,on:true};
+  }).filter(f=>f.url);
+}
+function hostOf(url){try{return new URL(url).hostname.replace("www.","");}catch(_){return url;}}
+function mergeFeeds(incoming){
+  const existing=new Set(feeds.map(f=>f.url));
+  let added=0;
+  incoming.forEach(f=>{if(!existing.has(f.url)){feeds.push(f);existing.add(f.url);added++;}});
+  save();renderList();
+  toast(added? `${added} source${added>1?"s":""} importée${added>1?"s":""}` : "Sources déjà présentes");
+}
+
+/* ---------- Utils ---------- */
+function show(id){document.getElementById("loading").classList.toggle("hidden",id!=="loading");}
+function hideStates(){document.getElementById("loading").classList.add("hidden");}
+function demobadge(on){document.getElementById("demobadge").classList.toggle("hidden",!on);}
+let toastT;function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");
+  clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1800);}
+
+loadFeeds();
+</script>
+
+<script>
+/* ---------- PWA : rendre l'app installable (fichier unique) ---------- */
+(function setupPWA(){
+  const svgIcon = size => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="112" fill="#0a0a0f"/>
+    <path d="M256 96 L400 256 L256 416 L112 256 Z" fill="#ff3b6b"/>
+    <circle cx="256" cy="256" r="46" fill="#4ad9ff"/></svg>`;
+  const iconUrl = size => "data:image/svg+xml;base64," + btoa(svgIcon(size));
+
+  const manifest = {
+    name:"Flux — actus en swipe", short_name:"Flux",
+    description:"Tes actualités RSS en mode swipe.",
+    start_url:".", scope:".", display:"standalone",
+    background_color:"#0a0a0f", theme_color:"#0a0a0f", orientation:"portrait",
+    icons:[
+      {src:iconUrl(192),sizes:"192x192",type:"image/svg+xml",purpose:"any maskable"},
+      {src:iconUrl(512),sizes:"512x512",type:"image/svg+xml",purpose:"any maskable"}
+    ]
+  };
+  const mBlob=new Blob([JSON.stringify(manifest)],{type:"application/manifest+json"});
+  const link=document.createElement("link");
+  link.rel="manifest";link.href=URL.createObjectURL(mBlob);
+  document.head.appendChild(link);
+
+  const theme=document.createElement("meta");theme.name="theme-color";theme.content="#0a0a0f";document.head.appendChild(theme);
+  const applecap=document.createElement("meta");applecap.name="apple-mobile-web-app-capable";applecap.content="yes";document.head.appendChild(applecap);
+  const appleIcon=document.createElement("link");appleIcon.rel="apple-touch-icon";appleIcon.href=iconUrl(192);document.head.appendChild(appleIcon);
+
+  if("serviceWorker" in navigator){
+    const swCode=`
+      const CACHE="flux-v1";
+      self.addEventListener("install",e=>self.skipWaiting());
+      self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
+      self.addEventListener("fetch",e=>{
+        if(e.request.method!=="GET")return;
+        e.respondWith(caches.open(CACHE).then(c=>
+          fetch(e.request).then(r=>{c.put(e.request,r.clone());return r;}).catch(()=>c.match(e.request))));
+      });`;
+    const swUrl=URL.createObjectURL(new Blob([swCode],{type:"text/javascript"}));
+    navigator.serviceWorker.register(swUrl).catch(()=>{});
+  }
+
+  let deferred=null;
+  const btn=document.getElementById("installBtn");
+  window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;btn.classList.remove("hidden");});
+  btn.onclick=async()=>{
+    if(!deferred){showIosHint();return;}
+    deferred.prompt();await deferred.userChoice;deferred=null;btn.classList.add("hidden");
+  };
+  window.addEventListener("appinstalled",()=>btn.classList.add("hidden"));
+
+  const isIos=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const standalone=window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone;
+  if(isIos && !standalone){btn.classList.remove("hidden");}
+  function showIosHint(){
+    if(isIos)toast("Appuie sur Partager puis « Sur l'écran d'accueil »");
+    else toast("Installation non disponible sur ce navigateur");
+  }
+})();
+</script>
+
+</body>
+</html>
