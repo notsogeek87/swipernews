@@ -6,6 +6,10 @@
 <title>SwiperNews — apprendre & actus en swipe</title>
 <link rel="icon" href="logo-192.png">
 <link rel="apple-touch-icon" href="logo-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0a0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap');
   :root{
@@ -214,12 +218,12 @@
   <h3 id="emptyTitle">Aucun article</h3>
   <p id="emptyMsg"></p>
   <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:340px">
-    <button class="iobtn" onclick="loadFeeds()">↻ Réessayer</button>
-    <button class="iobtn" onclick="document.getElementById('openSheet').click()">Ouvrir les sources</button>
+    <button class="iobtn" id="emptyRetry">↻ Réessayer</button>
+    <button class="iobtn" id="emptyOpen">Ouvrir les sources</button>
   </div>
 </div>
 
-<div class="sheet" id="sheet">
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Tes sources">
   <div class="sheet__panel">
     <div class="sheet__grip"></div>
     <h2>Tes sources</h2>
@@ -227,21 +231,21 @@
     <div id="feedList"></div>
     <div class="addbox">
       <input id="newUrl" type="url" placeholder="https://exemple.com/rss" inputmode="url">
-      <button onclick="addFeed()">Ajouter</button>
+      <button id="addFeedBtn">Ajouter</button>
     </div>
 
     <div class="iorow">
-      <button class="iobtn" onclick="exportFeeds('opml')">↓ Exporter (OPML)</button>
-      <button class="iobtn" onclick="exportFeeds('json')">↓ Exporter (JSON)</button>
-      <button class="iobtn" onclick="document.getElementById('importFile').click()">↑ Importer un fichier</button>
+      <button class="iobtn" id="exportOpml">↓ Exporter (OPML)</button>
+      <button class="iobtn" id="exportJson">↓ Exporter (JSON)</button>
+      <button class="iobtn" id="importBtn">↑ Importer un fichier</button>
     </div>
-    <input id="importFile" type="file" accept=".opml,.xml,.json,application/json,text/xml" style="display:none" onchange="importFromFile(event)">
+    <input id="importFile" type="file" accept=".opml,.xml,.json,application/json,text/xml" style="display:none">
 
-    <button class="applybtn" onclick="applyAndClose()">Voir mon fil</button>
+    <button class="applybtn" id="applyFeeds">Voir mon fil</button>
   </div>
 </div>
 
-<div class="sheet" id="intSheet">
+<div class="sheet" id="intSheet" role="dialog" aria-modal="true" aria-label="Tes centres d'intérêt">
   <div class="sheet__panel">
     <div class="sheet__grip"></div>
     <p class="intro hidden" id="introWelcome">✨ Le swipe qui rend plus malin. Même geste que sur tes réseaux, sauf qu'ici chaque carte t'apprend un truc que tu ne connaissais pas. Choisis ce qui t'allume la curiosité 👇</p>
@@ -251,7 +255,7 @@
     <h2 style="margin-top:24px">Sources</h2>
     <p class="sub">D'où viennent les cartes en mode Apprendre.</p>
     <div class="intgrid" id="srcGrid"></div>
-    <button class="applybtn" onclick="saveInterests()">Valider</button>
+    <button class="applybtn" id="saveInterestsBtn">Valider</button>
   </div>
 </div>
 
@@ -268,6 +272,28 @@
 <div class="toast" id="toast"></div>
 
 <script>
+/**
+ * Forme normalisée d'une carte, commune à toutes les sources (RSS, Wikipédia, GBIF, Gallica).
+ * @typedef {Object} Item
+ * @property {string} source  Nom de la source affiché
+ * @property {string} title   Titre
+ * @property {string} desc    Résumé/extrait en texte brut
+ * @property {string} link    URL de l'article (http/https)
+ * @property {string} img     URL d'image (http/https/data:image) ou ""
+ * @property {string} date    Date de publication brute ou ""
+ */
+
+/* ---------- Configuration centralisée (valeurs auparavant en dur un peu partout) ---------- */
+const CONFIG = {
+  FETCH_TIMEOUT: 7000,   // délai d'expiration réseau (ms)
+  BATCH_SIZE: 20,        // articles par lot (mode Apprendre)
+  MAX_NEWS: 120,         // articles conservés en mode Actus
+  MAX_CARDS: 60,         // cartes gardées dans le DOM (borne le fil infini)
+  MAX_ITEMS: 300,        // items gardés en mémoire (dédoublonnage du scroll)
+  CACHE_ITEMS: 40,       // articles mis en cache localStorage par catégorie
+  APP_URL: "http://news.lielu.eu", // lien promo inclus au partage
+};
+
 /* ---------- Articles Wikipédia de démo (repli hors-ligne du mode Apprendre) ---------- */
 const DEMO_LEARN = [
   {source:"Wikipédia", title:"Effet tunnel", desc:"En mécanique quantique, l'effet tunnel désigne la capacité d'une particule à franchir une barrière de potentiel qu'elle ne pourrait pas surmonter selon les lois de la physique classique. Ce comportement découle de la nature ondulatoire de la matière : la fonction d'onde de la particule ne s'annule pas brutalement à la barrière, mais décroît, laissant une probabilité non nulle de la retrouver de l'autre côté. Le phénomène est essentiel à la fusion nucléaire au cœur du Soleil, où il permet aux protons de se rapprocher malgré leur répulsion. Il est aussi exploité par le microscope à effet tunnel, capable d'imager des surfaces atome par atome, et par certains composants électroniques comme la diode tunnel.", date:"", img:"https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Effet_tunnel"},
@@ -507,9 +533,8 @@ function catKeysForBatch(){
   if(interests.length)return shuffle(interests.slice()).slice(0,3);
   return ["random"];
 }
-/* Un lot mélangé, tiré des sources choisies × catégories retenues */
-async function fetchLearn(count=20){
-  const keys=catKeysForBatch();
+/* Agrégation côté client (repli si le backend /api/learn n'est pas disponible). */
+async function fetchLearnClient(keys,count){
   const tasks=[];
   keys.forEach(catKey=>{
     LEARN_SOURCES.filter(s=>sources.includes(s.key)&&(s.cats==="*"||s.cats.includes(catKey)))
@@ -525,12 +550,25 @@ async function fetchLearn(count=20){
   const withImg=shuffle(out.filter(i=>i.img)),noImg=shuffle(out.filter(i=>!i.img));
   return withImg.concat(noImg).slice(0,count);          // articles avec image d'abord, sources mélangées
 }
+/* Un lot mélangé : backend agrégateur d'abord (cache CDN mutualisé), sinon client. */
+async function fetchLearn(count=CONFIG.BATCH_SIZE){
+  const keys=catKeysForBatch();
+  try{
+    const qs=new URLSearchParams({cats:keys.join(","),sources:sources.join(","),count:String(count)});
+    const res=await fetchWithTimeout("/api/learn?"+qs,{cache:"no-store"},CONFIG.FETCH_TIMEOUT);
+    if(res.ok){
+      const data=await res.json();
+      if(data&&Array.isArray(data.items)&&data.items.length)return data.items.slice(0,count);
+    }
+  }catch(e){warn("learn backend",e);/* repli client */}
+  return fetchLearnClient(keys,count);
+}
 
 /* ---------- Cache local : affichage instantané au lancement ---------- */
 const LS_CACHE="fluxswipe.cache.v1";
 function cacheSave(m){try{if(!items||items.length<3)return; // on ne met pas en cache un lot trop maigre
   const all=JSON.parse(localStorage.getItem(LS_CACHE)||"{}");
-  all[m]={t:Date.now(),items:items.slice(0,40)};localStorage.setItem(LS_CACHE,JSON.stringify(all));}catch(e){}}
+  all[m]={t:Date.now(),items:items.slice(0,CONFIG.CACHE_ITEMS)};localStorage.setItem(LS_CACHE,JSON.stringify(all));}catch(e){warn("cache save",e);}}
 function cacheLoad(m){try{const e=(JSON.parse(localStorage.getItem(LS_CACHE)||"{}"))[m];
   if(e&&Array.isArray(e.items)&&e.items.length>=3)return e.items;}catch(e){}return null;} // ignore un cache minuscule
 
@@ -573,7 +611,7 @@ async function loadFeeds(){
     });
     if(!all.length)throw new Error("no-items");
     all.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
-    items=all.slice(0,120);
+    items=all.slice(0,CONFIG.MAX_NEWS);
     render(cached&&feedEl.scrollTop>50);hideStates();cacheSave(key);
     if(failed.length)toast(`${failed.length} flux injoignable${failed.length>1?"s":""}`);
   }catch(e){
@@ -591,8 +629,7 @@ let loadingMore=false;
 // tableau, ce qui permet de retirer d'anciennes cartes du DOM sans tout casser.
 const cardReg=new Map();
 let cardSeq=0;
-const MAX_CARDS=60;   // borne le DOM en fil infini (évite fuite mémoire / lag sur longue session)
-const MAX_ITEMS=300;  // borne l'historique en mémoire (dédoublonnage du scroll infini)
+const {MAX_CARDS,MAX_ITEMS}=CONFIG;   // bornes du fil infini (DOM + mémoire)
 function renderCard(it){const id=cardSeq++;cardReg.set(id,it);return cardHTML(it,id);}
 function render(keepScroll){
   cardReg.clear();cardSeq=0;
@@ -665,7 +702,7 @@ feedEl.addEventListener("click",e=>{
 });
 
 /* Chaque partage inclut l'article ET un lien promo vers l'app */
-const APP_URL="http://news.lielu.eu";
+const APP_URL=CONFIG.APP_URL;
 const APP_TAG=`📲 Lu sur SwiperNews — l'actu & la culture en swipe : ${APP_URL}`;
 function shareParts(it){
   const link=it.link&&it.link!=="#"?it.link:"";
@@ -696,6 +733,9 @@ function openShareMenu(it){
   ];
   const back=document.createElement("div");
   back.className="sharemenu";
+  back.setAttribute("role","dialog");
+  back.setAttribute("aria-modal","true");
+  back.setAttribute("aria-label","Partager");
   back.innerHTML=`<div class="sharemenu__panel">
     <div class="sheet__grip"></div>
     <h2>Partager</h2>
@@ -739,11 +779,40 @@ document.addEventListener("keydown",e=>{const h=feedEl.clientHeight;
   if(e.key==="ArrowDown"||e.key===" ")feedEl.scrollBy({top:h,behavior:"smooth"});
   if(e.key==="ArrowUp")feedEl.scrollBy({top:-h,behavior:"smooth"});});
 
-/* ---------- Sheet ---------- */
+/* ---------- Sheet (panneau Sources) ---------- */
 const sheet=document.getElementById("sheet");
-document.getElementById("openSheet").onclick=()=>{renderList();sheet.classList.add("open");};
+// Donne le focus au premier élément interactif du panneau (accessibilité clavier)
+function focusDialog(el){const f=el.querySelector(".sheet__panel button, .sheet__panel input");if(f){try{f.focus();}catch(_){}}}
+document.getElementById("openSheet").onclick=()=>{renderList();sheet.classList.add("open");focusDialog(sheet);};
 document.getElementById("reloadBtn").onclick=()=>loadFeeds();
 sheet.onclick=e=>{if(e.target===sheet)sheet.classList.remove("open");};
+// Boutons du panneau Sources (remplacent les anciens onclick inline → CSP possible)
+document.getElementById("addFeedBtn").onclick=addFeed;
+document.getElementById("exportOpml").onclick=()=>exportFeeds("opml");
+document.getElementById("exportJson").onclick=()=>exportFeeds("json");
+document.getElementById("importBtn").onclick=()=>document.getElementById("importFile").click();
+document.getElementById("importFile").onchange=importFromFile;
+document.getElementById("applyFeeds").onclick=applyAndClose;
+// État vide
+document.getElementById("emptyRetry").onclick=()=>loadFeeds();
+document.getElementById("emptyOpen").onclick=()=>document.getElementById("openSheet").click();
+// Délégation des lignes de flux générées (case à cocher + suppression)
+document.getElementById("feedList").addEventListener("click",e=>{
+  const del=e.target.closest("[data-del]");
+  if(del){delFeed(+del.dataset.del);}
+});
+document.getElementById("feedList").addEventListener("change",e=>{
+  const cb=e.target.closest("[data-toggle]");
+  if(cb){toggleFeed(+cb.dataset.toggle);}
+});
+// Fermeture au clavier (Échap) pour tous les panneaux ouverts
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Escape")return;
+  const s=document.querySelector(".sheet.open");
+  if(s){s.classList.remove("open");return;}
+  const menu=document.querySelector(".sharemenu.open");
+  if(menu){menu.classList.remove("open");setTimeout(()=>menu.remove(),200);}
+});
 
 /* ---------- Sélecteur de mode (onglets Actus / Apprendre) ---------- */
 const tabNews=document.getElementById("tabNews"),tabLearn=document.getElementById("tabLearn");
@@ -804,7 +873,7 @@ function openInterests(){
   pendingSrc=new Set(sources);
   renderIntGrid();renderSrcGrid();
   document.getElementById("introWelcome").classList.toggle("hidden",interestsChosen()); // intro visible seulement la 1ère fois
-  intSheet.classList.add("open");
+  intSheet.classList.add("open");focusDialog(intSheet);
 }
 function renderIntGrid(){
   const grid=document.getElementById("intGrid");
@@ -839,12 +908,13 @@ function saveInterests(){
   if(mode==="learn")loadFeeds();
 }
 intSheet.onclick=e=>{if(e.target===intSheet)intSheet.classList.remove("open");};
+document.getElementById("saveInterestsBtn").onclick=saveInterests;
 renderCats();
 if(mode==="learn"&&!interestsChosen())openInterests();  // 1er lancement direct en mode Apprendre
 function renderList(){document.getElementById("feedList").innerHTML=feeds.map((f,i)=>`
-  <div class="feedrow"><input type="checkbox" ${f.on?"checked":""} onchange="toggleFeed(${i})">
+  <div class="feedrow"><input type="checkbox" ${f.on?"checked":""} data-toggle="${i}">
     <div><div class="name">${esc(f.name)}</div><div class="url">${esc(f.url)}</div></div>
-    <button class="del" onclick="delFeed(${i})">✕</button></div>`).join("");}
+    <button class="del" data-del="${i}" aria-label="Supprimer ${escAttr(f.name)}">✕</button></div>`).join("");}
 function toggleFeed(i){feeds[i].on=!feeds[i].on;save();}
 function delFeed(i){feeds.splice(i,1);save();renderList();}
 function addFeed(){const inp=document.getElementById("newUrl");const url=inp.value.trim();
@@ -944,56 +1014,14 @@ loadFeeds();
 </script>
 
 <script>
-/* ---------- PWA : rendre l'app installable (fichier unique) ---------- */
+/* ---------- PWA : rendre l'app installable ---------- */
+// Le manifeste (manifest.webmanifest) et le service worker (sw.js) sont désormais
+// de vrais fichiers servis en statique : meilleur audit (Lighthouse), débogage
+// possible, et cache navigateur correct du SW. (Requiert un service HTTP ; en
+// file:// l'enregistrement échoue silencieusement, comme avant.)
 (function setupPWA(){
-  const icon192=new URL("logo-192.png",location.href).href;
-  const icon512=new URL("logo-512.png",location.href).href;
-
-  const manifest = {
-    name:"SwiperNews — apprendre & actus en swipe", short_name:"SwiperNews",
-    description:"Apprends et suis l'actu en swipe.",
-    start_url:".", scope:".", display:"standalone",
-    background_color:"#0a0a0f", theme_color:"#0a0a0f", orientation:"portrait",
-    icons:[
-      {src:icon192,sizes:"192x192",type:"image/png",purpose:"any"},
-      {src:icon512,sizes:"512x512",type:"image/png",purpose:"any"}
-    ]
-  };
-  const mBlob=new Blob([JSON.stringify(manifest)],{type:"application/manifest+json"});
-  const link=document.createElement("link");
-  link.rel="manifest";link.href=URL.createObjectURL(mBlob);
-  document.head.appendChild(link);
-
-  const theme=document.createElement("meta");theme.name="theme-color";theme.content="#0a0a0f";document.head.appendChild(theme);
-  const applecap=document.createElement("meta");applecap.name="apple-mobile-web-app-capable";applecap.content="yes";document.head.appendChild(applecap);
-
   if("serviceWorker" in navigator){
-    const swCode=`
-      const CACHE="flux-v2";
-      self.addEventListener("install",e=>self.skipWaiting());
-      // Purge les anciens caches versionnés pour ne pas gonfler le stockage indéfiniment
-      self.addEventListener("activate",e=>e.waitUntil((async()=>{
-        const keys=await caches.keys();
-        await Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)));
-        await self.clients.claim();
-      })()));
-      self.addEventListener("fetch",e=>{
-        const req=e.request;
-        if(req.method!=="GET")return;
-        const url=new URL(req.url);
-        // On ne met en cache que l'app-shell same-origin (network-first + repli hors-ligne).
-        // Les données/images tierces passent en direct → pas de cache non borné.
-        if(url.origin!==self.location.origin)return;
-        e.respondWith(
-          fetch(req).then(r=>{
-            const copy=r.clone();
-            caches.open(CACHE).then(c=>c.put(req,copy)).catch(()=>{});
-            return r;
-          }).catch(()=>caches.open(CACHE).then(c=>c.match(req)))
-        );
-      });`;
-    const swUrl=URL.createObjectURL(new Blob([swCode],{type:"text/javascript"}));
-    navigator.serviceWorker.register(swUrl).catch(()=>{});
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
   }
 
   const isIos=/iphone|ipad|ipod/i.test(navigator.userAgent);

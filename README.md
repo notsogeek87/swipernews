@@ -113,6 +113,16 @@ La CI GitHub Actions (`.github/workflows/ci.yml`) rejoue lint + format + tests s
 - Le service worker ne met en cache que l'app-shell same-origin et purge ses
   anciennes versions (pas de cache non borné).
 
+## Architecture
+
+- **Mode Actus** : `api/feed.js` (proxy RSS durci) ou, en repli, proxys CORS publics.
+- **Mode Apprendre** : `api/learn.js` agrège **côté serveur** Wikipédia + GBIF + Gallica
+  (cache CDN mutualisé entre utilisateurs). Le front l'appelle en priorité et se rabat
+  sur son agrégation client si l'endpoint n'est pas déployé (hébergement statique).
+- **PWA** : `manifest.webmanifest` et `sw.js` sont de vrais fichiers servis en statique.
+- **Accessibilité** : panneaux en `role="dialog"` fermables au clavier (Échap), gestion
+  du focus ; titres de carte en `h2`.
+
 ## Limites connues
 
 - La récupération RSS dépend de services tiers gratuits (rss2json / proxys publics), qui
