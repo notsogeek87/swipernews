@@ -155,6 +155,23 @@
     background:#1a1a22;border:1px solid rgba(255,255,255,.12);color:var(--ink);font-family:var(--sans);
     font-weight:600;font-size:14px;padding:16px 12px;border-radius:14px;cursor:pointer}
   .sharedest:active{transform:scale(.97)}
+
+  /* Bannière d'incitation à installer la PWA */
+  .installbar{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:66;
+    display:flex;align-items:center;gap:12px;padding:12px;border-radius:18px;
+    background:rgba(18,18,26,.94);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(16px);
+    box-shadow:0 14px 44px rgba(0,0,0,.55);
+    transform:translateY(160%);opacity:0;transition:transform .38s cubic-bezier(.2,.8,.2,1),opacity .38s}
+  .installbar.show{transform:translateY(0);opacity:1}
+  .installbar__icon{width:42px;height:42px;flex:0 0 auto;border-radius:12px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;font-size:20px}
+  .installbar__txt{display:flex;flex-direction:column;line-height:1.25;min-width:0;flex:1}
+  .installbar__txt b{font-size:14px}
+  .installbar__txt span{font-size:12px;color:var(--muted)}
+  .installbar__btn{flex:0 0 auto;background:#f5f3ef;color:#0a0a0f;border:none;font-family:var(--sans);
+    font-weight:700;font-size:13px;padding:11px 16px;border-radius:100px;cursor:pointer}
+  .installbar__btn:active{transform:scale(.96)}
+  .installbar__close{flex:0 0 auto;background:transparent;border:none;color:var(--muted);font-size:17px;cursor:pointer;padding:4px 6px}
 </style>
 </head>
 <body>
@@ -227,6 +244,16 @@
     <div class="intgrid" id="intGrid"></div>
     <button class="applybtn" onclick="saveInterests()">Valider</button>
   </div>
+</div>
+
+<div class="installbar hidden" id="installBar">
+  <div class="installbar__icon">◆</div>
+  <div class="installbar__txt">
+    <b>Installe SwiperNews</b>
+    <span class="installbar__sub">Plein écran, hors-ligne, lancement en un tap.</span>
+  </div>
+  <button class="installbar__btn" id="installBarBtn">Installer</button>
+  <button class="installbar__close" id="installBarClose" aria-label="Fermer">✕</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -802,22 +829,50 @@ loadFeeds();
     navigator.serviceWorker.register(swUrl).catch(()=>{});
   }
 
+  const isIos=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const standalone=window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone;
+
   let deferred=null;
   const btn=document.getElementById("installBtn");
-  window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;btn.classList.remove("hidden");});
+  window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;btn.classList.remove("hidden");setTimeout(maybeShowBar,5000);});
   btn.onclick=async()=>{
     if(!deferred){showIosHint();return;}
     deferred.prompt();await deferred.userChoice;deferred=null;btn.classList.add("hidden");
   };
-  window.addEventListener("appinstalled",()=>btn.classList.add("hidden"));
+  window.addEventListener("appinstalled",()=>{btn.classList.add("hidden");closeBar(true);});
 
-  const isIos=/iphone|ipad|ipod/i.test(navigator.userAgent);
-  const standalone=window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone;
   if(isIos && !standalone){btn.classList.remove("hidden");}
   function showIosHint(){
     if(isIos)toast("Appuie sur Partager puis « Sur l'écran d'accueil »");
     else toast("Installation non disponible sur ce navigateur");
   }
+
+  /* ---- Bannière d'incitation à installer ---- */
+  const DISMISS_KEY="fluxswipe.pwa.dismiss.v1";
+  const bar=document.getElementById("installBar");
+  let barShown=false;
+  function dismissedRecently(){try{return Date.now()-(+localStorage.getItem(DISMISS_KEY)||0)<7*864e5;}catch(e){return false;}}
+  function closeBar(remember){
+    if(remember){try{localStorage.setItem(DISMISS_KEY,Date.now());}catch(e){}}
+    bar.classList.remove("show");setTimeout(()=>bar.classList.add("hidden"),300);
+  }
+  function maybeShowBar(){
+    if(barShown||standalone||dismissedRecently())return;
+    const canPrompt=!!deferred, ios=isIos&&!standalone;
+    if(!canPrompt&&!ios)return;                        // rien à proposer sur ce navigateur
+    const sub=bar.querySelector(".installbar__sub"), b=document.getElementById("installBarBtn");
+    if(canPrompt){sub.textContent="Plein écran, hors-ligne, lancement en un tap.";b.textContent="Installer";}
+    else{sub.textContent="Appuie sur Partager, puis « Sur l'écran d'accueil ».";b.textContent="Compris";}
+    barShown=true;
+    bar.classList.remove("hidden");requestAnimationFrame(()=>bar.classList.add("show"));
+  }
+  document.getElementById("installBarClose").onclick=()=>closeBar(true);
+  document.getElementById("installBarBtn").onclick=async()=>{
+    if(deferred){deferred.prompt();try{await deferred.userChoice;}catch(e){}deferred=null;closeBar(true);}
+    else closeBar(true);                               // iOS : les étapes sont dans le texte
+  };
+  // iOS n'émet pas beforeinstallprompt : on programme quand même la bannière
+  if(isIos && !standalone)setTimeout(maybeShowBar,5000);
 })();
 </script>
 
