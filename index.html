@@ -752,6 +752,7 @@ function saveInterests(){
   cat="all";try{localStorage.setItem(LS_CAT,cat);}catch(e){}
   intSheet.classList.remove("open");
   renderCats();
+  try{window.dispatchEvent(new Event("interests-validated"));}catch(e){} // autorise la bannière d'install
   if(mode==="learn")loadFeeds();
 }
 intSheet.onclick=e=>{if(e.target===intSheet)intSheet.classList.remove("open");};
@@ -911,12 +912,18 @@ loadFeeds();
   let deferred=null;
   window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;setTimeout(maybeShowBar,5000);});
   window.addEventListener("appinstalled",()=>{pwaSet({installed:true});hideBar();});
+  // ne proposer l'installation qu'une fois les centres d'intérêt validés
+  window.addEventListener("interests-validated",()=>setTimeout(maybeShowBar,800));
 
   /* ---- Bannière d'incitation à installer ---- */
   const bar=document.getElementById("installBar");
   let barShown=false;
   function canShowBar(){
     if(standalone)return false;
+    // pas tant qu'un panneau (intérêts/sources) est ouvert, ni avant validation des intérêts
+    if(typeof interestsChosen==="function"&&!interestsChosen())return false;
+    const s1=document.getElementById("intSheet"), s2=document.getElementById("sheet");
+    if((s1&&s1.classList.contains("open"))||(s2&&s2.classList.contains("open")))return false;
     const s=pwaState();
     if(s.installed||s.declined)return false;           // déjà installée, ou refus explicite
     if((s.dismissCount||0)>=2)return false;            // fermée 2 fois → il ne veut clairement pas
