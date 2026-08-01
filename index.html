@@ -297,7 +297,7 @@ async function fetchWikiBatch(){
     action:"query",format:"json",origin:"*",
     generator:"random",grnnamespace:"0",grnlimit:"20",
     prop:"extracts|pageimages|info",
-    explaintext:"1",exsentences:"10",exlimit:"20",       // exlimit=20 : un extrait pour CHAQUE article (défaut = 1 !)
+    explaintext:"1",exintro:"1",exlimit:"20",            // exintro (pas exsentences, incompatible avec exlimit>1) + exlimit=20 : un extrait pour CHAQUE article
     piprop:"thumbnail|original",pithumbsize:"1200",pilimit:"20",inprop:"url"
   });
   const url=`https://${WIKI_LANG}.wikipedia.org/w/api.php?${params}`;
