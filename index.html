@@ -221,6 +221,7 @@ function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(feeds));}catch(e)
 
 /* ---------- Récupération avec plusieurs proxys de secours ---------- */
 const PROXIES=[
+  u=>"/api/feed?url="+encodeURIComponent(u),                       // backend same-origin (Vercel) : fiable, aucun CORS
   u=>"https://api.allorigins.win/raw?url="+encodeURIComponent(u),
   u=>"https://corsproxy.io/?url="+encodeURIComponent(u),
   u=>"https://api.codetabs.com/v1/proxy/?quest="+encodeURIComponent(u),
@@ -260,10 +261,10 @@ async function fetchFeedRss2Json(feed){
     date:it.pubDate||""
   })).filter(i=>i.title);
 }
-/* Récupération robuste d'un flux : rss2json d'abord, puis repli proxys + parsing XML */
+/* Récupération robuste d'un flux : backend/proxys + XML d'abord, puis repli rss2json */
 async function fetchFeedRobust(feed){
-  try{const a=await fetchFeedRss2Json(feed);if(a.length)return a;}catch(e){/* repli XML */}
-  return await fetchFeed(feed);
+  try{const a=await fetchFeed(feed);if(a.length)return a;}catch(e){/* repli rss2json */}
+  return await fetchFeedRss2Json(feed);
 }
 async function fetchFeed(feed){
   const text=await fetchText(feed.url);
@@ -296,8 +297,8 @@ async function fetchWikiBatch(){
     action:"query",format:"json",origin:"*",
     generator:"random",grnnamespace:"0",grnlimit:"20",
     prop:"extracts|pageimages|info",
-    explaintext:"1",exsentences:"10",                    // jusqu'à 10 phrases par article
-    piprop:"thumbnail|original",pithumbsize:"1200",inprop:"url"
+    explaintext:"1",exsentences:"10",exlimit:"20",       // exlimit=20 : un extrait pour CHAQUE article (défaut = 1 !)
+    piprop:"thumbnail|original",pithumbsize:"1200",pilimit:"20",inprop:"url"
   });
   const url=`https://${WIKI_LANG}.wikipedia.org/w/api.php?${params}`;
   let data;

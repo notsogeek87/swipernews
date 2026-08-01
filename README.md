@@ -41,20 +41,25 @@ python3 -m http.server 8000
 
 ## Mise en ligne
 
-N'importe quel hébergement statique convient (le fichier est autonome) :
-
-- **GitHub Pages** : Settings → Pages → Branch `main` / dossier `/root`
-- **Netlify / Vercel** : glisser-déposer le dossier, ou connecter le dépôt
+- **Vercel (recommandé)** : connecter le dépôt (ou `vercel` en CLI). Vercel sert
+  `index.html` en statique **et** déploie automatiquement la fonction `api/feed.js`,
+  qui récupère les flux RSS côté serveur — c'est le chemin le plus fiable, sans aucun
+  proxy tiers.
+- **GitHub Pages / autre hébergement statique** : fonctionne aussi, mais sans backend :
+  l'app se rabat alors sur les proxys publics (moins fiables). Settings → Pages →
+  Branch `main`.
 
 ## Récupération des flux (mode actus)
 
 Un navigateur ne peut pas lire un flux RSS directement (CORS). Pour chaque source, l'app
 essaie donc, dans l'ordre :
 
-1. **rss2json** (`api.rss2json.com`) — un service dédié qui parse le flux côté serveur et
-   renvoie du JSON avec en-têtes CORS ; c'est le chemin le plus fiable ;
-2. en repli, une liste de **proxys CORS publics** (allorigins, corsproxy.io, codetabs,
-   thingproxy) suivie d'un parsing XML dans le navigateur.
+1. **Backend same-origin** `api/feed.js` (`/api/feed?url=…`) — présent si l'app est
+   déployée sur Vercel (ou tout hébergeur avec fonctions). Aucun CORS, aucun tiers :
+   c'est le plus fiable ;
+2. une liste de **proxys CORS publics** (allorigins, corsproxy.io, codetabs, thingproxy)
+   avec parsing XML dans le navigateur ;
+3. **rss2json** (`api.rss2json.com`) en dernier repli.
 
 Si toutes les sources échouent, l'app **n'affiche plus de contenu de démo** : elle montre
 un message d'erreur avec les boutons *Réessayer* et *Ouvrir les sources*. Pour une fiabilité
