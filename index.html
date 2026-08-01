@@ -367,11 +367,28 @@ async function loadFeeds(){
 
 /* ---------- Rendu ---------- */
 const feedEl=document.getElementById("feed");
+let loadingMore=false;
 function render(){
   feedEl.innerHTML=items.map((it,i)=>cardHTML(it,i)).join("");
   feedEl.scrollTop=0;
   document.getElementById("hint").classList.toggle("hidden",items.length===0);
   attachRail();updateProgress();
+}
+/* Ajoute des cartes à la suite sans réinitialiser le scroll (mode Apprendre infini) */
+function appendCards(newItems,start){
+  feedEl.insertAdjacentHTML("beforeend",newItems.map((it,k)=>cardHTML(it,start+k)).join(""));
+  attachRail();updateProgress();
+}
+async function loadMoreLearn(){
+  if(loadingMore||mode!=="learn")return;
+  loadingMore=true;
+  try{
+    const more=await fetchWikipedia(20);
+    const have=new Set(items.map(i=>i.title));
+    const fresh=more.filter(m=>!have.has(m.title));
+    if(fresh.length){const start=items.length;items=items.concat(fresh);appendCards(fresh,start);}
+  }catch(e){/* on réessaiera au prochain scroll */}
+  finally{loadingMore=false;}
 }
 function cardHTML(it,i){
   const bg=it.img?`<div class="card__bg" style="background-image:url('${escAttr(it.img)}')"></div>`:`<div class="card__noimg"></div>`;
@@ -446,7 +463,13 @@ function openShareMenu(it,url){
 }
 
 const pbar=document.getElementById("pbar");
-feedEl.addEventListener("scroll",()=>{updateProgress();if(feedEl.scrollTop>50)document.getElementById("hint").classList.add("hidden");});
+feedEl.addEventListener("scroll",()=>{
+  updateProgress();
+  if(feedEl.scrollTop>50)document.getElementById("hint").classList.add("hidden");
+  // Mode Apprendre : charge un nouveau lot avant d'atteindre le bas → fil sans fin
+  if(mode==="learn"&&!loadingMore&&items.length&&
+     feedEl.scrollTop+feedEl.clientHeight*3>=feedEl.scrollHeight)loadMoreLearn();
+});
 function updateProgress(){const max=feedEl.scrollHeight-feedEl.clientHeight;pbar.style.height=(max>0?feedEl.scrollTop/max*100:0)+"%";}
 document.addEventListener("keydown",e=>{const h=feedEl.clientHeight;
   if(e.key==="ArrowDown"||e.key===" ")feedEl.scrollBy({top:h,behavior:"smooth"});
