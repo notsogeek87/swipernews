@@ -29,10 +29,20 @@ catégorie utilise le moteur de recherche de Wikipédia (`generator=search`,
 `gsrsort=random`, `deepcategory:"…"`) pour tirer des articles au hasard dans la catégorie
 et ses sous-catégories. Le choix est mémorisé et chaque catégorie a son propre cache.
 
-Les articles viennent de l'API REST de Wikimedia
-(`/api/rest_v1/page/random/summary`), qui autorise le CORS : aucun proxy n'est
-nécessaire côté navigateur. Un repli démo s'affiche si l'API n'est pas joignable.
-La langue par défaut est le français (`WIKI_LANG="fr"` dans `index.html`).
+### Sources du mode Apprendre
+
+Le fil mélange plusieurs sources, et la **catégorie choisie s'applique à toutes** :
+
+- **Wikipédia** (API `action`, `generator=search`/`random`, extrait d'intro + image) — toutes catégories.
+- **GBIF / INPN** (`api.gbif.org`, occurrences avec photo) — biodiversité, catégories *Nature* / *Sciences*.
+- **Gallica – BnF** (API SRU, documents patrimoniaux numérisés + image IIIF) — toutes catégories.
+
+Chaque source est interrogée en parallèle ; les résultats sont dédoublonnés et mélangés
+(les cartes avec image d'abord). Les sources qui échouent ne contribuent simplement rien —
+le fil reste alimenté par les autres. Gallica passe par les proxys (SRU non-CORS) ;
+Wikipédia et GBIF autorisent le CORS. La langue par défaut est le français.
+
+*(Paris Musées nécessite une clé API — à ajouter ultérieurement.)*
 
 ## Lancer en local
 
