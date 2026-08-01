@@ -8,12 +8,12 @@ Un seul fichier, aucune dépendance, aucun build.
 - Navigation par swipe vertical plein écran (flèches ↑↓ / espace au clavier aussi)
 - Titre, résumé, image, source et date tirés directement des flux RSS
 - Gestion des sources : ajout, suppression, activation/désactivation
-- Import / export des sources aux formats **OPML** (standard) et **JSON**
+- Import / export des sources aux formats **OPML** (standard) et **JSON** — importe tes sources et lis-les directement
 - Partage d'un article (feuille de partage native, ou menu WhatsApp / Telegram / mail / X / copie du lien)
 - Favoris et bouton de partage sur chaque carte
 - **Mode Apprendre** 🎓 : bascule le fil vers des articles Wikipédia aléatoires pour swiper en apprenant (bouton dans la barre du haut). Le bouton **↻** sert une nouvelle fournée de savoir à chaque appui, et le mode est mémorisé entre les sessions.
 - Installable comme application (PWA) avec fonctionnement hors-ligne
-- Mode démo automatique si les flux ne sont pas joignables
+- En mode actus, si un flux est injoignable, un message clair invite à réessayer ou à revoir ses sources (plus de faux contenu de démo)
 
 ## Mode Apprendre
 
@@ -46,11 +46,25 @@ N'importe quel hébergement statique convient (le fichier est autonome) :
 - **GitHub Pages** : Settings → Pages → Branch `main` / dossier `/root`
 - **Netlify / Vercel** : glisser-déposer le dossier, ou connecter le dépôt
 
+## Récupération des flux (mode actus)
+
+Un navigateur ne peut pas lire un flux RSS directement (CORS). Pour chaque source, l'app
+essaie donc, dans l'ordre :
+
+1. **rss2json** (`api.rss2json.com`) — un service dédié qui parse le flux côté serveur et
+   renvoie du JSON avec en-têtes CORS ; c'est le chemin le plus fiable ;
+2. en repli, une liste de **proxys CORS publics** (allorigins, corsproxy.io, codetabs,
+   thingproxy) suivie d'un parsing XML dans le navigateur.
+
+Si toutes les sources échouent, l'app **n'affiche plus de contenu de démo** : elle montre
+un message d'erreur avec les boutons *Réessayer* et *Ouvrir les sources*. Pour une fiabilité
+maximale (et pour ne dépendre d'aucun tiers), prévoir un petit backend qui récupère et
+parse le RSS côté serveur.
+
 ## Limites connues
 
-- Un navigateur ne peut pas lire un flux RSS directement (CORS). L'app passe par des
-  proxys publics de secours. Pour une version fiable, prévoir un petit backend qui
-  récupère et parse le RSS côté serveur.
+- La récupération RSS dépend de services tiers gratuits (rss2json / proxys publics), qui
+  peuvent être limités en débit ou temporairement indisponibles.
 - Les favoris ne sont pas encore persistants entre sessions.
 
 ## Licence
