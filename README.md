@@ -11,8 +11,21 @@ Un seul fichier, aucune dépendance, aucun build.
 - Import / export des sources aux formats **OPML** (standard) et **JSON**
 - Partage d'un article (feuille de partage native, ou menu WhatsApp / Telegram / mail / X / copie du lien)
 - Favoris et bouton de partage sur chaque carte
+- **Mode Apprendre** 🎓 : bascule le fil vers des articles Wikipédia aléatoires pour swiper en apprenant (bouton dans la barre du haut). Le bouton **↻** sert une nouvelle fournée de savoir à chaque appui, et le mode est mémorisé entre les sessions.
 - Installable comme application (PWA) avec fonctionnement hors-ligne
 - Mode démo automatique si les flux ne sont pas joignables
+
+## Mode Apprendre
+
+Un bouton **🎓 Apprendre** (barre du haut) fait passer l'app en mode découverte :
+le fil n'affiche alors que des articles **Wikipédia** tirés au hasard (titre, extrait,
+image, lien vers l'article). L'ambiance change (accent cyan + badge) pour bien distinguer
+les deux univers, et un nouvel appui sur **📰 Actus** revient aux flux RSS.
+
+Les articles viennent de l'API REST de Wikimedia
+(`/api/rest_v1/page/random/summary`), qui autorise le CORS : aucun proxy n'est
+nécessaire côté navigateur. Un repli démo s'affiche si l'API n'est pas joignable.
+La langue par défaut est le français (`WIKI_LANG="fr"` dans `index.html`).
 
 ## Lancer en local
 

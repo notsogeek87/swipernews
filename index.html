@@ -64,6 +64,15 @@
     padding:6px 14px;border-radius:100px;font-size:12px;font-weight:600}
   .demobadge.hidden{display:none}
 
+  /* Mode Apprendre (Wikipédia) : bascule d'ambiance */
+  body.learn{--accent:#4ad9ff;--accent-2:#ff8bb0}
+  body.learn .brand .mark{transform:rotate(45deg);display:inline-block}
+  #learnBtn.on{background:var(--accent);border-color:var(--accent);color:#04121a}
+  .modebadge{position:fixed;top:calc(64px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:14;
+    background:rgba(74,217,255,.15);border:1px solid rgba(74,217,255,.4);color:#4ad9ff;
+    padding:6px 14px;border-radius:100px;font-size:12px;font-weight:600}
+  .modebadge.hidden{display:none}
+
   .hint{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translateX(-50%);
     z-index:14;color:var(--muted);font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;
     animation:float 1.8s ease-in-out infinite;pointer-events:none;opacity:.9}
@@ -129,12 +138,14 @@
   <div class="brand"><span class="mark">◆</span> Flux</div>
   <div class="actions">
     <button id="installBtn" class="hidden" title="Installer l'app">⤓ Installer</button>
+    <button id="learnBtn" title="Mode Apprendre — articles Wikipédia">🎓 Apprendre</button>
     <button id="reloadBtn" title="Recharger">↻</button>
     <button id="openSheet">Sources</button>
   </div>
 </header>
 
 <div class="demobadge hidden" id="demobadge">Mode démo — hors-ligne</div>
+<div class="modebadge hidden" id="modebadge">🎓 Mode Apprendre — Wikipédia</div>
 
 <div id="feed"></div>
 
@@ -182,6 +193,15 @@ const DEMO_ITEMS = [
   {source:"Hacker News", title:"A tiny language model runs entirely in the browser tab", desc:"The open-source project compiles to WebAssembly and needs no server, sparking a lively discussion about the future of on-device inference.", date:new Date(Date.now()-39600e3).toISOString(), img:"https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=1200&q=70", link:"#"},
 ];
 
+/* ---------- Articles Wikipédia de démo (repli hors-ligne du mode Apprendre) ---------- */
+const DEMO_LEARN = [
+  {source:"Wikipédia", title:"Effet tunnel", desc:"En mécanique quantique, l'effet tunnel désigne la capacité d'une particule à franchir une barrière de potentiel qu'elle ne pourrait pas surmonter selon la physique classique — un phénomène essentiel au fonctionnement du Soleil et des microscopes à effet tunnel.", date:"", img:"https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Effet_tunnel"},
+  {source:"Wikipédia", title:"Bibliothèque d'Alexandrie", desc:"Fondée au IIIe siècle av. J.-C., elle fut l'une des plus grandes bibliothèques de l'Antiquité et un foyer majeur du savoir hellénistique, rassemblant des centaines de milliers de rouleaux.", date:"", img:"https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Biblioth%C3%A8que_d%27Alexandrie"},
+  {source:"Wikipédia", title:"Tardigrade", desc:"Surnommé « ourson d'eau », ce micro-animal peut survivre à des conditions extrêmes : vide spatial, radiations intenses, dessiccation quasi totale et températures proches du zéro absolu.", date:"", img:"https://images.unsplash.com/photo-1439405326854-014607f694d7?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Tardigrada"},
+  {source:"Wikipédia", title:"Nombre d'or", desc:"Noté φ (environ 1,618), ce rapport apparaît en géométrie, dans l'art et l'architecture, et se retrouve dans la suite de Fibonacci ainsi que dans certaines proportions naturelles.", date:"", img:"https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Nombre_d%27or"},
+  {source:"Wikipédia", title:"Aurore polaire", desc:"Ce phénomène lumineux des hautes latitudes naît de l'interaction entre les particules du vent solaire et la haute atmosphère, guidées par le champ magnétique terrestre.", date:"", img:"https://images.unsplash.com/photo-1483347756197-71ef80e95f73?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Aurore_polaire"},
+];
+
 /* ---------- Sources ---------- */
 const DEFAULT_FEEDS = [
   {name:"Le Monde — Une", url:"https://www.lemonde.fr/rss/une.xml", on:true},
@@ -191,7 +211,9 @@ const DEFAULT_FEEDS = [
   {name:"The Verge", url:"https://www.theverge.com/rss/index.xml", on:false},
 ];
 const LS_KEY="fluxswipe.feeds.v1";
+const LS_MODE="fluxswipe.mode.v1";
 let feeds=load(),items=[],liked=new Set();
+let mode=(()=>{try{return localStorage.getItem(LS_MODE)==="learn"?"learn":"news";}catch(e){return "news";}})();
 
 function load(){try{const s=localStorage.getItem(LS_KEY);if(s)return JSON.parse(s);}catch(e){}return structuredClone(DEFAULT_FEEDS);}
 function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(feeds));}catch(e){}}
@@ -235,9 +257,50 @@ function relTime(dateStr){const t=Date.parse(dateStr);if(isNaN(t))return "";
   const d=(Date.now()-t)/1000;if(d<3600)return Math.max(1,Math.round(d/60))+" min";
   if(d<86400)return Math.round(d/3600)+" h";return Math.round(d/86400)+" j";}
 
+/* ---------- Mode Apprendre : articles Wikipédia aléatoires ---------- */
+const WIKI_LANG="fr";
+async function fetchWikiOne(){
+  const url=`https://${WIKI_LANG}.wikipedia.org/api/rest_v1/page/random/summary`;
+  try{
+    const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),8000);
+    const res=await fetch(url,{headers:{Accept:"application/json"},cache:"no-store",signal:ctl.signal});
+    clearTimeout(t);
+    if(res.ok)return await res.json();
+  }catch(e){/* repli proxy ci-dessous */}
+  const txt=await fetchText(url);return JSON.parse(txt); // repli via proxys si le direct échoue
+}
+async function fetchWikipedia(count=30){
+  const tries=Math.ceil(count*1.7);
+  const settled=await Promise.allSettled(Array.from({length:tries},fetchWikiOne));
+  const seen=new Set(),out=[];
+  for(const s of settled){
+    if(s.status!=="fulfilled"||!s.value)continue;
+    const w=s.value;
+    if(w.type&&w.type!=="standard")continue;            // évite les pages d'homonymie
+    const desc=(w.extract||"").trim();
+    if(!w.title||desc.length<80||seen.has(w.title))continue;
+    seen.add(w.title);
+    out.push({source:"Wikipédia",title:w.title,desc,
+      link:w.content_urls?.desktop?.page||w.content_urls?.mobile?.page||"",
+      img:w.originalimage?.source||w.thumbnail?.source||"",date:""});
+  }
+  out.sort((a,b)=>(b.img?1:0)-(a.img?1:0));             // les articles avec image d'abord
+  return out.slice(0,count);
+}
+
 /* ---------- Chargement principal ---------- */
 async function loadFeeds(){
-  show("loading");demobadge(false);
+  show("loading");demobadge(false);modebadge(mode==="learn");
+  if(mode==="learn"){
+    try{
+      const arr=await fetchWikipedia(30);
+      if(!arr.length)throw new Error("empty");
+      items=arr;
+    }catch(e){
+      items=structuredClone(DEMO_LEARN);demobadge(true);
+    }
+    render();hideStates();return;
+  }
   const active=feeds.filter(f=>f.on);
   try{
     if(!active.length) throw new Error("empty");
@@ -263,6 +326,7 @@ function render(){
 function cardHTML(it,i){
   const bg=it.img?`<div class="card__bg" style="background-image:url('${escAttr(it.img)}')"></div>`:`<div class="card__noimg"></div>`;
   const hasLink=it.link&&it.link!=="#";
+  const openLabel=it.source==="Wikipédia"?"Lire sur Wikipédia →":"Lire l'article →";
   return `<article class="card" data-i="${i}">
     ${bg}
     <div class="rail">
@@ -274,7 +338,7 @@ function cardHTML(it,i){
       <h1 class="card__title">${esc(it.title)}</h1>
       ${it.desc?`<p class="card__desc">${esc(it.desc)}</p>`:""}
       <div class="card__meta">${it.date?`<span>${relTime(it.date)}</span>`:""}</div>
-      ${hasLink?`<a class="card__open" href="${escAttr(it.link)}" target="_blank" rel="noopener">Lire l'article →</a>`:`<span class="card__open" style="background:rgba(255,255,255,.1);box-shadow:none">Article de démo</span>`}
+      ${hasLink?`<a class="card__open" href="${escAttr(it.link)}" target="_blank" rel="noopener">${openLabel}</a>`:`<span class="card__open" style="background:rgba(255,255,255,.1);box-shadow:none">Article de démo</span>`}
     </div>
   </article>`;
 }
@@ -343,6 +407,23 @@ const sheet=document.getElementById("sheet");
 document.getElementById("openSheet").onclick=()=>{renderList();sheet.classList.add("open");};
 document.getElementById("reloadBtn").onclick=()=>loadFeeds();
 sheet.onclick=e=>{if(e.target===sheet)sheet.classList.remove("open");};
+
+/* ---------- Bascule Mode Apprendre ---------- */
+const learnBtn=document.getElementById("learnBtn");
+function applyModeUI(){
+  const on=mode==="learn";
+  document.body.classList.toggle("learn",on);
+  learnBtn.classList.toggle("on",on);
+  learnBtn.textContent=on?"📰 Actus":"🎓 Apprendre";
+  learnBtn.title=on?"Revenir aux actus":"Mode Apprendre — articles Wikipédia";
+  document.getElementById("openSheet").classList.toggle("hidden",on); // les sources RSS n'ont pas de sens en mode Apprendre
+}
+learnBtn.onclick=()=>{
+  mode=mode==="learn"?"news":"learn";
+  try{localStorage.setItem(LS_MODE,mode);}catch(e){}
+  applyModeUI();loadFeeds();
+};
+applyModeUI();
 function renderList(){document.getElementById("feedList").innerHTML=feeds.map((f,i)=>`
   <div class="feedrow"><input type="checkbox" ${f.on?"checked":""} onchange="toggleFeed(${i})">
     <div><div class="name">${esc(f.name)}</div><div class="url">${esc(f.url)}</div></div>
@@ -427,6 +508,7 @@ function mergeFeeds(incoming){
 function show(id){document.getElementById("loading").classList.toggle("hidden",id!=="loading");}
 function hideStates(){document.getElementById("loading").classList.add("hidden");}
 function demobadge(on){document.getElementById("demobadge").classList.toggle("hidden",!on);}
+function modebadge(on){document.getElementById("modebadge").classList.toggle("hidden",!on);}
 let toastT;function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");
   clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1800);}
 
