@@ -607,7 +607,8 @@ async function fetchLearn(count=CONFIG.BATCH_SIZE){
   const keys=catKeysForBatch();
   let batch=null;
   try{
-    const qs=new URLSearchParams({cats:keys.join(","),sources:sources.join(","),count:String(count)});
+    // nonce : chaque lot est aléatoire → URL unique pour éviter tout cache intermédiaire
+    const qs=new URLSearchParams({cats:keys.join(","),sources:sources.join(","),count:String(count),n:Math.random().toString(36).slice(2)});
     const res=await fetchWithTimeout("/api/learn?"+qs,{cache:"no-store"},CONFIG.FETCH_TIMEOUT);
     if(res.ok){
       const data=await res.json();
