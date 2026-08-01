@@ -40,13 +40,13 @@
     padding:14px 22px;border-radius:100px;text-decoration:none;box-shadow:0 8px 30px rgba(255,59,107,.45);cursor:pointer}
   .card__open:active{transform:scale(.97)}
 
-  .rail{position:absolute;right:16px;bottom:calc(120px + env(safe-area-inset-bottom));z-index:3;
-    display:flex;flex-direction:column;gap:22px;align-items:center}
+  .rail{position:absolute;right:16px;bottom:calc(52px + env(safe-area-inset-bottom));z-index:3;
+    display:flex;flex-direction:column;gap:18px;align-items:center}
   .rail button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink);
-    width:52px;height:52px;border-radius:50%;font-size:22px;cursor:pointer;backdrop-filter:blur(12px);
+    width:52px;height:52px;border-radius:50%;cursor:pointer;backdrop-filter:blur(12px);
     display:grid;place-items:center;transition:transform .15s,background .2s}
   .rail button:active{transform:scale(.88)}
-  .rail button.on{background:var(--accent);border-color:var(--accent)}
+  .rail button svg{width:23px;height:23px;display:block}
 
   .progress{position:fixed;left:0;top:0;height:100dvh;width:3px;z-index:20;pointer-events:none}
   .progress__bar{width:100%;background:linear-gradient(var(--accent),var(--accent-2));border-radius:0 3px 3px 0;transition:height .2s}
@@ -249,7 +249,7 @@ const LS_KEY="fluxswipe.feeds.v1";
 const LS_MODE="fluxswipe.mode.v1";
 const LS_CAT="fluxswipe.cat.v1";
 const LS_INT="fluxswipe.interests.v1";
-let feeds=load(),items=[],liked=new Set();
+let feeds=load(),items=[];
 let mode=(()=>{try{return localStorage.getItem(LS_MODE)==="learn"?"learn":"news";}catch(e){return "news";}})();
 
 /* Centres d'intérêt (mode Apprendre). q = requête de recherche Wikipédia ; null = purement aléatoire.
@@ -489,8 +489,7 @@ function cardHTML(it,i){
   return `<article class="card" data-i="${i}">
     ${bg}
     <div class="rail">
-      <button class="likeBtn" data-i="${i}">♥</button>
-      <button class="shareBtn" data-i="${i}">↗</button>
+      <button class="shareBtn" data-i="${i}" aria-label="Partager" title="Partager"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
     </div>
     <div class="card__body">
       <span class="card__source"><span class="dot"></span>${esc(it.source)}</span>
@@ -504,9 +503,6 @@ function cardHTML(it,i){
 function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
 function escAttr(s){return (s||"").replace(/["'&<>]/g,c=>({'"':"&quot;","'":"&#39;","&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
 function attachRail(){
-  document.querySelectorAll(".likeBtn").forEach(b=>b.onclick=e=>{e.stopPropagation();
-    if(liked.has(+b.dataset.i)){liked.delete(+b.dataset.i);b.classList.remove("on");}
-    else{liked.add(+b.dataset.i);b.classList.add("on");toast("Ajouté aux favoris");}});
   document.querySelectorAll(".shareBtn").forEach(b=>b.onclick=async e=>{e.stopPropagation();
     shareItem(items[+b.dataset.i]);});
 }
