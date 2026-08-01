@@ -319,8 +319,34 @@ function activeCatKey(){
   return "random";
 }
 
-function load(){try{const s=localStorage.getItem(LS_KEY);if(s)return JSON.parse(s);}catch(e){}return structuredClone(DEFAULT_FEEDS);}
-function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(feeds));}catch(e){}}
+function load(){try{const s=localStorage.getItem(LS_KEY);if(s)return JSON.parse(s);}catch(e){warn("load feeds",e);}return structuredClone(DEFAULT_FEEDS);}
+function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(feeds));}catch(e){warn("save feeds",e);}}
+
+/* ---------- Helpers partagés ---------- */
+// Journalise sans casser le flux (remplace les catch silencieux, pour un debug possible)
+function warn(ctx,e){try{console.warn("[SwiperNews] "+ctx,e);}catch(_){}}
+// fetch avec délai d'expiration (factorise le motif AbortController+setTimeout répété)
+async function fetchWithTimeout(url,opts={},ms=7000){
+  const ctl=new AbortController();
+  const t=setTimeout(()=>ctl.abort(),ms);
+  try{return await fetch(url,{...opts,signal:ctl.signal});}
+  finally{clearTimeout(t);}
+}
+// N'autorise que les schémas sûrs pour un href (bloque javascript:, data:, etc. venant d'un flux)
+function safeLink(link){
+  if(!link||link==="#")return "";
+  try{const u=new URL(link,location.href);return (u.protocol==="http:"||u.protocol==="https:")?link:"";}
+  catch(_){return "";}
+}
+// N'autorise que http(s) ou data:image pour une image de fond
+function safeImg(src){
+  if(!src)return "";
+  try{const u=new URL(src,location.href);
+    if(u.protocol==="http:"||u.protocol==="https:")return src;
+    if(u.protocol==="data:"&&/^data:image\//i.test(src))return src;
+    return "";}
+  catch(_){return "";}
+}
 
 /* ---------- Récupération avec plusieurs proxys de secours ---------- */
 const PROXIES=[
@@ -332,18 +358,15 @@ const PROXIES=[
   u=>"https://api.allorigins.win/get?url="+encodeURIComponent(u), // renvoie {contents,status}
 ];
 async function fetchViaProxy(make,url,timeout){
-  const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),timeout);
-  try{
-    const res=await fetch(make(url),{cache:"no-store",signal:ctl.signal});
-    if(!res.ok)throw new Error("http");
-    let txt=await res.text();
-    // dé-emballe le format allorigins /get : {contents:"…",status:{http_code}}
-    if(txt&&txt.startsWith("{")&&txt.includes('"contents"')&&txt.includes('"http_code"')){
-      try{const j=JSON.parse(txt);if(j&&typeof j.contents==="string")txt=j.contents;}catch(_){}
-    }
-    if(txt&&txt.length>200)return txt;
-    throw new Error("empty");
-  }finally{clearTimeout(t);}
+  const res=await fetchWithTimeout(make(url),{cache:"no-store"},timeout);
+  if(!res.ok)throw new Error("http");
+  let txt=await res.text();
+  // dé-emballe le format allorigins /get : {contents:"…",status:{http_code}}
+  if(txt&&txt.startsWith("{")&&txt.includes('"contents"')&&txt.includes('"http_code"')){
+    try{const j=JSON.parse(txt);if(j&&typeof j.contents==="string")txt=j.contents;}catch(_){}
+  }
+  if(txt&&txt.length>200)return txt;
+  throw new Error("empty");
 }
 async function fetchText(url){
   // 1) backend same-origin d'abord (rapide et fiable sur Vercel)
@@ -355,9 +378,7 @@ async function fetchText(url){
 /* rss2json : service dédié qui parse le flux côté serveur et renvoie du JSON (CORS ok) */
 async function fetchFeedRss2Json(feed){
   const api="https://api.rss2json.com/v1/api.json?count=60&rss_url="+encodeURIComponent(feed.url);
-  const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),7000);
-  const res=await fetch(api,{cache:"no-store",signal:ctl.signal});
-  clearTimeout(t);
+  const res=await fetchWithTimeout(api,{cache:"no-store"},7000);
   if(!res.ok)throw new Error("http");
   const data=await res.json();
   if(!data||data.status!=="ok"||!Array.isArray(data.items))throw new Error("bad");
@@ -415,10 +436,9 @@ async function srcWikipedia(catKey){
   else{params.set("generator","random");params.set("grnnamespace","0");params.set("grnlimit","20");}
   const url=`https://${WIKI_LANG}.wikipedia.org/w/api.php?${params}`;
   let data;
-  try{const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),7000);
-    const res=await fetch(url,{cache:"no-store",signal:ctl.signal});clearTimeout(t);
+  try{const res=await fetchWithTimeout(url,{cache:"no-store"},7000);
     if(!res.ok)throw new Error("http");data=await res.json();}
-  catch(e){data=JSON.parse(await fetchText(url));}
+  catch(e){warn("wikipedia direct",e);data=JSON.parse(await fetchText(url));}
   const pages=data&&data.query&&data.query.pages?Object.values(data.query.pages):[];
   return pages.map(p=>({source:"Wikipédia",title:p.title||"",
     desc:(p.extract||"").replace(/\s+/g," ").trim(),
@@ -432,10 +452,9 @@ async function srcGBIF(catKey){
   const off=Math.floor(Math.random()*300);
   const url=`https://api.gbif.org/v1/occurrence/search?mediaType=StillImage&limit=20&offset=${off}&country=FR`;
   let data;
-  try{const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),7000);
-    const res=await fetch(url,{cache:"no-store",signal:ctl.signal});clearTimeout(t);
+  try{const res=await fetchWithTimeout(url,{cache:"no-store"},7000);
     if(!res.ok)throw new Error("http");data=await res.json();}
-  catch(e){try{data=JSON.parse(await fetchText(url));}catch(_){return [];}}
+  catch(e){warn("gbif direct",e);try{data=JSON.parse(await fetchText(url));}catch(_){return [];}}
   const rows=(data&&data.results)||[];
   return rows.map(o=>{
     const media=(o.media||[]).find(m=>m&&m.identifier);
@@ -459,8 +478,8 @@ async function srcGallica(catKey){
   const q=`(gallica all "${term}") and (dc.type all "image")`;
   const url=`https://gallica.bnf.fr/SRU?operation=searchRetrieve&version=1.2&maximumRecords=20&query=${encodeURIComponent(q)}`;
   let xml;
-  try{xml=await fetchText(url);}catch(e){return [];}     // SRU non-CORS → via proxy
-  let doc;try{doc=new DOMParser().parseFromString(xml,"text/xml");}catch(e){return [];}
+  try{xml=await fetchText(url);}catch(e){warn("gallica fetch",e);return [];}     // SRU non-CORS → via proxy
+  let doc;try{doc=new DOMParser().parseFromString(xml,"text/xml");}catch(e){warn("gallica parse",e);return [];}
   const out=[];
   [...doc.getElementsByTagNameNS("*","record")].forEach(r=>{
     const title=xTag(r,"title"), creator=xTag(r,"creator"), date=xTag(r,"date"), descr=xTag(r,"description");
@@ -516,7 +535,11 @@ function cacheLoad(m){try{const e=(JSON.parse(localStorage.getItem(LS_CACHE)||"{
   if(e&&Array.isArray(e.items)&&e.items.length>=3)return e.items;}catch(e){}return null;} // ignore un cache minuscule
 
 /* ---------- Chargement principal ---------- */
+// Compteur de génération : chaque appel invalide le précédent (annule proprement
+// un chargement obsolète après un changement rapide de mode/catégorie).
+let loadSeq=0;
 async function loadFeeds(){
+  const my=++loadSeq;
   demobadge(false);
   const m=mode;                                   // capture : l'utilisateur peut changer de mode pendant le fetch
   const key=m==="learn"?("learn_"+cat):"news";    // cache distinct par catégorie
@@ -528,10 +551,11 @@ async function loadFeeds(){
     try{
       const arr=await fetchLearn(20);              // un lot multi-sources au démarrage ; le scroll infini complète
       if(!arr.length)throw new Error("empty");
-      if(mode!==m||cat!==(key.slice(6)))return;    // catégorie changée entre-temps → on abandonne
+      if(my!==loadSeq)return;                       // chargement obsolète → on abandonne
       items=arr;render(cached&&feedEl.scrollTop>50);hideStates();cacheSave(key);
     }catch(e){
-      if(mode!==m||cached)return;                  // si on a déjà le cache, on le garde
+      if(my!==loadSeq||cached)return;               // si on a déjà le cache, on le garde
+      warn("learn load",e);
       items=structuredClone(DEMO_LEARN);demobadge(true);render();hideStates();
     }
     return;
@@ -541,7 +565,7 @@ async function loadFeeds(){
   if(!active.length){if(!cached){items=[];render();showEmpty("no-feeds");}return;}
   try{
     const results=await Promise.allSettled(active.map(fetchFeedRobust));
-    if(mode!==m)return;
+    if(my!==loadSeq)return;
     let all=[];const failed=[];
     results.forEach((r,i)=>{
       if(r.status==="fulfilled"&&r.value.length)all=all.concat(r.value);
@@ -553,7 +577,8 @@ async function loadFeeds(){
     render(cached&&feedEl.scrollTop>50);hideStates();cacheSave(key);
     if(failed.length)toast(`${failed.length} flux injoignable${failed.length>1?"s":""}`);
   }catch(e){
-    if(mode!==m)return;
+    if(my!==loadSeq)return;
+    warn("news load",e);
     if(cached)toast("Réseau indisponible — affichage du cache");
     else{items=[];render();showEmpty("all-failed");}
   }
@@ -562,16 +587,35 @@ async function loadFeeds(){
 /* ---------- Rendu ---------- */
 const feedEl=document.getElementById("feed");
 let loadingMore=false;
+// Registre carte→article : découple la recherche pour le partage de l'index du
+// tableau, ce qui permet de retirer d'anciennes cartes du DOM sans tout casser.
+const cardReg=new Map();
+let cardSeq=0;
+const MAX_CARDS=60;   // borne le DOM en fil infini (évite fuite mémoire / lag sur longue session)
+const MAX_ITEMS=300;  // borne l'historique en mémoire (dédoublonnage du scroll infini)
+function renderCard(it){const id=cardSeq++;cardReg.set(id,it);return cardHTML(it,id);}
 function render(keepScroll){
-  feedEl.innerHTML=items.map((it,i)=>cardHTML(it,i)).join("");
+  cardReg.clear();cardSeq=0;
+  feedEl.innerHTML=items.map(renderCard).join("");
   if(!keepScroll)feedEl.scrollTop=0;
   document.getElementById("hint").classList.toggle("hidden",items.length===0);
-  attachRail();updateProgress();
+  updateProgress();
 }
 /* Ajoute des cartes à la suite sans réinitialiser le scroll (mode Apprendre infini) */
-function appendCards(newItems,start){
-  feedEl.insertAdjacentHTML("beforeend",newItems.map((it,k)=>cardHTML(it,start+k)).join(""));
-  attachRail();updateProgress();
+function appendCards(newItems){
+  feedEl.insertAdjacentHTML("beforeend",newItems.map(renderCard).join(""));
+  capDom();updateProgress();
+}
+/* Retire les cartes les plus hautes au-delà de MAX_CARDS et ajuste le scroll
+   (chaque carte fait exactement la hauteur du viewport). */
+function capDom(){
+  let removed=0;
+  while(feedEl.children.length>MAX_CARDS){
+    const first=feedEl.firstElementChild;
+    cardReg.delete(+first.dataset.id);
+    first.remove();removed++;
+  }
+  if(removed)feedEl.scrollTop-=removed*feedEl.clientHeight;
 }
 async function loadMoreLearn(){
   if(loadingMore||mode!=="learn")return;
@@ -580,34 +624,45 @@ async function loadMoreLearn(){
     const more=await fetchLearn(20);
     const have=new Set(items.map(i=>i.title));
     const fresh=more.filter(m=>!have.has(m.title));
-    if(fresh.length){const start=items.length;items=items.concat(fresh);appendCards(fresh,start);}
-  }catch(e){/* on réessaiera au prochain scroll */}
+    if(fresh.length){
+      items=items.concat(fresh);
+      if(items.length>MAX_ITEMS)items=items.slice(-MAX_ITEMS);
+      appendCards(fresh);
+    }
+  }catch(e){warn("load more",e);/* on réessaiera au prochain scroll */}
   finally{loadingMore=false;}
 }
-function cardHTML(it,i){
-  const bg=it.img?`<div class="card__bg" style="background-image:url('${escAttr(it.img)}')"></div>`:`<div class="card__noimg"></div>`;
-  const hasLink=it.link&&it.link!=="#";
-  const openLabel=it.source==="Wikipédia"?"Lire sur Wikipédia →":(it.source&&it.source!=="Wikipédia"&&it.link&&it.link!=="#"?"Découvrir →":"Lire l'article →");
-  return `<article class="card" data-i="${i}">
+function cardHTML(it,id){
+  const img=safeImg(it.img);
+  const bg=img?`<div class="card__bg" style="background-image:url('${escAttr(img)}')"></div>`:`<div class="card__noimg"></div>`;
+  const link=safeLink(it.link);
+  const openLabel=it.source==="Wikipédia"?"Lire sur Wikipédia →":(link?"Découvrir →":"Lire l'article →");
+  return `<article class="card" data-id="${id}">
     ${bg}
     <div class="rail">
-      <button class="shareBtn" data-i="${i}" aria-label="Partager" title="Partager"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
+      <button class="shareBtn" aria-label="Partager" title="Partager"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
     </div>
     <div class="card__body">
       <span class="card__source"><span class="dot"></span>${esc(it.source)}</span>
-      <h1 class="card__title">${esc(it.title)}</h1>
+      <h2 class="card__title">${esc(it.title)}</h2>
       ${it.desc?`<p class="card__desc">${esc(it.desc)}</p>`:""}
       <div class="card__meta">${it.date?`<span>${relTime(it.date)}</span>`:""}</div>
-      ${hasLink?`<a class="card__open" href="${escAttr(it.link)}" target="_blank" rel="noopener">${openLabel}</a>`:`<span class="card__open" style="background:rgba(255,255,255,.1);box-shadow:none">Article de démo</span>`}
+      ${link?`<a class="card__open" href="${escAttr(link)}" target="_blank" rel="noopener">${openLabel}</a>`:`<span class="card__open" style="background:rgba(255,255,255,.1);box-shadow:none">Article de démo</span>`}
     </div>
   </article>`;
 }
 function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
 function escAttr(s){return (s||"").replace(/["'&<>]/g,c=>({'"':"&quot;","'":"&#39;","&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
-function attachRail(){
-  document.querySelectorAll(".shareBtn").forEach(b=>b.onclick=async e=>{e.stopPropagation();
-    shareItem(items[+b.dataset.i]);});
-}
+// Délégation unique : un seul écouteur pour tout le fil (au lieu de ré-attacher
+// un handler à chaque carte → supprime le coût O(n²) du scroll infini).
+feedEl.addEventListener("click",e=>{
+  const btn=e.target.closest(".shareBtn");
+  if(!btn)return;
+  e.stopPropagation();
+  const card=btn.closest(".card");
+  const it=card&&cardReg.get(+card.dataset.id);
+  if(it)shareItem(it);
+});
 
 /* Chaque partage inclut l'article ET un lien promo vers l'app */
 const APP_URL="http://news.lielu.eu";
@@ -914,13 +969,28 @@ loadFeeds();
 
   if("serviceWorker" in navigator){
     const swCode=`
-      const CACHE="flux-v1";
+      const CACHE="flux-v2";
       self.addEventListener("install",e=>self.skipWaiting());
-      self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
+      // Purge les anciens caches versionnés pour ne pas gonfler le stockage indéfiniment
+      self.addEventListener("activate",e=>e.waitUntil((async()=>{
+        const keys=await caches.keys();
+        await Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)));
+        await self.clients.claim();
+      })()));
       self.addEventListener("fetch",e=>{
-        if(e.request.method!=="GET")return;
-        e.respondWith(caches.open(CACHE).then(c=>
-          fetch(e.request).then(r=>{c.put(e.request,r.clone());return r;}).catch(()=>c.match(e.request))));
+        const req=e.request;
+        if(req.method!=="GET")return;
+        const url=new URL(req.url);
+        // On ne met en cache que l'app-shell same-origin (network-first + repli hors-ligne).
+        // Les données/images tierces passent en direct → pas de cache non borné.
+        if(url.origin!==self.location.origin)return;
+        e.respondWith(
+          fetch(req).then(r=>{
+            const copy=r.clone();
+            caches.open(CACHE).then(c=>c.put(req,copy)).catch(()=>{});
+            return r;
+          }).catch(()=>caches.open(CACHE).then(c=>c.match(req)))
+        );
       });`;
     const swUrl=URL.createObjectURL(new Blob([swCode],{type:"text/javascript"}));
     navigator.serviceWorker.register(swUrl).catch(()=>{});
