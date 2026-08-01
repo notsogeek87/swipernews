@@ -11,7 +11,7 @@ Un seul fichier, aucune dépendance, aucun build.
 - Import / export des sources aux formats **OPML** (standard) et **JSON** — importe tes sources et lis-les directement
 - Partage d'un article (feuille de partage native, ou menu WhatsApp / Telegram / mail / X / copie du lien)
 - Favoris et bouton de partage sur chaque carte
-- **Mode Apprendre** 🎓 : bascule le fil vers des articles Wikipédia aléatoires pour swiper en apprenant (bouton dans la barre du haut). Le bouton **↻** sert une nouvelle fournée de savoir à chaque appui, et le mode est mémorisé entre les sessions.
+- **Mode Apprendre** 🎓 : bascule le fil vers des articles Wikipédia aléatoires pour swiper en apprenant (bouton dans la barre du haut). Le fil est **sans fin** — de nouveaux articles se chargent automatiquement en approchant du bas — le bouton **↻** repart sur une nouvelle fournée, et le mode est mémorisé entre les sessions.
 - Installable comme application (PWA) avec fonctionnement hors-ligne
 - En mode actus, si un flux est injoignable, un message clair invite à réessayer ou à revoir ses sources (plus de faux contenu de démo)
 
