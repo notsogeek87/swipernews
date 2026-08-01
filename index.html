@@ -427,15 +427,17 @@ function dropSeen(list){const fresh=list.filter(it=>!seen.has(seenKey(it)));retu
    pour reprendre au même endroit à la réouverture de l'app. */
 const LS_POS="fluxswipe.pos.v1";
 let posMap=(()=>{try{return JSON.parse(localStorage.getItem(LS_POS)||"{}");}catch(e){return {};}})();
-let posDirty=false,posPersistT,resumePending=true,resumeAt=0;   // resumePending : reprise au démarrage
-function persistPos(){if(!posDirty)return;posDirty=false;
-  try{localStorage.setItem(LS_POS,JSON.stringify(posMap));}catch(e){warn("save pos",e);}}
+let resumePending=true,lastPosIdx=-1;   // resumePending : reprise au démarrage
+function persistPos(){try{localStorage.setItem(LS_POS,JSON.stringify(posMap));}catch(e){warn("save pos",e);}}
+// Écriture IMMÉDIATE à chaque changement de carte : survit à une fermeture brutale
+// (les events pagehide/visibilitychange ne sont pas fiables quand l'app est tuée).
 function rememberPos(){
   if(!feedEl.children.length)return;
   const idx=Math.round(feedEl.scrollTop/Math.max(1,feedEl.clientHeight));
+  if(idx===lastPosIdx)return;
+  lastPosIdx=idx;
   const it=items[idx];
-  if(it&&it.link){posMap[mode]=it.link;posDirty=true;
-    clearTimeout(posPersistT);posPersistT=setTimeout(persistPos,600);}
+  if(it&&it.link){posMap[mode]=it.link;persistPos();}
 }
 
 // Persiste sans attendre le debounce quand l'app passe en arrière-plan / se ferme
@@ -738,7 +740,7 @@ function endCardHTML(){
 }
 function render(keepScroll){
   const prevTop=feedEl.scrollTop;               // réassigner innerHTML remet le scroll à 0
-  cardReg.clear();cardSeq=0;lastMarkIdx=-1;
+  cardReg.clear();cardSeq=0;lastMarkIdx=-1;lastPosIdx=-1;
   let html=items.map(renderCard).join("");
   if(mode==="news"&&items.length)html+=endCardHTML();   // fin de fil explicite
   feedEl.innerHTML=html;
@@ -750,7 +752,7 @@ function render(keepScroll){
     const link=posMap["news"];
     if(!link){resumePending=false;}
     else{const i=items.findIndex(it=>it.link===link);
-      if(i>0){top=i*feedEl.clientHeight;resumePending=false;resumeAt=Date.now();}
+      if(i>0){top=i*feedEl.clientHeight;resumePending=false;}
       else if(i===0){resumePending=false;}}   // i===-1 : pas encore là → on réessaiera
   }
   feedEl.scrollTop=top;                          // restaure explicitement (innerHTML l'a remis à 0)
@@ -902,8 +904,8 @@ feedEl.addEventListener("scroll",()=>{
   if(feedEl.scrollTop>50)document.getElementById("hint").classList.add("hidden");
   if(Date.now()>=revealUntil&&Math.abs(feedEl.scrollTop-lastScrollY)>4){hideTop();scheduleTopReveal();} // on swipe → on masque
   lastScrollY=feedEl.scrollTop;
-  // L'utilisateur a scrollé avant la reprise (on était resté en haut) → on l'annule
-  if(resumePending&&Date.now()-resumeAt>200&&feedEl.scrollTop>4)resumePending=false;
+  // L'utilisateur a franchi au moins une carte avant la reprise → on l'annule
+  if(resumePending&&feedEl.scrollTop>feedEl.clientHeight*0.5)resumePending=false;
   markVisibleSeen();                        // marque la carte courante comme vue
   rememberPos();                            // mémorise la position (reprise à la réouverture)
   // Mode Apprendre : charge un nouveau lot avant d'atteindre le bas → fil sans fin
