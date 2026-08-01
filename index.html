@@ -78,6 +78,14 @@
     color:var(--muted);font-family:var(--sans);font-weight:600;font-size:13px;padding:7px 14px;border-radius:100px;
     cursor:pointer;white-space:nowrap;backdrop-filter:blur(12px);transition:background .2s,color .2s,border-color .2s}
   .cats button.active{background:rgba(74,217,255,.16);border-color:rgba(74,217,255,.5);color:#bff0ff}
+  .cats .catedit{color:#7fe3ff;border-color:rgba(74,217,255,.3)}
+
+  /* Sélecteur de centres d'intérêt (grille de chips à cocher) */
+  .intgrid{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
+  .intchip{background:#1a1a22;border:1px solid rgba(255,255,255,.12);color:var(--ink);
+    font-family:var(--sans);font-weight:600;font-size:14px;padding:11px 16px;border-radius:100px;
+    cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+  .intchip.on{background:rgba(74,217,255,.16);border-color:rgba(74,217,255,.55);color:#bff0ff}
 
   .demobadge{position:fixed;top:calc(116px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:14;
     background:rgba(74,217,255,.15);border:1px solid rgba(74,217,255,.35);color:var(--accent-2);
@@ -211,6 +219,16 @@
   </div>
 </div>
 
+<div class="sheet" id="intSheet">
+  <div class="sheet__panel">
+    <div class="sheet__grip"></div>
+    <h2>Tes centres d'intérêt</h2>
+    <p class="sub">Choisis ce que tu veux apprendre. Tu pourras les modifier à tout moment.</p>
+    <div class="intgrid" id="intGrid"></div>
+    <button class="applybtn" onclick="saveInterests()">Valider</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -234,6 +252,7 @@ const DEFAULT_FEEDS = [
 const LS_KEY="fluxswipe.feeds.v1";
 const LS_MODE="fluxswipe.mode.v1";
 const LS_CAT="fluxswipe.cat.v1";
+const LS_INT="fluxswipe.interests.v1";
 let feeds=load(),items=[],liked=new Set();
 let mode=(()=>{try{return localStorage.getItem(LS_MODE)==="learn"?"learn":"news";}catch(e){return "news";}})();
 
@@ -253,7 +272,17 @@ const CATEGORIES=[
   {key:"musique",  label:"🎵 Musique",       q:'deepcategory:"Musique"'},
   {key:"philo",    label:"🧠 Philosophie",   q:'deepcategory:"Philosophie"'},
 ];
-let cat=(()=>{try{return localStorage.getItem(LS_CAT)||"random";}catch(e){return "random";}})();
+/* Intérêts choisis par l'utilisateur (sous-ensemble de clés CATEGORIES, hors "random"). */
+let interests=(()=>{try{const s=localStorage.getItem(LS_INT);return s?JSON.parse(s):[];}catch(e){return [];}})();
+function interestsChosen(){try{return localStorage.getItem(LS_INT)!==null;}catch(e){return false;}}
+/* Filtre courant : "all" = mélange des intérêts choisis, sinon une clé d'intérêt précise. */
+let cat=(()=>{try{const v=localStorage.getItem(LS_CAT);return (v&&v!=="random")?v:"all";}catch(e){return "all";}})();
+/* Catégorie effective pour un lot : le filtre courant, ou un intérêt tiré au sort si "all". */
+function activeCatKey(){
+  if(cat!=="all")return cat;
+  if(interests.length)return interests[Math.floor(Math.random()*interests.length)];
+  return "random";
+}
 
 function load(){try{const s=localStorage.getItem(LS_KEY);if(s)return JSON.parse(s);}catch(e){}return structuredClone(DEFAULT_FEEDS);}
 function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(feeds));}catch(e){}}
@@ -336,7 +365,7 @@ function relTime(dateStr){const t=Date.parse(dateStr);if(isNaN(t))return "";
 const WIKI_LANG="fr";
 /* Un lot d'articles au hasard, via l'API action (extraits longs + image + URL, en un appel). */
 async function fetchWikiBatch(){
-  const c=CATEGORIES.find(x=>x.key===cat)||CATEGORIES[0];
+  const c=CATEGORIES.find(x=>x.key===activeCatKey())||CATEGORIES[0];
   const params=new URLSearchParams({
     action:"query",format:"json",origin:"*",
     prop:"extracts|pageimages|info",
@@ -564,15 +593,30 @@ function setMode(m){
   try{localStorage.setItem(LS_MODE,mode);}catch(e){}
   applyModeUI();loadFeeds();
 }
+function setMode2Learn(){                          // à l'entrée du mode Apprendre, on propose l'onboarding la 1ère fois
+  if(mode==="learn"&&!interestsChosen())openInterests();
+}
 tabNews.onclick=()=>setMode("news");
-tabLearn.onclick=()=>setMode("learn");
+tabLearn.onclick=()=>{setMode("learn");setMode2Learn();};
 applyModeUI();
 
-/* ---------- Centres d'intérêt (mode Apprendre) ---------- */
+/* ---------- Barre de filtres (mode Apprendre) ---------- */
 const catsEl=document.getElementById("cats");
 function renderCats(){
-  catsEl.innerHTML=CATEGORIES.map(c=>`<button data-k="${c.key}" class="${c.key===cat?"active":""}">${c.label}</button>`).join("");
-  catsEl.querySelectorAll("button").forEach(b=>b.onclick=()=>setCat(b.dataset.k));
+  let chips=[];
+  if(interests.length){
+    chips.push({k:"all",label:"✨ Tous"});
+    interests.forEach(k=>{const c=CATEGORIES.find(x=>x.key===k);if(c)chips.push({k,label:c.label});});
+  }else{
+    chips.push({k:"all",label:"🎲 Aléatoire"});
+  }
+  let html=chips.map(c=>`<button data-k="${c.k}" class="${c.k===cat?"active":""}">${c.label}</button>`).join("");
+  html+=`<button class="catedit" data-edit="1">✎ ${interests.length?"Modifier":"Choisir mes intérêts"}</button>`;
+  catsEl.innerHTML=html;
+  catsEl.querySelectorAll("button").forEach(b=>{
+    if(b.dataset.edit)b.onclick=openInterests;
+    else b.onclick=()=>setCat(b.dataset.k);
+  });
 }
 function setCat(k){
   if(k===cat)return;
@@ -583,7 +627,36 @@ function setCat(k){
   if(active)active.scrollIntoView({inline:"center",block:"nearest",behavior:"smooth"});
   if(mode==="learn")loadFeeds();
 }
+
+/* ---------- Sélecteur de centres d'intérêt ---------- */
+const intSheet=document.getElementById("intSheet");
+let pendingInt=new Set();
+function openInterests(){
+  pendingInt=new Set(interests);
+  renderIntGrid();
+  intSheet.classList.add("open");
+}
+function renderIntGrid(){
+  const grid=document.getElementById("intGrid");
+  grid.innerHTML=CATEGORIES.filter(c=>c.key!=="random").map(c=>
+    `<button class="intchip ${pendingInt.has(c.key)?"on":""}" data-k="${c.key}">${c.label}</button>`).join("");
+  grid.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.k;
+    if(pendingInt.has(k))pendingInt.delete(k);else pendingInt.add(k);
+    b.classList.toggle("on");
+  });
+}
+function saveInterests(){
+  interests=CATEGORIES.filter(c=>pendingInt.has(c.key)).map(c=>c.key); // garde l'ordre défini
+  try{localStorage.setItem(LS_INT,JSON.stringify(interests));}catch(e){}
+  cat="all";try{localStorage.setItem(LS_CAT,cat);}catch(e){}
+  intSheet.classList.remove("open");
+  renderCats();
+  if(mode==="learn")loadFeeds();
+}
+intSheet.onclick=e=>{if(e.target===intSheet)intSheet.classList.remove("open");};
 renderCats();
+if(mode==="learn"&&!interestsChosen())openInterests();  // 1er lancement direct en mode Apprendre
 function renderList(){document.getElementById("feedList").innerHTML=feeds.map((f,i)=>`
   <div class="feedrow"><input type="checkbox" ${f.on?"checked":""} onchange="toggleFeed(${i})">
     <div><div class="name">${esc(f.name)}</div><div class="url">${esc(f.url)}</div></div>
