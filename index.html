@@ -238,27 +238,31 @@ const PROXIES=[
   u=>"https://thingproxy.freeboard.io/fetch/"+u,
   u=>"https://api.allorigins.win/get?url="+encodeURIComponent(u), // renvoie {contents,status}
 ];
+async function fetchViaProxy(make,url,timeout){
+  const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),timeout);
+  try{
+    const res=await fetch(make(url),{cache:"no-store",signal:ctl.signal});
+    if(!res.ok)throw new Error("http");
+    let txt=await res.text();
+    // dé-emballe le format allorigins /get : {contents:"…",status:{http_code}}
+    if(txt&&txt.startsWith("{")&&txt.includes('"contents"')&&txt.includes('"http_code"')){
+      try{const j=JSON.parse(txt);if(j&&typeof j.contents==="string")txt=j.contents;}catch(_){}
+    }
+    if(txt&&txt.length>200)return txt;
+    throw new Error("empty");
+  }finally{clearTimeout(t);}
+}
 async function fetchText(url){
-  for(const make of PROXIES){
-    try{
-      const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),8000);
-      const res=await fetch(make(url),{cache:"no-store",signal:ctl.signal});
-      clearTimeout(t);
-      if(!res.ok)continue;
-      let txt=await res.text();
-      // dé-emballe le format allorigins /get : {contents:"…",status:{http_code}}
-      if(txt&&txt.startsWith("{")&&txt.includes('"contents"')&&txt.includes('"http_code"')){
-        try{const j=JSON.parse(txt);if(j&&typeof j.contents==="string")txt=j.contents;}catch(_){}
-      }
-      if(txt&&txt.length>200)return txt;
-    }catch(e){/* proxy suivant */}
-  }
+  // 1) backend same-origin d'abord (rapide et fiable sur Vercel)
+  try{return await fetchViaProxy(PROXIES[0],url,7000);}catch(e){}
+  // 2) sinon on lance TOUS les proxys en parallèle et on garde le premier qui répond
+  try{return await Promise.any(PROXIES.slice(1).map(m=>fetchViaProxy(m,url,7000)));}catch(e){}
   throw new Error("no-proxy");
 }
 /* rss2json : service dédié qui parse le flux côté serveur et renvoie du JSON (CORS ok) */
 async function fetchFeedRss2Json(feed){
   const api="https://api.rss2json.com/v1/api.json?count=60&rss_url="+encodeURIComponent(feed.url);
-  const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),9000);
+  const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),7000);
   const res=await fetch(api,{cache:"no-store",signal:ctl.signal});
   clearTimeout(t);
   if(!res.ok)throw new Error("http");
@@ -313,7 +317,7 @@ async function fetchWikiBatch(){
   const url=`https://${WIKI_LANG}.wikipedia.org/w/api.php?${params}`;
   let data;
   try{
-    const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),9000);
+    const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),7000);
     const res=await fetch(url,{cache:"no-store",signal:ctl.signal});
     clearTimeout(t);
     if(!res.ok)throw new Error("http");
@@ -323,8 +327,8 @@ async function fetchWikiBatch(){
   }
   return data&&data.query&&data.query.pages?Object.values(data.query.pages):[];
 }
-async function fetchWikipedia(count=30){
-  const batches=await Promise.allSettled([fetchWikiBatch(),fetchWikiBatch()]);
+async function fetchWikipedia(count=30,batchCount=2){
+  const batches=await Promise.allSettled(Array.from({length:batchCount},fetchWikiBatch));
   const seen=new Set(),out=[];
   for(const b of batches){
     if(b.status!=="fulfilled")continue;
@@ -342,23 +346,39 @@ async function fetchWikipedia(count=30){
   return out.slice(0,count);
 }
 
+/* ---------- Cache local : affichage instantané au lancement ---------- */
+const LS_CACHE="fluxswipe.cache.v1";
+function cacheSave(m){try{const all=JSON.parse(localStorage.getItem(LS_CACHE)||"{}");
+  all[m]={t:Date.now(),items:items.slice(0,40)};localStorage.setItem(LS_CACHE,JSON.stringify(all));}catch(e){}}
+function cacheLoad(m){try{const e=(JSON.parse(localStorage.getItem(LS_CACHE)||"{}"))[m];
+  if(e&&Array.isArray(e.items)&&e.items.length)return e.items;}catch(e){}return null;}
+
 /* ---------- Chargement principal ---------- */
 async function loadFeeds(){
-  show("loading");demobadge(false);
-  if(mode==="learn"){
+  demobadge(false);
+  const m=mode;                                   // capture : l'utilisateur peut changer de mode pendant le fetch
+  const cached=cacheLoad(m);
+  if(cached){items=cached;render();hideStates();}  // peinture immédiate depuis le cache
+  else show("loading");
+
+  if(m==="learn"){
     try{
-      const arr=await fetchWikipedia(30);
+      const arr=await fetchWikipedia(20,1);        // un seul lot au démarrage → rapide ; le scroll infini complète
       if(!arr.length)throw new Error("empty");
-      items=arr;
+      if(mode!==m)return;
+      items=arr;render(cached&&feedEl.scrollTop>50);hideStates();cacheSave(m);
     }catch(e){
-      items=structuredClone(DEMO_LEARN);demobadge(true);
+      if(mode!==m||cached)return;                  // si on a déjà le cache, on le garde
+      items=structuredClone(DEMO_LEARN);demobadge(true);render();hideStates();
     }
-    render();hideStates();return;
+    return;
   }
+
   const active=feeds.filter(f=>f.on);
-  if(!active.length){items=[];render();showEmpty("no-feeds");return;}
+  if(!active.length){if(!cached){items=[];render();showEmpty("no-feeds");}return;}
   try{
     const results=await Promise.allSettled(active.map(fetchFeedRobust));
+    if(mode!==m)return;
     let all=[];const failed=[];
     results.forEach((r,i)=>{
       if(r.status==="fulfilled"&&r.value.length)all=all.concat(r.value);
@@ -367,19 +387,21 @@ async function loadFeeds(){
     if(!all.length)throw new Error("no-items");
     all.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
     items=all.slice(0,120);
-    render();hideStates();
+    render(cached&&feedEl.scrollTop>50);hideStates();cacheSave(m);
     if(failed.length)toast(`${failed.length} flux injoignable${failed.length>1?"s":""}`);
   }catch(e){
-    items=[];render();showEmpty("all-failed");
+    if(mode!==m)return;
+    if(cached)toast("Réseau indisponible — affichage du cache");
+    else{items=[];render();showEmpty("all-failed");}
   }
 }
 
 /* ---------- Rendu ---------- */
 const feedEl=document.getElementById("feed");
 let loadingMore=false;
-function render(){
+function render(keepScroll){
   feedEl.innerHTML=items.map((it,i)=>cardHTML(it,i)).join("");
-  feedEl.scrollTop=0;
+  if(!keepScroll)feedEl.scrollTop=0;
   document.getElementById("hint").classList.toggle("hidden",items.length===0);
   attachRail();updateProgress();
 }
@@ -392,7 +414,7 @@ async function loadMoreLearn(){
   if(loadingMore||mode!=="learn")return;
   loadingMore=true;
   try{
-    const more=await fetchWikipedia(20);
+    const more=await fetchWikipedia(20,1);
     const have=new Set(items.map(i=>i.title));
     const fresh=more.filter(m=>!have.has(m.title));
     if(fresh.length){const start=items.length;items=items.concat(fresh);appendCards(fresh,start);}

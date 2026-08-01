@@ -12,7 +12,7 @@ module.exports = async function handler(req, res) {
 
   try {
     const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 12000);
+    const t = setTimeout(() => ctl.abort(), 8000);
     const upstream = await fetch(url, {
       signal: ctl.signal,
       redirect: "follow",
