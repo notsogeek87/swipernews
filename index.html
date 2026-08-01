@@ -439,6 +439,16 @@ function rememberPos(){
   const it=items[idx];
   if(it&&it.link){posMap[mode]=it.link;persistPos();}
 }
+// Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
+const DEBUG=/[?&]debug/.test(location.search);
+function dbg(msg){
+  if(!DEBUG)return;
+  let el=document.getElementById("dbg");
+  if(!el){el=document.createElement("div");el.id="dbg";
+    el.style.cssText="position:fixed;left:6px;bottom:6px;z-index:999;background:rgba(0,0,0,.82);color:#5f5;font:11px/1.4 monospace;padding:6px 8px;border-radius:6px;max-width:92vw;white-space:pre-wrap;pointer-events:none";
+    document.body.appendChild(el);}
+  el.textContent=msg;
+}
 
 // Persiste sans attendre le debounce quand l'app passe en arrière-plan / se ferme
 function persistAll(){persistSeen();persistPos();}
@@ -755,7 +765,14 @@ function render(keepScroll){
       if(i>0){top=i*feedEl.clientHeight;resumePending=false;}
       else if(i===0){resumePending=false;}}   // i===-1 : pas encore là → on réessaiera
   }
+  // Lecture de scrollHeight = on FORCE le recalcul du layout, sinon l'affectation
+  // de scrollTop est bornée par un scrollHeight encore à 0 → on retombe en haut.
+  void feedEl.scrollHeight;
   feedEl.scrollTop=top;                          // restaure explicitement (innerHTML l'a remis à 0)
+  // Filet de sécurité : re-applique après le prochain frame si la valeur a été bornée
+  if(top>0)requestAnimationFrame(()=>{if(Math.abs(feedEl.scrollTop-top)>4)feedEl.scrollTop=top;});
+  if(DEBUG&&mode==="news"){const l=posMap["news"]||"";const i=items.findIndex(it=>it.link===l);
+    dbg(`saved=…${l.slice(-26)}\nfound i=${i}  ch=${feedEl.clientHeight}  sh=${feedEl.scrollHeight}\ntop=${top}  scrollTop=${feedEl.scrollTop}\nitems=${items.length}  resumePending=${resumePending}`);}
   document.getElementById("hint").classList.toggle("hidden",items.length===0);
   updateProgress();markVisibleSeen();          // la 1ère carte affichée compte comme vue
 }
