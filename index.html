@@ -70,6 +70,15 @@
   .modeswitch button.active{background:rgba(255,255,255,.16);color:var(--ink);box-shadow:0 1px 8px rgba(0,0,0,.28)}
   .modeswitch button .ic{font-size:15px}
 
+  /* Barre de catégories (mode Apprendre) : chips défilables horizontalement */
+  .cats{display:none;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+  .cats::-webkit-scrollbar{display:none}
+  body.learn .cats{display:flex}
+  .cats button{flex:0 0 auto;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
+    color:var(--muted);font-family:var(--sans);font-weight:600;font-size:13px;padding:7px 14px;border-radius:100px;
+    cursor:pointer;white-space:nowrap;backdrop-filter:blur(12px);transition:background .2s,color .2s,border-color .2s}
+  .cats button.active{background:rgba(74,217,255,.16);border-color:rgba(74,217,255,.5);color:#bff0ff}
+
   .demobadge{position:fixed;top:calc(116px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:14;
     background:rgba(74,217,255,.15);border:1px solid rgba(74,217,255,.35);color:var(--accent-2);
     padding:6px 14px;border-radius:100px;font-size:12px;font-weight:600}
@@ -157,6 +166,7 @@
     <button id="tabNews" class="active" role="tab"><span class="ic">📰</span> Actus</button>
     <button id="tabLearn" role="tab"><span class="ic">🎓</span> Apprendre</button>
   </div>
+  <div class="cats" id="cats" aria-label="Centres d'intérêt"></div>
 </header>
 
 <div class="demobadge hidden" id="demobadge">Mode démo — hors-ligne</div>
@@ -223,8 +233,27 @@ const DEFAULT_FEEDS = [
 ];
 const LS_KEY="fluxswipe.feeds.v1";
 const LS_MODE="fluxswipe.mode.v1";
+const LS_CAT="fluxswipe.cat.v1";
 let feeds=load(),items=[],liked=new Set();
 let mode=(()=>{try{return localStorage.getItem(LS_MODE)==="learn"?"learn":"news";}catch(e){return "news";}})();
+
+/* Centres d'intérêt (mode Apprendre). q = requête de recherche Wikipédia ; null = purement aléatoire.
+   deepcategory:"X" cible les articles de la catégorie X et de ses sous-catégories. */
+const CATEGORIES=[
+  {key:"random",   label:"🎲 Aléatoire",     q:null},
+  {key:"sciences", label:"🔬 Sciences",      q:'deepcategory:"Sciences"'},
+  {key:"histoire", label:"📜 Histoire",      q:'deepcategory:"Histoire"'},
+  {key:"art",      label:"🎨 Art & Culture", q:'deepcategory:"Arts"'},
+  {key:"geo",      label:"🌍 Géographie",    q:'deepcategory:"Géographie"'},
+  {key:"nature",   label:"🐾 Nature",        q:'deepcategory:"Nature"'},
+  {key:"espace",   label:"🌌 Espace",        q:'deepcategory:"Astronomie"'},
+  {key:"tech",     label:"💻 Technologie",   q:'deepcategory:"Technologie"'},
+  {key:"sport",    label:"⚽ Sport",         q:'deepcategory:"Sport"'},
+  {key:"cinema",   label:"🎬 Cinéma",        q:'deepcategory:"Cinéma"'},
+  {key:"musique",  label:"🎵 Musique",       q:'deepcategory:"Musique"'},
+  {key:"philo",    label:"🧠 Philosophie",   q:'deepcategory:"Philosophie"'},
+];
+let cat=(()=>{try{return localStorage.getItem(LS_CAT)||"random";}catch(e){return "random";}})();
 
 function load(){try{const s=localStorage.getItem(LS_KEY);if(s)return JSON.parse(s);}catch(e){}return structuredClone(DEFAULT_FEEDS);}
 function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(feeds));}catch(e){}}
@@ -307,13 +336,19 @@ function relTime(dateStr){const t=Date.parse(dateStr);if(isNaN(t))return "";
 const WIKI_LANG="fr";
 /* Un lot d'articles au hasard, via l'API action (extraits longs + image + URL, en un appel). */
 async function fetchWikiBatch(){
+  const c=CATEGORIES.find(x=>x.key===cat)||CATEGORIES[0];
   const params=new URLSearchParams({
     action:"query",format:"json",origin:"*",
-    generator:"random",grnnamespace:"0",grnlimit:"20",
     prop:"extracts|pageimages|info",
     explaintext:"1",exintro:"1",exlimit:"20",            // exintro (pas exsentences, incompatible avec exlimit>1) + exlimit=20 : un extrait pour CHAQUE article
     piprop:"thumbnail|original",pithumbsize:"1200",pilimit:"20",inprop:"url"
   });
+  if(c.q){                                               // catégorie : recherche triée au hasard
+    params.set("generator","search");params.set("gsrsearch",c.q);
+    params.set("gsrsort","random");params.set("gsrnamespace","0");params.set("gsrlimit","20");
+  }else{                                                 // Aléatoire pur
+    params.set("generator","random");params.set("grnnamespace","0");params.set("grnlimit","20");
+  }
   const url=`https://${WIKI_LANG}.wikipedia.org/w/api.php?${params}`;
   let data;
   try{
@@ -357,7 +392,8 @@ function cacheLoad(m){try{const e=(JSON.parse(localStorage.getItem(LS_CACHE)||"{
 async function loadFeeds(){
   demobadge(false);
   const m=mode;                                   // capture : l'utilisateur peut changer de mode pendant le fetch
-  const cached=cacheLoad(m);
+  const key=m==="learn"?("learn_"+cat):"news";    // cache distinct par catégorie
+  const cached=cacheLoad(key);
   if(cached){items=cached;render();hideStates();}  // peinture immédiate depuis le cache
   else show("loading");
 
@@ -365,8 +401,8 @@ async function loadFeeds(){
     try{
       const arr=await fetchWikipedia(20,1);        // un seul lot au démarrage → rapide ; le scroll infini complète
       if(!arr.length)throw new Error("empty");
-      if(mode!==m)return;
-      items=arr;render(cached&&feedEl.scrollTop>50);hideStates();cacheSave(m);
+      if(mode!==m||cat!==(key.slice(6)))return;    // catégorie changée entre-temps → on abandonne
+      items=arr;render(cached&&feedEl.scrollTop>50);hideStates();cacheSave(key);
     }catch(e){
       if(mode!==m||cached)return;                  // si on a déjà le cache, on le garde
       items=structuredClone(DEMO_LEARN);demobadge(true);render();hideStates();
@@ -387,7 +423,7 @@ async function loadFeeds(){
     if(!all.length)throw new Error("no-items");
     all.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
     items=all.slice(0,120);
-    render(cached&&feedEl.scrollTop>50);hideStates();cacheSave(m);
+    render(cached&&feedEl.scrollTop>50);hideStates();cacheSave(key);
     if(failed.length)toast(`${failed.length} flux injoignable${failed.length>1?"s":""}`);
   }catch(e){
     if(mode!==m)return;
@@ -531,6 +567,23 @@ function setMode(m){
 tabNews.onclick=()=>setMode("news");
 tabLearn.onclick=()=>setMode("learn");
 applyModeUI();
+
+/* ---------- Centres d'intérêt (mode Apprendre) ---------- */
+const catsEl=document.getElementById("cats");
+function renderCats(){
+  catsEl.innerHTML=CATEGORIES.map(c=>`<button data-k="${c.key}" class="${c.key===cat?"active":""}">${c.label}</button>`).join("");
+  catsEl.querySelectorAll("button").forEach(b=>b.onclick=()=>setCat(b.dataset.k));
+}
+function setCat(k){
+  if(k===cat)return;
+  cat=k;
+  try{localStorage.setItem(LS_CAT,cat);}catch(e){}
+  renderCats();
+  const active=catsEl.querySelector("button.active");
+  if(active)active.scrollIntoView({inline:"center",block:"nearest",behavior:"smooth"});
+  if(mode==="learn")loadFeeds();
+}
+renderCats();
 function renderList(){document.getElementById("feedList").innerHTML=feeds.map((f,i)=>`
   <div class="feedrow"><input type="checkbox" ${f.on?"checked":""} onchange="toggleFeed(${i})">
     <div><div class="name">${esc(f.name)}</div><div class="url">${esc(f.url)}</div></div>

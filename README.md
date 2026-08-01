@@ -22,6 +22,13 @@ le fil n'affiche alors que des articles **Wikipédia** tirés au hasard (titre, 
 image, lien vers l'article). L'ambiance change (accent cyan + badge) pour bien distinguer
 les deux univers, et un nouvel appui sur **📰 Actus** revient aux flux RSS.
 
+Une **barre de centres d'intérêt** (chips défilables sous les onglets) permet de choisir
+ce qu'on veut apprendre : **Aléatoire** (défaut), Sciences, Histoire, Art & Culture,
+Géographie, Nature, Espace, Technologie, Sport, Cinéma, Musique, Philosophie. Chaque
+catégorie utilise le moteur de recherche de Wikipédia (`generator=search`,
+`gsrsort=random`, `deepcategory:"…"`) pour tirer des articles au hasard dans la catégorie
+et ses sous-catégories. Le choix est mémorisé et chaque catégorie a son propre cache.
+
 Les articles viennent de l'API REST de Wikimedia
 (`/api/rest_v1/page/random/summary`), qui autorise le CORS : aucun proxy n'est
 nécessaire côté navigateur. Un repli démo s'affiche si l'API n'est pas joignable.
