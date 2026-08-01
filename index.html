@@ -291,6 +291,7 @@ const CONFIG = {
   MAX_CARDS: 60,         // cartes gardées dans le DOM (borne le fil infini)
   MAX_ITEMS: 300,        // items gardés en mémoire (dédoublonnage du scroll)
   CACHE_ITEMS: 40,       // articles mis en cache localStorage par catégorie
+  SEEN_MAX: 2000,        // articles « déjà vus » mémorisés (mode Apprendre)
   APP_URL: "http://news.lielu.eu", // lien promo inclus au partage
 };
 
@@ -373,6 +374,29 @@ function safeImg(src){
     return "";}
   catch(_){return "";}
 }
+
+/* ---------- Mémoire « déjà vu » (mode Apprendre) ----------
+   Un article est marqué vu quand il passe réellement à l'écran. Les lots
+   suivants excluent ce qui a déjà été vu ; si tout a été vu, on ré-autorise
+   les plus anciens pour ne pas tarir le fil. Stockage borné. */
+const LS_SEEN="fluxswipe.seen.v1";
+let seen=(()=>{try{const a=JSON.parse(localStorage.getItem(LS_SEEN)||"[]");return new Set(Array.isArray(a)?a:[]);}catch(e){return new Set();}})();
+function seenKey(it){return (it.link||"")+"|"+(it.title||"");}
+let seenDirty=false,seenPersistT;
+function persistSeen(){if(!seenDirty)return;seenDirty=false;
+  try{localStorage.setItem(LS_SEEN,JSON.stringify([...seen]));}catch(e){warn("save seen",e);}}
+function addSeen(it){
+  const k=seenKey(it);
+  if(!it.title||seen.has(k))return;
+  seen.add(k);seenDirty=true;
+  if(seen.size>CONFIG.SEEN_MAX)seen=new Set([...seen].slice(-CONFIG.SEEN_MAX)); // garde les plus récents
+  clearTimeout(seenPersistT);seenPersistT=setTimeout(persistSeen,800);           // écriture localStorage groupée
+}
+// Retire les articles déjà vus ; si tout est vu, renvoie la liste telle quelle (repli)
+function dropSeen(list){const fresh=list.filter(it=>!seen.has(seenKey(it)));return fresh.length?fresh:list;}
+// Persiste sans attendre le debounce quand l'app passe en arrière-plan / se ferme
+window.addEventListener("pagehide",persistSeen);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")persistSeen();});
 
 /* ---------- Récupération avec plusieurs proxys de secours ---------- */
 const PROXIES=[
@@ -542,26 +566,29 @@ async function fetchLearnClient(keys,count){
   });
   if(!tasks.length)tasks.push(srcWikipedia(keys[0]||"random")); // garde-fou : au moins Wikipédia
   const results=await Promise.allSettled(tasks);
-  const seen=new Set();let out=[];
+  const dedup=new Set();let out=[];
   results.forEach(r=>{if(r.status==="fulfilled")r.value.forEach(it=>{
     const k=(it.link||"")+"|"+it.title;
-    if(it.title&&!seen.has(k)){seen.add(k);out.push(it);}
+    if(it.title&&!dedup.has(k)){dedup.add(k);out.push(it);}
   });});
   const withImg=shuffle(out.filter(i=>i.img)),noImg=shuffle(out.filter(i=>!i.img));
   return withImg.concat(noImg).slice(0,count);          // articles avec image d'abord, sources mélangées
 }
-/* Un lot mélangé : backend agrégateur d'abord (cache CDN mutualisé), sinon client. */
+/* Un lot mélangé : backend agrégateur d'abord (cache CDN mutualisé), sinon client.
+   On écarte les articles déjà vus (dropSeen), avec repli si tout a été vu. */
 async function fetchLearn(count=CONFIG.BATCH_SIZE){
   const keys=catKeysForBatch();
+  let batch=null;
   try{
     const qs=new URLSearchParams({cats:keys.join(","),sources:sources.join(","),count:String(count)});
     const res=await fetchWithTimeout("/api/learn?"+qs,{cache:"no-store"},CONFIG.FETCH_TIMEOUT);
     if(res.ok){
       const data=await res.json();
-      if(data&&Array.isArray(data.items)&&data.items.length)return data.items.slice(0,count);
+      if(data&&Array.isArray(data.items)&&data.items.length)batch=data.items;
     }
   }catch(e){warn("learn backend",e);/* repli client */}
-  return fetchLearnClient(keys,count);
+  if(!batch)batch=await fetchLearnClient(keys,count);
+  return dropSeen(batch).slice(0,count);
 }
 
 /* ---------- Cache local : affichage instantané au lancement ---------- */
@@ -631,12 +658,22 @@ const cardReg=new Map();
 let cardSeq=0;
 const {MAX_CARDS,MAX_ITEMS}=CONFIG;   // bornes du fil infini (DOM + mémoire)
 function renderCard(it){const id=cardSeq++;cardReg.set(id,it);return cardHTML(it,id);}
+// Marque comme « vu » la carte actuellement à l'écran (mode Apprendre seulement)
+let lastMarkIdx=-1;
+function markVisibleSeen(){
+  if(mode!=="learn"||!feedEl.children.length)return;
+  const idx=Math.round(feedEl.scrollTop/Math.max(1,feedEl.clientHeight));
+  if(idx===lastMarkIdx)return;
+  lastMarkIdx=idx;
+  const card=feedEl.children[idx];
+  if(card){const it=cardReg.get(+card.dataset.id);if(it)addSeen(it);}
+}
 function render(keepScroll){
-  cardReg.clear();cardSeq=0;
+  cardReg.clear();cardSeq=0;lastMarkIdx=-1;
   feedEl.innerHTML=items.map(renderCard).join("");
   if(!keepScroll)feedEl.scrollTop=0;
   document.getElementById("hint").classList.toggle("hidden",items.length===0);
-  updateProgress();
+  updateProgress();markVisibleSeen();          // la 1ère carte affichée compte comme vue
 }
 /* Ajoute des cartes à la suite sans réinitialiser le scroll (mode Apprendre infini) */
 function appendCards(newItems){
@@ -768,6 +805,7 @@ feedEl.addEventListener("scroll",()=>{
   if(feedEl.scrollTop>50)document.getElementById("hint").classList.add("hidden");
   if(Date.now()>=revealUntil&&Math.abs(feedEl.scrollTop-lastScrollY)>4){hideTop();scheduleTopReveal();} // on swipe → on masque
   lastScrollY=feedEl.scrollTop;
+  markVisibleSeen();                        // marque la carte courante comme vue
   // Mode Apprendre : charge un nouveau lot avant d'atteindre le bas → fil sans fin
   if(mode==="learn"&&!loadingMore&&items.length&&
      feedEl.scrollTop+feedEl.clientHeight*3>=feedEl.scrollHeight)loadMoreLearn();
@@ -849,6 +887,7 @@ function restoreFeed(m){
   document.getElementById("hint").classList.toggle("hidden",items.length===0);
   updateProgress();
   feedEl.scrollTop=s.scrollTop;                     // restaure la position exacte
+  lastMarkIdx=-1;markVisibleSeen();                 // recalage du marquage « vu »
   return true;
 }
 function setMode(m){
