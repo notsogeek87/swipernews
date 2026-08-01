@@ -1,0 +1,18 @@
+{
+  "name": "swipernews",
+  "version": "1.0.0",
+  "description": "Flux RSS et découverte Wikipédia en swipe vertical (PWA, un seul fichier, zéro build).",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "lint": "eslint api test eslint.config.js",
+    "format": "prettier --write .",
+    "format:check": "prettier --check \"**/*.{js,json,md}\"",
+    "test": "node --test"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "^9.13.0",
+    "prettier": "^3.3.3"
+  }
+}

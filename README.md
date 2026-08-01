@@ -1,7 +1,8 @@
 # Flux — actus RSS en swipe
 
 Une application web (PWA) qui affiche des flux RSS en mode swipe vertical, à la TikTok.
-Un seul fichier, aucune dépendance, aucun build.
+Côté **exécution**, tout tient dans `index.html` : aucune dépendance, aucun build, ouvrable tel quel.
+L'outillage de **développement** (lint, tests, CI) est optionnel et ne change rien au déploiement.
 
 ## Fonctionnalités
 
@@ -88,6 +89,39 @@ Si toutes les sources échouent, l'app **n'affiche plus de contenu de démo** : 
 un message d'erreur avec les boutons *Réessayer* et *Ouvrir les sources*. Pour une fiabilité
 maximale (et pour ne dépendre d'aucun tiers), prévoir un petit backend qui récupère et
 parse le RSS côté serveur.
+
+## Développement
+
+Le cœur de l'app reste sans build. Un petit outillage est fourni pour la qualité :
+
+```bash
+npm install       # eslint + prettier (dev uniquement)
+npm run lint      # analyse statique du backend et des tests
+npm run format    # formatage (index.html volontairement exclu)
+npm test          # tests unitaires (gardes anti-SSRF du proxy)
+```
+
+La CI GitHub Actions (`.github/workflows/ci.yml`) rejoue lint + format + tests sur chaque PR.
+
+## Sécurité
+
+- Le proxy `api/feed.js` valide l'URL demandée et **refuse le réseau interne**
+  (localhost, IP privées, métadonnées cloud) — protection anti-SSRF — en plus de
+  plafonner la taille de réponse.
+- Les liens et images issus des flux sont **assainis** avant affichage (schémas
+  `javascript:`/`data:` non exécutés).
+- Le service worker ne met en cache que l'app-shell same-origin et purge ses
+  anciennes versions (pas de cache non borné).
+
+## Architecture
+
+- **Mode Actus** : `api/feed.js` (proxy RSS durci) ou, en repli, proxys CORS publics.
+- **Mode Apprendre** : `api/learn.js` agrège **côté serveur** Wikipédia + GBIF + Gallica
+  (cache CDN mutualisé entre utilisateurs). Le front l'appelle en priorité et se rabat
+  sur son agrégation client si l'endpoint n'est pas déployé (hébergement statique).
+- **PWA** : `manifest.webmanifest` et `sw.js` sont de vrais fichiers servis en statique.
+- **Accessibilité** : panneaux en `role="dialog"` fermables au clavier (Échap), gestion
+  du focus ; titres de carte en `h2`.
 
 ## Limites connues
 
