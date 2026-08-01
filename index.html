@@ -182,7 +182,6 @@
   <div class="topline">
     <div class="brand"><span class="mark">◆</span> Flux</div>
     <div class="actions">
-      <button id="installBtn" class="hidden" title="Installer l'app">⤓ Installer</button>
       <button id="reloadBtn" class="iconbtn" title="Rafraîchir les articles" aria-label="Rafraîchir">↻</button>
       <button id="openSheet" title="Gérer tes sources / réglages">⚙ Sources</button>
     </div>
@@ -832,32 +831,33 @@ loadFeeds();
   const isIos=/iphone|ipad|ipod/i.test(navigator.userAgent);
   const standalone=window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone;
 
-  let deferred=null;
-  const btn=document.getElementById("installBtn");
-  window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;btn.classList.remove("hidden");setTimeout(maybeShowBar,5000);});
-  btn.onclick=async()=>{
-    if(!deferred){showIosHint();return;}
-    deferred.prompt();await deferred.userChoice;deferred=null;btn.classList.add("hidden");
-  };
-  window.addEventListener("appinstalled",()=>{btn.classList.add("hidden");closeBar(true);});
+  /* État PWA persistant : installed / declined / nombre de fermetures.
+     On ne propose l'installation que si l'utilisateur ne l'a pas déjà installée
+     et n'a pas signifié qu'il ne le souhaitait pas. */
+  const PWA_KEY="fluxswipe.pwa.v2";
+  function pwaState(){try{return JSON.parse(localStorage.getItem(PWA_KEY)||"{}");}catch(e){return {};}}
+  function pwaSet(patch){try{localStorage.setItem(PWA_KEY,JSON.stringify({...pwaState(),...patch}));}catch(e){}}
+  if(standalone)pwaSet({installed:true});             // lancée en app installée → on le mémorise
 
-  if(isIos && !standalone){btn.classList.remove("hidden");}
-  function showIosHint(){
-    if(isIos)toast("Appuie sur Partager puis « Sur l'écran d'accueil »");
-    else toast("Installation non disponible sur ce navigateur");
-  }
+  let deferred=null;
+  window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;setTimeout(maybeShowBar,5000);});
+  window.addEventListener("appinstalled",()=>{pwaSet({installed:true});hideBar();});
 
   /* ---- Bannière d'incitation à installer ---- */
-  const DISMISS_KEY="fluxswipe.pwa.dismiss.v1";
   const bar=document.getElementById("installBar");
   let barShown=false;
-  function dismissedRecently(){try{return Date.now()-(+localStorage.getItem(DISMISS_KEY)||0)<7*864e5;}catch(e){return false;}}
-  function closeBar(remember){
-    if(remember){try{localStorage.setItem(DISMISS_KEY,Date.now());}catch(e){}}
-    bar.classList.remove("show");setTimeout(()=>bar.classList.add("hidden"),300);
+  function canShowBar(){
+    if(standalone)return false;
+    const s=pwaState();
+    if(s.installed||s.declined)return false;           // déjà installée, ou refus explicite
+    if((s.dismissCount||0)>=2)return false;            // fermée 2 fois → il ne veut clairement pas
+    if(s.lastDismiss&&Date.now()-s.lastDismiss<3*864e5)return false; // rappel espacé de 3 jours
+    return true;
   }
+  function hideBar(){bar.classList.remove("show");setTimeout(()=>bar.classList.add("hidden"),300);}
+  function snooze(){const s=pwaState();pwaSet({dismissCount:(s.dismissCount||0)+1,lastDismiss:Date.now()});hideBar();}
   function maybeShowBar(){
-    if(barShown||standalone||dismissedRecently())return;
+    if(barShown||!canShowBar())return;
     const canPrompt=!!deferred, ios=isIos&&!standalone;
     if(!canPrompt&&!ios)return;                        // rien à proposer sur ce navigateur
     const sub=bar.querySelector(".installbar__sub"), b=document.getElementById("installBarBtn");
@@ -866,10 +866,15 @@ loadFeeds();
     barShown=true;
     bar.classList.remove("hidden");requestAnimationFrame(()=>bar.classList.add("show"));
   }
-  document.getElementById("installBarClose").onclick=()=>closeBar(true);
+  document.getElementById("installBarClose").onclick=snooze;
   document.getElementById("installBarBtn").onclick=async()=>{
-    if(deferred){deferred.prompt();try{await deferred.userChoice;}catch(e){}deferred=null;closeBar(true);}
-    else closeBar(true);                               // iOS : les étapes sont dans le texte
+    if(deferred){
+      deferred.prompt();
+      let outcome="dismissed";try{outcome=(await deferred.userChoice).outcome;}catch(e){}
+      deferred=null;
+      if(outcome==="accepted")pwaSet({installed:true});else pwaSet({declined:true}); // refus → on ne repropose plus
+      hideBar();
+    }else snooze();                                    // iOS « Compris » : étapes affichées, rappel espacé
   };
   // iOS n'émet pas beforeinstallprompt : on programme quand même la bannière
   if(isIos && !standalone)setTimeout(maybeShowBar,5000);
