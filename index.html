@@ -856,6 +856,7 @@ loadFeeds();
   }
   function hideBar(){bar.classList.remove("show");setTimeout(()=>bar.classList.add("hidden"),300);}
   function snooze(){const s=pwaState();pwaSet({dismissCount:(s.dismissCount||0)+1,lastDismiss:Date.now()});hideBar();}
+  function declineBar(){pwaSet({declined:true});hideBar();}   // clic sur la croix = il ne veut pas → on ne propose plus
   function maybeShowBar(){
     if(barShown||!canShowBar())return;
     const canPrompt=!!deferred, ios=isIos&&!standalone;
@@ -866,7 +867,7 @@ loadFeeds();
     barShown=true;
     bar.classList.remove("hidden");requestAnimationFrame(()=>bar.classList.add("show"));
   }
-  document.getElementById("installBarClose").onclick=snooze;
+  document.getElementById("installBarClose").onclick=declineBar;
   document.getElementById("installBarBtn").onclick=async()=>{
     if(deferred){
       deferred.prompt();
