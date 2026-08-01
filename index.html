@@ -160,6 +160,15 @@
   <p>Chargement des actus…</p>
 </div>
 
+<div class="state hidden" id="empty">
+  <h3 id="emptyTitle">Aucun article</h3>
+  <p id="emptyMsg"></p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:340px">
+    <button class="iobtn" onclick="loadFeeds()">↻ Réessayer</button>
+    <button class="iobtn" onclick="document.getElementById('openSheet').click()">Ouvrir les sources</button>
+  </div>
+</div>
+
 <div class="sheet" id="sheet">
   <div class="sheet__panel">
     <div class="sheet__grip"></div>
@@ -185,18 +194,6 @@
 <div class="toast" id="toast"></div>
 
 <script>
-/* ---------- Articles de démo (fonctionnent sans réseau) ---------- */
-const DEMO_ITEMS = [
-  {source:"Le Monde", title:"L'accord climatique final adopté après deux nuits de négociations", desc:"Les délégations sont parvenues à un compromis sur le financement des pays vulnérables, malgré les réticences de plusieurs grandes puissances jusqu'à la dernière heure.", date:new Date(Date.now()-1800e3).toISOString(), img:"https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=1200&q=70", link:"#"},
-  {source:"Tech Daily", title:"Les puces neuromorphiques font leur entrée dans les smartphones grand public", desc:"Une nouvelle génération de processeurs imite le fonctionnement du cerveau pour réduire drastiquement la consommation d'énergie des tâches d'IA embarquée.", date:new Date(Date.now()-5400e3).toISOString(), img:"https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=70", link:"#"},
-  {source:"BBC World", title:"Deep-sea mission uncovers dozens of species never seen before", desc:"Researchers exploring a trench in the Pacific catalogued marine life thriving in total darkness, reshaping ideas about the limits of habitability.", date:new Date(Date.now()-9000e3).toISOString(), img:"https://images.unsplash.com/photo-1551244072-5d12893278ab?w=1200&q=70", link:"#"},
-  {source:"Culture", title:"Le festival transforme une gare désaffectée en cathédrale sonore", desc:"Pendant trois jours, des installations immersives réinventent l'espace industriel, attirant un public bien au-delà des amateurs habituels de musique expérimentale.", date:new Date(Date.now()-14400e3).toISOString(), img:"https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&q=70", link:"#"},
-  {source:"Sport", title:"Une remontée historique scelle le titre à la dernière seconde", desc:"Menée de quinze points à cinq minutes du terme, l'équipe a renversé le match dans une fin de rencontre que les commentateurs qualifient déjà de légendaire.", date:new Date(Date.now()-18000e3).toISOString(), img:"https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=1200&q=70", link:"#"},
-  {source:"Sciences", title:"Un vaccin universel contre la grippe passe la phase d'essais clés", desc:"Ciblant une partie stable du virus, le candidat pourrait éviter la reformulation annuelle et offrir une protection durable sur plusieurs saisons.", date:new Date(Date.now()-25200e3).toISOString(), img:"https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200&q=70", link:"#"},
-  {source:"Économie", title:"Les monnaies numériques de banques centrales entrent en phase pilote", desc:"Plusieurs pays testent grandeur nature des paiements instantanés, relançant le débat sur la vie privée et le rôle des liquidités traditionnelles.", date:new Date(Date.now()-32400e3).toISOString(), img:"https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=1200&q=70", link:"#"},
-  {source:"Hacker News", title:"A tiny language model runs entirely in the browser tab", desc:"The open-source project compiles to WebAssembly and needs no server, sparking a lively discussion about the future of on-device inference.", date:new Date(Date.now()-39600e3).toISOString(), img:"https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=1200&q=70", link:"#"},
-];
-
 /* ---------- Articles Wikipédia de démo (repli hors-ligne du mode Apprendre) ---------- */
 const DEMO_LEARN = [
   {source:"Wikipédia", title:"Effet tunnel", desc:"En mécanique quantique, l'effet tunnel désigne la capacité d'une particule à franchir une barrière de potentiel qu'elle ne pourrait pas surmonter selon les lois de la physique classique. Ce comportement découle de la nature ondulatoire de la matière : la fonction d'onde de la particule ne s'annule pas brutalement à la barrière, mais décroît, laissant une probabilité non nulle de la retrouver de l'autre côté. Le phénomène est essentiel à la fusion nucléaire au cœur du Soleil, où il permet aux protons de se rapprocher malgré leur répulsion. Il est aussi exploité par le microscope à effet tunnel, capable d'imager des surfaces atome par atome, et par certains composants électroniques comme la diode tunnel.", date:"", img:"https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Effet_tunnel"},
@@ -226,7 +223,9 @@ function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(feeds));}catch(e)
 const PROXIES=[
   u=>"https://api.allorigins.win/raw?url="+encodeURIComponent(u),
   u=>"https://corsproxy.io/?url="+encodeURIComponent(u),
+  u=>"https://api.codetabs.com/v1/proxy/?quest="+encodeURIComponent(u),
   u=>"https://thingproxy.freeboard.io/fetch/"+u,
+  u=>"https://api.allorigins.win/get?url="+encodeURIComponent(u), // renvoie {contents,status}
 ];
 async function fetchText(url){
   for(const make of PROXIES){
@@ -234,10 +233,37 @@ async function fetchText(url){
       const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),8000);
       const res=await fetch(make(url),{cache:"no-store",signal:ctl.signal});
       clearTimeout(t);
-      if(res.ok){const txt=await res.text();if(txt&&txt.length>200)return txt;}
+      if(!res.ok)continue;
+      let txt=await res.text();
+      // dé-emballe le format allorigins /get : {contents:"…",status:{http_code}}
+      if(txt&&txt.startsWith("{")&&txt.includes('"contents"')&&txt.includes('"http_code"')){
+        try{const j=JSON.parse(txt);if(j&&typeof j.contents==="string")txt=j.contents;}catch(_){}
+      }
+      if(txt&&txt.length>200)return txt;
     }catch(e){/* proxy suivant */}
   }
   throw new Error("no-proxy");
+}
+/* rss2json : service dédié qui parse le flux côté serveur et renvoie du JSON (CORS ok) */
+async function fetchFeedRss2Json(feed){
+  const api="https://api.rss2json.com/v1/api.json?count=60&rss_url="+encodeURIComponent(feed.url);
+  const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),9000);
+  const res=await fetch(api,{cache:"no-store",signal:ctl.signal});
+  clearTimeout(t);
+  if(!res.ok)throw new Error("http");
+  const data=await res.json();
+  if(!data||data.status!=="ok"||!Array.isArray(data.items))throw new Error("bad");
+  return data.items.map(it=>({
+    source:feed.name,title:(it.title||"").trim(),
+    desc:stripHtml(it.description||it.content||""),link:it.link||"",
+    img:it.thumbnail||(it.enclosure&&it.enclosure.link)||imgFromHtml(it.content||it.description||""),
+    date:it.pubDate||""
+  })).filter(i=>i.title);
+}
+/* Récupération robuste d'un flux : rss2json d'abord, puis repli proxys + parsing XML */
+async function fetchFeedRobust(feed){
+  try{const a=await fetchFeedRss2Json(feed);if(a.length)return a;}catch(e){/* repli XML */}
+  return await fetchFeed(feed);
 }
 async function fetchFeed(feed){
   const text=await fetchText(feed.url);
@@ -252,10 +278,11 @@ async function fetchFeed(feed){
   }).filter(i=>i.title);
 }
 function stripHtml(html){const d=document.createElement("div");d.innerHTML=html;return (d.textContent||"").replace(/\s+/g," ").trim();}
+function imgFromHtml(html){const g=html&&html.match(/<img[^>]+src=["']([^"']+)["']/i);return g?g[1]:"";}
 function findImage(node,raw){
   const m=node.querySelector("enclosure[url], content[url], thumbnail, [medium='image']");
   if(m){const u=m.getAttribute("url");if(u)return u;}
-  const g=raw&&raw.match(/<img[^>]+src=["']([^"']+)["']/i);return g?g[1]:"";
+  return imgFromHtml(raw);
 }
 function relTime(dateStr){const t=Date.parse(dateStr);if(isNaN(t))return "";
   const d=(Date.now()-t)/1000;if(d<3600)return Math.max(1,Math.round(d/60))+" min";
@@ -318,17 +345,22 @@ async function loadFeeds(){
     render();hideStates();return;
   }
   const active=feeds.filter(f=>f.on);
+  if(!active.length){items=[];render();showEmpty("no-feeds");return;}
   try{
-    if(!active.length) throw new Error("empty");
-    const results=await Promise.allSettled(active.map(fetchFeed));
-    let all=[];results.forEach(r=>{if(r.status==="fulfilled")all=all.concat(r.value);});
-    if(!all.length) throw new Error("no-items");
+    const results=await Promise.allSettled(active.map(fetchFeedRobust));
+    let all=[];const failed=[];
+    results.forEach((r,i)=>{
+      if(r.status==="fulfilled"&&r.value.length)all=all.concat(r.value);
+      else failed.push(active[i].name);
+    });
+    if(!all.length)throw new Error("no-items");
     all.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
-    items=all.slice(0,120);demobadge(false);
+    items=all.slice(0,120);
+    render();hideStates();
+    if(failed.length)toast(`${failed.length} flux injoignable${failed.length>1?"s":""}`);
   }catch(e){
-    items=structuredClone(DEMO_ITEMS);demobadge(true);
+    items=[];render();showEmpty("all-failed");
   }
-  render();hideStates();
 }
 
 /* ---------- Rendu ---------- */
@@ -521,8 +553,20 @@ function mergeFeeds(incoming){
 }
 
 /* ---------- Utils ---------- */
-function show(id){document.getElementById("loading").classList.toggle("hidden",id!=="loading");}
-function hideStates(){document.getElementById("loading").classList.add("hidden");}
+function show(id){["loading","empty"].forEach(s=>document.getElementById(s).classList.toggle("hidden",s!==id));}
+function hideStates(){document.getElementById("loading").classList.add("hidden");document.getElementById("empty").classList.add("hidden");}
+function showEmpty(reason){
+  document.getElementById("loading").classList.add("hidden");
+  const title=document.getElementById("emptyTitle"),msg=document.getElementById("emptyMsg");
+  if(reason==="no-feeds"){
+    title.textContent="Aucune source active";
+    msg.textContent="Ajoute ou active des flux RSS, ou importe tes sources (OPML / JSON) depuis le panneau Sources.";
+  }else{
+    title.textContent="Flux injoignables";
+    msg.textContent="Impossible de récupérer tes flux pour le moment (proxy CORS indisponible ou flux hors-ligne). Réessaie, ou vérifie tes sources.";
+  }
+  document.getElementById("empty").classList.remove("hidden");
+}
 function demobadge(on){document.getElementById("demobadge").classList.toggle("hidden",!on);}
 function modebadge(on){document.getElementById("modebadge").classList.toggle("hidden",!on);}
 let toastT;function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");
