@@ -824,11 +824,40 @@ function applyModeUI(){
   // les sources RSS n'ont pas de sens en mode Apprendre → on masque le réglage
   document.getElementById("openSheet").classList.toggle("hidden",on);
 }
+/* Mémorisation du fil par mode : à la bascule, on restaure l'état exact
+   (cartes affichées + position de scroll) au lieu de tout recharger.
+   Un fetch réel ne se fait plus qu'au 1er affichage, via ↻, ou sur un
+   changement de catégorie. */
+const feedSnap={};
+function feedKey(m){return m==="learn"?("learn_"+cat):"news";}
+function snapshotFeed(m){
+  if(!feedEl.children.length)return;               // rien à mémoriser
+  feedSnap[feedKey(m)]={
+    html:feedEl.innerHTML,scrollTop:feedEl.scrollTop,
+    items:items.slice(),reg:new Map(cardReg),seq:cardSeq
+  };
+}
+function restoreFeed(m){
+  const s=feedSnap[feedKey(m)];
+  if(!s||!s.html)return false;
+  loadSeq++;                                        // invalide un éventuel chargement en cours
+  items=s.items.slice();
+  feedEl.innerHTML=s.html;
+  cardReg.clear();s.reg.forEach((v,k)=>cardReg.set(k,v));
+  cardSeq=s.seq;
+  demobadge(false);hideStates();
+  document.getElementById("hint").classList.toggle("hidden",items.length===0);
+  updateProgress();
+  feedEl.scrollTop=s.scrollTop;                     // restaure la position exacte
+  return true;
+}
 function setMode(m){
   if(m===mode)return;
+  snapshotFeed(mode);                               // mémorise le fil qu'on quitte
   mode=m;
-  try{localStorage.setItem(LS_MODE,mode);}catch(e){}
-  applyModeUI();loadFeeds();
+  try{localStorage.setItem(LS_MODE,mode);}catch(e){warn("save mode",e);}
+  applyModeUI();
+  if(!restoreFeed(m))loadFeeds();                   // restaure si possible, sinon (re)charge
 }
 function setMode2Learn(){                          // à l'entrée du mode Apprendre, on propose l'onboarding la 1ère fois
   if(mode==="learn"&&!interestsChosen())openInterests();
