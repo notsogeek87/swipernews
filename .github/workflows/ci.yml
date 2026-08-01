@@ -14,7 +14,7 @@ jobs:
         with:
           node-version: "20"
       - name: Install dependencies
-        run: npm install
+        run: npm ci   # installation reproductible : package-lock.json fait foi
       - name: Lint
         run: npm run lint
       - name: Format check

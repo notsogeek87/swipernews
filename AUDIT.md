@@ -5,6 +5,22 @@ Revue complète du dépôt à l'état `c9d051c` : `index.html` (1296 l.), `api/f
 Angles couverts : sécurité, performances, expérience utilisateur, accessibilité,
 architecture et maintenabilité.
 
+> **État d'application.** Les recommandations des lots 1, 2 et 3 ont été implémentées
+> dans le commit qui suit cet audit — à deux exceptions près, laissées telles quelles et
+> signalées ici :
+>
+> - **§3.7 — optimisation des PNG** (`logo-512.png`, 262 Ko) : aucun optimiseur d'images
+>   (`oxipng`, `pngquant`, `optipng`) n'est disponible dans l'environnement. À faire
+>   localement, c'est un gain gratuit de ~230 Ko.
+> - **§5.3 — Lighthouse CI** : le job a besoin d'une URL de preview Vercel et d'un jeton
+>   de projet, qui ne peuvent pas être configurés depuis ici.
+>
+> Le reste est en place et vérifié : `npm test` (30 tests, dont l'assainissement des flux
+> et le noyau Apprendre partagé), plus deux campagnes dans un vrai Chromium — 12
+> vérifications de comportement, et un test dédié à la reprise de position sous rendu
+> progressif. Le document ci-dessous reste le raisonnement de référence ; il décrit l'état
+> **avant** correction.
+
 ---
 
 ## 1. Synthèse

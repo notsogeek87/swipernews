@@ -2,16 +2,38 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- Pas de maximum-scale/user-scalable : bloquer le zoom viole WCAG 1.4.4 et
+     n'apporte rien à un fil en scroll-snap. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>SwiperNews — apprendre & actus en swipe</title>
+<meta name="description" content="Apprends et suis l'actu en swipe : Wikipédia, patrimoine, biodiversité et tes flux RSS, une carte plein écran à la fois.">
 <link rel="icon" href="logo-192.png">
 <link rel="apple-touch-icon" href="logo-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0a0a0f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+
+<!-- Aperçus de partage : chaque article partagé embarque un lien vers l'app,
+     c'est la boucle d'acquisition. Sans ces balises l'aperçu est une URL nue. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SwiperNews">
+<meta property="og:title" content="SwiperNews — apprendre & actus en swipe">
+<meta property="og:description" content="Le swipe qui rend plus malin. Même geste que sur tes réseaux, sauf qu'ici chaque carte t'apprend quelque chose.">
+<meta property="og:url" content="https://news.lielu.eu">
+<meta property="og:image" content="https://news.lielu.eu/logo-512.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SwiperNews — apprendre & actus en swipe">
+<meta name="twitter:description" content="Le swipe qui rend plus malin.">
+<meta name="twitter:image" content="https://news.lielu.eu/logo-512.png">
+
+<!-- Polices : un @import dans le <style> est le pire emplacement (le navigateur
+     doit parser le CSS avant même de découvrir la requête). preconnect + link
+     parallélisent la chaîne HTML → CSS → WOFF2. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap');
   :root{
     --bg:#0a0a0f;--ink:#f5f3ef;--muted:#8a8a99;
     --accent:#ff3b6b;--accent-2:#4ad9ff;
@@ -20,13 +42,26 @@
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--sans);overscroll-behavior:none}
 
+  /* Pas de scroll-behavior:smooth ici : par spec CSSOM View, le setter scrollTop
+     défile avec le comportement calculé de l'élément, donc TOUTES les
+     restaurations de position (reprise de session, capDom, bascule de mode)
+     seraient animées au lieu d'être instantanées — en conflit avec le
+     scroll-snap et avec le geste en cours. Le défilement doux est demandé
+     explicitement là où il est voulu (navigation clavier). */
   #feed{height:100dvh;width:100%;overflow-y:scroll;scroll-snap-type:y mandatory;
-    scroll-behavior:smooth;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    -webkit-overflow-scrolling:touch;scrollbar-width:none}
   #feed::-webkit-scrollbar{display:none}
 
+  /* content-visibility : le navigateur saute layout, paint ET chargement des
+     images de fond pour les cartes hors écran. Sans cela, un fil de 120 cartes
+     plein écran garde 120 images décodées en mémoire GPU.
+     contain-intrinsic-size évite l'effondrement de la hauteur de défilement. */
   .card{height:100dvh;width:100%;scroll-snap-align:start;scroll-snap-stop:always;
-    position:relative;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden}
-  .card__bg{position:absolute;inset:0;background-size:cover;background-position:center;transform:scale(1.08);filter:saturate(1.1)}
+    position:relative;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;
+    content-visibility:auto;contain-intrinsic-size:auto 100dvh}
+  /* pas de filter ici : saturate() crée une couche composite par carte, pour un
+     rendu qu'on obtient en ajustant le dégradé au-dessus */
+  .card__bg{position:absolute;inset:0;background-size:cover;background-position:center;transform:scale(1.08)}
   .card__bg::after{content:"";position:absolute;inset:0;
     background:linear-gradient(to top,rgba(6,6,10,.96) 0%,rgba(6,6,10,.82) 28%,rgba(6,6,10,.25) 60%,rgba(6,6,10,.55) 100%)}
   .card__noimg{position:absolute;inset:0;
@@ -51,8 +86,13 @@
   .card__open svg{width:18px;height:18px;flex:0 0 auto}
   .card__open:active{transform:scale(.97)}
 
-  .rail{position:absolute;right:16px;bottom:calc(41px + env(safe-area-inset-bottom));z-index:3;
+  /* Rail UNIQUE en position:fixed, hors des cartes. Auparavant chaque carte
+     portait son propre rail avec backdrop-filter:blur(12px) — l'un des effets
+     les plus coûteux du moteur de rendu — soit jusqu'à 120 surfaces de flou
+     simultanées. Il agit désormais sur la carte courante. */
+  .rail{position:fixed;right:16px;bottom:calc(41px + env(safe-area-inset-bottom));z-index:3;
     display:flex;flex-direction:column;gap:18px;align-items:center}
+  .rail.hidden{display:none}
   .rail button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink);
     width:52px;height:52px;border-radius:50%;cursor:pointer;backdrop-filter:blur(12px);
     display:grid;place-items:center;transition:transform .15s,background .2s}
@@ -191,9 +231,22 @@
     font-weight:700;font-size:13px;padding:11px 16px;border-radius:100px;cursor:pointer}
   .installbar__btn:active{transform:scale(.96)}
   .installbar__close{flex:0 0 auto;background:transparent;border:none;color:var(--muted);font-size:17px;cursor:pointer;padding:4px 6px}
+
+  /* Titre de page pour les lecteurs d'écran (les cartes sont en h2) */
+  .visually-hidden{position:absolute!important;width:1px;height:1px;margin:-1px;padding:0;
+    overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+
+  /* Respect du réglage système « réduire les animations » (WCAG 2.3.3) */
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
+      transition-duration:.001ms!important;scroll-behavior:auto!important}
+    .hint{animation:none}
+  }
 </style>
 </head>
 <body>
+
+<h1 class="visually-hidden">SwiperNews — apprendre et suivre l'actualité en swipe</h1>
 
 <div class="progress"><div class="progress__bar" id="pbar"></div></div>
 
@@ -206,24 +259,29 @@
     </div>
   </div>
   <div class="modeswitch" role="tablist" aria-label="Choix du mode">
-    <button id="tabLearn" class="active" role="tab"><span class="ic">🎓</span> Apprendre</button>
-    <button id="tabNews" role="tab"><span class="ic">📰</span> Actus</button>
+    <button id="tabLearn" class="active" role="tab" aria-selected="true" aria-controls="feed"><span class="ic">🎓</span> Apprendre</button>
+    <button id="tabNews" role="tab" aria-selected="false" aria-controls="feed"><span class="ic">📰</span> Actus</button>
   </div>
-  <div class="cats" id="cats" aria-label="Centres d'intérêt"></div>
+  <div class="cats" id="cats" role="group" aria-label="Centres d'intérêt"></div>
 </header>
 
-<div class="demobadge hidden" id="demobadge">Mode démo — hors-ligne</div>
+<div class="demobadge hidden" id="demobadge" role="status">Mode démo — hors-ligne</div>
 
-<div id="feed"></div>
+<div id="feed" role="tabpanel" aria-label="Fil d'articles"></div>
+
+<!-- Rail unique, partagé par toutes les cartes (agit sur la carte visible) -->
+<div class="rail hidden" id="rail">
+  <button id="shareBtn" aria-label="Partager cet article" title="Partager"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
+</div>
 
 <div class="hint" id="hint"><span class="arrow">⌃</span><span>Swipe</span></div>
 
-<div class="state hidden" id="loading">
+<div class="state hidden" id="loading" role="status">
   <div class="spinner"></div>
   <p>Chargement des actus…</p>
 </div>
 
-<div class="state hidden" id="empty">
+<div class="state hidden" id="empty" role="status">
   <h3 id="emptyTitle">Aucun article</h3>
   <p id="emptyMsg"></p>
   <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:340px">
@@ -280,7 +338,13 @@
   <button class="installbar__close" id="installBarClose" aria-label="Fermer">✕</button>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- Fonctions pures partagées avec les tests Node et avec la fonction serverless.
+     Scripts classiques (pas de modules ESM) pour que index.html reste ouvrable
+     en file://, comme annoncé dans le README. -->
+<script src="src/lib.js"></script>
+<script src="src/learn-core.js"></script>
 
 <script>
 /**
@@ -304,8 +368,16 @@ const CONFIG = {
   MAX_ITEMS: 300,        // items gardés en mémoire (dédoublonnage du scroll)
   CACHE_ITEMS: 40,       // articles mis en cache localStorage par catégorie
   SEEN_MAX: 2000,        // articles « déjà vus » mémorisés (mode Apprendre)
-  APP_URL: "http://news.lielu.eu", // lien promo inclus au partage
+  // https obligatoire : ce lien part dans CHAQUE partage. En http, redirection
+  // au mieux, avertissement « site non sécurisé » ou blocage au pire.
+  APP_URL: "https://news.lielu.eu",
 };
+
+/* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
+   implémentations que celles couvertes par `npm test` et que le backend. */
+const {stripHtml,imgFromHtml,safeLink,safeImg,cssUrl,esc,escAttr,relTime,shuffle,
+  seenKey,dropSeen,hostOf,parseJsonFeeds,parseOpmlFeeds}=self.SwiperLib;
+const LEARN=self.SwiperLearn;
 
 /* ---------- Articles Wikipédia de démo (repli hors-ligne du mode Apprendre) ---------- */
 const DEMO_LEARN = [
@@ -343,22 +415,9 @@ const LS_SRC="fluxswipe.sources.v1";
 let feeds=load(),items=[];
 let mode=(()=>{try{return localStorage.getItem(LS_MODE)==="news"?"news":"learn";}catch(e){return "learn";}})();
 
-/* Centres d'intérêt (mode Apprendre). q = requête de recherche Wikipédia ; null = purement aléatoire.
-   deepcategory:"X" cible les articles de la catégorie X et de ses sous-catégories. */
-const CATEGORIES=[
-  {key:"random",   label:"🎲 Aléatoire",     q:null},
-  {key:"sciences", label:"🔬 Sciences",      q:'deepcategory:"Sciences"'},
-  {key:"histoire", label:"📜 Histoire",      q:'deepcategory:"Histoire"'},
-  {key:"art",      label:"🎨 Art & Culture", q:'deepcategory:"Arts"'},
-  {key:"geo",      label:"🌍 Géographie",    q:'deepcategory:"Géographie"'},
-  {key:"nature",   label:"🐾 Nature",        q:'deepcategory:"Nature"'},
-  {key:"espace",   label:"🌌 Espace",        q:'deepcategory:"Astronomie"'},
-  {key:"tech",     label:"💻 Technologie",   q:'deepcategory:"Technologie"'},
-  {key:"sport",    label:"⚽ Sport",         q:'deepcategory:"Sport"'},
-  {key:"cinema",   label:"🎬 Cinéma",        q:'deepcategory:"Cinéma"'},
-  {key:"musique",  label:"🎵 Musique",       q:'deepcategory:"Musique"'},
-  {key:"philo",    label:"🧠 Philosophie",   q:'deepcategory:"Philosophie"'},
-];
+/* Centres d'intérêt : définis une seule fois dans src/learn-core.js, partagés
+   avec la fonction serverless (les deux listes avaient déjà divergé). */
+const CATEGORIES=LEARN.CATEGORIES;
 /* Intérêts choisis par l'utilisateur (sous-ensemble de clés CATEGORIES, hors "random"). */
 let interests=(()=>{try{const s=localStorage.getItem(LS_INT);return s?JSON.parse(s):[];}catch(e){return [];}})();
 function interestsChosen(){try{return localStorage.getItem(LS_INT)!==null;}catch(e){return false;}}
@@ -386,21 +445,7 @@ async function fetchWithTimeout(url,opts={},ms=7000){
   try{return await fetch(url,{...opts,signal:ctl.signal});}
   finally{clearTimeout(t);}
 }
-// N'autorise que les schémas sûrs pour un href (bloque javascript:, data:, etc. venant d'un flux)
-function safeLink(link){
-  if(!link||link==="#")return "";
-  try{const u=new URL(link,location.href);return (u.protocol==="http:"||u.protocol==="https:")?link:"";}
-  catch(_){return "";}
-}
-// N'autorise que http(s) ou data:image pour une image de fond
-function safeImg(src){
-  if(!src)return "";
-  try{const u=new URL(src,location.href);
-    if(u.protocol==="http:"||u.protocol==="https:")return src;
-    if(u.protocol==="data:"&&/^data:image\//i.test(src))return src;
-    return "";}
-  catch(_){return "";}
-}
+// safeLink / safeImg / stripHtml : voir src/lib.js (couverts par npm test).
 
 /* ---------- Mémoire « déjà vu » (mode Apprendre) ----------
    Un article est marqué vu quand il passe réellement à l'écran. Les lots
@@ -408,7 +453,6 @@ function safeImg(src){
    les plus anciens pour ne pas tarir le fil. Stockage borné. */
 const LS_SEEN="fluxswipe.seen.v1";
 let seen=(()=>{try{const a=JSON.parse(localStorage.getItem(LS_SEEN)||"[]");return new Set(Array.isArray(a)?a:[]);}catch(e){return new Set();}})();
-function seenKey(it){return (it.link||"")+"|"+(it.title||"");}
 let seenDirty=false,seenPersistT;
 function persistSeen(){if(!seenDirty)return;seenDirty=false;
   try{localStorage.setItem(LS_SEEN,JSON.stringify([...seen]));}catch(e){warn("save seen",e);}}
@@ -419,8 +463,6 @@ function addSeen(it){
   if(seen.size>CONFIG.SEEN_MAX)seen=new Set([...seen].slice(-CONFIG.SEEN_MAX)); // garde les plus récents
   clearTimeout(seenPersistT);seenPersistT=setTimeout(persistSeen,800);           // écriture localStorage groupée
 }
-// Retire les articles déjà vus ; si tout est vu, renvoie la liste telle quelle (repli)
-function dropSeen(list){const fresh=list.filter(it=>!seen.has(seenKey(it)));return fresh.length?fresh:list;}
 
 /* ---------- Reprise de position entre sessions ----------
    On mémorise l'article courant (par lien, pas par index car le tri peut bouger)
@@ -429,16 +471,42 @@ const LS_POS="fluxswipe.pos.v1";
 let posMap=(()=>{try{return JSON.parse(localStorage.getItem(LS_POS)||"{}");}catch(e){return {};}})();
 let resumePending=true,lastPosIdx=-1;   // resumePending : reprise au démarrage
 function persistPos(){try{localStorage.setItem(LS_POS,JSON.stringify(posMap));}catch(e){warn("save pos",e);}}
-// Écriture IMMÉDIATE à chaque changement de carte : survit à une fermeture brutale
-// (les events pagehide/visibilitychange ne sont pas fiables quand l'app est tuée).
+// Mémorise l'article courant à chaque changement de carte. L'écriture
+// localStorage (stringify + setItem synchrones) est repoussée en temps mort
+// pour ne pas bloquer le fil pendant le geste ; pagehide/visibilitychange et
+// scrollend servent de filets pour ne rien perdre à la fermeture.
+let posIdleT;
+function schedulePosWrite(){
+  if(typeof requestIdleCallback==="function"){
+    clearTimeout(posIdleT);posIdleT=setTimeout(()=>requestIdleCallback(persistPos,{timeout:1000}),0);
+  }else{clearTimeout(posIdleT);posIdleT=setTimeout(persistPos,200);}
+}
 function rememberPos(){
   if(!feedEl.children.length)return;
-  const idx=Math.round(feedEl.scrollTop/Math.max(1,feedEl.clientHeight));
+  const idx=scrollIndex();
   if(idx===lastPosIdx)return;
   lastPosIdx=idx;
-  const it=items[idx];
-  if(it&&it.link){posMap[mode]=it.link;persistPos();}
+  // via le registre de cartes, pas items[idx] : capDom() retire des cartes en
+  // tête du fil infini, donc les deux index ne coïncident plus après un cap.
+  const it=currentItem();
+  if(it&&it.link){posMap[mode]=it.link;schedulePosWrite();}
 }
+/* Défilement instantané, quel que soit le CSS en vigueur.
+   Le setter scrollTop utilise le comportement calculé de l'élément : si
+   scroll-behavior vaut smooth, la restauration devient une ANIMATION qui entre
+   en conflit avec le scroll-snap et avec le geste en cours. On force donc
+   explicitement le comportement le temps de l'affectation. */
+function setScrollTopInstant(el,top){
+  const prev=el.style.scrollBehavior;
+  el.style.scrollBehavior="auto";
+  el.scrollTop=top;
+  el.style.scrollBehavior=prev;
+}
+/* Index de la carte à l'écran (chaque carte fait exactement une hauteur de vue). */
+let cachedVH=0;
+function viewH(){return cachedVH||(cachedVH=feedEl.clientHeight)||1;}
+window.addEventListener("resize",()=>{cachedVH=0;});
+function scrollIndex(){return Math.round(feedEl.scrollTop/Math.max(1,viewH()));}
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
@@ -513,100 +581,50 @@ async function fetchFeed(feed){
       date:get("pubDate")||get("published")||get("updated")};
   }).filter(i=>i.title);
 }
-function stripHtml(html){const d=document.createElement("div");d.innerHTML=html;return (d.textContent||"").replace(/\s+/g," ").trim();}
-function imgFromHtml(html){const g=html&&html.match(/<img[^>]+src=["']([^"']+)["']/i);return g?g[1]:"";}
+// stripHtml (version inerte, sans innerHTML) et imgFromHtml : voir src/lib.js
 function findImage(node,raw){
   const m=node.querySelector("enclosure[url], content[url], thumbnail, [medium='image']");
   if(m){const u=m.getAttribute("url");if(u)return u;}
   return imgFromHtml(raw);
 }
-function relTime(dateStr){const t=Date.parse(dateStr);if(isNaN(t))return "";
-  const d=(Date.now()-t)/1000;if(d<3600)return Math.max(1,Math.round(d/60))+" min";
-  if(d<86400)return Math.round(d/3600)+" h";return Math.round(d/86400)+" j";}
+// relTime : voir src/lib.js
 
-/* ---------- Mode Apprendre : sources multiples (Wikipédia, GBIF/INPN, Gallica) ---------- */
-const WIKI_LANG="fr";
-/* terme de recherche FR par catégorie, pour les sources autres que Wikipédia */
-const CAT_TERM={sciences:"science",histoire:"histoire",art:"art",geo:"géographie",
-  nature:"nature",espace:"astronomie",tech:"technologie",sport:"sport",
-  cinema:"cinéma",musique:"musique",philo:"philosophie"};
-function xTag(node,local){const e=node.getElementsByTagNameNS("*",local);return e.length?e[0].textContent.trim():"";}
-function xTags(node,local){return [...node.getElementsByTagNameNS("*",local)].map(e=>e.textContent.trim());}
+/* ---------- Mode Apprendre : sources multiples (Wikipédia, GBIF/INPN, Gallica) ----------
+   URL et normaliseurs viennent de src/learn-core.js : une seule implémentation,
+   partagée avec /api/learn (elles avaient divergé). Ici on ne garde que la
+   politique de récupération propre au navigateur (direct si CORS, sinon proxy). */
 
 /* --- Wikipédia (extrait d'intro + image, tri aléatoire par catégorie) --- */
 async function srcWikipedia(catKey){
-  const c=CATEGORIES.find(x=>x.key===catKey)||CATEGORIES[0];
-  const params=new URLSearchParams({action:"query",format:"json",origin:"*",
-    prop:"extracts|pageimages|info",explaintext:"1",exintro:"1",exlimit:"20",
-    piprop:"thumbnail|original",pithumbsize:"1200",pilimit:"20",inprop:"url"});
-  if(c.q){params.set("generator","search");params.set("gsrsearch",c.q);params.set("gsrsort","random");params.set("gsrnamespace","0");params.set("gsrlimit","20");}
-  else{params.set("generator","random");params.set("grnnamespace","0");params.set("grnlimit","20");}
-  const url=`https://${WIKI_LANG}.wikipedia.org/w/api.php?${params}`;
+  const url=LEARN.wikiUrl(catKey);
   let data;
-  try{const res=await fetchWithTimeout(url,{cache:"no-store"},7000);
+  try{const res=await fetchWithTimeout(url,{cache:"no-store"},CONFIG.FETCH_TIMEOUT);
     if(!res.ok)throw new Error("http");data=await res.json();}
   catch(e){warn("wikipedia direct",e);data=JSON.parse(await fetchText(url));}
-  const pages=data&&data.query&&data.query.pages?Object.values(data.query.pages):[];
-  return pages.map(p=>({source:"Wikipédia",title:p.title||"",
-    desc:(p.extract||"").replace(/\s+/g," ").trim(),
-    link:p.canonicalurl||p.fullurl||"",
-    img:(p.original&&p.original.source)||(p.thumbnail&&p.thumbnail.source)||"",date:""}))
-    .filter(i=>i.title&&i.desc.length>=120);
+  return LEARN.normalizeWiki(data);
 }
 
 /* --- GBIF / INPN (biodiversité : espèces observées avec photo) --- */
-async function srcGBIF(catKey){
-  const off=Math.floor(Math.random()*300);
-  const url=`https://api.gbif.org/v1/occurrence/search?mediaType=StillImage&limit=20&offset=${off}&country=FR`;
+async function srcGBIF(){
+  const url=LEARN.gbifUrl();
   let data;
-  try{const res=await fetchWithTimeout(url,{cache:"no-store"},7000);
+  try{const res=await fetchWithTimeout(url,{cache:"no-store"},CONFIG.FETCH_TIMEOUT);
     if(!res.ok)throw new Error("http");data=await res.json();}
   catch(e){warn("gbif direct",e);try{data=JSON.parse(await fetchText(url));}catch(_){return [];}}
-  const rows=(data&&data.results)||[];
-  return rows.map(o=>{
-    const media=(o.media||[]).find(m=>m&&m.identifier);
-    const img=media?media.identifier:"";
-    const name=o.scientificName||o.acceptedScientificName||o.verbatimScientificName||"";
-    const vern=o.vernacularName||"";
-    const title=vern||name;
-    if(!title||!img)return null;
-    const taxo=[o.kingdom,o.phylum,o.class,o.order,o.family].filter(Boolean).join(" › ");
-    const where=[o.locality,o.stateProvince,o.country].filter(Boolean).join(", ");
-    const desc=`${name}${vern?` — « ${vern} »`:""}. Classification : ${taxo||"non précisée"}.${where?` Observé à ${where}.`:""} Donnée de biodiversité (GBIF / INPN).`;
-    return {source:"GBIF · INPN",title,desc,img,date:"",
-      link:o.key?`https://www.gbif.org/occurrence/${o.key}`:"https://www.gbif.org"};
-  }).filter(Boolean);
+  return LEARN.normalizeGbif(data);
 }
 
-/* --- Gallica (BnF) : documents patrimoniaux numérisés (API SRU) --- */
+/* --- Gallica (BnF) : documents patrimoniaux numérisés (API SRU, non-CORS → proxy) --- */
 async function srcGallica(catKey){
-  const term=CAT_TERM[catKey];
-  if(!term)return [];                                    // pas de terme (ex. "random") → on n'interroge pas Gallica
-  const q=`(gallica all "${term}") and (dc.type all "image")`;
-  const url=`https://gallica.bnf.fr/SRU?operation=searchRetrieve&version=1.2&maximumRecords=20&query=${encodeURIComponent(q)}`;
-  let xml;
-  try{xml=await fetchText(url);}catch(e){warn("gallica fetch",e);return [];}     // SRU non-CORS → via proxy
-  let doc;try{doc=new DOMParser().parseFromString(xml,"text/xml");}catch(e){warn("gallica parse",e);return [];}
-  const out=[];
-  [...doc.getElementsByTagNameNS("*","record")].forEach(r=>{
-    const title=xTag(r,"title"), creator=xTag(r,"creator"), date=xTag(r,"date"), descr=xTag(r,"description");
-    const ident=xTags(r,"identifier").find(u=>u.includes("ark:/"))||"";
-    const m=ident.match(/ark:\/([^\s"']+)/);
-    if(!title||!m)return;
-    const img=`https://gallica.bnf.fr/iiif/ark:/${m[1]}/f1/full/,800/0/native.jpg`;
-    const desc=[descr,[creator,date].filter(Boolean).join(", ")].filter(Boolean).join(" — ")||title;
-    out.push({source:"Gallica · BnF",title,desc,img,date:"",link:ident});
-  });
-  return out;
+  const url=LEARN.gallicaUrl(catKey);
+  if(!url)return [];                                    // "Aléatoire" : pas de terme de recherche
+  try{return LEARN.normalizeGallica(await fetchText(url));}
+  catch(e){warn("gallica fetch",e);return [];}
 }
 
-/* Sources disponibles. cats "*" = toutes ; sinon liste de catégories pertinentes. */
-const LEARN_SOURCES=[
-  {key:"wikipedia", label:"Wikipédia",   fn:srcWikipedia, cats:"*"},
-  {key:"gbif",      label:"GBIF · INPN", fn:srcGBIF,      cats:["nature","sciences"]},
-  {key:"gallica",   label:"Gallica · BnF", fn:srcGallica, cats:"*"},
-];
-function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+const SRC_FN={wikipedia:srcWikipedia,gbif:srcGBIF,gallica:srcGallica};
+/* Libellés des sources pour le sélecteur (métadonnées partagées avec le backend) */
+const LEARN_SOURCES=LEARN.SOURCE_META;
 /* Catégories à interroger pour un lot : une seule si filtre précis ;
    plusieurs intérêts (jusqu'à 3) en "Tous" pour un fil toujours fourni et varié. */
 function catKeysForBatch(){
@@ -619,18 +637,12 @@ async function fetchLearnClient(keys,count){
   const tasks=[];
   const tag=(p,catKey)=>p.then(list=>list.map(it=>({...it,cat:catKey}))); // marque la catégorie
   keys.forEach(catKey=>{
-    LEARN_SOURCES.filter(s=>sources.includes(s.key)&&(s.cats==="*"||s.cats.includes(catKey)))
-      .forEach(s=>tasks.push(tag(s.fn(catKey),catKey)));
+    LEARN.sourcesForCat(catKey,sources).forEach(s=>tasks.push(tag(SRC_FN[s.key](catKey),catKey)));
   });
   if(!tasks.length)tasks.push(tag(srcWikipedia(keys[0]||"random"),keys[0]||"random")); // garde-fou : au moins Wikipédia
   const results=await Promise.allSettled(tasks);
-  const dedup=new Set();let out=[];
-  results.forEach(r=>{if(r.status==="fulfilled")r.value.forEach(it=>{
-    const k=(it.link||"")+"|"+it.title;
-    if(it.title&&!dedup.has(k)){dedup.add(k);out.push(it);}
-  });});
-  const withImg=shuffle(out.filter(i=>i.img)),noImg=shuffle(out.filter(i=>!i.img));
-  return withImg.concat(noImg).slice(0,count);          // articles avec image d'abord, sources mélangées
+  const lists=results.filter(r=>r.status==="fulfilled").map(r=>r.value);
+  return LEARN.dedupAndRank(lists,count);               // articles avec image d'abord, sources mélangées
 }
 /* Un lot mélangé : backend agrégateur d'abord (cache CDN mutualisé), sinon client.
    On écarte les articles déjà vus (dropSeen), avec repli si tout a été vu. */
@@ -638,16 +650,19 @@ async function fetchLearn(count=CONFIG.BATCH_SIZE){
   const keys=catKeysForBatch();
   let batch=null;
   try{
-    // nonce : chaque lot est aléatoire → URL unique pour éviter tout cache intermédiaire
-    const qs=new URLSearchParams({cats:keys.join(","),sources:sources.join(","),count:String(count),n:Math.random().toString(36).slice(2)});
-    const res=await fetchWithTimeout("/api/learn?"+qs,{cache:"no-store"},CONFIG.FETCH_TIMEOUT);
+    // « seau » aléatoire plutôt qu'un nonce : l'URL reste l'une des BUCKETS
+    // variantes, donc cacheable par le CDN et mutualisée entre utilisateurs,
+    // tout en restant variée à l'échelle d'une session. Avec un nonce, chaque
+    // lot manquait le cache et payait l'aller-retour vers les 3 sources.
+    const qs=new URLSearchParams({cats:keys.join(","),sources:sources.join(","),count:String(count),b:String(LEARN.randomBucket())});
+    const res=await fetchWithTimeout("/api/learn?"+qs,{},CONFIG.FETCH_TIMEOUT);
     if(res.ok){
       const data=await res.json();
       if(data&&Array.isArray(data.items)&&data.items.length)batch=data.items;
     }
   }catch(e){warn("learn backend",e);/* repli client */}
   if(!batch)batch=await fetchLearnClient(keys,count);
-  return dropSeen(batch).slice(0,count);
+  return dropSeen(batch,seen).slice(0,count);
 }
 
 /* ---------- Cache local : affichage instantané au lancement ---------- */
@@ -676,7 +691,7 @@ async function loadFeeds(){
       const arr=await fetchLearn(20);              // un lot multi-sources au démarrage ; le scroll infini complète
       if(!arr.length)throw new Error("empty");
       if(my!==loadSeq)return;                       // chargement obsolète → on abandonne
-      items=arr;render(cached&&feedEl.scrollTop>50);hideStates();cacheSave(key);
+      items=arr;render();hideStates();cacheSave(key);
     }catch(e){
       if(my!==loadSeq||cached)return;               // si on a déjà le cache, on le garde
       warn("learn load",e);
@@ -696,7 +711,7 @@ async function loadFeeds(){
         all=all.concat(res);
         all.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
         items=all.slice(0,CONFIG.MAX_NEWS);
-        render(painted&&feedEl.scrollTop>50);hideStates();  // 1er rendu en haut, suivants gardent la position
+        render();hideStates();   // render() réancre sur l'article lu (voir son commentaire)
         painted=true;
       }else failed.push(f.name);
     }).catch(()=>{if(my===loadSeq)failed.push(f.name);})
@@ -724,15 +739,53 @@ const cardReg=new Map();
 let cardSeq=0;
 const {MAX_CARDS,MAX_ITEMS}=CONFIG;   // bornes du fil infini (DOM + mémoire)
 function renderCard(it){const id=cardSeq++;cardReg.set(id,it);return cardHTML(it,id);}
+/* Article actuellement à l'écran (sert au rail de partage et à l'ancrage). */
+function currentItem(){
+  const card=feedEl.children[scrollIndex()];
+  return card?cardReg.get(+card.dataset.id):null;
+}
+/* Lien de la carte visible, pour réancrer le fil après une mutation.
+   Vide si on est encore en haut : dans ce cas c'est la reprise de session qui
+   décide de la position, pas l'ancrage. */
+function anchorLink(){
+  if(!feedEl.children.length||feedEl.scrollTop<4)return "";
+  const it=currentItem();
+  return it&&it.link?it.link:"";
+}
 // Marque comme « vu » la carte actuellement à l'écran (mode Apprendre seulement)
 let lastMarkIdx=-1;
 function markVisibleSeen(){
   if(mode!=="learn"||!feedEl.children.length)return;
-  const idx=Math.round(feedEl.scrollTop/Math.max(1,feedEl.clientHeight));
+  const idx=scrollIndex();
   if(idx===lastMarkIdx)return;
   lastMarkIdx=idx;
   const card=feedEl.children[idx];
   if(card){const it=cardReg.get(+card.dataset.id);if(it)addSeen(it);}
+}
+
+/* ---------- Images de fond paresseuses ----------
+   Deux raisons de ne PAS mettre l'URL dans un style inline :
+   1) perf — on ne charge que ce qui approche de l'écran, au lieu des 120 images
+      plein écran du fil ;
+   2) sécurité — la valeur d'un attribut `style` est décodée en HTML AVANT d'être
+      parsée en CSS, donc échapper les apostrophes ne protège pas : une URL de
+      flux du type `…a');position:fixed;inset:0;…` injecterait des déclarations
+      CSS arbitraires. En affectant style.backgroundImage en JS, aucune
+      interprétation HTML n'a lieu. */
+const bgObserver=("IntersectionObserver" in self)?new IntersectionObserver((entries,obs)=>{
+  entries.forEach(en=>{
+    if(!en.isIntersecting)return;
+    const el=en.target,src=el.dataset.bg;
+    if(src)el.style.backgroundImage='url("'+cssUrl(src)+'")';
+    delete el.dataset.bg;
+    obs.unobserve(el);
+  });
+},{root:feedEl,rootMargin:"150% 0px"}):null;   // ~1,5 écran d'avance : jamais de carte vide au swipe
+function observeBackgrounds(scope){
+  (scope||feedEl).querySelectorAll(".card__bg[data-bg]").forEach(el=>{
+    if(bgObserver)bgObserver.observe(el);
+    else{el.style.backgroundImage='url("'+cssUrl(el.dataset.bg)+'")';delete el.dataset.bg;}
+  });
 }
 // Carte de fin (mode Actus) : les flux RSS sont finis, on marque clairement le bout
 function endCardHTML(){
@@ -748,38 +801,47 @@ function endCardHTML(){
     </div>
   </article>`;
 }
-function render(keepScroll){
-  const prevTop=feedEl.scrollTop;               // réassigner innerHTML remet le scroll à 0
+/* Reconstruit le fil en gardant l'utilisateur SUR SON ARTICLE.
+   Le mode Actus rend progressivement : chaque flux qui répond retrie la liste
+   par date. En restaurant une position en PIXELS, l'article sous les yeux
+   changeait d'identité à chaque réponse. On réancre donc sur le lien de la
+   carte visible — et, au démarrage seulement, sur l'article de la session
+   précédente. */
+function render(){
+  const anchor=anchorLink();                    // avant mutation : où est l'utilisateur ?
   cardReg.clear();cardSeq=0;lastMarkIdx=-1;lastPosIdx=-1;
   let html=items.map(renderCard).join("");
   if(mode==="news"&&items.length)html+=endCardHTML();   // fin de fil explicite
   feedEl.innerHTML=html;
-  let top=keepScroll?prevTop:0;
-  // Reprise au démarrage : on revient à l'article quitté (par son lien). Comme le
-  // fil Actus se remplit progressivement, on réessaie à chaque rendu tant que
-  // l'article n'est pas encore chargé (on n'abandonne pas au 1er rendu partiel).
-  if(resumePending&&mode==="news"&&items.length){
-    const link=posMap["news"];
-    if(!link){resumePending=false;}
+  // Pas de capDom() ici : sur ce chemin le DOM reflète `items` un pour un, ce
+  // dont dépendent l'ancrage et la reprise. Le fil Actus est borné par MAX_NEWS,
+  // et capDom ne sert qu'au fil infini du mode Apprendre (appendCards).
+  let top=0;
+  if(anchor){
+    const i=items.findIndex(it=>it.link===anchor);
+    if(i>=0)top=i*viewH();
+    resumePending=false;                        // l'utilisateur a pris la main
+  }else if(resumePending&&items.length){
+    // Reprise de session : le fil Actus se remplit progressivement, on réessaie
+    // à chaque rendu tant que l'article n'est pas encore arrivé.
+    const link=posMap[mode];
+    if(!link)resumePending=false;
     else{const i=items.findIndex(it=>it.link===link);
-      if(i>0){top=i*feedEl.clientHeight;resumePending=false;}
-      else if(i===0){resumePending=false;}}   // i===-1 : pas encore là → on réessaiera
+      if(i>0){top=i*viewH();resumePending=false;}
+      else if(i===0)resumePending=false;}       // i===-1 : pas encore là → on réessaiera
   }
-  // Lecture de scrollHeight = on FORCE le recalcul du layout, sinon l'affectation
-  // de scrollTop est bornée par un scrollHeight encore à 0 → on retombe en haut.
-  void feedEl.scrollHeight;
-  feedEl.scrollTop=top;                          // restaure explicitement (innerHTML l'a remis à 0)
-  // Filet de sécurité : re-applique après le prochain frame si la valeur a été bornée
-  if(top>0)requestAnimationFrame(()=>{if(Math.abs(feedEl.scrollTop-top)>4)feedEl.scrollTop=top;});
-  if(DEBUG&&mode==="news"){const l=posMap["news"]||"";const i=items.findIndex(it=>it.link===l);
-    dbg(`saved=…${l.slice(-26)}\nfound i=${i}  ch=${feedEl.clientHeight}  sh=${feedEl.scrollHeight}\ntop=${top}  scrollTop=${feedEl.scrollTop}\nitems=${items.length}  resumePending=${resumePending}`);}
-  document.getElementById("hint").classList.toggle("hidden",items.length===0);
-  updateProgress();markVisibleSeen();          // la 1ère carte affichée compte comme vue
+  setScrollTopInstant(feedEl,top);              // innerHTML a remis le scroll à 0
+  observeBackgrounds();
+  if(DEBUG){const l=posMap[mode]||"";const i=items.findIndex(it=>it.link===l);
+    dbg(`anchor=…${(anchor||"").slice(-20)}\nsaved=…${l.slice(-20)}  found i=${i}\ntop=${top}  scrollTop=${feedEl.scrollTop}\nitems=${items.length}  resumePending=${resumePending}`);}
+  // Le hint ne doit pas resurgir en pleine lecture à chaque rendu progressif.
+  document.getElementById("hint").classList.toggle("hidden",items.length===0||feedEl.scrollTop>50);
+  updateRail();updateProgress();markVisibleSeen();  // la 1ère carte affichée compte comme vue
 }
 /* Ajoute des cartes à la suite sans réinitialiser le scroll (mode Apprendre infini) */
 function appendCards(newItems){
   feedEl.insertAdjacentHTML("beforeend",newItems.map(renderCard).join(""));
-  capDom();updateProgress();
+  capDom();observeBackgrounds();updateProgress();
 }
 /* Retire les cartes les plus hautes au-delà de MAX_CARDS et ajuste le scroll
    (chaque carte fait exactement la hauteur du viewport). */
@@ -790,7 +852,9 @@ function capDom(){
     cardReg.delete(+first.dataset.id);
     first.remove();removed++;
   }
-  if(removed)feedEl.scrollTop-=removed*feedEl.clientHeight;
+  // instantané : sans cela le CSS scroll-behavior transformerait ce recalage en
+  // animation, en plein geste de l'utilisateur
+  if(removed)setScrollTopInstant(feedEl,feedEl.scrollTop-removed*viewH());
 }
 async function loadMoreLearn(){
   if(loadingMore||mode!=="learn")return;
@@ -808,23 +872,22 @@ async function loadMoreLearn(){
   finally{loadingMore=false;}
 }
 // Libellé (emoji + nom) d'une catégorie Apprendre à partir de sa clé
-function catLabel(key){const c=CATEGORIES.find(x=>x.key===key);return c?c.label:"";}
+const catLabel=LEARN.catLabel;
 // Icônes d'action : boussole (Découvrir, Apprendre) / livre ouvert (Lire l'article, Actus)
 const ICON_DISCOVER=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>`;
 const ICON_READ=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>`;
 function cardHTML(it,id){
-  const img=safeImg(it.img);
-  const bg=img?`<div class="card__bg" style="background-image:url('${escAttr(img)}')"></div>`:`<div class="card__noimg"></div>`;
-  const link=safeLink(it.link);
+  const img=safeImg(it.img,location.href);
+  // data-bg (et non un style inline) : chargement paresseux + pas d'URL de flux
+  // interprétée comme du CSS. Voir observeBackgrounds().
+  const bg=img?`<div class="card__bg" data-bg="${escAttr(img)}"></div>`:`<div class="card__noimg"></div>`;
+  const link=safeLink(it.link,location.href);
   const learnCard=mode==="learn";
   const openLabel=learnCard?"Découvrir":"Lire l'article";
   const openIcon=learnCard?ICON_DISCOVER:ICON_READ;
   const catB=it.cat&&catLabel(it.cat)?`<span class="card__cat">${esc(catLabel(it.cat))}</span>`:"";
   return `<article class="card" data-id="${id}">
     ${bg}
-    <div class="rail">
-      <button class="shareBtn" aria-label="Partager" title="Partager"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
-    </div>
     <div class="card__body">
       ${catB}
       <span class="card__source"><span class="dot"></span>${esc(it.source)}</span>
@@ -835,8 +898,7 @@ function cardHTML(it,id){
     </div>
   </article>`;
 }
-function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
-function escAttr(s){return (s||"").replace(/["'&<>]/g,c=>({'"':"&quot;","'":"&#39;","&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+// esc / escAttr : voir src/lib.js
 // Délégation unique : un seul écouteur pour tout le fil (au lieu de ré-attacher
 // un handler à chaque carte → supprime le coût O(n²) du scroll infini).
 feedEl.addEventListener("click",e=>{
@@ -846,13 +908,19 @@ feedEl.addEventListener("click",e=>{
     if(end.dataset.end==="reload")loadFeeds();
     else document.getElementById("openSheet").click();
     return;}
-  const btn=e.target.closest(".shareBtn");
-  if(!btn)return;
-  e.stopPropagation();
-  const card=btn.closest(".card");
-  const it=card&&cardReg.get(+card.dataset.id);
-  if(it)shareItem(it);
 });
+/* Rail unique : il agit sur la carte visible (une seule surface backdrop-filter
+   pour toute l'app au lieu d'une par carte). Masqué sur la carte de fin. */
+const railEl=document.getElementById("rail");
+function updateRail(){
+  const it=currentItem();
+  railEl.classList.toggle("hidden",!it);
+}
+document.getElementById("shareBtn").onclick=e=>{
+  e.stopPropagation();
+  const it=currentItem();
+  if(it)shareItem(it);
+};
 
 /* Chaque partage inclut l'article ET un lien promo vers l'app */
 const APP_URL=CONFIG.APP_URL;
@@ -916,33 +984,83 @@ let topRevealT, lastScrollY=0, revealUntil=0;
 function showTop(){topEl.classList.remove("top--away");}
 function hideTop(){topEl.classList.add("top--away");}
 function scheduleTopReveal(){clearTimeout(topRevealT);topRevealT=setTimeout(showTop,2500);} // revient ~2,5 s après l'arrêt du scroll
-feedEl.addEventListener("scroll",()=>{
+/* Le traitement du scroll est groupé dans un requestAnimationFrame : il lit la
+   géométrie (dont scrollHeight, coûteux sur un fil de cartes plein écran) puis
+   écrit des styles. En le faisant à chaque événement, on alternait lectures et
+   écritures pendant le geste — layout thrashing garanti. */
+let scrollTick=false;
+function onScrollFrame(){
+  scrollTick=false;
+  const top=feedEl.scrollTop,h=viewH();
   updateProgress();
-  if(feedEl.scrollTop>50)document.getElementById("hint").classList.add("hidden");
-  if(Date.now()>=revealUntil&&Math.abs(feedEl.scrollTop-lastScrollY)>4){hideTop();scheduleTopReveal();} // on swipe → on masque
-  lastScrollY=feedEl.scrollTop;
+  if(top>50)document.getElementById("hint").classList.add("hidden");
+  if(Date.now()>=revealUntil&&Math.abs(top-lastScrollY)>4){hideTop();scheduleTopReveal();} // on swipe → on masque
+  lastScrollY=top;
   // L'utilisateur a franchi au moins une carte avant la reprise → on l'annule
-  if(resumePending&&feedEl.scrollTop>feedEl.clientHeight*0.5)resumePending=false;
+  if(resumePending&&top>h*0.5)resumePending=false;
   markVisibleSeen();                        // marque la carte courante comme vue
   rememberPos();                            // mémorise la position (reprise à la réouverture)
+  updateRail();
   // Mode Apprendre : charge un nouveau lot avant d'atteindre le bas → fil sans fin
-  if(mode==="learn"&&!loadingMore&&items.length&&
-     feedEl.scrollTop+feedEl.clientHeight*3>=feedEl.scrollHeight)loadMoreLearn();
-});
+  if(mode==="learn"&&!loadingMore&&items.length&&top+h*3>=feedEl.scrollHeight)loadMoreLearn();
+}
+feedEl.addEventListener("scroll",()=>{
+  if(scrollTick)return;
+  scrollTick=true;requestAnimationFrame(onScrollFrame);
+},{passive:true});
+// scrollend (là où il existe) : moment idéal pour figer la position sur disque
+if("onscrollend" in self)feedEl.addEventListener("scrollend",persistPos);
 // tap → réaffiche, et on empêche le re-masquage pendant que le snap se termine
 feedEl.addEventListener("click",()=>{clearTimeout(topRevealT);showTop();revealUntil=Date.now()+1500;});
 function updateProgress(){const max=feedEl.scrollHeight-feedEl.clientHeight;pbar.style.height=(max>0?feedEl.scrollTop/max*100:0)+"%";}
-document.addEventListener("keydown",e=>{const h=feedEl.clientHeight;
-  if(e.key==="ArrowDown"||e.key===" ")feedEl.scrollBy({top:h,behavior:"smooth"});
-  if(e.key==="ArrowUp")feedEl.scrollBy({top:-h,behavior:"smooth"});});
+/* Navigation clavier. Gardes indispensables : sans elles, une espace tapée dans
+   le champ « ajouter un flux » faisait défiler le fil, et les flèches
+   défilaient DERRIÈRE un panneau ouvert. C'est aussi le seul endroit où le
+   défilement doux est voulu — d'où le behavior explicite. */
+document.addEventListener("keydown",e=>{
+  if(e.key!=="ArrowDown"&&e.key!=="ArrowUp"&&e.key!==" ")return;
+  if(e.target.closest("input,textarea,select,[contenteditable=''],[contenteditable=true]"))return;
+  if(document.querySelector(".sheet.open,.sharemenu.open"))return;
+  e.preventDefault();
+  const h=viewH();
+  feedEl.scrollBy({top:e.key==="ArrowUp"?-h:h,behavior:"smooth"});
+});
 
 /* ---------- Sheet (panneau Sources) ---------- */
 const sheet=document.getElementById("sheet");
-// Donne le focus au premier élément interactif du panneau (accessibilité clavier)
-function focusDialog(el){const f=el.querySelector(".sheet__panel button, .sheet__panel input");if(f){try{f.focus();}catch(_){}}}
-document.getElementById("openSheet").onclick=()=>{renderList();renderSuggest();sheet.classList.add("open");focusDialog(sheet);};
+/* Gestion du focus des panneaux modaux.
+   `aria-modal` ne piège PAS le focus par lui-même : sans `inert` sur le reste
+   du document, la tabulation continue derrière le panneau. On mémorise aussi
+   l'élément déclencheur pour lui rendre le focus à la fermeture. */
+let lastFocused=null;
+const bgLayers=()=>[document.querySelector(".top"),feedEl,document.getElementById("rail")];
+function openDialog(el){
+  lastFocused=document.activeElement;
+  el.classList.add("open");
+  bgLayers().forEach(n=>{if(n)n.inert=true;});
+  const f=el.querySelector(".sheet__panel button, .sheet__panel input");
+  if(f){try{f.focus();}catch(_){}}
+}
+function closeDialog(el){
+  el.classList.remove("open");
+  bgLayers().forEach(n=>{if(n)n.inert=false;});
+  if(lastFocused){try{lastFocused.focus();}catch(_){}lastFocused=null;}
+}
+// Boucle de tabulation à l'intérieur du panneau ouvert
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Tab")return;
+  const open=document.querySelector(".sheet.open");
+  if(!open)return;
+  const f=[...open.querySelectorAll('button, input, [href], select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter(n=>!n.disabled&&n.offsetParent!==null);
+  if(!f.length)return;
+  const first=f[0],last=f[f.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+});
+document.getElementById("openSheet").onclick=()=>{renderList();renderSuggest();openDialog(sheet);};
 document.getElementById("reloadBtn").onclick=()=>{toast("Actualisation…");loadFeeds();};
-sheet.onclick=e=>{if(e.target===sheet)sheet.classList.remove("open");};
+sheet.onclick=e=>{if(e.target===sheet)closeDialog(sheet);};
 // Boutons du panneau Sources (remplacent les anciens onclick inline → CSP possible)
 document.getElementById("addFeedBtn").onclick=addFeed;
 document.getElementById("exportOpml").onclick=()=>exportFeeds("opml");
@@ -975,7 +1093,7 @@ document.getElementById("suggestBox").addEventListener("click",e=>{
 document.addEventListener("keydown",e=>{
   if(e.key!=="Escape")return;
   const s=document.querySelector(".sheet.open");
-  if(s){s.classList.remove("open");return;}
+  if(s){closeDialog(s);return;}
   const menu=document.querySelector(".sharemenu.open");
   if(menu){menu.classList.remove("open");setTimeout(()=>menu.remove(),200);}
 });
@@ -987,6 +1105,8 @@ function applyModeUI(){
   document.body.classList.toggle("learn",on);
   tabNews.classList.toggle("active",!on);
   tabLearn.classList.toggle("active",on);
+  tabNews.setAttribute("aria-selected",String(!on));   // l'état actif doit être exposé, pas seulement peint
+  tabLearn.setAttribute("aria-selected",String(on));
   // les sources RSS n'ont pas de sens en mode Apprendre → on masque le réglage
   document.getElementById("openSheet").classList.toggle("hidden",on);
 }
@@ -1014,7 +1134,8 @@ function restoreFeed(m){
   demobadge(false);hideStates();
   document.getElementById("hint").classList.toggle("hidden",items.length===0);
   updateProgress();
-  feedEl.scrollTop=s.scrollTop;                     // restaure la position exacte
+  setScrollTopInstant(feedEl,s.scrollTop);          // restaure la position exacte, sans animation
+  observeBackgrounds();updateRail();
   lastMarkIdx=-1;markVisibleSeen();                 // recalage du marquage « vu »
   return true;
 }
@@ -1069,7 +1190,7 @@ function openInterests(){
   pendingSrc=new Set(sources);
   renderIntGrid();renderSrcGrid();
   document.getElementById("introWelcome").classList.toggle("hidden",interestsChosen()); // intro visible seulement la 1ère fois
-  intSheet.classList.add("open");focusDialog(intSheet);
+  openDialog(intSheet);
 }
 function renderIntGrid(){
   const grid=document.getElementById("intGrid");
@@ -1098,12 +1219,12 @@ function saveInterests(){
   try{localStorage.setItem(LS_INT,JSON.stringify(interests));}catch(e){}
   try{localStorage.setItem(LS_SRC,JSON.stringify(sources));}catch(e){}
   cat="all";try{localStorage.setItem(LS_CAT,cat);}catch(e){}
-  intSheet.classList.remove("open");
+  closeDialog(intSheet);
   renderCats();
   try{window.dispatchEvent(new Event("interests-validated"));}catch(e){} // autorise la bannière d'install
   if(mode==="learn")loadFeeds();
 }
-intSheet.onclick=e=>{if(e.target===intSheet)intSheet.classList.remove("open");};
+intSheet.onclick=e=>{if(e.target===intSheet)closeDialog(intSheet);};
 document.getElementById("saveInterestsBtn").onclick=saveInterests;
 renderCats();
 if(mode==="learn"&&!interestsChosen())openInterests();  // 1er lancement direct en mode Apprendre
@@ -1128,7 +1249,7 @@ function addFeed(){const inp=document.getElementById("newUrl");const url=inp.val
   if(!/^https?:\/\//.test(url)){toast("URL invalide");return;}
   let name=url;try{name=new URL(url).hostname.replace("www.","");}catch(_){}
   feeds.push({name,url,on:true});save();inp.value="";renderList();renderSuggest();}
-function applyAndClose(){sheet.classList.remove("open");loadFeeds();}
+function applyAndClose(){closeDialog(sheet);loadFeeds();}
 
 /* ---------- Import / Export des sources ---------- */
 function download(filename,content,mime){
@@ -1174,22 +1295,7 @@ function importFromFile(ev){
   };
   reader.readAsText(file);
 }
-function parseJsonFeeds(text){
-  const data=JSON.parse(text);
-  const arr=Array.isArray(data)?data:(data.feeds||[]);
-  return arr.filter(f=>f&&f.url).map(f=>({
-    name:f.name||hostOf(f.url),url:String(f.url),on:f.on!==false
-  }));
-}
-function parseOpmlFeeds(text){
-  const doc=new DOMParser().parseFromString(text,"text/xml");
-  return [...doc.querySelectorAll("outline[xmlUrl]")].map(o=>{
-    const url=o.getAttribute("xmlUrl");
-    const name=o.getAttribute("text")||o.getAttribute("title")||hostOf(url);
-    return {name,url,on:true};
-  }).filter(f=>f.url);
-}
-function hostOf(url){try{return new URL(url).hostname.replace("www.","");}catch(_){return url;}}
+// parseJsonFeeds / parseOpmlFeeds / hostOf : voir src/lib.js
 function mergeFeeds(incoming){
   const existing=new Set(feeds.map(f=>f.url));
   let added=0;
@@ -1229,7 +1335,30 @@ loadFeeds();
 // file:// l'enregistrement échoue silencieusement, comme avant.)
 (function setupPWA(){
   if("serviceWorker" in navigator){
-    navigator.serviceWorker.register("sw.js").catch(()=>{});
+    // Le service worker sert désormais la coquille depuis le cache (peinture
+    // immédiate). Contrepartie : une version fraîche peut attendre en coulisse,
+    // donc on la signale au lieu de laisser l'utilisateur sur l'ancienne.
+    navigator.serviceWorker.register("sw.js").then(reg=>{
+      reg.addEventListener("updatefound",()=>{
+        const sw=reg.installing;
+        if(!sw)return;
+        sw.addEventListener("statechange",()=>{
+          if(sw.state==="installed"&&navigator.serviceWorker.controller){
+            toast("Nouvelle version disponible — rouvre l'app");
+          }
+        });
+      });
+    }).catch(()=>{});
+    // Ne recharger que s'il s'agit d'un REMPLACEMENT de service worker. À la
+    // toute première visite, l'installation prend le contrôle de la page en
+    // cours (skipWaiting + clients.claim) et déclencherait un rechargement
+    // parasite au lancement.
+    const hadController=!!navigator.serviceWorker.controller;
+    let reloading=false;
+    navigator.serviceWorker.addEventListener("controllerchange",()=>{
+      if(!hadController||reloading)return;
+      reloading=true;location.reload();
+    });
   }
 
   const isIos=/iphone|ipad|ipod/i.test(navigator.userAgent);

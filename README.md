@@ -10,8 +10,8 @@ L'outillage de **développement** (lint, tests, CI) est optionnel et ne change r
 - Titre, résumé, image, source et date tirés directement des flux RSS
 - Gestion des sources : ajout, suppression, activation/désactivation
 - Import / export des sources aux formats **OPML** (standard) et **JSON** — importe tes sources et lis-les directement
-- Partage d'un article (feuille de partage native, ou menu WhatsApp / Telegram / mail / X / copie du lien)
-- Favoris et bouton de partage sur chaque carte
+- Partage d'un article (feuille de partage native, ou menu WhatsApp / Telegram / mail / X / copie du lien),
+  depuis un rail unique qui agit sur la carte affichée
 - **Mode Apprendre** 🎓 : un sélecteur à deux onglets en haut (**📰 Actus** / **🎓 Apprendre**, l'actif surligné) bascule le fil vers des articles Wikipédia aléatoires pour swiper en apprenant. Le fil est **sans fin** — de nouveaux articles se chargent automatiquement en approchant du bas — le bouton **↻** repart sur une nouvelle fournée, et le mode est mémorisé entre les sessions.
 - Installable comme application (PWA) avec fonctionnement hors-ligne
 - En mode actus, si un flux est injoignable, un message clair invite à réessayer ou à revoir ses sources (plus de faux contenu de démo)
@@ -84,6 +84,11 @@ essaie donc, dans l'ordre :
 - Les proxys de secours sont interrogés **en parallèle** (le premier qui répond gagne), au lieu d'un par un.
 - Les derniers articles sont **mis en cache** (localStorage) : au lancement suivant, ils s'affichent instantanément pendant que le fil se rafraîchit en arrière-plan (et le cache est conservé si le réseau échoue).
 - En mode Apprendre, un **seul lot** d'articles est chargé au démarrage ; le scroll infini complète le reste.
+- Les cartes hors écran sont **ignorées par le moteur de rendu** (`content-visibility`) et
+  leurs images ne sont chargées qu'à l'approche de l'écran : un fil de 120 cartes plein
+  écran ne garde plus 120 images en mémoire.
+- `/api/learn` répond sur l'une de quelques variantes tirées au sort, donc **cacheables
+  par le CDN** et mutualisées entre utilisateurs (un nonce par requête empêchait tout cache).
 
 Si toutes les sources échouent, l'app **n'affiche plus de contenu de démo** : elle montre
 un message d'erreur avec les boutons *Réessayer* et *Ouvrir les sources*. Pour une fiabilité
@@ -95,10 +100,10 @@ parse le RSS côté serveur.
 Le cœur de l'app reste sans build. Un petit outillage est fourni pour la qualité :
 
 ```bash
-npm install       # eslint + prettier (dev uniquement)
-npm run lint      # analyse statique du backend et des tests
+npm ci            # eslint + prettier (dev uniquement)
+npm run lint      # analyse statique de api/, src/ et des tests
 npm run format    # formatage (index.html volontairement exclu)
-npm test          # tests unitaires (gardes anti-SSRF du proxy)
+npm test          # tests unitaires (assainissement, parsing, noyau Apprendre, anti-SSRF)
 ```
 
 La CI GitHub Actions (`.github/workflows/ci.yml`) rejoue lint + format + tests sur chaque PR.
@@ -108,10 +113,22 @@ La CI GitHub Actions (`.github/workflows/ci.yml`) rejoue lint + format + tests s
 - Le proxy `api/feed.js` valide l'URL demandée et **refuse le réseau interne**
   (localhost, IP privées, métadonnées cloud) — protection anti-SSRF — en plus de
   plafonner la taille de réponse.
+- `api/feed.js` **ne relaie jamais le `Content-Type` de l'amont** : la réponse est
+  toujours servie en `application/xml` avec `nosniff` et `Content-Disposition:
+  attachment`. Sans cela, `/api/feed?url=…` pouvait servir du HTML ou du JavaScript
+  exécuté sur notre propre origine.
+- Les points d'accès `/api/*` n'ouvrent le CORS qu'à l'origine configurée par la
+  variable d'environnement `ALLOWED_ORIGIN` (rien par défaut) : le front est
+  same-origin et n'en a pas besoin, et l'endpoint n'est pas offert comme proxy ouvert.
+- Le HTML des flux est converti en texte via un **document inerte** (`DOMParser`), et
+  non via `innerHTML` sur un élément détaché — qui, lui, déclenche bien les handlers
+  `onerror` des flux.
 - Les liens et images issus des flux sont **assainis** avant affichage (schémas
-  `javascript:`/`data:` non exécutés).
-- Le service worker ne met en cache que l'app-shell same-origin et purge ses
-  anciennes versions (pas de cache non borné).
+  `javascript:`/`data:` non exécutés), et les URL d'image sont posées en JavaScript
+  plutôt que dans un attribut `style` (un attribut `style` est décodé en HTML avant
+  d'être parsé en CSS, ce qui rend l'échappement HTML insuffisant).
+- Le service worker ne met en cache que l'app-shell same-origin, jamais `/api/*`, et
+  purge ses anciennes versions (pas de cache non borné).
 
 ## Architecture
 
@@ -119,15 +136,29 @@ La CI GitHub Actions (`.github/workflows/ci.yml`) rejoue lint + format + tests s
 - **Mode Apprendre** : `api/learn.js` agrège **côté serveur** Wikipédia + GBIF + Gallica
   (cache CDN mutualisé entre utilisateurs). Le front l'appelle en priorité et se rabat
   sur son agrégation client si l'endpoint n'est pas déployé (hébergement statique).
+- **Code partagé** : `src/lib.js` (fonctions pures : assainissement, parsing OPML/JSON,
+  dates) et `src/learn-core.js` (catégories, URL et normaliseurs du mode Apprendre) sont
+  chargés par `index.html` **et** par les fonctions serverless — une seule implémentation,
+  couverte par `npm test`. Ce sont des `<script>` classiques, pas des modules ESM :
+  `index.html` reste ouvrable en `file://`.
 - **PWA** : `manifest.webmanifest` et `sw.js` sont de vrais fichiers servis en statique.
-- **Accessibilité** : panneaux en `role="dialog"` fermables au clavier (Échap), gestion
-  du focus ; titres de carte en `h2`.
+  Le service worker sert la coquille depuis le cache (peinture immédiate) et ne met
+  **jamais** `/api/*` en cache.
+- **En-têtes** : `vercel.json` porte la CSP, les en-têtes de sécurité et le cache long
+  des assets immuables.
+- **Accessibilité** : zoom autorisé, panneaux en `role="dialog"` avec piège de focus et
+  fermeture clavier (Échap), `prefers-reduced-motion` respecté ; titres de carte en `h2`.
 
 ## Limites connues
 
 - La récupération RSS dépend de services tiers gratuits (rss2json / proxys publics), qui
   peuvent être limités en débit ou temporairement indisponibles.
-- Les favoris ne sont pas encore persistants entre sessions.
+- Pas de favoris : il n'y a pas encore de « garder pour plus tard ». La position de
+  lecture, elle, est bien mémorisée entre les sessions.
+- `index.html` reste volontairement hors du périmètre lint/format. La logique
+  réutilisable en a été extraite vers `src/`, mais le rendu et les interactions y
+  vivent encore.
+- Les icônes PNG ne sont pas optimisées (`logo-512.png` pèse ~260 Ko).
 
 ## Licence
 

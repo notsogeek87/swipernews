@@ -5,7 +5,7 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "lint": "eslint api test eslint.config.js",
+    "lint": "eslint api src test eslint.config.js",
     "format": "prettier --write .",
     "format:check": "prettier --check \"**/*.{js,json,md}\"",
     "test": "node --test"

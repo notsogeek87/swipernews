@@ -13,7 +13,7 @@ test("normalizeWiki extrait titre/extrait/image et filtre les extraits trop cour
           title: "Effet tunnel",
           extract: "x".repeat(150),
           canonicalurl: "https://fr.wikipedia.org/wiki/Effet_tunnel",
-          original: { source: "https://img/effet.jpg" },
+          thumbnail: { source: "https://img/effet.jpg" },
         },
         2: { title: "Trop court", extract: "court" }, // < 120 → écarté
       },
@@ -23,6 +23,7 @@ test("normalizeWiki extrait titre/extrait/image et filtre les extraits trop cour
   assert.equal(out.length, 1);
   assert.equal(out[0].source, "Wikipédia");
   assert.equal(out[0].title, "Effet tunnel");
+  // le thumbnail borné, jamais `original` : voir test/learn-core.test.js
   assert.equal(out[0].img, "https://img/effet.jpg");
 });
 

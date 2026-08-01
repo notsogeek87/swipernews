@@ -98,9 +98,19 @@ async function readCapped(upstream) {
   return Buffer.concat(chunks.map((c) => Buffer.from(c))).toString("utf-8");
 }
 
-async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+// Le front est same-origin : il n'a besoin d'aucun CORS. Un "*" ferait de ce
+// point d'accès un proxy ouvert utilisable par n'importe quel site, à nos frais
+// d'exécution et sous notre réputation IP. On n'ouvre donc qu'une origine
+// explicitement configurée (ALLOWED_ORIGIN), et rien par défaut.
+function applyCors(res) {
+  const origin = process.env.ALLOWED_ORIGIN;
+  if (origin) res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+}
+
+async function handler(req, res) {
+  applyCors(res);
   if (req.method === "OPTIONS") {
     res.status(204).end();
     return;
@@ -138,10 +148,15 @@ async function handler(req, res) {
     });
 
     const text = await readCapped(upstream);
-    res.setHeader(
-      "Content-Type",
-      upstream.headers.get("content-type") || "text/xml; charset=utf-8"
-    );
+    // On NE relaie JAMAIS le Content-Type de l'amont. Le faire permettrait de
+    // servir du text/html — donc du script exécuté sur NOTRE origine — ou du
+    // application/javascript, qui deviendrait un script same-origin éligible à
+    // navigator.serviceWorker.register(). Le front ne lit que du XML : on force
+    // le type, on interdit le sniffing, et Content-Disposition empêche le rendu
+    // en cas de navigation directe vers /api/feed?url=...
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Disposition", "attachment");
     // cache CDN 5 min, sert l'ancienne version pendant la revalidation
     res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
     res.status(upstream.status).send(text);

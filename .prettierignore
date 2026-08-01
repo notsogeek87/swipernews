@@ -1,5 +1,6 @@
 node_modules
 # index.html contient du JS/CSS inline volontairement dense, on le laisse tel quel
 index.html
-# prose existante : on ne la reformate pas automatiquement
+# prose : on ne la reformate pas automatiquement
 README.md
+AUDIT.md
