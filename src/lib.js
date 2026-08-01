@@ -105,31 +105,26 @@
   }
 
   /**
-   * Prépare une URL pour une valeur CSS `url("...")`.
+   * Échappe une URL pour l'insérer dans une chaîne CSS entre guillemets,
+   * destinée à `element.style.backgroundImage = 'url("' + cssString(u) + '")'`.
    *
-   * Point de sécurité : échapper pour un attribut HTML ne suffit PAS ici. La
-   * valeur d'un attribut `style` est décodée en HTML AVANT d'être parsée en CSS,
-   * donc un `&#39;` redevient une apostrophe et referme la chaîne CSS. On
-   * pour-encode donc les caractères qui peuvent sortir de `url("...")`.
-   * (Utilisé uniquement en repli : le chemin normal affecte `style.backgroundImage`
-   * en JS, où aucune interprétation HTML n'a lieu.)
+   * NE PAS pour-encoder ici. Dans un chemin d'URL, `(`, `)` et `'` sont des
+   * sub-delims : `%28` n'est PAS équivalent à `(` (RFC 3986 §6.2.2.2), et
+   * beaucoup de serveurs d'images répondent 404 sur la forme encodée. Les
+   * pour-encoder cassait donc silencieusement toutes les images dont le nom de
+   * fichier contient une parenthèse ou une apostrophe.
+   *
+   * Le seul échappement nécessaire est celui des délimiteurs de la chaîne CSS.
+   * C'est suffisant parce que la valeur est posée via CSSOM : il n'y a aucune
+   * étape de décodage HTML (contrairement à un attribut `style`, décodé en HTML
+   * avant d'être parsé en CSS — c'est pour cela qu'`escAttr` n'y protège pas),
+   * et une affectation à `style.backgroundImage` ne peut de toute façon pas
+   * introduire une seconde déclaration.
    */
-  // Attention : encodeURIComponent laisse passer ' ( ) * ! ~ — donc justement
-  // l'apostrophe et les parenthèses qui permettent de sortir de url('...').
-  // La table est explicite pour cette raison.
-  const CSS_ESCAPES = {
-    '"': "%22",
-    "'": "%27",
-    "(": "%28",
-    ")": "%29",
-    "\\": "%5C",
-    " ": "%20",
-  };
-  function cssUrl(src) {
-    return String(src || "").replace(
-      /["'()\\\s]/g,
-      (c) => CSS_ESCAPES[c] || encodeURIComponent(c)
-    );
+  function cssString(src) {
+    return String(src || "")
+      .replace(/[\\"]/g, "\\$&")
+      .replace(/[\n\r\f]/g, " ");
   }
 
   /** Échappement pour du contenu texte inséré en HTML. */
@@ -256,7 +251,7 @@
     imgFromHtml,
     safeLink,
     safeImg,
-    cssUrl,
+    cssString,
     esc,
     escAttr,
     relTime,

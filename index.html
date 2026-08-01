@@ -375,7 +375,7 @@ const CONFIG = {
 
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
-const {stripHtml,imgFromHtml,safeLink,safeImg,cssUrl,esc,escAttr,relTime,shuffle,
+const {stripHtml,imgFromHtml,safeLink,safeImg,cssString,esc,escAttr,relTime,shuffle,
   seenKey,dropSeen,hostOf,parseJsonFeeds,parseOpmlFeeds}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
@@ -776,7 +776,7 @@ const bgObserver=("IntersectionObserver" in self)?new IntersectionObserver((entr
   entries.forEach(en=>{
     if(!en.isIntersecting)return;
     const el=en.target,src=el.dataset.bg;
-    if(src)el.style.backgroundImage='url("'+cssUrl(src)+'")';
+    if(src)el.style.backgroundImage='url("'+cssString(src)+'")';
     delete el.dataset.bg;
     obs.unobserve(el);
   });
@@ -784,7 +784,7 @@ const bgObserver=("IntersectionObserver" in self)?new IntersectionObserver((entr
 function observeBackgrounds(scope){
   (scope||feedEl).querySelectorAll(".card__bg[data-bg]").forEach(el=>{
     if(bgObserver)bgObserver.observe(el);
-    else{el.style.backgroundImage='url("'+cssUrl(el.dataset.bg)+'")';delete el.dataset.bg;}
+    else{el.style.backgroundImage='url("'+cssString(el.dataset.bg)+'")';delete el.dataset.bg;}
   });
 }
 // Carte de fin (mode Actus) : les flux RSS sont finis, on marque clairement le bout

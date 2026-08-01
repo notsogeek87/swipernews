@@ -45,15 +45,29 @@ test("safeImg accepte http(s) et data:image, rien d'autre", () => {
   assert.equal(lib.safeImg("javascript:alert(1)"), "");
 });
 
-test("cssUrl neutralise une évasion de url() — l'échappement HTML ne suffit pas", () => {
-  // Une valeur d'attribut style est décodée en HTML AVANT le parsing CSS : un
-  // &#39; y redevient une apostrophe. cssUrl pour-encode donc réellement.
-  const hostile = "https://ok.fr/a');position:fixed;inset:0;background:url('//evil/x.png";
-  const out = lib.cssUrl(hostile);
-  assert.ok(!out.includes("'"), "aucune apostrophe ne doit subsister");
-  assert.ok(!out.includes('"'));
-  assert.ok(!out.includes("("), "aucune parenthèse ne doit subsister");
-  assert.ok(!out.includes(" "));
+test("cssString préserve l'URL à l'identique — surtout ( ) et '", () => {
+  // Régression : pour-encoder ces caractères cassait silencieusement les images
+  // dont le nom de fichier en contient (RFC 3986 : ce sont des sub-delims, %28
+  // n'est PAS équivalent à "(" — beaucoup de serveurs répondent 404).
+  const legit =
+    "https://www.francetvinfo.fr/pictures/photo(1)_l'usine,2026.jpg?w=1200&h=680";
+  assert.equal(lib.cssString(legit), legit);
+  for (const c of ["(", ")", "'", ",", "&", "?", "="]) {
+    assert.ok(lib.cssString("https://x/a" + c + "b.jpg").includes(c), "perdu : " + c);
+  }
+});
+
+test("cssString neutralise ce qui pourrait sortir de la chaîne CSS", () => {
+  // La valeur est posée via CSSOM (aucun décodage HTML) : seuls les
+  // délimiteurs de chaîne comptent.
+  const hostile = 'https://ok.fr/a");position:fixed;inset:0;background:url("//evil/x.png';
+  const out = lib.cssString(hostile);
+  assert.ok(!/(^|[^\\])"/.test(out), "aucun guillemet non échappé ne doit subsister");
+  assert.equal(lib.cssString('a\\b"c'), 'a\\\\b\\"c');
+  assert.ok(
+    !/[\n\r\f]/.test(lib.cssString("a\nb")),
+    "pas de saut de ligne dans une chaîne CSS"
+  );
 });
 
 test("escAttr et esc échappent les caractères structurants", () => {
