@@ -66,16 +66,18 @@
 
   /* Mode Apprendre (Wikipédia) : bascule d'ambiance */
   body.learn{--accent:#4ad9ff;--accent-2:#ff8bb0}
-  body.learn .brand .mark{transform:rotate(45deg);display:inline-block}
+  body.learn .brand .mark{transform:rotate(45deg);display:inline-block;transition:transform .3s}
+  /* suffixe discret « · Apprendre » dans le logo, à la place d'un gros badge flottant */
+  .brand__mode{display:none;padding-left:11px;font-size:13px;font-weight:600;letter-spacing:.01em;
+    color:#7fe3ff;border-left:1px solid rgba(255,255,255,.18)}
+  body.learn .brand__mode{display:inline-block}
   /* Mode Apprendre : on privilégie le texte — titre plus compact, description plus longue */
   body.learn .card__title{font-size:clamp(22px,5.6vw,32px);margin-bottom:10px}
   body.learn .card__desc{-webkit-line-clamp:10;font-size:15px;line-height:1.55;max-width:60ch;color:#e4e2dd}
   body.learn .card__body{padding-top:20px}
-  #learnBtn.on{background:var(--accent);border-color:var(--accent);color:#04121a}
-  .modebadge{position:fixed;top:calc(64px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:14;
-    background:rgba(74,217,255,.15);border:1px solid rgba(74,217,255,.4);color:#4ad9ff;
-    padding:6px 14px;border-radius:100px;font-size:12px;font-weight:600}
-  .modebadge.hidden{display:none}
+  /* bouton actif : pastille cyan translucide + léger halo, plus doux qu'un aplat plein */
+  #learnBtn.on{background:rgba(74,217,255,.14);border-color:rgba(74,217,255,.5);
+    color:#bff0ff;box-shadow:0 0 18px rgba(74,217,255,.22)}
 
   .hint{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translateX(-50%);
     z-index:14;color:var(--muted);font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;
@@ -139,7 +141,7 @@
 <div class="progress"><div class="progress__bar" id="pbar"></div></div>
 
 <header class="top">
-  <div class="brand"><span class="mark">◆</span> Flux</div>
+  <div class="brand"><span class="mark">◆</span> Flux<span class="brand__mode">Apprendre</span></div>
   <div class="actions">
     <button id="installBtn" class="hidden" title="Installer l'app">⤓ Installer</button>
     <button id="learnBtn" title="Mode Apprendre — articles Wikipédia">🎓 Apprendre</button>
@@ -149,7 +151,6 @@
 </header>
 
 <div class="demobadge hidden" id="demobadge">Mode démo — hors-ligne</div>
-<div class="modebadge hidden" id="modebadge">🎓 Mode Apprendre — Wikipédia</div>
 
 <div id="feed"></div>
 
@@ -334,7 +335,7 @@ async function fetchWikipedia(count=30){
 
 /* ---------- Chargement principal ---------- */
 async function loadFeeds(){
-  show("loading");demobadge(false);modebadge(mode==="learn");
+  show("loading");demobadge(false);
   if(mode==="learn"){
     try{
       const arr=await fetchWikipedia(30);
@@ -569,7 +570,6 @@ function showEmpty(reason){
   document.getElementById("empty").classList.remove("hidden");
 }
 function demobadge(on){document.getElementById("demobadge").classList.toggle("hidden",!on);}
-function modebadge(on){document.getElementById("modebadge").classList.toggle("hidden",!on);}
 let toastT;function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");
   clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1800);}
 
