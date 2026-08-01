@@ -260,8 +260,9 @@ module.exports = async function handler(req, res) {
     res.status(502).json({ error: "Aucun contenu récupéré" });
     return;
   }
-  // Cache CDN : mutualise les lots entre utilisateurs pendant 2 min
-  res.setHeader("Cache-Control", "s-maxage=120, stale-while-revalidate=300");
+  // Contenu ALÉATOIRE : pas de cache CDN, sinon le scroll infini rappelle la même
+  // URL et reçoit le même lot → plus rien de neuf à ajouter. Chaque appel est frais.
+  res.setHeader("Cache-Control", "no-store");
   res.status(200).json({ items });
 };
 
