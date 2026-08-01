@@ -51,15 +51,26 @@
   .progress{position:fixed;left:0;top:0;height:100dvh;width:3px;z-index:20;pointer-events:none}
   .progress__bar{width:100%;background:linear-gradient(var(--accent),var(--accent-2));border-radius:0 3px 3px 0;transition:height .2s}
 
-  .top{position:fixed;top:0;left:0;right:0;z-index:15;padding:calc(14px + env(safe-area-inset-top)) 18px 14px;
-    display:flex;align-items:center;justify-content:space-between;background:linear-gradient(rgba(6,6,10,.7),transparent)}
+  .top{position:fixed;top:0;left:0;right:0;z-index:15;padding:calc(12px + env(safe-area-inset-top)) 16px 14px;
+    display:flex;flex-direction:column;gap:11px;background:linear-gradient(rgba(6,6,10,.82),rgba(6,6,10,.5) 65%,transparent)}
+  .topline{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .brand{font-weight:700;font-size:18px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
   .brand .mark{color:var(--accent)}
   .top .actions{display:flex;gap:8px}
-  .top button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink);
+  .top .actions button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink);
     padding:9px 14px;border-radius:100px;font-family:var(--sans);font-weight:600;font-size:13px;cursor:pointer;backdrop-filter:blur(12px)}
+  .iconbtn{width:38px;height:38px;padding:0!important;display:grid;place-items:center;font-size:17px}
 
-  .demobadge{position:fixed;top:calc(64px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:14;
+  /* Sélecteur de mode : deux onglets visibles, l'actif en surbrillance */
+  .modeswitch{align-self:center;display:inline-flex;gap:4px;padding:4px;border-radius:100px;
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(12px)}
+  .modeswitch button{border:none;background:transparent;color:var(--muted);font-family:var(--sans);
+    font-weight:600;font-size:13.5px;padding:8px 18px;border-radius:100px;cursor:pointer;
+    display:flex;align-items:center;gap:7px;transition:background .2s,color .2s}
+  .modeswitch button.active{background:rgba(255,255,255,.16);color:var(--ink);box-shadow:0 1px 8px rgba(0,0,0,.28)}
+  .modeswitch button .ic{font-size:15px}
+
+  .demobadge{position:fixed;top:calc(116px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:14;
     background:rgba(74,217,255,.15);border:1px solid rgba(74,217,255,.35);color:var(--accent-2);
     padding:6px 14px;border-radius:100px;font-size:12px;font-weight:600}
   .demobadge.hidden{display:none}
@@ -67,17 +78,10 @@
   /* Mode Apprendre (Wikipédia) : bascule d'ambiance */
   body.learn{--accent:#4ad9ff;--accent-2:#ff8bb0}
   body.learn .brand .mark{transform:rotate(45deg);display:inline-block;transition:transform .3s}
-  /* suffixe discret « · Apprendre » dans le logo, à la place d'un gros badge flottant */
-  .brand__mode{display:none;padding-left:11px;font-size:13px;font-weight:600;letter-spacing:.01em;
-    color:#7fe3ff;border-left:1px solid rgba(255,255,255,.18)}
-  body.learn .brand__mode{display:inline-block}
   /* Mode Apprendre : on privilégie le texte — titre plus compact, description plus longue */
   body.learn .card__title{font-size:clamp(22px,5.6vw,32px);margin-bottom:10px}
   body.learn .card__desc{-webkit-line-clamp:10;font-size:15px;line-height:1.55;max-width:60ch;color:#e4e2dd}
   body.learn .card__body{padding-top:20px}
-  /* bouton actif : pastille cyan translucide + léger halo, plus doux qu'un aplat plein */
-  #learnBtn.on{background:rgba(74,217,255,.14);border-color:rgba(74,217,255,.5);
-    color:#bff0ff;box-shadow:0 0 18px rgba(74,217,255,.22)}
 
   .hint{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translateX(-50%);
     z-index:14;color:var(--muted);font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;
@@ -141,12 +145,17 @@
 <div class="progress"><div class="progress__bar" id="pbar"></div></div>
 
 <header class="top">
-  <div class="brand"><span class="mark">◆</span> Flux<span class="brand__mode">Apprendre</span></div>
-  <div class="actions">
-    <button id="installBtn" class="hidden" title="Installer l'app">⤓ Installer</button>
-    <button id="learnBtn" title="Mode Apprendre — articles Wikipédia">🎓 Apprendre</button>
-    <button id="reloadBtn" title="Recharger">↻</button>
-    <button id="openSheet">Sources</button>
+  <div class="topline">
+    <div class="brand"><span class="mark">◆</span> Flux</div>
+    <div class="actions">
+      <button id="installBtn" class="hidden" title="Installer l'app">⤓ Installer</button>
+      <button id="reloadBtn" class="iconbtn" title="Rafraîchir les articles" aria-label="Rafraîchir">↻</button>
+      <button id="openSheet" title="Gérer tes sources / réglages">⚙ Sources</button>
+    </div>
+  </div>
+  <div class="modeswitch" role="tablist" aria-label="Choix du mode">
+    <button id="tabNews" class="active" role="tab"><span class="ic">📰</span> Actus</button>
+    <button id="tabLearn" role="tab"><span class="ic">🎓</span> Apprendre</button>
   </div>
 </header>
 
@@ -481,21 +490,24 @@ document.getElementById("openSheet").onclick=()=>{renderList();sheet.classList.a
 document.getElementById("reloadBtn").onclick=()=>loadFeeds();
 sheet.onclick=e=>{if(e.target===sheet)sheet.classList.remove("open");};
 
-/* ---------- Bascule Mode Apprendre ---------- */
-const learnBtn=document.getElementById("learnBtn");
+/* ---------- Sélecteur de mode (onglets Actus / Apprendre) ---------- */
+const tabNews=document.getElementById("tabNews"),tabLearn=document.getElementById("tabLearn");
 function applyModeUI(){
   const on=mode==="learn";
   document.body.classList.toggle("learn",on);
-  learnBtn.classList.toggle("on",on);
-  learnBtn.textContent=on?"📰 Actus":"🎓 Apprendre";
-  learnBtn.title=on?"Revenir aux actus":"Mode Apprendre — articles Wikipédia";
-  document.getElementById("openSheet").classList.toggle("hidden",on); // les sources RSS n'ont pas de sens en mode Apprendre
+  tabNews.classList.toggle("active",!on);
+  tabLearn.classList.toggle("active",on);
+  // les sources RSS n'ont pas de sens en mode Apprendre → on masque le réglage
+  document.getElementById("openSheet").classList.toggle("hidden",on);
 }
-learnBtn.onclick=()=>{
-  mode=mode==="learn"?"news":"learn";
+function setMode(m){
+  if(m===mode)return;
+  mode=m;
   try{localStorage.setItem(LS_MODE,mode);}catch(e){}
   applyModeUI();loadFeeds();
-};
+}
+tabNews.onclick=()=>setMode("news");
+tabLearn.onclick=()=>setMode("learn");
 applyModeUI();
 function renderList(){document.getElementById("feedList").innerHTML=feeds.map((f,i)=>`
   <div class="feedrow"><input type="checkbox" ${f.on?"checked":""} onchange="toggleFeed(${i})">
