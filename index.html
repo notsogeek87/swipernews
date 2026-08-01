@@ -243,6 +243,9 @@
     <h2>Tes centres d'intérêt</h2>
     <p class="sub">Choisis ce que tu veux apprendre. Tu pourras les modifier à tout moment.</p>
     <div class="intgrid" id="intGrid"></div>
+    <h2 style="margin-top:24px">Sources</h2>
+    <p class="sub">D'où viennent les cartes en mode Apprendre.</p>
+    <div class="intgrid" id="srcGrid"></div>
     <button class="applybtn" onclick="saveInterests()">Valider</button>
   </div>
 </div>
@@ -277,6 +280,7 @@ const LS_KEY="fluxswipe.feeds.v1";
 const LS_MODE="fluxswipe.mode.v1";
 const LS_CAT="fluxswipe.cat.v1";
 const LS_INT="fluxswipe.interests.v1";
+const LS_SRC="fluxswipe.sources.v1";
 let feeds=load(),items=[];
 let mode=(()=>{try{return localStorage.getItem(LS_MODE)==="news"?"news":"learn";}catch(e){return "learn";}})();
 
@@ -301,6 +305,8 @@ let interests=(()=>{try{const s=localStorage.getItem(LS_INT);return s?JSON.parse
 function interestsChosen(){try{return localStorage.getItem(LS_INT)!==null;}catch(e){return false;}}
 /* Filtre courant : "all" = mélange des intérêts choisis, sinon une clé d'intérêt précise. */
 let cat=(()=>{try{const v=localStorage.getItem(LS_CAT);return (v&&v!=="random")?v:"all";}catch(e){return "all";}})();
+/* Sources actives du mode Apprendre. Par défaut : Wikipédia seul. */
+let sources=(()=>{try{const s=localStorage.getItem(LS_SRC);const a=s?JSON.parse(s):null;return (Array.isArray(a)&&a.length)?a:["wikipedia"];}catch(e){return ["wikipedia"];}})();
 /* Catégorie effective pour un lot : le filtre courant, ou un intérêt tiré au sort si "all". */
 function activeCatKey(){
   if(cat!=="all")return cat;
@@ -463,17 +469,18 @@ async function srcGallica(catKey){
   return out;
 }
 
-/* Sources actives selon la catégorie ("*" = toutes) */
+/* Sources disponibles. cats "*" = toutes ; sinon liste de catégories pertinentes. */
 const LEARN_SOURCES=[
-  {fn:srcWikipedia, cats:"*"},
-  {fn:srcGBIF,      cats:["nature","sciences"]},
-  {fn:srcGallica,   cats:"*"},
+  {key:"wikipedia", label:"Wikipédia",   fn:srcWikipedia, cats:"*"},
+  {key:"gbif",      label:"GBIF · INPN", fn:srcGBIF,      cats:["nature","sciences"]},
+  {key:"gallica",   label:"Gallica · BnF", fn:srcGallica, cats:"*"},
 ];
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
-/* Un lot mélangé, tiré des sources pertinentes pour la catégorie courante */
+/* Un lot mélangé, tiré des sources choisies par l'utilisateur ET pertinentes pour la catégorie */
 async function fetchLearn(count=20){
   const catKey=activeCatKey();
-  const fns=LEARN_SOURCES.filter(s=>s.cats==="*"||s.cats.includes(catKey)).map(s=>s.fn);
+  let fns=LEARN_SOURCES.filter(s=>sources.includes(s.key)&&(s.cats==="*"||s.cats.includes(catKey))).map(s=>s.fn);
+  if(!fns.length)fns=[srcWikipedia];                     // garde-fou : au moins Wikipédia
   const results=await Promise.allSettled(fns.map(fn=>fn(catKey)));
   const seen=new Set();let out=[];
   results.forEach(r=>{if(r.status==="fulfilled")r.value.forEach(it=>{
@@ -709,10 +716,11 @@ function setCat(k){
 
 /* ---------- Sélecteur de centres d'intérêt ---------- */
 const intSheet=document.getElementById("intSheet");
-let pendingInt=new Set();
+let pendingInt=new Set(),pendingSrc=new Set();
 function openInterests(){
   pendingInt=new Set(interests);
-  renderIntGrid();
+  pendingSrc=new Set(sources);
+  renderIntGrid();renderSrcGrid();
   intSheet.classList.add("open");
 }
 function renderIntGrid(){
@@ -725,9 +733,22 @@ function renderIntGrid(){
     b.classList.toggle("on");
   });
 }
+function renderSrcGrid(){
+  const grid=document.getElementById("srcGrid");
+  grid.innerHTML=LEARN_SOURCES.map(s=>
+    `<button class="intchip ${pendingSrc.has(s.key)?"on":""}" data-k="${s.key}">${s.label}</button>`).join("");
+  grid.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.k;
+    if(pendingSrc.has(k))pendingSrc.delete(k);else pendingSrc.add(k);
+    b.classList.toggle("on");
+  });
+}
 function saveInterests(){
   interests=CATEGORIES.filter(c=>pendingInt.has(c.key)).map(c=>c.key); // garde l'ordre défini
+  sources=LEARN_SOURCES.filter(s=>pendingSrc.has(s.key)).map(s=>s.key);
+  if(!sources.length)sources=["wikipedia"];              // au moins une source
   try{localStorage.setItem(LS_INT,JSON.stringify(interests));}catch(e){}
+  try{localStorage.setItem(LS_SRC,JSON.stringify(sources));}catch(e){}
   cat="all";try{localStorage.setItem(LS_CAT,cat);}catch(e){}
   intSheet.classList.remove("open");
   renderCats();
