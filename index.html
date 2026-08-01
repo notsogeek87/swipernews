@@ -507,26 +507,35 @@ function attachRail(){
     shareItem(items[+b.dataset.i]);});
 }
 
+/* Chaque partage inclut l'article ET un lien promo vers l'app */
+const APP_URL="http://news.lielu.eu";
+const APP_TAG=`📲 Lu sur SwiperNews — l'actu & la culture en swipe : ${APP_URL}`;
+function shareParts(it){
+  const link=it.link&&it.link!=="#"?it.link:"";
+  const full=[it.title,link,APP_TAG].filter(Boolean).join("\n\n");  // titre + lien article + promo
+  return {link,full};
+}
 async function shareItem(it){
-  const url=it.link&&it.link!=="#"?it.link:location.href;
-  const shareData={title:it.title,text:it.title,url};
+  const {full}=shareParts(it);
   // 1) partage natif (ouvre la feuille de partage du téléphone : Messages, WhatsApp, Mail…)
   if(navigator.share){
-    try{await navigator.share(shareData);return;}catch(err){if(err&&err.name==="AbortError")return;}
+    try{await navigator.share({title:it.title,text:full});return;}catch(err){if(err&&err.name==="AbortError")return;}
   }
   // 2) repli : menu maison avec destinations courantes
-  openShareMenu(it,url);
+  openShareMenu(it);
 }
 
 /* Menu de partage de repli (desktop ou si le partage natif est absent) */
-function openShareMenu(it,url){
-  const enc=encodeURIComponent, t=enc(it.title), u=enc(url);
+function openShareMenu(it){
+  const {link,full}=shareParts(it);
+  const enc=encodeURIComponent;
+  const efull=enc(full), etp=enc(it.title+"\n\n"+APP_TAG), elink=enc(link||APP_URL);
   const targets=[
-    {label:"WhatsApp", href:`https://wa.me/?text=${t}%20${u}`},
-    {label:"Telegram", href:`https://t.me/share/url?url=${u}&text=${t}`},
-    {label:"E-mail",   href:`mailto:?subject=${t}&body=${t}%0A${u}`},
-    {label:"X (Twitter)", href:`https://twitter.com/intent/tweet?text=${t}&url=${u}`},
-    {label:"Facebook", href:`https://www.facebook.com/sharer/sharer.php?u=${u}`},
+    {label:"WhatsApp", href:`https://wa.me/?text=${efull}`},
+    {label:"Telegram", href:`https://t.me/share/url?url=${elink}&text=${etp}`},
+    {label:"E-mail",   href:`mailto:?subject=${enc(it.title)}&body=${efull}`},
+    {label:"X (Twitter)", href:`https://twitter.com/intent/tweet?text=${etp}&url=${elink}`},
+    {label:"Facebook", href:`https://www.facebook.com/sharer/sharer.php?u=${elink}`},
   ];
   const back=document.createElement("div");
   back.className="sharemenu";
@@ -536,7 +545,7 @@ function openShareMenu(it,url){
     <p class="sub">${esc(it.title)}</p>
     <div class="sharegrid">
       ${targets.map(x=>`<a class="sharedest" href="${escAttr(x.href)}" target="_blank" rel="noopener">${x.label}</a>`).join("")}
-      <button class="sharedest" id="copyLink">Copier le lien</button>
+      <button class="sharedest" id="copyLink">Copier</button>
     </div>
   </div>`;
   document.body.appendChild(back);
@@ -545,7 +554,7 @@ function openShareMenu(it,url){
   back.onclick=e=>{if(e.target===back)close();};
   back.querySelectorAll("a.sharedest").forEach(a=>a.addEventListener("click",close));
   back.querySelector("#copyLink").onclick=async()=>{
-    try{await navigator.clipboard.writeText(url);toast("Lien copié");}catch(_){toast("Copie impossible");}
+    try{await navigator.clipboard.writeText(full);toast("Copié");}catch(_){toast("Copie impossible");}
     close();
   };
 }
