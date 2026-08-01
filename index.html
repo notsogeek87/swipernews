@@ -67,6 +67,10 @@
   /* Mode Apprendre (Wikipédia) : bascule d'ambiance */
   body.learn{--accent:#4ad9ff;--accent-2:#ff8bb0}
   body.learn .brand .mark{transform:rotate(45deg);display:inline-block}
+  /* Mode Apprendre : on privilégie le texte — titre plus compact, description plus longue */
+  body.learn .card__title{font-size:clamp(22px,5.6vw,32px);margin-bottom:10px}
+  body.learn .card__desc{-webkit-line-clamp:10;font-size:15px;line-height:1.55;max-width:60ch;color:#e4e2dd}
+  body.learn .card__body{padding-top:20px}
   #learnBtn.on{background:var(--accent);border-color:var(--accent);color:#04121a}
   .modebadge{position:fixed;top:calc(64px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:14;
     background:rgba(74,217,255,.15);border:1px solid rgba(74,217,255,.4);color:#4ad9ff;
@@ -195,11 +199,11 @@ const DEMO_ITEMS = [
 
 /* ---------- Articles Wikipédia de démo (repli hors-ligne du mode Apprendre) ---------- */
 const DEMO_LEARN = [
-  {source:"Wikipédia", title:"Effet tunnel", desc:"En mécanique quantique, l'effet tunnel désigne la capacité d'une particule à franchir une barrière de potentiel qu'elle ne pourrait pas surmonter selon la physique classique — un phénomène essentiel au fonctionnement du Soleil et des microscopes à effet tunnel.", date:"", img:"https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Effet_tunnel"},
-  {source:"Wikipédia", title:"Bibliothèque d'Alexandrie", desc:"Fondée au IIIe siècle av. J.-C., elle fut l'une des plus grandes bibliothèques de l'Antiquité et un foyer majeur du savoir hellénistique, rassemblant des centaines de milliers de rouleaux.", date:"", img:"https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Biblioth%C3%A8que_d%27Alexandrie"},
-  {source:"Wikipédia", title:"Tardigrade", desc:"Surnommé « ourson d'eau », ce micro-animal peut survivre à des conditions extrêmes : vide spatial, radiations intenses, dessiccation quasi totale et températures proches du zéro absolu.", date:"", img:"https://images.unsplash.com/photo-1439405326854-014607f694d7?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Tardigrada"},
-  {source:"Wikipédia", title:"Nombre d'or", desc:"Noté φ (environ 1,618), ce rapport apparaît en géométrie, dans l'art et l'architecture, et se retrouve dans la suite de Fibonacci ainsi que dans certaines proportions naturelles.", date:"", img:"https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Nombre_d%27or"},
-  {source:"Wikipédia", title:"Aurore polaire", desc:"Ce phénomène lumineux des hautes latitudes naît de l'interaction entre les particules du vent solaire et la haute atmosphère, guidées par le champ magnétique terrestre.", date:"", img:"https://images.unsplash.com/photo-1483347756197-71ef80e95f73?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Aurore_polaire"},
+  {source:"Wikipédia", title:"Effet tunnel", desc:"En mécanique quantique, l'effet tunnel désigne la capacité d'une particule à franchir une barrière de potentiel qu'elle ne pourrait pas surmonter selon les lois de la physique classique. Ce comportement découle de la nature ondulatoire de la matière : la fonction d'onde de la particule ne s'annule pas brutalement à la barrière, mais décroît, laissant une probabilité non nulle de la retrouver de l'autre côté. Le phénomène est essentiel à la fusion nucléaire au cœur du Soleil, où il permet aux protons de se rapprocher malgré leur répulsion. Il est aussi exploité par le microscope à effet tunnel, capable d'imager des surfaces atome par atome, et par certains composants électroniques comme la diode tunnel.", date:"", img:"https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Effet_tunnel"},
+  {source:"Wikipédia", title:"Bibliothèque d'Alexandrie", desc:"Fondée au IIIe siècle av. J.-C. sous la dynastie des Ptolémées, la bibliothèque d'Alexandrie fut l'une des plus grandes bibliothèques de l'Antiquité et un foyer majeur du savoir hellénistique. Elle rassemblait des centaines de milliers de rouleaux de papyrus et attirait savants, poètes et scientifiques de tout le bassin méditerranéen. On y aurait copié systématiquement les ouvrages des navires accostant au port. Son déclin, étalé sur plusieurs siècles, reste entouré de récits contradictoires, et elle demeure un symbole durable de la connaissance perdue.", date:"", img:"https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Biblioth%C3%A8que_d%27Alexandrie"},
+  {source:"Wikipédia", title:"Tardigrade", desc:"Surnommé « ourson d'eau », le tardigrade est un micro-animal de moins d'un millimètre réputé pour sa résistance hors du commun. Il peut survivre à des conditions extrêmes : vide spatial, radiations intenses, pressions énormes, dessiccation quasi totale et températures proches du zéro absolu. Pour cela, il entre dans un état de vie ralentie appelé cryptobiose, dans lequel son métabolisme devient presque indétectable. Une fois réhydraté, il reprend son activité comme si de rien n'était. On en trouve partout, des fonds océaniques aux mousses de nos jardins.", date:"", img:"https://images.unsplash.com/photo-1439405326854-014607f694d7?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Tardigrada"},
+  {source:"Wikipédia", title:"Nombre d'or", desc:"Le nombre d'or, noté φ et valant environ 1,618, est le rapport entre deux longueurs telles que le tout est au plus grand ce que le plus grand est au plus petit. On le retrouve en géométrie, notamment dans le pentagone régulier, et il est intimement lié à la suite de Fibonacci, dont le rapport de deux termes successifs tend vers φ. Depuis l'Antiquité, il a nourri de nombreuses spéculations esthétiques en art et en architecture, parfois exagérées. Il apparaît aussi dans certaines proportions naturelles, comme la disposition des graines de tournesol.", date:"", img:"https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Nombre_d%27or"},
+  {source:"Wikipédia", title:"Aurore polaire", desc:"Une aurore polaire est un phénomène lumineux des hautes latitudes, appelé aurore boréale dans l'hémisphère nord et aurore australe dans le sud. Elle naît de l'interaction entre les particules chargées du vent solaire et les gaz de la haute atmosphère, guidées par le champ magnétique terrestre vers les régions polaires. Les collisions excitent les atomes d'oxygène et d'azote, qui réémettent de la lumière en retombant à leur état d'énergie normal. La couleur dépend du gaz et de l'altitude : vert pour l'oxygène à basse altitude, rouge plus haut, bleu et violet pour l'azote. L'intensité des aurores suit le cycle d'activité du Soleil.", date:"", img:"https://images.unsplash.com/photo-1483347756197-71ef80e95f73?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Aurore_polaire"},
 ];
 
 /* ---------- Sources ---------- */
@@ -259,32 +263,44 @@ function relTime(dateStr){const t=Date.parse(dateStr);if(isNaN(t))return "";
 
 /* ---------- Mode Apprendre : articles Wikipédia aléatoires ---------- */
 const WIKI_LANG="fr";
-async function fetchWikiOne(){
-  const url=`https://${WIKI_LANG}.wikipedia.org/api/rest_v1/page/random/summary`;
+/* Un lot d'articles au hasard, via l'API action (extraits longs + image + URL, en un appel). */
+async function fetchWikiBatch(){
+  const params=new URLSearchParams({
+    action:"query",format:"json",origin:"*",
+    generator:"random",grnnamespace:"0",grnlimit:"20",
+    prop:"extracts|pageimages|info",
+    explaintext:"1",exsentences:"10",                    // jusqu'à 10 phrases par article
+    piprop:"thumbnail|original",pithumbsize:"1200",inprop:"url"
+  });
+  const url=`https://${WIKI_LANG}.wikipedia.org/w/api.php?${params}`;
+  let data;
   try{
-    const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),8000);
-    const res=await fetch(url,{headers:{Accept:"application/json"},cache:"no-store",signal:ctl.signal});
+    const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),9000);
+    const res=await fetch(url,{cache:"no-store",signal:ctl.signal});
     clearTimeout(t);
-    if(res.ok)return await res.json();
-  }catch(e){/* repli proxy ci-dessous */}
-  const txt=await fetchText(url);return JSON.parse(txt); // repli via proxys si le direct échoue
+    if(!res.ok)throw new Error("http");
+    data=await res.json();
+  }catch(e){
+    data=JSON.parse(await fetchText(url));               // repli via proxys si le direct échoue
+  }
+  return data&&data.query&&data.query.pages?Object.values(data.query.pages):[];
 }
 async function fetchWikipedia(count=30){
-  const tries=Math.ceil(count*1.7);
-  const settled=await Promise.allSettled(Array.from({length:tries},fetchWikiOne));
+  const batches=await Promise.allSettled([fetchWikiBatch(),fetchWikiBatch()]);
   const seen=new Set(),out=[];
-  for(const s of settled){
-    if(s.status!=="fulfilled"||!s.value)continue;
-    const w=s.value;
-    if(w.type&&w.type!=="standard")continue;            // évite les pages d'homonymie
-    const desc=(w.extract||"").trim();
-    if(!w.title||desc.length<80||seen.has(w.title))continue;
-    seen.add(w.title);
-    out.push({source:"Wikipédia",title:w.title,desc,
-      link:w.content_urls?.desktop?.page||w.content_urls?.mobile?.page||"",
-      img:w.originalimage?.source||w.thumbnail?.source||"",date:""});
+  for(const b of batches){
+    if(b.status!=="fulfilled")continue;
+    for(const p of b.value){
+      const title=p.title||"";
+      const desc=(p.extract||"").replace(/\s+/g," ").trim();
+      if(!title||seen.has(title)||desc.length<120)continue; // écarte ébauches / homonymies
+      seen.add(title);
+      out.push({source:"Wikipédia",title,desc,
+        link:p.canonicalurl||p.fullurl||"",
+        img:(p.original&&p.original.source)||(p.thumbnail&&p.thumbnail.source)||"",date:""});
+    }
   }
-  out.sort((a,b)=>(b.img?1:0)-(a.img?1:0));             // les articles avec image d'abord
+  out.sort((a,b)=>(b.img?1:0)-(a.img?1:0));               // les articles avec image d'abord
   return out.slice(0,count);
 }
 
