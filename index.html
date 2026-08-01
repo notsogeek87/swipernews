@@ -37,6 +37,10 @@
   .card__source{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;
     letter-spacing:.08em;text-transform:uppercase;color:var(--accent-2);margin-bottom:14px}
   .card__source .dot{width:6px;height:6px;border-radius:50%;background:var(--accent-2);box-shadow:0 0 12px var(--accent-2)}
+  /* Badge de catégorie (mode Apprendre) */
+  .card__cat{display:flex;width:fit-content;align-items:center;gap:6px;
+    background:rgba(74,217,255,.14);border:1px solid rgba(74,217,255,.42);color:#bff0ff;
+    font-size:12px;font-weight:600;padding:5px 12px;border-radius:100px;margin-bottom:12px}
   .card__title{font-family:'Newsreader',serif;font-size:clamp(26px,7vw,40px);line-height:1.1;font-weight:500;letter-spacing:-.01em;margin-bottom:14px}
   .card__desc{font-size:15px;line-height:1.5;color:#d6d4cf;max-width:46ch;
     display:-webkit-box;-webkit-line-clamp:10;-webkit-box-orient:vertical;overflow:hidden}
@@ -287,6 +291,7 @@
  * @property {string} link    URL de l'article (http/https)
  * @property {string} img     URL d'image (http/https/data:image) ou ""
  * @property {string} date    Date de publication brute ou ""
+ * @property {string} [cat]   Clé de catégorie (mode Apprendre) pour le badge
  */
 
 /* ---------- Configuration centralisée (valeurs auparavant en dur un peu partout) ---------- */
@@ -581,11 +586,12 @@ function catKeysForBatch(){
 /* Agrégation côté client (repli si le backend /api/learn n'est pas disponible). */
 async function fetchLearnClient(keys,count){
   const tasks=[];
+  const tag=(p,catKey)=>p.then(list=>list.map(it=>({...it,cat:catKey}))); // marque la catégorie
   keys.forEach(catKey=>{
     LEARN_SOURCES.filter(s=>sources.includes(s.key)&&(s.cats==="*"||s.cats.includes(catKey)))
-      .forEach(s=>tasks.push(s.fn(catKey)));
+      .forEach(s=>tasks.push(tag(s.fn(catKey),catKey)));
   });
-  if(!tasks.length)tasks.push(srcWikipedia(keys[0]||"random")); // garde-fou : au moins Wikipédia
+  if(!tasks.length)tasks.push(tag(srcWikipedia(keys[0]||"random"),keys[0]||"random")); // garde-fou : au moins Wikipédia
   const results=await Promise.allSettled(tasks);
   const dedup=new Set();let out=[];
   results.forEach(r=>{if(r.status==="fulfilled")r.value.forEach(it=>{
@@ -743,17 +749,21 @@ async function loadMoreLearn(){
   }catch(e){warn("load more",e);/* on réessaiera au prochain scroll */}
   finally{loadingMore=false;}
 }
+// Libellé (emoji + nom) d'une catégorie Apprendre à partir de sa clé
+function catLabel(key){const c=CATEGORIES.find(x=>x.key===key);return c?c.label:"";}
 function cardHTML(it,id){
   const img=safeImg(it.img);
   const bg=img?`<div class="card__bg" style="background-image:url('${escAttr(img)}')"></div>`:`<div class="card__noimg"></div>`;
   const link=safeLink(it.link);
   const openLabel=it.source==="Wikipédia"?"Lire sur Wikipédia →":(link?"Découvrir →":"Lire l'article →");
+  const catB=it.cat&&catLabel(it.cat)?`<span class="card__cat">${esc(catLabel(it.cat))}</span>`:"";
   return `<article class="card" data-id="${id}">
     ${bg}
     <div class="rail">
       <button class="shareBtn" aria-label="Partager" title="Partager"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
     </div>
     <div class="card__body">
+      ${catB}
       <span class="card__source"><span class="dot"></span>${esc(it.source)}</span>
       <h2 class="card__title">${esc(it.title)}</h2>
       ${it.desc?`<p class="card__desc">${esc(it.desc)}</p>`:""}

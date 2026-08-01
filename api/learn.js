@@ -239,15 +239,18 @@ module.exports = async function handler(req, res) {
   const wanted = parseList(q.sources, ["wikipedia"]);
   const count = Math.min(Math.max(parseInt(q.count, 10) || 20, 1), 40);
 
+  const tag = (p, catKey) => p.then((list) => list.map((it) => ({ ...it, cat: catKey }))); // marque la catégorie
   const tasks = [];
   for (const catKey of cats) {
     for (const key of wanted) {
       const s = SOURCES[key];
       if (!s) continue;
-      if (s.cats === "*" || s.cats.includes(catKey)) tasks.push(s.fn(catKey));
+      if (s.cats === "*" || s.cats.includes(catKey))
+        tasks.push(tag(s.fn(catKey), catKey));
     }
   }
-  if (!tasks.length) tasks.push(srcWikipedia(cats[0] || "random")); // garde-fou
+  if (!tasks.length)
+    tasks.push(tag(srcWikipedia(cats[0] || "random"), cats[0] || "random")); // garde-fou
 
   const results = await Promise.allSettled(tasks);
   const lists = results.filter((r) => r.status === "fulfilled").map((r) => r.value);
