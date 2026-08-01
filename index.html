@@ -54,7 +54,9 @@
   .progress__bar{width:100%;background:linear-gradient(var(--accent),var(--accent-2));border-radius:0 3px 3px 0;transition:height .2s}
 
   .top{position:fixed;top:0;left:0;right:0;z-index:15;padding:calc(12px + env(safe-area-inset-top)) 16px 14px;
-    display:flex;flex-direction:column;gap:11px;background:linear-gradient(rgba(6,6,10,.82),rgba(6,6,10,.5) 65%,transparent)}
+    display:flex;flex-direction:column;gap:11px;background:linear-gradient(rgba(6,6,10,.82),rgba(6,6,10,.5) 65%,transparent);
+    transition:transform .32s ease,opacity .32s ease}
+  .top.top--away{transform:translateY(-115%);opacity:0;pointer-events:none}  /* masqué pendant le swipe */
   .topline{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .brand{font-weight:700;font-size:18px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
   .brand__logo{display:flex;align-items:center}
@@ -660,13 +662,23 @@ function openShareMenu(it){
 }
 
 const pbar=document.getElementById("pbar");
+/* Masquage auto du haut pendant le swipe ; réapparaît au tap ou après une pause */
+const topEl=document.querySelector(".top");
+let topRevealT, lastScrollY=0, revealUntil=0;
+function showTop(){topEl.classList.remove("top--away");}
+function hideTop(){topEl.classList.add("top--away");}
+function scheduleTopReveal(){clearTimeout(topRevealT);topRevealT=setTimeout(showTop,2500);} // revient ~2,5 s après l'arrêt du scroll
 feedEl.addEventListener("scroll",()=>{
   updateProgress();
   if(feedEl.scrollTop>50)document.getElementById("hint").classList.add("hidden");
+  if(Date.now()>=revealUntil&&Math.abs(feedEl.scrollTop-lastScrollY)>4){hideTop();scheduleTopReveal();} // on swipe → on masque
+  lastScrollY=feedEl.scrollTop;
   // Mode Apprendre : charge un nouveau lot avant d'atteindre le bas → fil sans fin
   if(mode==="learn"&&!loadingMore&&items.length&&
      feedEl.scrollTop+feedEl.clientHeight*3>=feedEl.scrollHeight)loadMoreLearn();
 });
+// tap → réaffiche, et on empêche le re-masquage pendant que le snap se termine
+feedEl.addEventListener("click",()=>{clearTimeout(topRevealT);showTop();revealUntil=Date.now()+1500;});
 function updateProgress(){const max=feedEl.scrollHeight-feedEl.clientHeight;pbar.style.height=(max>0?feedEl.scrollTop/max*100:0)+"%";}
 document.addEventListener("keydown",e=>{const h=feedEl.clientHeight;
   if(e.key==="ArrowDown"||e.key===" ")feedEl.scrollBy({top:h,behavior:"smooth"});
