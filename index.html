@@ -656,25 +656,31 @@ async function loadFeeds(){
 
   const active=feeds.filter(f=>f.on);
   if(!active.length){if(!cached){items=[];render();showEmpty("no-feeds");}return;}
-  try{
-    const results=await Promise.allSettled(active.map(fetchFeedRobust));
-    if(my!==loadSeq)return;
-    let all=[];const failed=[];
-    results.forEach((r,i)=>{
-      if(r.status==="fulfilled"&&r.value.length)all=all.concat(r.value);
-      else failed.push(active[i].name);
-    });
-    if(!all.length)throw new Error("no-items");
-    all.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
-    items=all.slice(0,CONFIG.MAX_NEWS);
-    render(cached&&feedEl.scrollTop>50);hideStates();cacheSave(key);
-    if(failed.length)toast(`${failed.length} flux injoignable${failed.length>1?"s":""}`);
-  }catch(e){
-    if(my!==loadSeq)return;
-    warn("news load",e);
-    if(cached)toast("Réseau indisponible — affichage du cache");
-    else{items=[];render();showEmpty("all-failed");}
-  }
+  // Rendu progressif : chaque flux s'affiche dès qu'il répond, sans attendre le plus lent.
+  let all=[];const failed=[];let done=0,painted=!!cached;
+  active.forEach(f=>{
+    fetchFeedRobust(f).then(res=>{
+      if(my!==loadSeq)return;
+      if(res&&res.length){
+        all=all.concat(res);
+        all.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
+        items=all.slice(0,CONFIG.MAX_NEWS);
+        render(painted&&feedEl.scrollTop>50);hideStates();  // 1er rendu en haut, suivants gardent la position
+        painted=true;
+      }else failed.push(f.name);
+    }).catch(()=>{if(my===loadSeq)failed.push(f.name);})
+      .finally(()=>{
+        if(my!==loadSeq)return;
+        if(++done<active.length)return;                     // pas encore tous terminés
+        if(!all.length){
+          if(cached)toast("Réseau indisponible — affichage du cache");
+          else{items=[];render();showEmpty("all-failed");}
+        }else{
+          cacheSave(key);
+          if(failed.length)toast(`${failed.length} flux injoignable${failed.length>1?"s":""}`);
+        }
+      });
+  });
 }
 
 /* ---------- Rendu ---------- */
@@ -876,7 +882,7 @@ const sheet=document.getElementById("sheet");
 // Donne le focus au premier élément interactif du panneau (accessibilité clavier)
 function focusDialog(el){const f=el.querySelector(".sheet__panel button, .sheet__panel input");if(f){try{f.focus();}catch(_){}}}
 document.getElementById("openSheet").onclick=()=>{renderList();renderSuggest();sheet.classList.add("open");focusDialog(sheet);};
-document.getElementById("reloadBtn").onclick=()=>loadFeeds();
+document.getElementById("reloadBtn").onclick=()=>{toast("Actualisation…");loadFeeds();};
 sheet.onclick=e=>{if(e.target===sheet)sheet.classList.remove("open");};
 // Boutons du panneau Sources (remplacent les anciens onclick inline → CSP possible)
 document.getElementById("addFeedBtn").onclick=addFeed;
@@ -1129,8 +1135,9 @@ function mergeFeeds(incoming){
   const existing=new Set(feeds.map(f=>f.url));
   let added=0;
   incoming.forEach(f=>{if(!existing.has(f.url)){feeds.push(f);existing.add(f.url);added++;}});
-  save();renderList();
+  save();renderList();renderSuggest();
   toast(added? `${added} source${added>1?"s":""} importée${added>1?"s":""}` : "Sources déjà présentes");
+  if(added&&mode==="news")loadFeeds();   // rafraîchit le fil avec les sources importées
 }
 
 /* ---------- Utils ---------- */
