@@ -89,6 +89,8 @@
     font-family:var(--sans);font-weight:600;font-size:14px;padding:11px 16px;border-radius:100px;
     cursor:pointer;transition:background .15s,border-color .15s,color .15s}
   .intchip.on{background:rgba(74,217,255,.16);border-color:rgba(74,217,255,.55);color:#bff0ff}
+  .intro{background:rgba(74,217,255,.1);border:1px solid rgba(74,217,255,.28);color:#cfeffb;
+    font-size:14px;line-height:1.45;padding:13px 15px;border-radius:14px;margin-bottom:18px}
 
   .demobadge{position:fixed;top:calc(116px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:14;
     background:rgba(74,217,255,.15);border:1px solid rgba(74,217,255,.35);color:var(--accent-2);
@@ -240,6 +242,7 @@
 <div class="sheet" id="intSheet">
   <div class="sheet__panel">
     <div class="sheet__grip"></div>
+    <p class="intro hidden" id="introWelcome">✨ Le swipe qui rend plus malin. Même geste que sur tes réseaux, sauf qu'ici chaque carte t'apprend un truc que tu ne connaissais pas. Choisis ce qui t'allume la curiosité 👇</p>
     <h2>Tes centres d'intérêt</h2>
     <p class="sub">Choisis ce que tu veux apprendre. Tu pourras les modifier à tout moment.</p>
     <div class="intgrid" id="intGrid"></div>
@@ -733,6 +736,7 @@ function openInterests(){
   pendingInt=new Set(interests);
   pendingSrc=new Set(sources);
   renderIntGrid();renderSrcGrid();
+  document.getElementById("introWelcome").classList.toggle("hidden",interestsChosen()); // intro visible seulement la 1ère fois
   intSheet.classList.add("open");
 }
 function renderIntGrid(){
