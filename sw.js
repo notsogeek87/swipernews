@@ -1,31 +1,46 @@
 // Service worker de SwiperNews.
 //
-// Stratégie : app-shell same-origin en *stale-while-revalidate* — on peint
-// immédiatement depuis le cache puis on rafraîchit en arrière-plan. L'ancienne
-// stratégie network-first faisait attendre le réseau à chaque lancement, ce qui
-// annulait l'argument « lancement en un tap » de l'app installée.
+// RÈGLE CENTRALE : `index.html` et les modules `src/*.js` forment un ENSEMBLE
+// INDIVISIBLE. Servir un index.html neuf avec un src/lib.js périmé (ou
+// l'inverse) casse l'app entièrement. Deux garde-fous, redondants à dessein :
 //
-// Les réponses d'API ne sont JAMAIS mises en cache : /api/learn porte un
-// paramètre différent à chaque lot, donc chaque appel créait une entrée neuve
-// et le CacheStorage grandissait sans borne jusqu'à saturer le quota (ce qui
-// finissait par faire évincer l'app-shell elle-même).
-const CACHE = "flux-v3";
-const SHELL = [
-  "./",
-  "./index.html",
-  "./src/lib.js",
-  "./src/learn-core.js",
-  "./manifest.webmanifest",
-  "./logo-192.png",
-  "./logo-512.png",
-];
+//   1. index.html est servi RÉSEAU D'ABORD (le cache ne sert que hors-ligne).
+//      Un cache-first sur la coquille gagnait quelques centaines de
+//      millisecondes au lancement au prix d'un risque de version mélangée :
+//      mauvais échange.
+//   2. index.html demande ses modules avec `?v=<VERSION>` (voir APP_VERSION
+//      dans index.html). Une version différente est une URL différente, donc
+//      une entrée de cache différente : un module périmé ne peut pas être
+//      servi à un index.html neuf, même si le cache n'a pas été purgé.
+//
+// Les assets réellement immuables (icônes, manifeste) restent en cache d'abord.
+// Les réponses d'API ne sont jamais mises en cache : /api/learn porte un
+// paramètre variable, donc chaque appel créerait une entrée neuve.
+//
+// À CHAQUE modification de index.html ou de src/*.js : incrémenter APP_VERSION
+// dans index.html ET CACHE ci-dessous (garder les deux numéros alignés).
+const CACHE = "flux-v4";
+
+// Mis en cache à l'installation : uniquement ce qui ne dépend pas de la version.
+const SHELL = ["./logo-192.png", "./logo-512.png", "./manifest.webmanifest"];
+
+// Ressources dont la fraîcheur prime sur la vitesse (voir règle centrale).
+function isShellDocument(url) {
+  return (
+    url.pathname.endsWith("/") ||
+    url.pathname.endsWith("/index.html") ||
+    url.pathname.startsWith("/src/")
+  );
+}
 
 self.addEventListener("install", (e) =>
   e.waitUntil(
     (async () => {
       const c = await caches.open(CACHE);
-      // addAll échoue en bloc si une seule requête échoue : on tolère les manques.
+      // add() individuel : addAll échoue en bloc si une seule requête échoue.
       await Promise.all(SHELL.map((u) => c.add(u).catch(() => {})));
+      // On pré-charge aussi le document courant pour le mode hors-ligne.
+      await c.add("./").catch(() => {});
       await self.skipWaiting();
     })()
   )
@@ -41,9 +56,13 @@ self.addEventListener("activate", (e) =>
   )
 );
 
-// Permet à la page de déclencher la bascule de version sans rechargement forcé.
-self.addEventListener("message", (e) => {
+// Permet à la page de forcer une purge complète (filet de sécurité côté client).
+self.addEventListener("message", async (e) => {
   if (e.data === "skip-waiting") self.skipWaiting();
+  if (e.data === "purge") {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+  }
 });
 
 self.addEventListener("fetch", (e) => {
@@ -51,28 +70,47 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // pas de cache des origines tierces
-  if (url.pathname.startsWith("/api/")) return; // données : toujours le réseau, jamais le cache
+  if (url.pathname.startsWith("/api/")) return; // données : toujours le réseau
 
+  // Coquille (document + modules) : réseau d'abord, cache en repli hors-ligne.
+  if (req.mode === "navigate" || isShellDocument(url)) {
+    e.respondWith(
+      (async () => {
+        try {
+          const fresh = await fetch(req);
+          if (fresh && fresh.ok && fresh.type === "basic") {
+            const cache = await caches.open(CACHE);
+            cache.put(req, fresh.clone()).catch(() => {});
+          }
+          return fresh;
+        } catch (_) {
+          const cache = await caches.open(CACHE);
+          const cached = (await cache.match(req)) || (await cache.match("./"));
+          if (cached) return cached;
+          throw _;
+        }
+      })()
+    );
+    return;
+  }
+
+  // Assets immuables : cache d'abord, revalidation en arrière-plan.
   e.respondWith(
     (async () => {
       const cache = await caches.open(CACHE);
-      const cached = await cache.match(req, { ignoreSearch: false });
+      const cached = await cache.match(req);
       const network = fetch(req)
         .then((r) => {
           if (r && r.ok && r.type === "basic") cache.put(req, r.clone()).catch(() => {});
           return r;
         })
         .catch(() => null);
-
-      // Cache d'abord (peinture immédiate), revalidation en arrière-plan.
+      // waitUntil : sans cela la revalidation peut être tuée avec le worker,
+      // et le cache ne se met jamais à jour.
+      e.waitUntil(network);
       if (cached) return cached;
       const fresh = await network;
       if (fresh) return fresh;
-      // Hors-ligne et pas en cache : on retombe sur la coquille pour une navigation.
-      if (req.mode === "navigate") {
-        const shell = await cache.match("./index.html");
-        if (shell) return shell;
-      }
       return Response.error();
     })()
   );

@@ -108,6 +108,30 @@ npm test          # tests unitaires (assainissement, parsing, noyau Apprendre, a
 
 La CI GitHub Actions (`.github/workflows/ci.yml`) rejoue lint + format + tests sur chaque PR.
 
+### ⚠️ Versionner la coquille à chaque modification
+
+`index.html` et `src/*.js` forment un **ensemble indivisible** : servir un `index.html`
+neuf avec un `src/lib.js` périmé casse l'app entièrement (fil sans images ni
+interactions). Le déploiement en a déjà fait les frais une fois.
+
+Après **toute** modification de `index.html` ou de `src/*.js`, incrémenter le même
+numéro aux **deux** endroits :
+
+| Fichier | Ligne à changer |
+|---|---|
+| `index.html` | `<script src="src/lib.js?v=N">` et `src/learn-core.js?v=N` |
+| `sw.js` | `const CACHE = "flux-vN"` |
+
+Trois garde-fous rendent l'oubli non catastrophique, mais ils ne dispensent pas du geste :
+
+1. `index.html` et `src/*.js` sont servis **réseau d'abord** par le service worker
+   (le cache ne sert qu'hors-ligne) ;
+2. le `?v=` fait partie de l'URL, donc un module d'une autre version n'est jamais
+   servi depuis le cache à un `index.html` neuf ;
+3. au chargement, `index.html` vérifie que les modules exposent bien ce qu'il attend ;
+   sinon il purge caches et service worker et recharge une fois, puis affiche un
+   message explicite plutôt qu'une interface à moitié morte.
+
 ## Sécurité
 
 - Le proxy `api/feed.js` valide l'URL demandée et **refuse le réseau interne**
@@ -142,8 +166,7 @@ La CI GitHub Actions (`.github/workflows/ci.yml`) rejoue lint + format + tests s
   couverte par `npm test`. Ce sont des `<script>` classiques, pas des modules ESM :
   `index.html` reste ouvrable en `file://`.
 - **PWA** : `manifest.webmanifest` et `sw.js` sont de vrais fichiers servis en statique.
-  Le service worker sert la coquille depuis le cache (peinture immédiate) et ne met
-  **jamais** `/api/*` en cache.
+  Le service worker ne met **jamais** `/api/*` en cache.
 - **En-têtes** : `vercel.json` porte la CSP, les en-têtes de sécurité et le cache long
   des assets immuables.
 - **Accessibilité** : zoom autorisé, panneaux en `role="dialog"` avec piège de focus et
