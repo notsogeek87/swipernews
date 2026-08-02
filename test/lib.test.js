@@ -128,3 +128,33 @@ test("hostOf retire le www et tolère une url invalide", () => {
   assert.equal(lib.hostOf("https://www.lemonde.fr/rss/une.xml"), "lemonde.fr");
   assert.equal(lib.hostOf("n'importe quoi"), "n'importe quoi");
 });
+
+test("upscaleImageUrl demande une variante plus grande quand la taille est dans l'URL", () => {
+  // Motifs répandus chez les CDN de presse
+  assert.equal(
+    lib.upscaleImageUrl("https://f.fr/pictures/abc/640x360/photo.jpg"),
+    "https://f.fr/pictures/abc/1200x675/photo.jpg"
+  );
+  assert.equal(
+    lib.upscaleImageUrl("https://f.fr/img/photo_400x225.jpg"),
+    "https://f.fr/img/photo_1200x675.jpg"
+  );
+  assert.equal(
+    lib.upscaleImageUrl("https://f.fr/i.jpg?width=500&h=280"),
+    "https://f.fr/i.jpg?width=1200&h=280"
+  );
+  assert.equal(
+    lib.upscaleImageUrl("https://f.fr/w/300/photo.jpg"),
+    "https://f.fr/w/1200/photo.jpg"
+  );
+});
+
+test("upscaleImageUrl ne propose rien s'il n'y a rien à gagner", () => {
+  // déjà assez grande
+  assert.equal(lib.upscaleImageUrl("https://f.fr/a/1600x900/p.jpg"), "");
+  // aucun motif de taille reconnu : on ne devine pas
+  assert.equal(lib.upscaleImageUrl("https://f.fr/pictures/abcdef/photo.jpg"), "");
+  assert.equal(lib.upscaleImageUrl(""), "");
+  // ne doit pas confondre une date ou un identifiant avec une taille
+  assert.equal(lib.upscaleImageUrl("https://f.fr/2026/08/01/photo.jpg"), "");
+});

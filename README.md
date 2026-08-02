@@ -140,6 +140,14 @@ npm test          # tests unitaires (assainissement, parsing, noyau Apprendre, a
 
 La CI GitHub Actions (`.github/workflows/ci.yml`) rejoue lint + format + tests sur chaque PR.
 
+### Diagnostiquer une image floue
+
+Ouvrir l'app avec `?debug=1` : un encadré affiche, pour la carte visible, la
+provenance de l'image (`content` / `thumbnail` / `enclosure` / `description`), la
+largeur **déclarée** par le flux, la largeur **réelle** du fichier chargé, et
+l'URL utilisée. Si la taille réelle est très inférieure à l'écran, c'est le flux
+qui ne publie qu'une petite image.
+
 ### ⚠️ Versionner la coquille à chaque modification
 
 `index.html` et `src/*.js` forment un **ensemble indivisible** : servir un `index.html`

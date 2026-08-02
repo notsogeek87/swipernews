@@ -127,6 +127,50 @@
       .replace(/[\n\r\f]/g, " ");
   }
 
+  /**
+   * Propose une variante PLUS GRANDE d'une URL d'image, quand la taille est
+   * inscrite dedans — cas très répandu chez les CDN de presse
+   * (`/640x360/`, `?width=640`, `_640x360.jpg`).
+   *
+   * Utile quand un flux ne publie qu'une petite image : l'agrandissement se
+   * demande alors au CDN plutôt que d'étirer 200 px en plein écran. Renvoie ""
+   * si aucun motif reconnu ou si l'image est déjà assez grande — l'appelant ne
+   * tente alors rien. La variante n'est utilisée que si elle se charge
+   * réellement (voir applyBg), donc une URL inventée ne casse jamais l'affichage.
+   */
+  const IMG_TARGET_W = 1200;
+  function upscaleImageUrl(src, targetW) {
+    const url = String(src || "");
+    const T = targetW || IMG_TARGET_W;
+    if (!url) return "";
+    const ratio = (w, h) => Math.round((Number(h) * T) / Number(w));
+
+    // /640x360/ dans le chemin
+    let out = url.replace(/\/(\d{2,4})x(\d{2,4})\//g, (m, w, h) =>
+      Number(w) >= T ? m : `/${T}x${ratio(w, h)}/`
+    );
+    if (out !== url) return out;
+
+    // _640x360.jpg en fin de nom
+    out = url.replace(
+      /_(\d{2,4})x(\d{2,4})(\.(?:jpe?g|png|webp|avif))/i,
+      (m, w, h, ext) => (Number(w) >= T ? m : `_${T}x${ratio(w, h)}${ext}`)
+    );
+    if (out !== url) return out;
+
+    // ?width=640, &w=640, ?size=640
+    out = url.replace(/([?&](?:width|w|size|maxwidth))=(\d{2,4})\b/gi, (m, k, v) =>
+      Number(v) >= T ? m : `${k}=${T}`
+    );
+    if (out !== url) return out;
+
+    // /w640/ ou /w/640/
+    out = url.replace(/\/w\/?(\d{2,4})\//g, (m, w) =>
+      Number(w) >= T ? m : m.replace(w, String(T))
+    );
+    return out !== url ? out : "";
+  }
+
   /** Échappement pour du contenu texte inséré en HTML. */
   function esc(s) {
     return (s == null ? "" : String(s)).replace(
@@ -252,6 +296,8 @@
     safeLink,
     safeImg,
     cssString,
+    upscaleImageUrl,
+    IMG_TARGET_W,
     esc,
     escAttr,
     relTime,
