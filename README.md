@@ -357,12 +357,16 @@ et Android accepte d'installer la plus récente par-dessus l'ancienne.
 **Signature.** Sans clé, le workflow produit un APK *debug* : installable pour
 tester, mais signé d'une clé jetable régénérée à chaque run — impossible donc
 d'installer une build par-dessus la précédente, et rien n'est publié en release.
-Pour des paquets signés durablement, créer une clé **une fois** et la garder :
+Pour des paquets signés durablement, créer une clé **une fois** et la garder.
+`keytool` est fourni par n'importe quel JDK — dont celui embarqué dans Android
+Studio (`.../Android Studio/jbr/bin/keytool`) si aucun n'est installé par
+ailleurs :
 
 ```bash
 keytool -genkey -v -keystore release.keystore -alias swipernews \
   -keyalg RSA -keysize 2048 -validity 10000
-base64 -w0 release.keystore    # valeur du secret ANDROID_KEYSTORE_BASE64
+# valeur du secret ANDROID_KEYSTORE_BASE64 (une seule ligne, macOS comme Linux)
+base64 < release.keystore | tr -d '\n'
 ```
 
 Puis, dans *Settings → Secrets and variables → Actions* du dépôt, ajouter
