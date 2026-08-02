@@ -359,8 +359,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=9"></script>
-<script src="src/learn-core.js?v=9"></script>
+<script src="src/lib.js?v=10"></script>
+<script src="src/learn-core.js?v=10"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -599,7 +599,7 @@ function onCardChange(){
   updateRail();
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="9";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="10";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
   if(!DEBUG)return;
@@ -775,6 +775,7 @@ function cacheLoad(m){try{const e=(JSON.parse(localStorage.getItem(LS_CACHE)||"{
 // Compteur de génération : chaque appel invalide le précédent (annule proprement
 // un chargement obsolète après un changement rapide de mode/catégorie).
 let loadSeq=0,feedLoadStarted=false;
+let feedKeyShown=null;   // clé du fil actuellement affiché (mode + catégorie)
 /* ---------- Rechargement au retour d'arrière-plan (mode Actus) ----------
    Seulement en Actus : en Apprendre le fil est un tirage aléatoire sans fin,
    le recharger remplacerait le lot en cours et ferait perdre sa lecture.
@@ -789,31 +790,38 @@ async function loadFeeds(){
   demobadge(false);
   const m=mode;                                   // capture : l'utilisateur peut changer de mode pendant le fetch
   const key=m==="learn"?("learn_"+cat):"news";    // cache distinct par catégorie
-  const hadContent=items.length>0;                // un fil est déjà à l'écran ?
-  // Le cache local sert à peindre INSTANTANÉMENT au démarrage. Si un fil est
-  // déjà affiché (rafraîchissement manuel ou automatique), on n'y touche pas :
-  // il ne contient que CACHE_ITEMS articles et écraserait un fil plus complet,
-  // faisant disparaître la carte en cours de lecture.
-  const cached=hadContent?null:cacheLoad(key);
-  if(cached){items=cached;render();hideStates();}  // peinture immédiate depuis le cache
-  else if(!hadContent)show("loading");
+  // « Même fil » = le contenu affiché appartient à la MÊME clé que celle qu'on
+  // charge. Se contenter de « quelque chose est affiché » laissait le fil Actus
+  // à l'écran pendant tout le chargement du mode Apprendre.
+  const sameFeed=(feedKeyShown===key&&items.length>0);
+  // Le cache local sert à peindre INSTANTANÉMENT. On ne l'applique pas à un
+  // simple rafraîchissement du fil courant : il ne contient que CACHE_ITEMS
+  // articles et tronquerait un fil plus complet, faisant disparaître la carte
+  // en cours de lecture.
+  const cached=sameFeed?null:cacheLoad(key);
+  if(cached){items=cached;render();hideStates();feedKeyShown=key;}
+  else if(!sameFeed){
+    // On change de fil sans cache : vider explicitement. L'écran de chargement
+    // est transparent, il ne masquerait pas les cartes de l'autre mode.
+    items=[];render();show("loading");
+  }
 
   if(m==="learn"){
     try{
       const arr=await fetchLearn(20);              // un lot multi-sources au démarrage ; le scroll infini complète
       if(!arr.length)throw new Error("empty");
       if(my!==loadSeq)return;                       // chargement obsolète → on abandonne
-      items=arr;render();hideStates();cacheSave(key);
+      items=arr;render();hideStates();feedKeyShown=key;cacheSave(key);
     }catch(e){
       if(my!==loadSeq||cached)return;               // si on a déjà le cache, on le garde
       warn("learn load",e);
-      items=structuredClone(DEMO_LEARN);demobadge(true);render();hideStates();
+      items=structuredClone(DEMO_LEARN);demobadge(true);render();hideStates();feedKeyShown=key;
     }
     return;
   }
 
   const active=feeds.filter(f=>f.on);
-  if(!active.length){if(!cached&&!hadContent){items=[];render();showEmpty("no-feeds");}return;}
+  if(!active.length){if(!cached&&!sameFeed){items=[];render();showEmpty("no-feeds");}return;}
   // Rendu progressif : chaque flux s'affiche dès qu'il répond, sans attendre le plus lent.
   let all=[];const failed=[];let done=0;
   active.forEach(f=>{
@@ -823,7 +831,7 @@ async function loadFeeds(){
         all=all.concat(res);
         all.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
         items=all.slice(0,CONFIG.MAX_NEWS);
-        render();hideStates();   // render() réancre sur l'article lu (voir son commentaire)
+        render();hideStates();feedKeyShown=key;   // render() réancre sur l'article lu
       }else failed.push(f);
     }).catch(()=>{if(my===loadSeq)failed.push(f);})
       .finally(()=>{
@@ -832,7 +840,7 @@ async function loadFeeds(){
         if(!all.length){
           // On ne vide JAMAIS un fil déjà affiché parce qu'un rafraîchissement a
           // échoué : mieux vaut du contenu un peu ancien qu'un écran d'erreur.
-          if(cached||hadContent)toast("Réseau indisponible — le fil n'a pas été actualisé");
+          if(cached||sameFeed)toast("Réseau indisponible — le fil n'a pas été actualisé");
           else{items=[];render();showEmpty("all-failed");}
         }else{
           lastNewsLoad=Date.now();
@@ -1343,7 +1351,7 @@ function restoreFeed(m){
   feedEl.innerHTML=s.html;
   cardReg.clear();s.reg.forEach((v,k)=>cardReg.set(k,v));
   cardSeq=s.seq;
-  demobadge(false);hideStates();
+  demobadge(false);hideStates();feedKeyShown=feedKey(m);
   document.getElementById("hint").classList.toggle("hidden",items.length===0);
   updateProgress();
   setScrollTopInstant(feedEl,s.scrollTop);          // restaure la position exacte, sans animation
