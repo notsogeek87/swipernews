@@ -210,6 +210,7 @@
   .sheet.open{display:flex}
   .sheet__panel{background:#111117;width:100%;border-radius:24px 24px 0 0;padding:22px 20px calc(28px + env(safe-area-inset-bottom));
     max-height:82dvh;overflow-y:auto;border-top:1px solid rgba(255,255,255,.08)}
+  .sheet__panel:focus{outline:none}
   .sheet__grip{width:44px;height:5px;border-radius:5px;background:rgba(255,255,255,.18);margin:0 auto 20px}
   .sheet h2{font-size:20px;margin-bottom:4px;letter-spacing:-.02em}
   .sheet p.sub{color:var(--muted);font-size:14px;margin-bottom:18px}
@@ -352,7 +353,7 @@
 </div>
 
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Tes sources">
-  <div class="sheet__panel">
+  <div class="sheet__panel" tabindex="-1">
     <div class="sheet__grip"></div>
     <h2>Tes sources</h2>
     <p class="sub">Coche les flux à afficher, ajoute ceux que tu veux.</p>
@@ -376,7 +377,7 @@
 </div>
 
 <div class="sheet" id="intSheet" role="dialog" aria-modal="true" aria-label="Tes centres d'intérêt">
-  <div class="sheet__panel">
+  <div class="sheet__panel" tabindex="-1">
     <div class="sheet__grip"></div>
     <p class="intro hidden" id="introWelcome">✨ Le swipe qui rend plus malin. Même geste que sur tes réseaux, sauf qu'ici chaque carte t'apprend un truc que tu ne connaissais pas. Choisis ce qui allume ta curiosité 👇</p>
     <h2>Tes centres d'intérêt</h2>
@@ -410,8 +411,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=23"></script>
-<script src="src/learn-core.js?v=23"></script>
+<script src="src/lib.js?v=24"></script>
+<script src="src/learn-core.js?v=24"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -680,7 +681,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="23";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="24";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia/GBIF s'appellent déjà en direct
@@ -1651,7 +1652,11 @@ function openDialog(el){
   lastFocused=document.activeElement;
   el.classList.add("open");
   bgLayers().forEach(n=>{if(n)n.inert=true;});
-  const f=el.querySelector(".sheet__panel button, .sheet__panel input");
+  // Le focus initial va sur le panneau lui-même (tabindex=-1), pas sur le
+  // 1er bouton/input : sinon le halo de focus par défaut du navigateur se
+  // pose sur la 1ère puce de catégorie et donne l'impression trompeuse
+  // qu'elle est déjà sélectionnée, alors que rien n'a été choisi.
+  const f=el.querySelector(".sheet__panel");
   if(f){try{f.focus();}catch(_){}}
 }
 function closeDialog(el){
