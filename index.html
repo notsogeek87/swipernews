@@ -359,8 +359,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=16"></script>
-<script src="src/learn-core.js?v=16"></script>
+<script src="src/lib.js?v=17"></script>
+<script src="src/learn-core.js?v=17"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -626,7 +626,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="16";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="17";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
   if(!DEBUG)return;
@@ -1451,6 +1451,50 @@ feedEl.addEventListener("scroll",()=>{
 if("onscrollend" in self)feedEl.addEventListener("scrollend",persistPos);
 // tap → réaffiche, et on empêche le re-masquage pendant que le snap se termine
 feedEl.addEventListener("click",()=>showTop());   // seul déclencheur du retour de la barre
+
+/* ---------- Bascule Apprendre <-> Actus au swipe horizontal ----------
+   Active UNIQUEMENT quand la barre du haut est visible. Pendant la lecture elle
+   est masquée, et c'est justement là qu'un geste un peu oblique risquerait de
+   changer de mode par erreur : le geste est donc purement et simplement ignoré.
+   La condition est évaluée au DÉBUT du geste (l'intention de l'utilisateur au
+   moment où il pose le doigt) et revérifiée à la fin, au cas où un défilement
+   aurait masqué la barre entre-temps.
+   Sens : les onglets sont [Apprendre][Actus] ; balayer vers la gauche amène
+   l'onglet de droite, comme un carrousel. */
+const SWIPE_MIN_X=60;    // déplacement horizontal minimal pour valider
+const SWIPE_MAX_Y=45;    // au-delà, le geste est vertical : on renonce
+const SWIPE_RATIO=2;     // franchement horizontal : |dx| > 2 x |dy|
+const SWIPE_MAX_MS=700;  // un balayage, pas un glissement lent
+let swipeStart=null;
+function swipeAllowed(){
+  return !topEl.classList.contains("top--away")
+    && !document.querySelector(".sheet.open,.sharemenu.open");
+}
+feedEl.addEventListener("touchstart",e=>{
+  swipeStart=null;
+  if(e.touches.length!==1||!swipeAllowed())return;
+  const t=e.touches[0];
+  swipeStart={x:t.clientX,y:t.clientY,at:Date.now()};
+},{passive:true});
+feedEl.addEventListener("touchmove",e=>{
+  if(!swipeStart||!e.touches.length)return;
+  // Dès que le doigt part verticalement, ce n'est plus un changement de mode :
+  // on abandonne sans attendre la fin du geste.
+  if(Math.abs(e.touches[0].clientY-swipeStart.y)>SWIPE_MAX_Y)swipeStart=null;
+},{passive:true});
+feedEl.addEventListener("touchcancel",()=>{swipeStart=null;},{passive:true});
+feedEl.addEventListener("touchend",e=>{
+  const s=swipeStart;swipeStart=null;
+  if(!s||!e.changedTouches||!e.changedTouches.length)return;
+  if(Date.now()-s.at>SWIPE_MAX_MS)return;
+  const t=e.changedTouches[0];
+  const dx=t.clientX-s.x,dy=t.clientY-s.y;
+  if(Math.abs(dx)<SWIPE_MIN_X)return;
+  if(Math.abs(dy)>SWIPE_MAX_Y||Math.abs(dx)<Math.abs(dy)*SWIPE_RATIO)return;
+  if(!swipeAllowed())return;                 // la barre s'est masquée en route
+  setMode(dx<0?"news":"learn");
+  if(mode==="learn")setMode2Learn();
+},{passive:true});
 function updateProgress(){const max=feedEl.scrollHeight-feedEl.clientHeight;pbar.style.height=(max>0?feedEl.scrollTop/max*100:0)+"%";}
 /* Navigation clavier. Gardes indispensables : sans elles, une espace tapée dans
    le champ « ajouter un flux » faisait défiler le fil, et les flèches

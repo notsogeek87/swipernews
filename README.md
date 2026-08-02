@@ -9,6 +9,10 @@ L'outillage de **développement** (lint, tests, CI) est optionnel et ne change r
 - Navigation par swipe vertical plein écran (flèches ↑↓ / espace au clavier aussi)
 - La barre du haut se masque pendant le swipe et ne revient **que sur un appui à
   l'écran** (aucune réapparition automatique)
+- Bascule **Actus / Apprendre au balayage horizontal**, mais uniquement quand la
+  barre du haut est visible : pendant la lecture elle est masquée, et le geste
+  est alors ignoré pour éviter tout changement de mode accidentel. Balayer vers
+  la gauche amène l'onglet de droite, comme un carrousel
 - Reprise de lecture : l'app rouvre sur l'article quitté, **pour chaque mode
   indépendamment**. Si l'article a disparu du flux entre-temps (un RSS ne garde
   que ses N derniers items), la reprise se rabat sur le repère temporel puis sur
