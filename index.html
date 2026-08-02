@@ -359,8 +359,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=10"></script>
-<script src="src/learn-core.js?v=10"></script>
+<script src="src/lib.js?v=11"></script>
+<script src="src/learn-core.js?v=11"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -599,7 +599,7 @@ function onCardChange(){
   updateRail();
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="10";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="11";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
   if(!DEBUG)return;
@@ -680,10 +680,38 @@ async function fetchFeed(feed){
   }).filter(i=>i.title);
 }
 // stripHtml (version inerte, sans innerHTML) et imgFromHtml : voir src/lib.js
+/* Choisit la MEILLEURE image de l'item, pas la première rencontrée.
+   Media RSS liste par convention la vignette en premier : prendre le premier
+   élément donnait systématiquement la plus petite (200-460 px observés), étirée
+   ensuite en fond plein écran — d'où des images floues.
+   On compare donc les largeurs déclarées, et à défaut on classe par type
+   (media:content = image pleine taille > enclosure > media:thumbnail).
+   getElementsByTagNameNS("*") : en XML, un sélecteur CSS sans namespace
+   n'atteint pas les éléments préfixés comme media:content. */
+const IMG_RANK={content:3,enclosure:2,thumbnail:1};
 function findImage(node,raw){
-  const m=node.querySelector("enclosure[url], content[url], thumbnail, [medium='image']");
-  if(m){const u=m.getAttribute("url");if(u)return u;}
-  return imgFromHtml(raw);
+  const cands=[];
+  for(const local of ["content","thumbnail"]){
+    for(const el of node.getElementsByTagNameNS("*",local))cands.push([el,local]);
+  }
+  for(const el of node.getElementsByTagName("enclosure"))cands.push([el,"enclosure"]);
+
+  let best=null,bestW=-1,bestRank=-1;
+  for(const [el,local] of cands){
+    const url=el.getAttribute("url");
+    if(!url)continue;
+    // Exclut les pièces jointes audio/vidéo (podcasts) : elles portent aussi
+    // un attribut url et étaient prises pour des images.
+    const type=(el.getAttribute("type")||el.getAttribute("medium")||"").toLowerCase();
+    if(type&&!type.startsWith("image"))continue;
+    if(!type&&!/\.(jpe?g|png|webp|avif|gif)(\?|$)/i.test(url))continue;
+    const w=parseInt(el.getAttribute("width")||"0",10)||0;
+    const rank=IMG_RANK[local]||0;
+    // largeur déclarée d'abord ; à égalité (ou sans largeur), le type le plus
+    // susceptible d'être une image pleine taille
+    if(w>bestW||(w===bestW&&rank>bestRank)){bestW=w;bestRank=rank;best=url;}
+  }
+  return best||imgFromHtml(raw);
 }
 // relTime : voir src/lib.js
 

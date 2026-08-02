@@ -13,7 +13,9 @@ L'outillage de **développement** (lint, tests, CI) est optionnel et ne change r
   indépendamment**. Si l'article a disparu du flux entre-temps (un RSS ne garde
   que ses N derniers items), la reprise se rabat sur le repère temporel puis sur
   l'index, au lieu de retomber en tête du fil
-- Titre, résumé, image, source et date tirés directement des flux RSS
+- Titre, résumé, image, source et date tirés directement des flux RSS. Quand un
+  article propose plusieurs tailles d'image, la **plus grande** est retenue (les
+  flux listent la vignette en premier ; la prendre donnait des fonds flous)
 - Gestion des sources : ajout, suppression, activation/désactivation
 - Import / export des sources aux formats **OPML** (standard) et **JSON** — importe tes sources et lis-les directement
 - Partage d'un article (feuille de partage native, ou menu WhatsApp / Telegram / mail / X / copie du lien),
