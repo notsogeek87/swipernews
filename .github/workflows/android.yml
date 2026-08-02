@@ -120,39 +120,43 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      # main : une release par build, marquée « latest ».
-      # staging : une préversion roulante, toujours à la même adresse.
+      # L'artefact du run est toujours servi zippé par GitHub ; une release, elle,
+      # donne un .apk téléchargeable en direct — donc installable depuis le
+      # téléphone. Trois cas :
+      #   signé + main    → une release par build, marquée « latest » ;
+      #   signé + staging → préversion roulante, toujours à la même adresse ;
+      #   non signé       → préversion roulante « debug », par branche.
       - name: Publie la release
-        if: github.event_name == 'push' && steps.keystore.outputs.signed == 'true'
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
           APK: ${{ steps.build.outputs.apk }}
+          BRANCH: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          if [ "${{ github.ref_name }}" = "main" ]; then
+          if [ "${{ steps.keystore.outputs.signed }}" != "true" ]; then
+            tag="android-debug-$BRANCH"
+            title="Android debug — $BRANCH (build ${{ github.run_number }})"
+            notes="APK **debug** : signé d'une clé jetable, régénérée à chaque build. Installable pour tester, mais à désinstaller avant de poser le suivant. Ajouter les secrets ANDROID_* pour des paquets signés durablement (voir README). Produit depuis ${{ github.sha }}."
+            rolling=1
+            flag=--prerelease
+          elif [ "$BRANCH" = "main" ]; then
             tag="android-v${{ steps.version.outputs.name }}"
-            gh release create "$tag" "$APK" \
-              --title "Android $tag" \
-              --notes "APK signé produit depuis ${{ github.sha }}." \
-              --latest
+            title="Android $tag"
+            notes="APK signé produit depuis ${{ github.sha }}."
+            rolling=0
+            flag=--latest
           else
             tag="android-staging"
-            gh release delete "$tag" --cleanup-tag --yes || true
-            gh release create "$tag" "$APK" \
-              --title "Android staging (build ${{ github.run_number }})" \
-              --notes "Préversion roulante produite depuis ${{ github.sha }}." \
-              --prerelease
+            title="Android staging (build ${{ github.run_number }})"
+            notes="Préversion roulante signée, produite depuis ${{ github.sha }}."
+            rolling=1
+            flag=--prerelease
           fi
-          echo "[$APK](${{ github.server_url }}/${{ github.repository }}/releases/tag/$tag)" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Rappelle où trouver l'APK non signé
-        if: steps.keystore.outputs.signed != 'true'
-        run: |
-          {
-            echo "### APK debug : \`${{ steps.build.outputs.apk }}\`"
-            echo
-            echo "Téléchargeable dans les artefacts de ce run. Pour obtenir un APK"
-            echo "signé publié en release, ajouter les secrets \`ANDROID_KEYSTORE_BASE64\`,"
-            echo "\`ANDROID_KEYSTORE_PASSWORD\`, \`ANDROID_KEY_ALIAS\` et \`ANDROID_KEY_PASSWORD\`"
-            echo "(voir README, « Build automatique de l'APK »)."
-          } >> "$GITHUB_STEP_SUMMARY"
+          # Une release roulante réutilise son tag : on efface l'ancienne d'abord.
+          if [ "$rolling" = 1 ]; then
+            gh release delete "$tag" --cleanup-tag --yes || true
+          fi
+          gh release create "$tag" "$APK" --title "$title" --notes "$notes" "$flag"
+          url="${{ github.server_url }}/${{ github.repository }}/releases/tag/$tag"
+          echo "### APK publié : [$APK]($url)" >> "$GITHUB_STEP_SUMMARY"

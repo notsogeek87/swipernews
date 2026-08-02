@@ -341,23 +341,30 @@ Gradle. Aucun Android Studio n'est nécessaire — le SDK est installé sur le
 
 Où récupérer le paquet :
 
-| Déclencheur          | Résultat                                                                      |
-| -------------------- | ----------------------------------------------------------------------------- |
-| push sur `main`      | release `android-v<version>` marquée « latest », APK attaché                   |
-| push sur `staging`   | préversion roulante `android-staging` — toujours la même adresse de téléchargement |
-| pull request         | artefact du run seulement, aucune release                                      |
+| Déclencheur                  | Résultat                                                                           |
+| ---------------------------- | ---------------------------------------------------------------------------------- |
+| push sur `main`, clé en place | release `android-v<version>` marquée « latest », APK attaché                        |
+| push sur `staging`, clé en place | préversion roulante `android-staging` — toujours la même adresse de téléchargement |
+| push sans clé de signature   | préversion roulante `android-debug-<branche>`, APK debug                            |
+| pull request                 | artefact du run seulement, aucune release                                           |
 
-L'APK est aussi joint aux **artefacts** de chaque run (90 jours), y compris sur
-`main` et `staging`.
+Passer par une **release** plutôt que par l'artefact du run n'est pas cosmétique :
+GitHub sert tout artefact d'Actions dans un `.zip`, même quand il ne contient
+qu'un fichier, alors qu'une release donne un `.apk` en téléchargement direct —
+donc installable depuis le téléphone, sans détour par un ordinateur.
+
+L'APK reste malgré tout joint aux **artefacts** de chaque run (90 jours), y
+compris sur `main` et `staging`.
 
 `versionCode` vaut le numéro de run et `versionName` la version de
 `package.json` suffixée de ce numéro : deux builds ne se marchent jamais dessus,
 et Android accepte d'installer la plus récente par-dessus l'ancienne.
 
 **Signature.** Sans clé, le workflow produit un APK *debug* : installable pour
-tester, mais signé d'une clé jetable régénérée à chaque run — impossible donc
-d'installer une build par-dessus la précédente, et rien n'est publié en release.
-Pour des paquets signés durablement, créer une clé **une fois** et la garder.
+tester, mais signé d'une clé jetable régénérée à chaque run — il faut donc
+désinstaller la version précédente avant de poser la suivante. Pour des paquets
+signés durablement, installables par-dessus les précédents, créer une clé
+**une fois** et la garder.
 `keytool` est fourni par n'importe quel JDK — dont celui embarqué dans Android
 Studio (`.../Android Studio/jbr/bin/keytool`) si aucun n'est installé par
 ailleurs :
