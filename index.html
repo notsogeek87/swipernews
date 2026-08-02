@@ -242,6 +242,14 @@
   .installbar__btn:active{transform:scale(.96)}
   .installbar__close{flex:0 0 auto;background:transparent;border:none;color:var(--muted);font-size:17px;cursor:pointer;padding:4px 6px}
 
+  /* Bascule entre modes : glissement court + fondu, dans le sens du geste.
+     Un glissement pleine largeur serait plus spectaculaire mais impliquerait de
+     dupliquer un fil de plus de 100 cartes ; ce mouvement court est celui des
+     onglets natifs, et il reste fluide sur mobile (transform + opacity seuls,
+     donc composés par le GPU, sans recalcul de mise en page). */
+  .feed--anim{transition:transform .19s cubic-bezier(.22,.61,.36,1),opacity .19s ease;
+    pointer-events:none}
+
   /* Titre de page pour les lecteurs d'écran (les cartes sont en h2) */
   .visually-hidden{position:absolute!important;width:1px;height:1px;margin:-1px;padding:0;
     overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
@@ -359,8 +367,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=17"></script>
-<script src="src/learn-core.js?v=17"></script>
+<script src="src/lib.js?v=18"></script>
+<script src="src/learn-core.js?v=18"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -626,7 +634,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="17";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="18";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
   if(!DEBUG)return;
@@ -1625,13 +1633,44 @@ function restoreFeed(m){
   onCardChange();                                   // recalage du suivi de carte
   return true;
 }
+/* Ordre des onglets, qui donne le SENS de la transition : aller vers un onglet
+   situé à droite fait glisser le contenu vers la gauche, comme un carrousel.
+   Vaut pour le balayage comme pour un appui sur un onglet. */
+const MODE_ORDER={learn:0,news:1};
+const FEED_ANIM_MS=190;
+let modeAnimating=false;
+function animateModeSwap(dir,swap){
+  if(modeAnimating||!dir){swap();return;}
+  modeAnimating=true;
+  const shift=42;
+  feedEl.classList.add("feed--anim");
+  feedEl.style.transform=`translateX(${-dir*shift}px)`;   // sortie
+  feedEl.style.opacity="0";
+  setTimeout(()=>{
+    swap();                                                // échange hors écran
+    feedEl.classList.remove("feed--anim");                 // repositionne sans animer
+    feedEl.style.transform=`translateX(${dir*shift}px)`;
+    void feedEl.offsetWidth;                               // force le reflow
+    feedEl.classList.add("feed--anim");
+    feedEl.style.transform="translateX(0)";                // entrée
+    feedEl.style.opacity="1";
+    setTimeout(()=>{
+      feedEl.classList.remove("feed--anim");
+      feedEl.style.transform="";feedEl.style.opacity="";
+      modeAnimating=false;
+    },FEED_ANIM_MS);
+  },FEED_ANIM_MS);
+}
 function setMode(m){
   if(m===mode)return;
+  const dir=MODE_ORDER[m]>MODE_ORDER[mode]?1:-1;    // +1 : on va vers la droite
   snapshotFeed(mode);                               // mémorise le fil qu'on quitte
   mode=m;
   try{localStorage.setItem(LS_MODE,mode);}catch(e){warn("save mode",e);}
   applyModeUI();
-  if(!restoreFeed(m))loadFeeds();                   // restaure si possible, sinon (re)charge
+  animateModeSwap(dir,()=>{
+    if(!restoreFeed(m))loadFeeds();                 // restaure si possible, sinon (re)charge
+  });
 }
 function setMode2Learn(){                          // à l'entrée du mode Apprendre, on propose l'onboarding la 1ère fois
   if(mode==="learn"&&!interestsChosen())openInterests();
