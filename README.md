@@ -267,6 +267,70 @@ Bubblewrap télécharge lui-même le JDK et le SDK Android au premier lancement
 ce dépôt** : `dl.google.com`, seul hôte fournissant le SDK Android, le plugin
 Gradle Android et `androidx.browser`, y est bloqué par la politique réseau.
 
+### Alternative : app embarquée hors-ligne (Capacitor)
+
+La TWA ci-dessus reste un rideau sur `https://news.lielu.eu` : sans réseau au
+lancement, elle ne s'ouvre pas. [Capacitor](https://capacitorjs.com) embarque
+au contraire `index.html`, `src/*.js`, le manifeste et les icônes **dans
+l'APK** : l'app s'ouvre hors-ligne. Capacitor refuse que `webDir` pointe sur la
+racine du dépôt ; `npm run cap:prepare` régénère donc un dossier `www/`
+(ignoré par git, simple copie des fichiers racine) avant chaque `cap sync`, ce
+qui reste sans étape de build JS — juste une copie.
+
+Les données, elles, restent réseau (flux RSS, Wikipédia/GBIF/Gallica) — c'est
+inhérent à une app d'actualités — mais l'app packagée n'appelle **jamais**
+`news.lielu.eu` : elle va chercher chaque source directement depuis l'appareil,
+sans dépendance au backend Vercel.
+
+Un navigateur ne peut normalement pas lire un flux RSS tiers ni interroger
+Gallica en direct (pas de CORS chez eux) — d'où `api/feed.js` et son repli
+proxys publics côté web. Wikipédia et GBIF, eux, autorisent déjà le CORS et se
+lisent en direct dans n'importe quel navigateur (voir `srcWikipedia`/`srcGBIF`
+dans `index.html`). Dans l'APK, seuls les flux RSS et Gallica ont donc besoin
+d'un contournement : `nativeGet` (`index.html`) appelle *explicitement* le
+plugin `Capacitor.Plugins.CapacitorHttp`, qui route la requête par le réseau
+**natif** Android au lieu de la WebView — le CORS, qui est une politique de
+navigateur, ne s'applique alors plus du tout, avec un timeout natif fiable
+(`connectTimeout`/`readTimeout`).
+
+Une première tentative activait `plugins.CapacitorHttp` **globalement**
+(`capacitor.config.json`), ce qui patche `fetch()` pour absolument tout —
+y compris Wikipédia/GBIF, qui n'en avaient pourtant pas besoin — et s'est
+révélée nettement plus lente à l'usage. Mesuré sur l'émulateur Android local
+après être passé à un appel ciblé (`nativeGet` uniquement pour RSS/Gallica) :
+~3,2 s pour charger 4 flux RSS en parallèle, ~5 s pour un lot Apprendre
+(Wikipédia + GBIF) — comparable à ce qu'on peut attendre sur le web.
+
+```bash
+npm install
+npm run cap:prepare    # copie index.html/src/manifeste/icônes dans www/
+npx cap add android    # génère le projet natif dans android/ (télécharge le SDK
+                        # Android — même limitation réseau que Bubblewrap ci-dessus,
+                        # à faire hors de cet environnement)
+npm run android:open   # ouvre android/ dans Android Studio pour builder/signer
+```
+
+Après la première génération, `npm run cap:sync` (prepare + `cap sync
+android`) suffit à répercuter une modification de `index.html`/`src/*.js` dans
+le projet natif avant de rebuilder.
+
+Contrairement à la TWA, la coquille embarquée ne se met **pas** à jour
+automatiquement avec le site : republier l'APK (nouvelle build signée avec la
+même clé) est nécessaire après toute modification de `index.html` ou de
+`src/*.js`.
+
+**Icône et écran de démarrage** : générés par [`@capacitor/assets`](https://github.com/ionic-team/capacitor-assets)
+à partir de `resources/` (icône `icon.png` = `logo-512.png`, calque adaptatif
+`icon-foreground.png` = `logo-maskable-512.png` déjà en zone de sécurité,
+fond uni `icon-background.png`/écran de démarrage `splash*.png` à la couleur du
+thème `#0a0a0f`). Après une mise à jour du logo à la racine, régénérer avec :
+
+```bash
+cp logo-512.png resources/icon.png
+cp logo-maskable-512.png resources/icon-foreground.png
+npm run android:assets
+```
+
 ### Ce que le dépôt fournit déjà
 
 - `manifest.webmanifest` remplit les exigences d'une TWA : `id`, `name`,

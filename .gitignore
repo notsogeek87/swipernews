@@ -3,3 +3,10 @@ npm-debug.log*
 .DS_Store
 .vercel
 *.local
+
+# Capacitor : miroir généré à partir des fichiers racine (npm run cap:prepare),
+# jamais la source de vérité — voir README "App embarquée hors-ligne".
+www/
+
+# Configuration workspace Android Studio, locale à la machine
+.idea/

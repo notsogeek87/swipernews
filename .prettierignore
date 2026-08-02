@@ -4,3 +4,6 @@ index.html
 # prose : on ne la reformate pas automatiquement
 README.md
 AUDIT.md
+# projet natif généré (npx cap add android) et son miroir de build (npm run cap:prepare)
+android
+www

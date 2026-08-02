@@ -410,8 +410,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=21"></script>
-<script src="src/learn-core.js?v=21"></script>
+<script src="src/lib.js?v=23"></script>
+<script src="src/learn-core.js?v=23"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -489,7 +489,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,hostOf,parseJsonFeeds,parseOpmlFeeds}=self.SwiperLib;
+  seenKey,dropSeen,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Articles Wikipédia de démo (repli hors-ligne du mode Apprendre) ---------- */
@@ -680,7 +680,18 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="21";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="23";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+// App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
+// dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
+// news.lielu.eu pour les données) : Wikipédia/GBIF s'appellent déjà en direct
+// dans un navigateur (CORS ouvert chez eux, voir srcWikipedia/srcGBIF), et
+// seuls les flux RSS et Gallica (pas de CORS chez eux) ont besoin d'un
+// contournement — géré par nativeGet ci-dessous, qui appelle explicitement le
+// plugin CapacitorHttp (réseau natif Android, aucun CORS) SEULEMENT pour ces
+// deux cas. Sans ce ciblage, activer CapacitorHttp globalement (patch de
+// fetch()) ralentissait aussi Wikipédia/GBIF, qui n'en avaient pourtant pas
+// besoin — d'où capacitor.config.json qui ne l'active plus globalement.
+const isNativeApp=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
   if(!DEBUG)return;
@@ -704,7 +715,7 @@ document.addEventListener("visibilitychange",()=>{
 
 /* ---------- Récupération avec plusieurs proxys de secours ---------- */
 const PROXIES=[
-  u=>"/api/feed?url="+encodeURIComponent(u),                       // backend same-origin (Vercel) : fiable, aucun CORS
+  u=>"/api/feed?url="+encodeURIComponent(u),                        // backend same-origin (Vercel) : fiable, aucun CORS
   u=>"https://api.allorigins.win/raw?url="+encodeURIComponent(u),
   u=>"https://corsproxy.io/?url="+encodeURIComponent(u),
   u=>"https://api.codetabs.com/v1/proxy/?quest="+encodeURIComponent(u),
@@ -722,7 +733,27 @@ async function fetchViaProxy(make,url,timeout){
   if(txt&&txt.length>200)return txt;
   throw new Error("empty");
 }
+// App native uniquement : appelle explicitement le plugin CapacitorHttp (réseau
+// natif Android, aucun CORS), avec un vrai timeout natif — plus fiable qu'un
+// AbortController sur le fetch() patché, dont le respect du signal est incertain.
+async function nativeGet(url,timeoutMs){
+  const http=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.CapacitorHttp;
+  if(!http)throw new Error("CapacitorHttp indisponible");
+  const res=await http.request({url,method:"GET",responseType:"text",connectTimeout:timeoutMs,readTimeout:timeoutMs});
+  if(!(res.status>=200&&res.status<300))throw new Error("http "+res.status);
+  const txt=typeof res.data==="string"?res.data:JSON.stringify(res.data);
+  if(txt&&txt.length>200)return txt;
+  throw new Error("empty");
+}
 async function fetchText(url){
+  if(isNativeApp){
+    // Direct via le pont natif (aucun CORS) ; en cas d'échec, proxys publics —
+    // jamais le backend Vercel (PROXIES[0]), qui ne résoudrait à rien depuis
+    // l'origine locale de l'app packagée.
+    try{return await nativeGet(url,7000);}catch(e){}
+    try{return await Promise.any(PROXIES.slice(1).map(m=>fetchViaProxy(m,url,7000)));}catch(e){}
+    throw new Error("no-proxy");
+  }
   // 1) backend same-origin d'abord (rapide et fiable sur Vercel)
   try{return await fetchViaProxy(PROXIES[0],url,7000);}catch(e){}
   // 2) sinon on lance TOUS les proxys en parallèle et on garde le premier qui répond
@@ -862,18 +893,25 @@ async function fetchLearnClient(keys,count){
 async function fetchLearn(count=CONFIG.BATCH_SIZE){
   const keys=catKeysForBatch();
   let batch=null;
-  try{
-    // « seau » aléatoire plutôt qu'un nonce : l'URL reste l'une des BUCKETS
-    // variantes, donc cacheable par le CDN et mutualisée entre utilisateurs,
-    // tout en restant variée à l'échelle d'une session. Avec un nonce, chaque
-    // lot manquait le cache et payait l'aller-retour vers les 3 sources.
-    const qs=new URLSearchParams({cats:keys.join(","),sources:sources.join(","),count:String(count),b:String(LEARN.randomBucket())});
-    const res=await fetchWithTimeout("/api/learn?"+qs,{},CONFIG.FETCH_TIMEOUT);
-    if(res.ok){
-      const data=await res.json();
-      if(data&&Array.isArray(data.items)&&data.items.length)batch=data.items;
-    }
-  }catch(e){warn("learn backend",e);/* repli client */}
+  // App native : pas de backend Vercel, on agrège directement sur l'appareil
+  // (Wikipédia/GBIF en CORS direct, Gallica via nativeGet — voir SRC_FN /
+  // srcGallica). Ces trois appels restent rapides individuellement ; c'était
+  // l'activation globale de CapacitorHttp (patch de fetch()) qui ralentissait
+  // tout, pas l'agrégation client en elle-même.
+  if(!isNativeApp){
+    try{
+      // « seau » aléatoire plutôt qu'un nonce : l'URL reste l'une des BUCKETS
+      // variantes, donc cacheable par le CDN et mutualisée entre utilisateurs,
+      // tout en restant variée à l'échelle d'une session. Avec un nonce, chaque
+      // lot manquait le cache et payait l'aller-retour vers les 3 sources.
+      const qs=new URLSearchParams({cats:keys.join(","),sources:sources.join(","),count:String(count),b:String(LEARN.randomBucket())});
+      const res=await fetchWithTimeout("/api/learn?"+qs,{},CONFIG.FETCH_TIMEOUT);
+      if(res.ok){
+        const data=await res.json();
+        if(data&&Array.isArray(data.items)&&data.items.length)batch=data.items;
+      }
+    }catch(e){warn("learn backend",e);/* repli client */}
+  }
   if(!batch)batch=await fetchLearnClient(keys,count);
   return dropSeen(batch,seen).slice(0,count);
 }
@@ -1173,14 +1211,28 @@ function ogRemember(link,img){
     }catch(e){warn("save og",e);}
   },1200);
 }
+// App native : même correctif que /api/og (voir api/og.js pour le contexte —
+// Franceinfo, notamment, ne publie dans son flux qu'une vignette Thumbor
+// signée à 432 px, alors que la page de l'article référence en <meta og:image>
+// la version pleine taille). Direct via nativeGet (aucun CORS), extraction
+// avec la même fonction metaContent que le backend (src/lib.js, partagée).
+async function nativeOgImage(link){
+  const html=await nativeGet(link,6000);
+  const raw=metaContent(html,["og:image:secure_url","og:image:url","og:image","twitter:image","twitter:image:src"]);
+  if(!raw)throw new Error("aucune og:image");
+  const abs=new URL(decodeEntities(raw),link);
+  if(abs.protocol!=="http:"&&abs.protocol!=="https:")throw new Error("schéma d'image non autorisé");
+  return abs.href;
+}
 const ogPending=new Map();
 function ogImageFor(link){
   if(!link)return Promise.resolve("");
   if(Object.prototype.hasOwnProperty.call(ogCache,link))return Promise.resolve(ogCache[link]);
   if(ogPending.has(link))return ogPending.get(link);
-  const p=fetchWithTimeout("/api/og?url="+encodeURIComponent(link),{},CONFIG.FETCH_TIMEOUT)
-    .then(r=>r.ok?r.json():null)
-    .then(d=>{const img=safeImg(d&&d.image,location.href)||"";ogRemember(link,img);return img;})
+  const p=(isNativeApp?nativeOgImage(link):fetchWithTimeout("/api/og?url="+encodeURIComponent(link),{},CONFIG.FETCH_TIMEOUT)
+      .then(r=>r.ok?r.json():null)
+      .then(d=>d&&d.image))
+    .then(img=>{img=safeImg(img,location.href)||"";ogRemember(link,img);return img;})
     .catch(e=>{warn("og",e);ogRemember(link,"");return "";})
     .finally(()=>ogPending.delete(link));
   ogPending.set(link,p);

@@ -261,6 +261,31 @@
     return withImg.concat(noImg).slice(0, count);
   }
 
+  /** Extrait le contenu d'une balise <meta>, quel que soit l'ordre des attributs.
+   *  Utilisé côté serveur (api/og.js) pour lire og:image sur la page d'un article,
+   *  et côté app packagée (index.html) pour la même extraction faite en direct
+   *  (voir nativeOgImage) — une seule implémentation, testée une fois. */
+  function metaContent(html, names) {
+    for (const name of names) {
+      const escaped = name.replace(/[:.]/g, "\\$&");
+      const patterns = [
+        new RegExp(
+          `<meta[^>]+(?:property|name)\\s*=\\s*["']${escaped}["'][^>]*?content\\s*=\\s*["']([^"']+)["']`,
+          "i"
+        ),
+        new RegExp(
+          `<meta[^>]+content\\s*=\\s*["']([^"']+)["'][^>]*?(?:property|name)\\s*=\\s*["']${escaped}["']`,
+          "i"
+        ),
+      ];
+      for (const re of patterns) {
+        const m = html.match(re);
+        if (m && m[1]) return m[1].trim();
+      }
+    }
+    return "";
+  }
+
   /** Nom d'hôte lisible d'une URL (sans "www."), ou l'URL brute si non parsable. */
   function hostOf(url) {
     try {
@@ -337,5 +362,6 @@
     parseJsonFeeds,
     parseOpmlFeeds,
     decodeEntities,
+    metaContent,
   };
 });

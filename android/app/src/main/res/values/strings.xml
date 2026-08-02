@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SwiperNews</string>
+    <string name="title_activity_main">SwiperNews</string>
+    <string name="package_name">eu.lielu.news</string>
+    <string name="custom_url_scheme">eu.lielu.news</string>
+</resources>

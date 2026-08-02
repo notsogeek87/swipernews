@@ -1,0 +1,8 @@
+{
+  "appId": "eu.lielu.news",
+  "appName": "SwiperNews",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}

@@ -8,10 +8,18 @@
     "lint": "eslint api src test eslint.config.js",
     "format": "prettier --write .",
     "format:check": "prettier --check \"**/*.{js,json,md}\"",
-    "test": "node --test"
+    "test": "node --test",
+    "cap:prepare": "rm -rf www && mkdir -p www && cp index.html manifest.webmanifest sw.js logo-192.png logo-512.png logo-maskable-512.png www/ && cp -r src www/src",
+    "cap:sync": "npm run cap:prepare && cap sync android",
+    "android:open": "cap open android",
+    "android:assets": "capacitor-assets generate --android"
   },
   "license": "MIT",
   "devDependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
     "eslint": "^9.13.0",
     "prettier": "^3.3.3"
   }

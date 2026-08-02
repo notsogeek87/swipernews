@@ -18,6 +18,7 @@
 "use strict";
 
 const { assertSafeUrl } = require("./feed.js");
+const { metaContent } = require("../src/lib.js");
 
 const FETCH_TIMEOUT_MS = 6000;
 // Les balises Open Graph vivent dans le <head> : inutile de lire l'article
@@ -44,28 +45,6 @@ async function readHead(upstream) {
     }
   }
   return html;
-}
-
-// Extrait le contenu d'une balise meta, quel que soit l'ordre des attributs.
-function metaContent(html, names) {
-  for (const name of names) {
-    const escaped = name.replace(/[:.]/g, "\\$&");
-    const patterns = [
-      new RegExp(
-        `<meta[^>]+(?:property|name)\\s*=\\s*["']${escaped}["'][^>]*?content\\s*=\\s*["']([^"']+)["']`,
-        "i"
-      ),
-      new RegExp(
-        `<meta[^>]+content\\s*=\\s*["']([^"']+)["'][^>]*?(?:property|name)\\s*=\\s*["']${escaped}["']`,
-        "i"
-      ),
-    ];
-    for (const re of patterns) {
-      const m = html.match(re);
-      if (m && m[1]) return m[1].trim();
-    }
-  }
-  return "";
 }
 
 function decodeEntities(s) {
