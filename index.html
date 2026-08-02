@@ -48,8 +48,11 @@
      seraient animées au lieu d'être instantanées — en conflit avec le
      scroll-snap et avec le geste en cours. Le défilement doux est demandé
      explicitement là où il est voulu (navigation clavier). */
+  /* position:relative — les cartes sont ainsi positionnées PAR RAPPORT au fil,
+     donc card.offsetTop donne directement l'offset dans le contenu défilable
+     (c'est ce qui sert à repérer la carte courante et à restaurer la position). */
   #feed{height:100dvh;width:100%;overflow-y:scroll;scroll-snap-type:y mandatory;
-    -webkit-overflow-scrolling:touch;scrollbar-width:none}
+    -webkit-overflow-scrolling:touch;scrollbar-width:none;position:relative}
   #feed::-webkit-scrollbar{display:none}
 
   /* content-visibility : le navigateur saute layout, paint ET chargement des
@@ -349,8 +352,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=5"></script>
-<script src="src/learn-core.js?v=5"></script>
+<script src="src/lib.js?v=6"></script>
+<script src="src/learn-core.js?v=6"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -528,9 +531,19 @@ function rememberPos(){
   // via le registre de cartes : capDom() retire des cartes en tête du fil
   // infini, donc l'index DOM et celui de `items` ne coïncident plus après un cap.
   const it=currentItem();
-  if(!it||!it.link||posMap[mode]===it.link)return;
-  posMap[mode]=it.link;
+  if(!it||!it.link)return;
+  const prev=posEntry(mode);              // tolère l'ancien format
+  if(prev&&prev.link===it.link)return;
+  // On mémorise aussi la DATE et l'INDEX : un flux d'actualité ne garde que ses
+  // N derniers articles, donc au retour le lien exact a souvent disparu. Sans
+  // repli, la reprise échouait silencieusement et l'utilisateur retombait en
+  // haut — exactement comme si rien n'était mémorisé.
+  posMap[mode]={link:it.link,date:it.date||"",idx:currentIndex()};
   persistPos();
+  if(DEBUG){const relu=(JSON.parse(localStorage.getItem(LS_POS)||"{}")[mode])||{};
+    dbg(`v${APP_VERSION}  mode=${mode}  idx=${currentIndex()}\n`+
+        `ÉCRIT …${it.link.slice(-24)}\n`+
+        `RELU  …${String(relu.link||relu||"(rien)").slice(-24)}`);}
 }
 /* Défilement instantané, quel que soit le CSS en vigueur.
    Le setter scrollTop utilise le comportement calculé de l'élément : si
@@ -548,42 +561,34 @@ function setScrollTopInstant(el,top){
 function viewH(){return feedEl.clientHeight||1;}
 
 /* ---------- Repérage de la carte courante ----------
-   Volontairement SANS arithmétique sur scrollTop / clientHeight.
-   Sur mobile, `100dvh` change quand la barre d'URL se rétracte : toute valeur
-   de hauteur mémorisée devient fausse en plein défilement, et un index calculé
-   par division désigne alors la mauvaise carte — donc on mémorisait le mauvais
-   article. Un IntersectionObserver donne la carte réellement à l'écran, quelle
-   que soit sa hauteur. */
-let currentCard=null,cardObserver=null;
-const HAS_IO=("IntersectionObserver" in self);
-// Création paresseuse : `feedEl` (la racine de l'observateur) est déclaré plus
-// bas dans le script, on ne peut donc pas l'instancier ici.
-function ensureCardObserver(){
-  if(cardObserver||!HAS_IO)return cardObserver;
-  cardObserver=new IntersectionObserver(entries=>{
-    let best=null;
-    entries.forEach(en=>{
-      if(en.isIntersecting&&(!best||en.intersectionRatio>best.intersectionRatio))best=en;
-    });
-    if(!best||best.target===currentCard)return;
-    currentCard=best.target;
-    onCardChange();
-  },{root:feedEl,threshold:[0.55]});
-  return cardObserver;
+   Par la GÉOMÉTRIE RÉELLE des cartes, pas par une division
+   scrollTop / hauteur supposée : sur mobile `100dvh` change quand la barre
+   d'URL se rétracte, et une hauteur supposée constante désigne alors la
+   mauvaise carte — donc on mémorisait le mauvais article.
+   Pas d'IntersectionObserver non plus ici : son seuil se déclenche de façon
+   peu fiable sur un swipe rapide, et le lot d'entrées peut ne pas contenir la
+   carte entrante. Une lecture directe est déterministe et testable. */
+function currentIndex(){
+  const kids=feedEl.children;
+  if(!kids.length)return -1;
+  const mid=feedEl.scrollTop+feedEl.clientHeight/2;   // milieu de l'écran
+  let lo=0,hi=kids.length-1,ans=0;
+  while(lo<=hi){                                       // recherche binaire sur offsetTop
+    const m=(lo+hi)>>1;
+    if(kids[m].offsetTop<=mid){ans=m;lo=m+1;}else hi=m-1;
+  }
+  return ans;
 }
-function observeCards(){
-  const obs=ensureCardObserver();
-  if(!obs)return;
-  [...feedEl.children].forEach(c=>obs.observe(c));
-}
-/* Repli si IntersectionObserver manque : on retombe sur le calcul d'index. */
-function scrollIndexFallback(){return Math.round(feedEl.scrollTop/Math.max(1,viewH()));}
+function currentCardEl(){const i=currentIndex();return i<0?null:feedEl.children[i];}
+/* Appelé à chaque frame de défilement : marquage « vu », mémorisation de la
+   position, mise à jour du rail. Les trois sont idempotents. */
 function onCardChange(){
   markVisibleSeen();
   rememberPos();
   updateRail();
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
+const APP_VERSION="6";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
   if(!DEBUG)return;
@@ -817,9 +822,7 @@ const {MAX_CARDS,MAX_ITEMS}=CONFIG;   // bornes du fil infini (DOM + mémoire)
 function renderCard(it){const id=cardSeq++;cardReg.set(id,it);return cardHTML(it,id);}
 /* Article actuellement à l'écran (sert au rail de partage et à l'ancrage). */
 function currentItem(){
-  const card=(currentCard&&currentCard.isConnected)
-    ?currentCard
-    :feedEl.children[scrollIndexFallback()];
+  const card=currentCardEl();
   return card?cardReg.get(+card.dataset.id)||null:null;
 }
 /* Lien de la carte visible, pour réancrer le fil après une mutation.
@@ -829,6 +832,30 @@ function anchorLink(){
   if(!feedEl.children.length||feedEl.scrollTop<4)return "";
   const it=currentItem();
   return it&&it.link?it.link:"";
+}
+/* Position mémorisée, tolérante à l'ancien format (une simple chaîne). */
+function posEntry(m){
+  const v=posMap[m];
+  if(!v)return null;
+  return typeof v==="string"?{link:v,date:"",idx:-1}:v;
+}
+/* Retrouve où reprendre, du plus précis au plus approximatif :
+   1. le lien exact ;
+   2. sinon le premier article aussi récent ou plus ancien que celui quitté
+      (le fil est trié par date : on retombe au bon endroit de la chronologie) ;
+   3. sinon l'index mémorisé, borné à la taille du fil.
+   Renvoie -1 seulement si le fil est encore trop incomplet pour décider. */
+function resolveResume(pos){
+  if(!pos)return 0;
+  const byLink=items.findIndex(it=>it.link===pos.link);
+  if(byLink>=0)return byLink;
+  const t=Date.parse(pos.date);
+  if(!isNaN(t)){
+    const byDate=items.findIndex(it=>{const d=Date.parse(it.date);return !isNaN(d)&&d<=t;});
+    if(byDate>=0)return byDate;
+  }
+  if(pos.idx>0&&items.length)return Math.min(pos.idx,items.length-1);
+  return -1;
 }
 /* Défile jusqu'à la carte d'index i en utilisant sa position RÉELLE.
    offsetTop ne suppose pas que toutes les cartes ont la même hauteur, et le
@@ -899,14 +926,13 @@ function endCardHTML(){
    précédente. */
 function render(){
   const anchor=anchorLink();                    // avant mutation : où est l'utilisateur ?
-  cardReg.clear();cardSeq=0;currentCard=null;
+  cardReg.clear();cardSeq=0;
   let html=items.map(renderCard).join("");
   if(mode==="news"&&items.length)html+=endCardHTML();   // fin de fil explicite
   feedEl.innerHTML=html;
   // Pas de capDom() ici : sur ce chemin le DOM reflète `items` un pour un, ce
   // dont dépendent l'ancrage et la reprise. Le fil Actus est borné par MAX_NEWS,
   // et capDom ne sert qu'au fil infini du mode Apprendre (appendCards).
-  observeCards();
   let top=0;
   if(anchor){
     const i=items.findIndex(it=>it.link===anchor);
@@ -915,24 +941,29 @@ function render(){
   }else if(resumePending[mode]&&items.length){
     // Reprise de session : le fil Actus se remplit progressivement, on réessaie
     // à chaque rendu tant que l'article n'est pas encore arrivé.
-    const link=posMap[mode];
+    const link=posEntry(mode);
+    if(DEBUG)console.log("[resume]",mode,"items="+items.length,"cible="+(link&&link.link),
+      "i="+(link?resolveResume(link):"n/a"));
     if(!link)resumePending[mode]=false;
-    else{const i=items.findIndex(it=>it.link===link);
+    else{const i=resolveResume(link);
       if(i>0){top=scrollToCard(i);resumePending[mode]=false;}
       else if(i===0)resumePending[mode]=false;} // i===-1 : pas encore là → on réessaiera
   }
   if(!top)setScrollTopInstant(feedEl,0);        // innerHTML a déjà remis le scroll à 0
   observeBackgrounds();
-  if(DEBUG){const l=posMap[mode]||"";const i=items.findIndex(it=>it.link===l);
-    dbg(`anchor=…${(anchor||"").slice(-20)}\nsaved=…${l.slice(-20)}  found i=${i}\ntop=${top}  scrollTop=${feedEl.scrollTop}\nitems=${items.length}  resume=${resumePending[mode]}`);}
+  if(DEBUG){const e=posEntry(mode),l=(e&&e.link)||"";const i=e?resolveResume(e):-1;
+    dbg(`v${APP_VERSION}  mode=${mode}  items=${items.length}\n`+
+        `mémorisé=…${l.slice(-24)||"(rien)"}\n`+
+        `trouvé i=${i}  reprise=${resumePending[mode]}\n`+
+        `top=${top}  scrollTop=${Math.round(feedEl.scrollTop)}  idx=${currentIndex()}`);}
   // Le hint ne doit pas resurgir en pleine lecture à chaque rendu progressif.
   document.getElementById("hint").classList.toggle("hidden",items.length===0||feedEl.scrollTop>50);
-  updateRail();updateProgress();markVisibleSeen();  // la 1ère carte affichée compte comme vue
+  updateProgress();onCardChange();              // la 1ère carte affichée compte comme vue
 }
 /* Ajoute des cartes à la suite sans réinitialiser le scroll (mode Apprendre infini) */
 function appendCards(newItems){
   feedEl.insertAdjacentHTML("beforeend",newItems.map(renderCard).join(""));
-  capDom();observeCards();observeBackgrounds();updateProgress();
+  capDom();observeBackgrounds();updateProgress();
 }
 /* Retire les cartes les plus hautes au-delà de MAX_CARDS et ajuste le scroll
    (chaque carte fait exactement la hauteur du viewport). */
@@ -942,7 +973,6 @@ function capDom(){
     const first=feedEl.firstElementChild;
     cardReg.delete(+first.dataset.id);
     removedH+=first.offsetHeight;               // hauteur RÉELLE, pas supposée
-    if(cardObserver)cardObserver.unobserve(first);
     first.remove();
   }
   // instantané : sans cela le CSS scroll-behavior transformerait ce recalage en
@@ -1073,10 +1103,11 @@ function openShareMenu(it){
 const pbar=document.getElementById("pbar");
 /* Masquage auto du haut pendant le swipe ; réapparaît au tap ou après une pause */
 const topEl=document.querySelector(".top");
-let topRevealT, lastScrollY=0, revealUntil=0;
+/* La barre du haut se masque au swipe et ne revient QUE sur un appui à
+   l'écran — pas de réapparition automatique après un délai. */
+let lastScrollY=0;
 function showTop(){topEl.classList.remove("top--away");}
 function hideTop(){topEl.classList.add("top--away");}
-function scheduleTopReveal(){clearTimeout(topRevealT);topRevealT=setTimeout(showTop,2500);} // revient ~2,5 s après l'arrêt du scroll
 /* Le traitement du scroll est groupé dans un requestAnimationFrame : il lit la
    géométrie (dont scrollHeight, coûteux sur un fil de cartes plein écran) puis
    écrit des styles. En le faisant à chaque événement, on alternait lectures et
@@ -1087,12 +1118,11 @@ function onScrollFrame(){
   const top=feedEl.scrollTop,h=viewH();
   updateProgress();
   if(top>50)document.getElementById("hint").classList.add("hidden");
-  if(Date.now()>=revealUntil&&Math.abs(top-lastScrollY)>4){hideTop();scheduleTopReveal();} // on swipe → on masque
+  if(Math.abs(top-lastScrollY)>4)hideTop();   // on swipe → on masque (jusqu'au prochain appui)
   lastScrollY=top;
   // L'utilisateur a franchi au moins une carte avant la reprise → on l'annule
   if(resumePending[mode]&&top>h*0.5)resumePending[mode]=false;
-  // Sans IntersectionObserver, on retombe sur le suivi par calcul d'index.
-  if(!HAS_IO){markVisibleSeen();rememberPos();updateRail();}
+  onCardChange();   // carte courante : marquage « vu », position, rail
   // Mode Apprendre : charge un nouveau lot avant d'atteindre le bas → fil sans fin
   if(mode==="learn"&&!loadingMore&&items.length&&top+h*3>=feedEl.scrollHeight)loadMoreLearn();
 }
@@ -1103,7 +1133,7 @@ feedEl.addEventListener("scroll",()=>{
 // scrollend (là où il existe) : moment idéal pour figer la position sur disque
 if("onscrollend" in self)feedEl.addEventListener("scrollend",persistPos);
 // tap → réaffiche, et on empêche le re-masquage pendant que le snap se termine
-feedEl.addEventListener("click",()=>{clearTimeout(topRevealT);showTop();revealUntil=Date.now()+1500;});
+feedEl.addEventListener("click",()=>showTop());   // seul déclencheur du retour de la barre
 function updateProgress(){const max=feedEl.scrollHeight-feedEl.clientHeight;pbar.style.height=(max>0?feedEl.scrollTop/max*100:0)+"%";}
 /* Navigation clavier. Gardes indispensables : sans elles, une espace tapée dans
    le champ « ajouter un flux » faisait défiler le fil, et les flèches
@@ -1228,7 +1258,7 @@ function restoreFeed(m){
   updateProgress();
   setScrollTopInstant(feedEl,s.scrollTop);          // restaure la position exacte, sans animation
   observeBackgrounds();updateRail();
-  currentCard=null;observeCards();markVisibleSeen();  // recalage du suivi de carte
+  onCardChange();                                   // recalage du suivi de carte
   return true;
 }
 function setMode(m){

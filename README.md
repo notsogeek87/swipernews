@@ -7,6 +7,12 @@ L'outillage de **développement** (lint, tests, CI) est optionnel et ne change r
 ## Fonctionnalités
 
 - Navigation par swipe vertical plein écran (flèches ↑↓ / espace au clavier aussi)
+- La barre du haut se masque pendant le swipe et ne revient **que sur un appui à
+  l'écran** (aucune réapparition automatique)
+- Reprise de lecture : l'app rouvre sur l'article quitté, **pour chaque mode
+  indépendamment**. Si l'article a disparu du flux entre-temps (un RSS ne garde
+  que ses N derniers items), la reprise se rabat sur le repère temporel puis sur
+  l'index, au lieu de retomber en tête du fil
 - Titre, résumé, image, source et date tirés directement des flux RSS
 - Gestion des sources : ajout, suppression, activation/désactivation
 - Import / export des sources aux formats **OPML** (standard) et **JSON** — importe tes sources et lis-les directement
