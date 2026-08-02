@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "eu.lielu.news.twa",
+      "sha256_cert_fingerprints": [
+        "REMPLACER_PAR_L_EMPREINTE_SHA256_DE_VOTRE_CLE_DE_SIGNATURE"
+      ]
+    }
+  }
+]

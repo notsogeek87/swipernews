@@ -213,6 +213,56 @@ Trois garde-fous rendent l'oubli non catastrophique, mais ils ne dispensent pas 
    sinon il purge caches et service worker et recharge une fois, puis affiche un
    message explicite plutôt qu'une interface à moitié morte.
 
+## Générer un APK Android (facultatif)
+
+L'app s'installe déjà en PWA depuis le navigateur. Un **APK** apporte deux choses :
+l'installation par fichier (sans passer par le menu du navigateur) et, surtout, un
+`targetSdkVersion` à jour — ce qui évite l'avertissement Play Protect « conçue pour
+une version plus ancienne d'Android » que produisent certains navigateurs quand ils
+fabriquent eux-mêmes le paquet.
+
+Le format adapté est une **TWA** (Trusted Web Activity) : un APK minimal qui affiche
+ce site en plein écran, sans barre d'URL. Le contenu reste celui du site, donc les
+mises à jour continuent de se faire sans réinstaller.
+
+### Le plus simple : PWABuilder
+
+1. Aller sur <https://www.pwabuilder.com>, saisir `https://news.lielu.eu` ;
+2. choisir **Android → Generate Package**. Laisser PWABuilder créer la clé de
+   signature, et **télécharger le paquet complet** (il contient l'APK, le `.aab`,
+   la clé `signing.keystore` et le fichier `assetlinks.json` déjà rempli) ;
+3. copier le contenu de leur `assetlinks.json` dans `well-known/assetlinks.json`
+   de ce dépôt, puis redéployer. Sans cette étape, l'app fonctionne mais affiche
+   une barre d'URL en haut ;
+4. transférer l'APK sur le téléphone et l'installer.
+
+**Conserver la clé de signature** (`signing.keystore` et son mot de passe) : sans
+elle, aucune mise à jour de l'APK ne pourra être installée par-dessus.
+
+### En ligne de commande : Bubblewrap
+
+```bash
+npm install -g @bubblewrap/cli
+bubblewrap init --manifest https://news.lielu.eu/manifest.webmanifest
+bubblewrap build          # produit app-release-signed.apk
+bubblewrap fingerprint    # empreinte SHA-256 à coller dans well-known/assetlinks.json
+```
+
+Bubblewrap télécharge lui-même le JDK et le SDK Android au premier lancement
+(~1 Go). Cela **ne peut pas être fait depuis l'environnement de développement de
+ce dépôt** : `dl.google.com`, seul hôte fournissant le SDK Android, le plugin
+Gradle Android et `androidx.browser`, y est bloqué par la politique réseau.
+
+### Ce que le dépôt fournit déjà
+
+- `manifest.webmanifest` remplit les exigences d'une TWA : `id`, `name`,
+  `short_name`, `start_url` et `scope` absolus, `display: standalone`, couleurs de
+  thème, icônes 192 et 512, plus une icône **maskable** pour que le lanceur Android
+  n'en rogne pas les bords ;
+- `well-known/assetlinks.json` est en place, avec une empreinte à remplacer, et
+  `vercel.json` le réécrit vers `/.well-known/assetlinks.json` — le chemin exact
+  qu'Android va interroger.
+
 ## Sécurité
 
 - Le proxy `api/feed.js` valide l'URL demandée et **refuse le réseau interne**

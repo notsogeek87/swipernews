@@ -9,9 +9,9 @@ architecture et maintenabilité.
 > dans le commit qui suit cet audit — à deux exceptions près, laissées telles quelles et
 > signalées ici :
 >
-> - **§3.7 — optimisation des PNG** (`logo-512.png`, 262 Ko) : aucun optimiseur d'images
->   (`oxipng`, `pngquant`, `optipng`) n'est disponible dans l'environnement. À faire
->   localement, c'est un gain gratuit de ~230 Ko.
+> - ~~**§3.7 — optimisation des PNG**~~ : **fait**. Quantification par palette avec
+>   canal alpha préservé (Pillow, `FASTOCTREE`) : `logo-512.png` passe de 262 Ko à
+>   29 Ko et `logo-192.png` de 41 Ko à 8 Ko, sans différence visible.
 > - **§5.3 — Lighthouse CI** : le job a besoin d'une URL de preview Vercel et d'un jeton
 >   de projet, qui ne peuvent pas être configurés depuis ici.
 >

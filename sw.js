@@ -19,10 +19,15 @@
 //
 // À CHAQUE modification de index.html ou de src/*.js : incrémenter APP_VERSION
 // dans index.html ET CACHE ci-dessous (garder les deux numéros alignés).
-const CACHE = "flux-v18";
+const CACHE = "flux-v19";
 
 // Mis en cache à l'installation : uniquement ce qui ne dépend pas de la version.
-const SHELL = ["./logo-192.png", "./logo-512.png", "./manifest.webmanifest"];
+const SHELL = [
+  "./logo-192.png",
+  "./logo-512.png",
+  "./logo-maskable-512.png",
+  "./manifest.webmanifest",
+];
 
 // Ressources dont la fraîcheur prime sur la vitesse (voir règle centrale).
 function isShellDocument(url) {
