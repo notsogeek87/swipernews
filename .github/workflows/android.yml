@@ -33,7 +33,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22" # plancher de la CLI Capacitor 8, qui refuse Node 20
 
       - uses: actions/setup-java@v4
         with:
