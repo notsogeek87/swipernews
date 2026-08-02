@@ -1,5 +1,5 @@
-// Fonction serverless Vercel : agrège les sources du mode Apprendre
-// (Wikipédia, GBIF/INPN, Gallica/BnF) CÔTÉ SERVEUR.
+// Fonction serverless Vercel : agrège les catégories du mode Apprendre
+// (Wikipédia) CÔTÉ SERVEUR.
 //
 // Intérêt : mutualiser le cache CDN entre tous les utilisateurs, masquer les
 // futures clés d'API, et ne dépendre d'aucun proxy CORS public. Le front
@@ -27,18 +27,6 @@ function fetchWithTimeout(url) {
     .finally(() => clearTimeout(t));
 }
 const fetchJson = (url) => fetchWithTimeout(url).then((r) => r.json());
-const fetchText = (url) => fetchWithTimeout(url).then((r) => r.text());
-
-/* ---------- Récupération par source ---------- */
-const FETCHERS = {
-  wikipedia: (catKey) => fetchJson(core.wikiUrl(catKey)).then(core.normalizeWiki),
-  gbif: () => fetchJson(core.gbifUrl()).then(core.normalizeGbif),
-  gallica: (catKey) => {
-    const url = core.gallicaUrl(catKey);
-    if (!url) return Promise.resolve([]);
-    return fetchText(url).then(core.normalizeGallica);
-  },
-};
 
 function parseList(v, fallback) {
   if (!v || typeof v !== "string") return fallback;
@@ -74,18 +62,13 @@ module.exports = async function handler(req, res) {
   const q = req.query || {};
   const known = new Set(core.CATEGORIES.map((c) => c.key));
   const cats = parseList(q.cats, ["random"]).filter((c) => known.has(c));
-  const wanted = parseList(q.sources, ["wikipedia"]).filter((s) => FETCHERS[s]);
   const count = Math.min(Math.max(parseInt(q.count, 10) || 20, 1), 40);
   const catList = cats.length ? cats : ["random"];
 
   const tag = (p, catKey) => p.then((list) => list.map((it) => ({ ...it, cat: catKey })));
-  const tasks = [];
-  for (const catKey of catList) {
-    for (const s of core.sourcesForCat(catKey, wanted.length ? wanted : ["wikipedia"])) {
-      tasks.push(tag(FETCHERS[s.key](catKey), catKey));
-    }
-  }
-  if (!tasks.length) tasks.push(tag(FETCHERS.wikipedia(catList[0]), catList[0])); // garde-fou
+  const tasks = catList.map((catKey) =>
+    tag(fetchJson(core.wikiUrl(catKey)).then(core.normalizeWiki), catKey)
+  );
 
   const results = await Promise.allSettled(tasks);
   const lists = results.filter((r) => r.status === "fulfilled").map((r) => r.value);
@@ -108,6 +91,4 @@ module.exports = async function handler(req, res) {
 
 // Exports pour les tests unitaires (les normaliseurs vivent dans learn-core).
 module.exports.normalizeWiki = core.normalizeWiki;
-module.exports.normalizeGbif = core.normalizeGbif;
-module.exports.normalizeGallica = core.normalizeGallica;
 module.exports.dedupAndRank = core.dedupAndRank;

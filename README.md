@@ -51,20 +51,12 @@ catégorie utilise le moteur de recherche de Wikipédia (`generator=search`,
 `gsrsort=random`, `deepcategory:"…"`) pour tirer des articles au hasard dans la catégorie
 et ses sous-catégories. Le choix est mémorisé et chaque catégorie a son propre cache.
 
-### Sources du mode Apprendre
+### Source du mode Apprendre
 
-Le fil mélange plusieurs sources, et la **catégorie choisie s'applique à toutes** :
-
-- **Wikipédia** (API `action`, `generator=search`/`random`, extrait d'intro + image) — toutes catégories.
-- **GBIF / INPN** (`api.gbif.org`, occurrences avec photo) — biodiversité, catégories *Nature* / *Sciences*.
-- **Gallica – BnF** (API SRU, documents patrimoniaux numérisés + image IIIF) — toutes catégories.
-
-Chaque source est interrogée en parallèle ; les résultats sont dédoublonnés et mélangés
-(les cartes avec image d'abord). Les sources qui échouent ne contribuent simplement rien —
-le fil reste alimenté par les autres. Gallica passe par les proxys (SRU non-CORS) ;
-Wikipédia et GBIF autorisent le CORS. La langue par défaut est le français.
-
-*(Paris Musées nécessite une clé API — à ajouter ultérieurement.)*
+Le fil s'appuie sur **Wikipédia** (API `action`, `generator=search`/`random`, extrait
+d'intro + image), en français par défaut, pour toutes les catégories. Quand plusieurs
+catégories sont interrogées pour un même lot (mode « Tous »), les résultats sont
+dédoublonnés et mélangés (les cartes avec image d'abord).
 
 ## Lancer en local
 
@@ -277,29 +269,28 @@ racine du dépôt ; `npm run cap:prepare` régénère donc un dossier `www/`
 (ignoré par git, simple copie des fichiers racine) avant chaque `cap sync`, ce
 qui reste sans étape de build JS — juste une copie.
 
-Les données, elles, restent réseau (flux RSS, Wikipédia/GBIF/Gallica) — c'est
-inhérent à une app d'actualités — mais l'app packagée n'appelle **jamais**
-`news.lielu.eu` : elle va chercher chaque source directement depuis l'appareil,
-sans dépendance au backend Vercel.
+Les données, elles, restent réseau (flux RSS, Wikipédia) — c'est inhérent à une
+app d'actualités — mais l'app packagée n'appelle **jamais** `news.lielu.eu` :
+elle va chercher chaque source directement depuis l'appareil, sans dépendance
+au backend Vercel.
 
-Un navigateur ne peut normalement pas lire un flux RSS tiers ni interroger
-Gallica en direct (pas de CORS chez eux) — d'où `api/feed.js` et son repli
-proxys publics côté web. Wikipédia et GBIF, eux, autorisent déjà le CORS et se
-lisent en direct dans n'importe quel navigateur (voir `srcWikipedia`/`srcGBIF`
-dans `index.html`). Dans l'APK, seuls les flux RSS et Gallica ont donc besoin
-d'un contournement : `nativeGet` (`index.html`) appelle *explicitement* le
-plugin `Capacitor.Plugins.CapacitorHttp`, qui route la requête par le réseau
-**natif** Android au lieu de la WebView — le CORS, qui est une politique de
-navigateur, ne s'applique alors plus du tout, avec un timeout natif fiable
-(`connectTimeout`/`readTimeout`).
+Un navigateur ne peut normalement pas lire un flux RSS tiers (pas de CORS chez
+la plupart des sources) — d'où `api/feed.js` et son repli proxys publics côté
+web. Wikipédia, elle, autorise déjà le CORS et se lit en direct dans n'importe
+quel navigateur (voir `srcWikipedia` dans `index.html`). Dans l'APK, seuls les
+flux RSS ont donc besoin d'un contournement : `nativeGet` (`index.html`)
+appelle *explicitement* le plugin `Capacitor.Plugins.CapacitorHttp`, qui route
+la requête par le réseau **natif** Android au lieu de la WebView — le CORS,
+qui est une politique de navigateur, ne s'applique alors plus du tout, avec un
+timeout natif fiable (`connectTimeout`/`readTimeout`).
 
 Une première tentative activait `plugins.CapacitorHttp` **globalement**
 (`capacitor.config.json`), ce qui patche `fetch()` pour absolument tout —
-y compris Wikipédia/GBIF, qui n'en avaient pourtant pas besoin — et s'est
-révélée nettement plus lente à l'usage. Mesuré sur l'émulateur Android local
-après être passé à un appel ciblé (`nativeGet` uniquement pour RSS/Gallica) :
-~3,2 s pour charger 4 flux RSS en parallèle, ~5 s pour un lot Apprendre
-(Wikipédia + GBIF) — comparable à ce qu'on peut attendre sur le web.
+y compris Wikipédia, qui n'en avait pourtant pas besoin — et s'est révélée
+nettement plus lente à l'usage. Mesuré sur l'émulateur Android local après
+être passé à un appel ciblé (`nativeGet` uniquement pour RSS) : ~3,2 s pour
+charger 4 flux RSS en parallèle — un lot Apprendre (Wikipédia seul, en CORS
+direct) reste comparable à ce qu'on peut attendre sur le web.
 
 ```bash
 npm install
@@ -422,9 +413,9 @@ dépôt** : perdue, plus aucune mise à jour de l'app installée n'est possible.
   non modifiable), `api/og.js` va lire la balise `og:image` de l'article, qui
   pointe vers la version pleine taille. Appelé uniquement si l'image du flux est
   réellement petite, résultat mémorisé côté client et mis en cache 24 h par le CDN.
-- **Mode Apprendre** : `api/learn.js` agrège **côté serveur** Wikipédia + GBIF + Gallica
-  (cache CDN mutualisé entre utilisateurs). Le front l'appelle en priorité et se rabat
-  sur son agrégation client si l'endpoint n'est pas déployé (hébergement statique).
+- **Mode Apprendre** : `api/learn.js` agrège **côté serveur** les catégories Wikipédia
+  demandées (cache CDN mutualisé entre utilisateurs). Le front l'appelle en priorité et
+  se rabat sur son agrégation client si l'endpoint n'est pas déployé (hébergement statique).
 - **Code partagé** : `src/lib.js` (fonctions pures : assainissement, parsing OPML/JSON,
   dates) et `src/learn-core.js` (catégories, URL et normaliseurs du mode Apprendre) sont
   chargés par `index.html` **et** par les fonctions serverless — une seule implémentation,

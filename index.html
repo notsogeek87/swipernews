@@ -177,7 +177,10 @@
     color:var(--muted);font-family:var(--sans);font-weight:600;font-size:13px;padding:7px 14px;border-radius:100px;
     cursor:pointer;white-space:nowrap;backdrop-filter:blur(12px);transition:background .2s,color .2s,border-color .2s}
   .cats button.active{background:rgba(74,217,255,.16);border-color:rgba(74,217,255,.5);color:#bff0ff}
-  .cats .catedit{color:#7fe3ff;border-color:rgba(74,217,255,.3)}
+
+  /* Bouton "Modifier mes centres d'intérêt" : en haut à droite, comme ⚙ Sources
+     (mode Actus) — les deux occupent le même emplacement, jamais visibles ensemble. */
+  .top .actions .catedit{color:#7fe3ff;border-color:rgba(74,217,255,.35)}
 
   /* Sélecteur de centres d'intérêt (grille de chips à cocher) */
   .intgrid{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
@@ -318,6 +321,7 @@
     <div class="actions">
       <button id="reloadBtn" class="iconbtn" title="Rafraîchir les articles" aria-label="Rafraîchir">↻</button>
       <button id="openSheet" title="Gérer tes sources / réglages">⚙ Sources</button>
+      <button id="editIntBtn" class="catedit hidden" title="Choisir tes centres d'intérêt">✎ Modifier</button>
     </div>
   </div>
   <div class="modeswitch" role="tablist" aria-label="Choix du mode">
@@ -383,9 +387,6 @@
     <h2>Tes centres d'intérêt</h2>
     <p class="sub">Choisis ce que tu veux apprendre. Tu pourras les modifier à tout moment.</p>
     <div class="intgrid" id="intGrid"></div>
-    <h2 style="margin-top:24px">Sources</h2>
-    <p class="sub">D'où viennent les cartes en mode Apprendre.</p>
-    <div class="intgrid" id="srcGrid"></div>
     <button class="applybtn" id="saveInterestsBtn">Valider</button>
   </div>
 </div>
@@ -454,7 +455,7 @@
 
 <script>
 /**
- * Forme normalisée d'une carte, commune à toutes les sources (RSS, Wikipédia, GBIF, Gallica).
+ * Forme normalisée d'une carte, commune à toutes les sources (RSS, Wikipédia).
  * @typedef {Object} Item
  * @property {string} source  Nom de la source affiché
  * @property {string} title   Titre
@@ -525,7 +526,6 @@ const LS_KEY="fluxswipe.feeds.v1";
 const LS_MODE="fluxswipe.mode.v1";
 const LS_CAT="fluxswipe.cat.v1";
 const LS_INT="fluxswipe.interests.v1";
-const LS_SRC="fluxswipe.sources.v1";
 let feeds=load(),items=[];
 /* Flux injoignables au dernier chargement : sert à les signaler dans le panneau
    Sources, car un toast disparaît avant qu'on ait pu agir. Volontairement non
@@ -541,8 +541,6 @@ let interests=(()=>{try{const s=localStorage.getItem(LS_INT);return s?JSON.parse
 function interestsChosen(){try{return localStorage.getItem(LS_INT)!==null;}catch(e){return false;}}
 /* Filtre courant : "all" = mélange des intérêts choisis, sinon une clé d'intérêt précise. */
 let cat=(()=>{try{const v=localStorage.getItem(LS_CAT);return (v&&v!=="random")?v:"all";}catch(e){return "all";}})();
-/* Sources actives du mode Apprendre. Par défaut : Wikipédia seul. */
-let sources=(()=>{try{const s=localStorage.getItem(LS_SRC);const a=s?JSON.parse(s):null;return (Array.isArray(a)&&a.length)?a:["wikipedia"];}catch(e){return ["wikipedia"];}})();
 /* Catégorie effective pour un lot : le filtre courant, ou un intérêt tiré au sort si "all". */
 function activeCatKey(){
   if(cat!=="all")return cat;
@@ -684,14 +682,14 @@ function dbgImage(){
 const APP_VERSION="24";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
-// news.lielu.eu pour les données) : Wikipédia/GBIF s'appellent déjà en direct
-// dans un navigateur (CORS ouvert chez eux, voir srcWikipedia/srcGBIF), et
-// seuls les flux RSS et Gallica (pas de CORS chez eux) ont besoin d'un
-// contournement — géré par nativeGet ci-dessous, qui appelle explicitement le
-// plugin CapacitorHttp (réseau natif Android, aucun CORS) SEULEMENT pour ces
-// deux cas. Sans ce ciblage, activer CapacitorHttp globalement (patch de
-// fetch()) ralentissait aussi Wikipédia/GBIF, qui n'en avaient pourtant pas
-// besoin — d'où capacitor.config.json qui ne l'active plus globalement.
+// news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
+// navigateur (CORS ouvert chez eux, voir srcWikipedia), et seuls les flux RSS
+// (pas de CORS chez eux) ont besoin d'un contournement — géré par nativeGet
+// ci-dessous, qui appelle explicitement le plugin CapacitorHttp (réseau natif
+// Android, aucun CORS) SEULEMENT pour ce cas. Sans ce ciblage, activer
+// CapacitorHttp globalement (patch de fetch()) ralentissait aussi Wikipédia,
+// qui n'en avait pourtant pas besoin — d'où capacitor.config.json qui ne
+// l'active plus globalement.
 const isNativeApp=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
@@ -834,7 +832,7 @@ function findImage(node,raw){
 }
 // relTime : voir src/lib.js
 
-/* ---------- Mode Apprendre : sources multiples (Wikipédia, GBIF/INPN, Gallica) ----------
+/* ---------- Mode Apprendre : contenu Wikipédia ----------
    URL et normaliseurs viennent de src/learn-core.js : une seule implémentation,
    partagée avec /api/learn (elles avaient divergé). Ici on ne garde que la
    politique de récupération propre au navigateur (direct si CORS, sinon proxy). */
@@ -849,27 +847,6 @@ async function srcWikipedia(catKey){
   return LEARN.normalizeWiki(data);
 }
 
-/* --- GBIF / INPN (biodiversité : espèces observées avec photo) --- */
-async function srcGBIF(){
-  const url=LEARN.gbifUrl();
-  let data;
-  try{const res=await fetchWithTimeout(url,{cache:"no-store"},CONFIG.FETCH_TIMEOUT);
-    if(!res.ok)throw new Error("http");data=await res.json();}
-  catch(e){warn("gbif direct",e);try{data=JSON.parse(await fetchText(url));}catch(_){return [];}}
-  return LEARN.normalizeGbif(data);
-}
-
-/* --- Gallica (BnF) : documents patrimoniaux numérisés (API SRU, non-CORS → proxy) --- */
-async function srcGallica(catKey){
-  const url=LEARN.gallicaUrl(catKey);
-  if(!url)return [];                                    // "Aléatoire" : pas de terme de recherche
-  try{return LEARN.normalizeGallica(await fetchText(url));}
-  catch(e){warn("gallica fetch",e);return [];}
-}
-
-const SRC_FN={wikipedia:srcWikipedia,gbif:srcGBIF,gallica:srcGallica};
-/* Libellés des sources pour le sélecteur (métadonnées partagées avec le backend) */
-const LEARN_SOURCES=LEARN.SOURCE_META;
 /* Catégories à interroger pour un lot : une seule si filtre précis ;
    plusieurs intérêts (jusqu'à 3) en "Tous" pour un fil toujours fourni et varié. */
 function catKeysForBatch(){
@@ -879,12 +856,8 @@ function catKeysForBatch(){
 }
 /* Agrégation côté client (repli si le backend /api/learn n'est pas disponible). */
 async function fetchLearnClient(keys,count){
-  const tasks=[];
   const tag=(p,catKey)=>p.then(list=>list.map(it=>({...it,cat:catKey}))); // marque la catégorie
-  keys.forEach(catKey=>{
-    LEARN.sourcesForCat(catKey,sources).forEach(s=>tasks.push(tag(SRC_FN[s.key](catKey),catKey)));
-  });
-  if(!tasks.length)tasks.push(tag(srcWikipedia(keys[0]||"random"),keys[0]||"random")); // garde-fou : au moins Wikipédia
+  const tasks=keys.map(catKey=>tag(srcWikipedia(catKey),catKey));
   const results=await Promise.allSettled(tasks);
   const lists=results.filter(r=>r.status==="fulfilled").map(r=>r.value);
   return LEARN.dedupAndRank(lists,count);               // articles avec image d'abord, sources mélangées
@@ -895,17 +868,16 @@ async function fetchLearn(count=CONFIG.BATCH_SIZE){
   const keys=catKeysForBatch();
   let batch=null;
   // App native : pas de backend Vercel, on agrège directement sur l'appareil
-  // (Wikipédia/GBIF en CORS direct, Gallica via nativeGet — voir SRC_FN /
-  // srcGallica). Ces trois appels restent rapides individuellement ; c'était
-  // l'activation globale de CapacitorHttp (patch de fetch()) qui ralentissait
-  // tout, pas l'agrégation client en elle-même.
+  // (Wikipédia en CORS direct). Cet appel reste rapide individuellement ;
+  // c'était l'activation globale de CapacitorHttp (patch de fetch()) qui
+  // ralentissait tout, pas l'agrégation client en elle-même.
   if(!isNativeApp){
     try{
       // « seau » aléatoire plutôt qu'un nonce : l'URL reste l'une des BUCKETS
       // variantes, donc cacheable par le CDN et mutualisée entre utilisateurs,
       // tout en restant variée à l'échelle d'une session. Avec un nonce, chaque
-      // lot manquait le cache et payait l'aller-retour vers les 3 sources.
-      const qs=new URLSearchParams({cats:keys.join(","),sources:sources.join(","),count:String(count),b:String(LEARN.randomBucket())});
+      // lot manquait le cache et payait l'aller-retour à Wikipédia.
+      const qs=new URLSearchParams({cats:keys.join(","),count:String(count),b:String(LEARN.randomBucket())});
       const res=await fetchWithTimeout("/api/learn?"+qs,{},CONFIG.FETCH_TIMEOUT);
       if(res.ok){
         const data=await res.json();
@@ -1728,8 +1700,11 @@ function applyModeUI(){
   tabLearn.classList.toggle("active",on);
   tabNews.setAttribute("aria-selected",String(!on));   // l'état actif doit être exposé, pas seulement peint
   tabLearn.setAttribute("aria-selected",String(on));
-  // les sources RSS n'ont pas de sens en mode Apprendre → on masque le réglage
+  // les sources RSS n'ont pas de sens en mode Apprendre → on masque le réglage,
+  // et inversement pour les centres d'intérêt : les deux boutons se partagent
+  // le même emplacement en haut à droite, jamais visibles ensemble.
   document.getElementById("openSheet").classList.toggle("hidden",on);
+  document.getElementById("editIntBtn").classList.toggle("hidden",!on);
 }
 /* Mémorisation du fil par mode : à la bascule, on restaure l'état exact
    (cartes affichées + position de scroll) au lieu de tout recharger.
@@ -1808,6 +1783,8 @@ applyModeUI();
 
 /* ---------- Barre de filtres (mode Apprendre) ---------- */
 const catsEl=document.getElementById("cats");
+const editIntBtn=document.getElementById("editIntBtn");
+editIntBtn.onclick=openInterests;
 function renderCats(){
   let chips=[];
   if(interests.length){
@@ -1816,13 +1793,9 @@ function renderCats(){
   }else{
     chips.push({k:"all",label:"🎲 Aléatoire"});
   }
-  let html=chips.map(c=>`<button data-k="${c.k}" class="${c.k===cat?"active":""}">${c.label}</button>`).join("");
-  html+=`<button class="catedit" data-edit="1">✎ ${interests.length?"Modifier":"Choisir mes intérêts"}</button>`;
-  catsEl.innerHTML=html;
-  catsEl.querySelectorAll("button").forEach(b=>{
-    if(b.dataset.edit)b.onclick=openInterests;
-    else b.onclick=()=>setCat(b.dataset.k);
-  });
+  catsEl.innerHTML=chips.map(c=>`<button data-k="${c.k}" class="${c.k===cat?"active":""}">${c.label}</button>`).join("");
+  catsEl.querySelectorAll("button").forEach(b=>{b.onclick=()=>setCat(b.dataset.k);});
+  editIntBtn.textContent=interests.length?"✎ Modifier":"✎ Choisir mes intérêts";
 }
 function setCat(k){
   if(k===cat)return;
@@ -1836,11 +1809,10 @@ function setCat(k){
 
 /* ---------- Sélecteur de centres d'intérêt ---------- */
 const intSheet=document.getElementById("intSheet");
-let pendingInt=new Set(),pendingSrc=new Set();
+let pendingInt=new Set();
 function openInterests(){
   pendingInt=new Set(interests);
-  pendingSrc=new Set(sources);
-  renderIntGrid();renderSrcGrid();
+  renderIntGrid();
   document.getElementById("introWelcome").classList.toggle("hidden",interestsChosen()); // intro visible seulement la 1ère fois
   openDialog(intSheet);
 }
@@ -1854,22 +1826,9 @@ function renderIntGrid(){
     b.classList.toggle("on");
   });
 }
-function renderSrcGrid(){
-  const grid=document.getElementById("srcGrid");
-  grid.innerHTML=LEARN_SOURCES.map(s=>
-    `<button class="intchip ${pendingSrc.has(s.key)?"on":""}" data-k="${s.key}">${s.label}</button>`).join("");
-  grid.querySelectorAll("button").forEach(b=>b.onclick=()=>{
-    const k=b.dataset.k;
-    if(pendingSrc.has(k))pendingSrc.delete(k);else pendingSrc.add(k);
-    b.classList.toggle("on");
-  });
-}
 function saveInterests(){
   interests=CATEGORIES.filter(c=>pendingInt.has(c.key)).map(c=>c.key); // garde l'ordre défini
-  sources=LEARN_SOURCES.filter(s=>pendingSrc.has(s.key)).map(s=>s.key);
-  if(!sources.length)sources=["wikipedia"];              // au moins une source
   try{localStorage.setItem(LS_INT,JSON.stringify(interests));}catch(e){}
-  try{localStorage.setItem(LS_SRC,JSON.stringify(sources));}catch(e){}
   cat="all";try{localStorage.setItem(LS_CAT,cat);}catch(e){}
   renderCats();
   if(mode==="learn")loadFeeds();          // AVANT la fermeture : closeDialog ne

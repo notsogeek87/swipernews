@@ -6,13 +6,11 @@ const test = require("node:test");
 const assert = require("node:assert");
 const core = require("../src/learn-core.js");
 
-test("chaque catégorie a une requête Wikipédia et un terme, sauf l'aléatoire", () => {
+test("chaque catégorie a une requête Wikipédia, sauf l'aléatoire", () => {
   const random = core.CATEGORIES.find((c) => c.key === "random");
   assert.equal(random.q, null);
-  assert.equal(random.term, "");
   for (const c of core.CATEGORIES.filter((c) => c.key !== "random")) {
     assert.ok(c.q && c.q.startsWith("deepcategory:"), `q manquante pour ${c.key}`);
-    assert.ok(c.term, `term manquant pour ${c.key}`);
     assert.ok(c.label, `label manquant pour ${c.key}`);
   }
 });
@@ -59,29 +57,6 @@ test("normalizeWiki accepte encore l'ancien format indexé par pageid", () => {
   assert.equal(out[0].title, "T");
 });
 
-test("gallicaUrl ne construit rien pour la catégorie aléatoire", () => {
-  assert.equal(core.gallicaUrl("random"), "");
-  assert.ok(core.gallicaUrl("histoire").includes("gallica.bnf.fr/SRU"));
-});
-
-test("sourcesForCat respecte la pertinence et la sélection de l'utilisateur", () => {
-  const all = ["wikipedia", "gbif", "gallica"];
-  // GBIF n'a de sens que sur nature/sciences
-  assert.deepEqual(
-    core.sourcesForCat("cinema", all).map((s) => s.key),
-    ["wikipedia", "gallica"]
-  );
-  assert.deepEqual(
-    core.sourcesForCat("nature", all).map((s) => s.key),
-    ["wikipedia", "gbif", "gallica"]
-  );
-  // une source désactivée n'est jamais interrogée
-  assert.deepEqual(
-    core.sourcesForCat("nature", ["wikipedia"]).map((s) => s.key),
-    ["wikipedia"]
-  );
-});
-
 test("randomBucket reste dans la plage cacheable", () => {
   for (let i = 0; i < 200; i++) {
     const b = core.randomBucket();
@@ -92,6 +67,5 @@ test("randomBucket reste dans la plage cacheable", () => {
 test("api/learn réexporte bien le noyau partagé (pas de seconde implémentation)", () => {
   const api = require("../api/learn.js");
   assert.equal(api.normalizeWiki, core.normalizeWiki);
-  assert.equal(api.normalizeGallica, core.normalizeGallica);
   assert.equal(api.dedupAndRank, core.dedupAndRank);
 });
