@@ -20,7 +20,10 @@ L'outillage de **développement** (lint, tests, CI) est optionnel et ne change r
   depuis un rail unique qui agit sur la carte affichée
 - **Mode Apprendre** 🎓 : un sélecteur à deux onglets en haut (**📰 Actus** / **🎓 Apprendre**, l'actif surligné) bascule le fil vers des articles Wikipédia aléatoires pour swiper en apprenant. Le fil est **sans fin** — de nouveaux articles se chargent automatiquement en approchant du bas — le bouton **↻** repart sur une nouvelle fournée, et le mode est mémorisé entre les sessions.
 - Installable comme application (PWA) avec fonctionnement hors-ligne
-- En mode actus, si un flux est injoignable, un message clair invite à réessayer ou à revoir ses sources (plus de faux contenu de démo)
+- En mode actus, si un flux est injoignable, le message le **nomme** (et le panneau
+  Sources marque la ligne d'un badge « injoignable »), pour savoir quelle source
+  corriger ou supprimer. Si toutes échouent, un message invite à réessayer ou à
+  revoir ses sources (plus de faux contenu de démo)
 
 ## Mode Apprendre
 

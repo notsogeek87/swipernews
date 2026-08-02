@@ -173,6 +173,10 @@
   .sheet p.sub{color:var(--muted);font-size:14px;margin-bottom:18px}
   .feedrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06)}
   .feedrow input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent)}
+  .feedrow .name{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  /* Signale une source injoignable au dernier chargement, là où on peut la supprimer */
+  .badge-ko{background:rgba(255,59,107,.16);border:1px solid rgba(255,59,107,.45);color:#ffb3c6;
+    font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px;white-space:nowrap}
   .feedrow .name{font-weight:600;font-size:15px}
   .feedrow .url{color:var(--muted);font-size:12px;word-break:break-all}
   .feedrow .del{margin-left:auto;background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer}
@@ -197,8 +201,11 @@
   @keyframes spin{to{transform:rotate(360deg)}}
   .state h3{color:var(--ink);font-size:18px}
   .hidden{display:none!important}
+  /* max-width + retour à la ligne : le message peut désormais citer des noms de
+     flux, il ne doit pas déborder de l'écran */
   .toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);
-    background:#1a1a22;border:1px solid rgba(255,255,255,.12);color:var(--ink);padding:12px 20px;border-radius:100px;
+    background:#1a1a22;border:1px solid rgba(255,255,255,.12);color:var(--ink);padding:12px 18px;border-radius:16px;
+    max-width:min(88vw,420px);text-align:center;line-height:1.4;
     font-size:14px;z-index:60;opacity:0;transition:opacity .25s;pointer-events:none}
   .toast.show{opacity:1}
 
@@ -352,8 +359,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=6"></script>
-<script src="src/learn-core.js?v=6"></script>
+<script src="src/lib.js?v=7"></script>
+<script src="src/learn-core.js?v=7"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -460,6 +467,10 @@ const LS_CAT="fluxswipe.cat.v1";
 const LS_INT="fluxswipe.interests.v1";
 const LS_SRC="fluxswipe.sources.v1";
 let feeds=load(),items=[];
+/* Flux injoignables au dernier chargement : sert à les signaler dans le panneau
+   Sources, car un toast disparaît avant qu'on ait pu agir. Volontairement non
+   persisté — une source peut très bien remarcher au chargement suivant. */
+let unreachable=new Set();
 let mode=(()=>{try{return localStorage.getItem(LS_MODE)==="news"?"news":"learn";}catch(e){return "learn";}})();
 
 /* Centres d'intérêt : définis une seule fois dans src/learn-core.js, partagés
@@ -588,7 +599,7 @@ function onCardChange(){
   updateRail();
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="6";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="7";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
   if(!DEBUG)return;
@@ -794,8 +805,8 @@ async function loadFeeds(){
         items=all.slice(0,CONFIG.MAX_NEWS);
         render();hideStates();   // render() réancre sur l'article lu (voir son commentaire)
         painted=true;
-      }else failed.push(f.name);
-    }).catch(()=>{if(my===loadSeq)failed.push(f.name);})
+      }else failed.push(f);
+    }).catch(()=>{if(my===loadSeq)failed.push(f);})
       .finally(()=>{
         if(my!==loadSeq)return;
         if(++done<active.length)return;                     // pas encore tous terminés
@@ -804,7 +815,16 @@ async function loadFeeds(){
           else{items=[];render();showEmpty("all-failed");}
         }else{
           cacheSave(key);
-          if(failed.length)toast(`${failed.length} flux injoignable${failed.length>1?"s":""}`);
+          unreachable=new Set(failed.map(f=>f.url));   // pour marquer le panneau Sources
+          if(failed.length){
+            // Nommer les flux : « 2 flux injoignables » n'indique pas lesquels
+            // supprimer. Au-delà de 3, on abrège pour rester lisible.
+            const noms=failed.map(f=>f.name);
+            const liste=noms.length>3
+              ? noms.slice(0,3).join(", ")+" +"+(noms.length-3)
+              : noms.join(", ");
+            toast(`Injoignable${noms.length>1?"s":""} : ${liste}`,4200);
+          }
         }
         resumePending[m]=false;   // chargement terminé : on n'essaie plus de reprendre (ex. refresh manuel)
       });
@@ -1352,7 +1372,8 @@ renderCats();
 if(mode==="learn"&&!interestsChosen())openInterests();  // 1er lancement direct en mode Apprendre
 function renderList(){document.getElementById("feedList").innerHTML=feeds.map((f,i)=>`
   <div class="feedrow"><input type="checkbox" ${f.on?"checked":""} data-toggle="${i}">
-    <div><div class="name">${esc(f.name)}</div><div class="url">${esc(f.url)}</div></div>
+    <div><div class="name">${esc(f.name)}${unreachable.has(f.url)?'<span class="badge-ko">injoignable</span>':""}</div>
+      <div class="url">${esc(f.url)}</div></div>
     <button class="del" data-del="${i}" aria-label="Supprimer ${escAttr(f.name)}">✕</button></div>`).join("");}
 /* Suggestions : chips « + Source » pour celles pas encore présentes (plus de sources = plus d'articles) */
 function renderSuggest(){
@@ -1443,8 +1464,8 @@ function showEmpty(reason){
   document.getElementById("empty").classList.remove("hidden");
 }
 function demobadge(on){document.getElementById("demobadge").classList.toggle("hidden",!on);}
-let toastT;function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");
-  clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1800);}
+let toastT;function toast(m,ms){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");
+  clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),ms||1800);}
 
 loadFeeds();
 </script>
