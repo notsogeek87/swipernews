@@ -359,8 +359,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=14"></script>
-<script src="src/learn-core.js?v=14"></script>
+<script src="src/lib.js?v=15"></script>
+<script src="src/learn-core.js?v=15"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -621,7 +621,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="14";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="15";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
   if(!DEBUG)return;
@@ -1715,21 +1715,34 @@ if(!firstRun)loadFeeds();
 // possible, et cache navigateur correct du SW. (Requiert un service HTTP ; en
 // file:// l'enregistrement échoue silencieusement, comme avant.)
 (function setupPWA(){
+  /* ---------- Mise à jour de l'app installée ----------
+     Une PWA installée n'est qu'une coquille qui ouvre cette URL : mettre à jour
+     le site met à jour l'app, il n'y a JAMAIS de réinstallation à faire.
+     index.html et src/*.js sont servis réseau d'abord par le service worker, et
+     les modules portent un ?v= : un lancement avec du réseau donne donc déjà la
+     dernière version. Reste le cas d'une app laissée ouverte plusieurs jours,
+     qui ne renavigue jamais — c'est ce que couvre le code ci-dessous. */
+  let swReg=null,swUpdateReady=false,lastUpdateCheck=0,hiddenSince=0;
+  const UPDATE_CHECK_MS=15*60*1000;   // au plus une vérification par quart d'heure
+  const AWAY_BEFORE_RELOAD_MS=30*1000; // absence minimale pour recharger sans gêner
+
   if("serviceWorker" in navigator){
-    // Le service worker sert désormais la coquille depuis le cache (peinture
-    // immédiate). Contrepartie : une version fraîche peut attendre en coulisse,
-    // donc on la signale au lieu de laisser l'utilisateur sur l'ancienne.
     navigator.serviceWorker.register("sw.js").then(reg=>{
+      swReg=reg;
+      // Une version peut déjà attendre depuis une session précédente.
+      if(reg.waiting&&navigator.serviceWorker.controller)swUpdateReady=true;
       reg.addEventListener("updatefound",()=>{
         const sw=reg.installing;
         if(!sw)return;
         sw.addEventListener("statechange",()=>{
           if(sw.state==="installed"&&navigator.serviceWorker.controller){
-            toast("Nouvelle version disponible — rouvre l'app");
+            swUpdateReady=true;
+            toast("Nouvelle version prête");
           }
         });
       });
     }).catch(()=>{});
+
     // Ne recharger que s'il s'agit d'un REMPLACEMENT de service worker. À la
     // toute première visite, l'installation prend le contrôle de la page en
     // cours (skipWaiting + clients.claim) et déclencherait un rechargement
@@ -1739,6 +1752,28 @@ if(!firstRun)loadFeeds();
     navigator.serviceWorker.addEventListener("controllerchange",()=>{
       if(!hadController||reloading)return;
       reloading=true;location.reload();
+    });
+
+    // Demande au worker en attente de prendre la main : controllerchange
+    // ci-dessus rechargera la page sur la nouvelle version.
+    function applyUpdate(){
+      const w=swReg&&swReg.waiting;
+      if(w)w.postMessage("skip-waiting");
+      else location.reload();
+    }
+    function checkForUpdate(){
+      if(!swReg||Date.now()-lastUpdateCheck<UPDATE_CHECK_MS)return;
+      lastUpdateCheck=Date.now();
+      try{swReg.update();}catch(e){/* hors ligne : on réessaiera */}
+    }
+    document.addEventListener("visibilitychange",()=>{
+      if(document.visibilityState==="hidden"){hiddenSince=Date.now();return;}
+      checkForUpdate();
+      // On applique la mise à jour au retour d'une absence : c'est le moment le
+      // moins gênant, et la position de lecture est de toute façon restaurée.
+      if(swUpdateReady&&hiddenSince&&Date.now()-hiddenSince>AWAY_BEFORE_RELOAD_MS){
+        swUpdateReady=false;applyUpdate();
+      }
     });
   }
 

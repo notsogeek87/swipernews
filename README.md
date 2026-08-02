@@ -148,6 +148,24 @@ largeur **déclarée** par le flux, la largeur **réelle** du fichier chargé, e
 l'URL utilisée. Si la taille réelle est très inférieure à l'écran, c'est le flux
 qui ne publie qu'une petite image.
 
+### Mise à jour d'une app installée (PWA)
+
+Une PWA installée n'est qu'une **coquille qui ouvre cette URL** : mettre le site
+à jour met l'app à jour. L'utilisateur n'a **jamais** à la réinstaller.
+
+Trois mécanismes garantissent qu'il tourne sur la dernière version :
+
+1. `index.html` et `src/*.js` sont servis **réseau d'abord** par le service
+   worker, et les modules portent un `?v=` — un lancement avec du réseau donne
+   donc déjà la dernière version ;
+2. `sw.js`, `index.html` et le manifeste sont servis en `max-age=0,
+   must-revalidate` (`vercel.json`), donc aucun intermédiaire ne peut épingler
+   une ancienne version ;
+3. une app **restée ouverte** plusieurs jours ne renavigue jamais : au retour
+   d'arrière-plan, elle vérifie s'il existe une nouvelle version (au plus une
+   fois par quart d'heure) et l'applique si l'absence a duré plus de 30 s — la
+   position de lecture étant restaurée, le rechargement passe inaperçu.
+
 ### ⚠️ Versionner la coquille à chaque modification
 
 `index.html` et `src/*.js` forment un **ensemble indivisible** : servir un `index.html`
