@@ -359,8 +359,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=12"></script>
-<script src="src/learn-core.js?v=12"></script>
+<script src="src/lib.js?v=13"></script>
+<script src="src/learn-core.js?v=13"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -609,23 +609,25 @@ function dbgImage(){
   if(!it){dbg("(pas de carte)");return;}
   const url=(bg&&(bg.dataset.bgUsed||bg.dataset.bg))||"(aucune image)";
   const probe=new Image();
+  const tried=(bg&&bg.dataset.bgTried)||"";
   probe.onload=()=>dbg(
     `v${APP_VERSION}  ${it.source}\n`+
     `déclaré : ${it.imgFrom||"?"} ${it.imgW?it.imgW+"px":"largeur absente"}\n`+
     `posée   : ${(bg&&bg.dataset.bgKind)||"?"}\n`+
     `RÉELLE  : ${probe.naturalWidth}x${probe.naturalHeight}\n`+
-    url.replace(/^https?:\/\//,""));
+    `URL  : ${url.replace(/^https?:\/\//,"")}\n`+
+    (tried?`TENTÉ: ${tried.replace(/^https?:\/\//,"")}`:"TENTÉ: (rien)"));
   probe.onerror=()=>dbg(`v${APP_VERSION}  ${it.source}\nimage NON CHARGÉE\n`+url);
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="12";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="13";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
   if(!DEBUG)return;
   let el=document.getElementById("dbg");
   if(!el){el=document.createElement("div");el.id="dbg";
-    el.style.cssText="position:fixed;left:6px;bottom:6px;z-index:999;background:rgba(0,0,0,.82);color:#5f5;font:11px/1.4 monospace;padding:6px 8px;border-radius:6px;max-width:92vw;white-space:pre-wrap;pointer-events:none";
+    el.style.cssText="position:fixed;left:6px;right:6px;bottom:6px;z-index:999;background:rgba(0,0,0,.88);color:#5f5;font:10.5px/1.35 monospace;padding:6px 8px;border-radius:6px;white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere;pointer-events:none";
     document.body.appendChild(el);}
   el.textContent=msg;
 }
@@ -1006,7 +1008,8 @@ function applyBg(el,src){
     el.dataset.bgUsed=u;el.dataset.bgKind=tag;
   };
   const bigger=upscaleImageUrl(src);
-  if(!bigger){set(src,"origine");return;}
+  el.dataset.bgTried=bigger||"";
+  if(!bigger){set(src,"origine (aucune taille dans l'URL)");return;}
   const probe=new Image();
   probe.onload=()=>{
     if(probe.naturalWidth>50){set(bigger,"agrandie "+probe.naturalWidth+"px");}

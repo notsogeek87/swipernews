@@ -143,18 +143,21 @@
     const url = String(src || "");
     const T = targetW || IMG_TARGET_W;
     if (!url) return "";
+    // Garde : une largeur ou une hauteur nulle produirait une division par zéro
+    // et une URL contenant "NaN", qui renverrait 404.
+    const ok2 = (w, h) => Number(w) > 0 && Number(h) > 0;
     const ratio = (w, h) => Math.round((Number(h) * T) / Number(w));
 
     // /640x360/ dans le chemin
     let out = url.replace(/\/(\d{2,4})x(\d{2,4})\//g, (m, w, h) =>
-      Number(w) >= T ? m : `/${T}x${ratio(w, h)}/`
+      !ok2(w, h) || Number(w) >= T ? m : `/${T}x${ratio(w, h)}/`
     );
     if (out !== url) return out;
 
     // _640x360.jpg en fin de nom
     out = url.replace(
       /_(\d{2,4})x(\d{2,4})(\.(?:jpe?g|png|webp|avif))/i,
-      (m, w, h, ext) => (Number(w) >= T ? m : `_${T}x${ratio(w, h)}${ext}`)
+      (m, w, h, ext) => (!ok2(w, h) || Number(w) >= T ? m : `_${T}x${ratio(w, h)}${ext}`)
     );
     if (out !== url) return out;
 
@@ -168,7 +171,9 @@
     out = url.replace(/\/w\/?(\d{2,4})\//g, (m, w) =>
       Number(w) >= T ? m : m.replace(w, String(T))
     );
-    return out !== url ? out : "";
+    // Filet : jamais d'URL contenant NaN/Infinity.
+    if (out !== url && !/NaN|Infinity/.test(out)) return out;
+    return "";
   }
 
   /** Échappement pour du contenu texte inséré en HTML. */

@@ -158,3 +158,16 @@ test("upscaleImageUrl ne propose rien s'il n'y a rien à gagner", () => {
   // ne doit pas confondre une date ou un identifiant avec une taille
   assert.equal(lib.upscaleImageUrl("https://f.fr/2026/08/01/photo.jpg"), "");
 });
+
+test("upscaleImageUrl ne fabrique jamais d'URL dégénérée", () => {
+  // Une hauteur nulle donnerait /1200xNaN/ — une URL qui répond 404 et fait
+  // perdre l'image d'origine si l'appelant n'a pas de repli.
+  for (const u of [
+    "https://f.fr/a/640x0/p.jpg",
+    "https://f.fr/a/00x00/p.jpg",
+    "https://f.fr/img/p_640x0.jpg",
+  ]) {
+    const out = lib.upscaleImageUrl(u);
+    assert.ok(!/NaN|Infinity/.test(out), "URL dégénérée pour " + u + " : " + out);
+  }
+});
