@@ -136,6 +136,15 @@
   .rail button svg{width:23px;height:23px;display:block}
 
   .progress{position:fixed;left:0;top:0;height:100dvh;width:3px;z-index:20;pointer-events:none}
+  /* Chargement en arrière-plan : fine barre indéterminée en haut. Volontairement
+     NON bloquante — masquer un fil déjà lisible serait pire que le laisser voir. */
+  .syncbar{position:fixed;left:0;top:0;height:2px;width:100%;z-index:21;pointer-events:none;
+    overflow:hidden;display:none}
+  .syncbar.on{display:block}
+  .syncbar::after{content:"";position:absolute;top:0;left:0;height:100%;width:40%;
+    background:linear-gradient(90deg,transparent,var(--accent),transparent);
+    animation:sync 1.1s linear infinite}
+  @keyframes sync{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
   .progress__bar{width:100%;background:linear-gradient(var(--accent),var(--accent-2));border-radius:0 3px 3px 0;transition:height .2s}
 
   .top{position:fixed;top:0;left:0;right:0;z-index:15;padding:calc(12px + env(safe-area-inset-top)) 16px 14px;
@@ -300,6 +309,7 @@
 <h1 class="visually-hidden">SwiperNews — apprendre et suivre l'actualité en swipe</h1>
 
 <div class="progress"><div class="progress__bar" id="pbar"></div></div>
+<div class="syncbar" id="syncbar" aria-hidden="true"></div>
 
 <header class="top">
   <div class="topline">
@@ -400,8 +410,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=20"></script>
-<script src="src/learn-core.js?v=20"></script>
+<script src="src/lib.js?v=21"></script>
+<script src="src/learn-core.js?v=21"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -464,6 +474,9 @@ const CONFIG = {
                          // limite artificielle quand elles sont peu nombreuses
   MAX_PARALLEL: 6,       // flux récupérés simultanément (322 d'un coup = échec massif)
   MAX_FEEDS_PER_LOAD: 40,// sources interrogées par chargement, en rotation
+  FIRST_PAINT_MS: 220,   // 1re repeinture : courte, pour afficher vite
+  RENDER_COALESCE_MS: 750,// puis fenêtre large : sans cela, 40 sources = 40
+                         // reconstructions du fil en quelques secondes
   MAX_CARDS: 60,         // cartes gardées dans le DOM (borne le fil infini)
   MAX_ITEMS: 300,        // items gardés en mémoire (dédoublonnage du scroll)
   CACHE_ITEMS: 40,       // articles mis en cache localStorage par catégorie
@@ -667,7 +680,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="20";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="21";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
   if(!DEBUG)return;
@@ -889,7 +902,7 @@ const AUTO_RELOAD_MS=5*60*1000;
 let lastNewsLoad=0;
 async function loadFeeds(){
   const my=++loadSeq;feedLoadStarted=true;
-  demobadge(false);
+  demobadge(false);syncing(false);
   const m=mode;                                   // capture : l'utilisateur peut changer de mode pendant le fetch
   const key=m==="learn"?("learn_"+cat):"news";    // cache distinct par catégorie
   // « Même fil » = le contenu affiché appartient à la MÊME clé que celle qu'on
@@ -947,8 +960,31 @@ async function loadFeeds(){
     items=all.slice(0,CONFIG.MAX_NEWS);
   }
 
+  /* Repeinture GROUPÉE. Repeindre à chaque source qui répond donnait, avec 40
+     sources, 40 reconstructions du fil en quelques secondes — et comme chaque
+     rebuild() retrie par date, les nouveaux articles s'insèrent au milieu : les
+     cartes bougeaient sans arrêt. On accumule et on repeint au plus une fois
+     par fenêtre, ce qui correspond en pratique à un lot de MAX_PARALLEL. */
+  let renderT=null,painted=false;
+  function paint(){
+    renderT=null;painted=true;
+    if(my!==loadSeq)return;
+    rebuild();render();hideStates();feedKeyShown=key;   // render() réancre sur l'article lu
+  }
+  /* Fenêtre progressive : courte pour le tout premier rendu (le contenu doit
+     apparaître vite), large ensuite (le fil doit cesser de bouger). */
+  function scheduleRender(){
+    if(renderT)return;
+    renderT=setTimeout(paint,painted?CONFIG.RENDER_COALESCE_MS:CONFIG.FIRST_PAINT_MS);
+  }
+  function flushRender(){
+    if(renderT){clearTimeout(renderT);renderT=null;}
+    paint();
+  }
+
   // Récupération par lots bornés plutôt que tout en parallèle.
   let cursor=0,inFlight=0,done=0;
+  syncing(true);
   function pump(){
     while(inFlight<CONFIG.MAX_PARALLEL&&cursor<active.length){
       const f=active[cursor++];
@@ -959,8 +995,7 @@ async function loadFeeds(){
           // Plafond par source : on garde ses articles les plus récents.
           const own=res.slice().sort((a,b)=>itemTime(b)-itemTime(a)).slice(0,perFeed);
           collected.set(f.url,own);
-          rebuild();
-          render();hideStates();feedKeyShown=key;   // render() réancre sur l'article lu
+          scheduleRender();      // groupé : voir RENDER_COALESCE_MS
         }else failed.push(f);
       }).catch(()=>{if(my===loadSeq)failed.push(f);})
         .finally(()=>{
@@ -972,6 +1007,8 @@ async function loadFeeds(){
     }
   }
   function finish(){
+    syncing(false);
+    if(collected.size)flushRender();   // état final exact, sans attendre la fenêtre
     if(!collected.size){
       // On ne vide JAMAIS un fil déjà affiché parce qu'un rafraîchissement a
       // échoué : mieux vaut du contenu un peu ancien qu'un écran d'erreur.
@@ -1886,6 +1923,9 @@ function showEmpty(reason){
   document.getElementById("empty").classList.remove("hidden");
 }
 function demobadge(on){document.getElementById("demobadge").classList.toggle("hidden",!on);}
+/* Indicateur de chargement en arrière-plan (barre fine en haut). Ne bloque rien :
+   le fil déjà affiché reste lisible et utilisable pendant que les sources arrivent. */
+function syncing(on){document.getElementById("syncbar").classList.toggle("on",!!on);}
 let toastT;function toast(m,ms){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");
   clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),ms||1800);}
 

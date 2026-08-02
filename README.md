@@ -111,7 +111,17 @@ Un export Feedly peut contenir plusieurs centaines de flux. Trois garde-fous :
   quasi-totalité échouait ;
 - **part maximale par source** = `MAX_NEWS / nombre de sources`, avec un minimum
   de 10. Avec peu de sources il n'y a donc aucune limite pratique ; avec des
-  centaines, aucune ne peut occuper tout le fil.
+  centaines, aucune ne peut occuper tout le fil ;
+- **repeinture groupée** : le fil n'est pas reconstruit à chaque source qui répond.
+  Avec 40 sources cela faisait 40 reconstructions en quelques secondes, et comme
+  le fil est trié par date, chaque source insérait ses articles au milieu — les
+  cartes bougeaient sans arrêt. Les résultats sont accumulés et le fil repeint au
+  plus une fois par fenêtre : 40 repeintures tombent à 5, sans rien perdre.
+  La première fenêtre est courte (le contenu doit apparaître vite), les suivantes
+  plus larges (le fil doit cesser de bouger).
+
+Pendant qu'un chargement se poursuit en arrière-plan, une fine barre en haut de
+l'écran l'indique. Elle ne bloque rien : le fil déjà affiché reste lisible.
 
 Les articles datés **dans le futur** de plus de deux jours (agendas de concerts,
 annonces de festivals) sont classés en fin de fil comme les articles sans date :
