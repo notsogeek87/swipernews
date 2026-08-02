@@ -176,6 +176,28 @@
     return "";
   }
 
+  /**
+   * Largeur demandée, lue directement dans l'URL quand elle y figure — évite de
+   * télécharger une image pour découvrir qu'elle est trop petite.
+   *
+   * Gère notamment les URL Thumbor, où le recadrage précède la taille de sortie :
+   *   /<signature>/0x0:1024x576/432x243/filters:.../photo.jpg  ->  432
+   * On retient donc le DERNIER segment de la forme /LxH/.
+   */
+  function imageSizeFromUrl(src) {
+    const url = String(src || "");
+    if (!url) return 0;
+    let w = 0;
+    const seg = /\/(\d{2,4})x(\d{2,4})\//g;
+    let m;
+    while ((m = seg.exec(url))) w = Number(m[1]); // le dernier gagne
+    if (w) return w;
+    const suffix = url.match(/_(\d{2,4})x(\d{2,4})\.(?:jpe?g|png|webp|avif)/i);
+    if (suffix) return Number(suffix[1]);
+    const query = url.match(/[?&](?:width|w|maxwidth)=(\d{2,4})\b/i);
+    return query ? Number(query[1]) : 0;
+  }
+
   /** Échappement pour du contenu texte inséré en HTML. */
   function esc(s) {
     return (s == null ? "" : String(s)).replace(
@@ -302,6 +324,7 @@
     safeImg,
     cssString,
     upscaleImageUrl,
+    imageSizeFromUrl,
     IMG_TARGET_W,
     esc,
     escAttr,

@@ -25,6 +25,7 @@ module.exports = [
         self: "readonly",
         globalThis: "readonly",
         DOMParser: "readonly",
+        TextDecoder: "readonly",
       },
     },
     rules: {

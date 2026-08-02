@@ -359,8 +359,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=13"></script>
-<script src="src/learn-core.js?v=13"></script>
+<script src="src/lib.js?v=14"></script>
+<script src="src/learn-core.js?v=14"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -429,7 +429,7 @@ const CONFIG = {
 
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
-const {stripHtml,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,esc,escAttr,relTime,shuffle,
+const {stripHtml,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
   seenKey,dropSeen,hostOf,parseJsonFeeds,parseOpmlFeeds}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
@@ -621,7 +621,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="13";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="14";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
   if(!DEBUG)return;
@@ -1002,21 +1002,96 @@ function markVisibleSeen(){
    on retombe sur l'URL d'origine, donc aucun risque d'image cassée. On ne tente
    rien si l'URL ne contient aucune taille reconnaissable — pas de requête
    supplémentaire inutile. */
+/* Largeur en deçà de laquelle une image devient visiblement molle en fond
+   plein écran (écran mobile courant : ~1100-1300 px physiques). */
+const MIN_GOOD_W=800;
+
+/* ---------- og:image : rattraper les flux qui ne publient qu'une vignette ----------
+   Certains éditeurs servent des URL d'images SIGNÉES (Thumbor) où la taille
+   fait partie de la signature : impossible d'en réclamer une plus grande en
+   modifiant l'URL. La page de l'article, elle, référence la version large via
+   <meta og:image> — une URL déjà signée. /api/og va la chercher côté serveur.
+   Résultats mémorisés (session + localStorage) pour n'interroger qu'une fois
+   par article, y compris les échecs. */
+const LS_OG="fluxswipe.og.v1";
+let ogCache=(()=>{try{return JSON.parse(localStorage.getItem(LS_OG)||"{}");}catch(e){return {};}})();
+let ogSaveT;
+function ogRemember(link,img){
+  ogCache[link]=img||"";
+  clearTimeout(ogSaveT);
+  ogSaveT=setTimeout(()=>{
+    try{
+      const keys=Object.keys(ogCache);
+      if(keys.length>300)keys.slice(0,keys.length-300).forEach(k=>delete ogCache[k]);
+      localStorage.setItem(LS_OG,JSON.stringify(ogCache));
+    }catch(e){warn("save og",e);}
+  },1200);
+}
+const ogPending=new Map();
+function ogImageFor(link){
+  if(!link)return Promise.resolve("");
+  if(Object.prototype.hasOwnProperty.call(ogCache,link))return Promise.resolve(ogCache[link]);
+  if(ogPending.has(link))return ogPending.get(link);
+  const p=fetchWithTimeout("/api/og?url="+encodeURIComponent(link),{},CONFIG.FETCH_TIMEOUT)
+    .then(r=>r.ok?r.json():null)
+    .then(d=>{const img=safeImg(d&&d.image,location.href)||"";ogRemember(link,img);return img;})
+    .catch(e=>{warn("og",e);ogRemember(link,"");return "";})
+    .finally(()=>ogPending.delete(link));
+  ogPending.set(link,p);
+  return p;
+}
+// Charge une image et renvoie sa largeur réelle (0 si elle échoue).
+function probeWidth(url){
+  return new Promise(r=>{
+    const i=new Image();
+    i.onload=()=>r(i.naturalWidth||0);
+    i.onerror=()=>r(0);
+    i.src=url;
+  });
+}
+
+/* Pose l'image de fond, puis cherche mieux si elle est trop petite.
+   L'originale est affichée tout de suite (rien n'attend le réseau) ; une
+   meilleure version la remplace si elle existe. Comme les images sont chargées
+   ~1,5 écran à l'avance, le remplacement a le plus souvent lieu avant que la
+   carte n'arrive à l'écran. */
 function applyBg(el,src){
+  const card=el.closest(".card");
+  const it=card?cardReg.get(+card.dataset.id):null;
+  const link=(it&&it.link)||"";
   const set=(u,tag)=>{
     el.style.backgroundImage='url("'+cssString(u)+'")';
     el.dataset.bgUsed=u;el.dataset.bgKind=tag;
   };
+  set(src,"origine");
+
+  const hintW=imageSizeFromUrl(src);           // taille lue dans l'URL, 0 si absente
   const bigger=upscaleImageUrl(src);
   el.dataset.bgTried=bigger||"";
-  if(!bigger){set(src,"origine (aucune taille dans l'URL)");return;}
-  const probe=new Image();
-  probe.onload=()=>{
-    if(probe.naturalWidth>50){set(bigger,"agrandie "+probe.naturalWidth+"px");}
-    else set(src,"origine");
+
+  const trySwap=(url,tag,minW)=>{
+    if(!url||url===src)return Promise.resolve(false);
+    return probeWidth(url).then(w=>{
+      if(w>Math.max(minW,50)){set(url,tag+" "+w+"px");return true;}
+      return false;
+    });
   };
-  probe.onerror=()=>set(src,"origine (agrandissement refusé)");
-  probe.src=bigger;
+
+  (async()=>{
+    try{
+      // 1) variante plus grande déductible de l'URL : gratuit, aucun appel serveur
+      if(bigger&&await trySwap(bigger,"agrandie",hintW))return;
+      if(!bigger)el.dataset.bgKind="origine (aucune taille dans l'URL)";
+      else el.dataset.bgKind="origine (agrandissement refusé)";
+      // 2) l'image est-elle vraiment trop petite ? (mesurée seulement si l'URL
+      //    ne le dit pas — elle est déjà dans le cache du navigateur)
+      const known=hintW||await probeWidth(src);
+      if(known>=MIN_GOOD_W||!link)return;
+      // 3) image de partage de l'article, souvent la version pleine taille
+      const og=await ogImageFor(link);
+      if(og)await trySwap(og,"og:image",known);
+    }catch(e){warn("applyBg",e);}
+  })();
 }
 const bgObserver=("IntersectionObserver" in self)?new IntersectionObserver((entries,obs)=>{
   entries.forEach(en=>{

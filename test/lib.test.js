@@ -171,3 +171,16 @@ test("upscaleImageUrl ne fabrique jamais d'URL dégénérée", () => {
     assert.ok(!/NaN|Infinity/.test(out), "URL dégénérée pour " + u + " : " + out);
   }
 });
+
+test("imageSizeFromUrl lit la taille demandée dans une URL Thumbor", () => {
+  // Cas réel (franceinfo) : le recadrage précède la taille de sortie, c'est
+  // cette dernière qui compte.
+  const u =
+    "https://www.franceinfo.fr/pictures/GkzbKoCOcG6ZX3WGIQXvbxI5iec/0x0:1024x576/432x243/filters:format(jpg):quality(50)/2026/08/02/6a6ef.jpg";
+  assert.equal(lib.imageSizeFromUrl(u), 432);
+  assert.equal(lib.imageSizeFromUrl("https://f.fr/a/1200x675/p.jpg"), 1200);
+  assert.equal(lib.imageSizeFromUrl("https://f.fr/img/p_800x450.jpg"), 800);
+  assert.equal(lib.imageSizeFromUrl("https://f.fr/i.jpg?width=640"), 640);
+  assert.equal(lib.imageSizeFromUrl("https://f.fr/pictures/abcdef/photo.jpg"), 0);
+  assert.equal(lib.imageSizeFromUrl(""), 0);
+});

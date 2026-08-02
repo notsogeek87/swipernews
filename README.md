@@ -197,6 +197,11 @@ Trois garde-fous rendent l'oubli non catastrophique, mais ils ne dispensent pas 
 ## Architecture
 
 - **Mode Actus** : `api/feed.js` (proxy RSS durci) ou, en repli, proxys CORS publics.
+- **Images** : quand un flux ne publie qu'une vignette (Franceinfo sert des URL
+  Thumbor **signées** en 432 px, où la taille fait partie de la signature — donc
+  non modifiable), `api/og.js` va lire la balise `og:image` de l'article, qui
+  pointe vers la version pleine taille. Appelé uniquement si l'image du flux est
+  réellement petite, résultat mémorisé côté client et mis en cache 24 h par le CDN.
 - **Mode Apprendre** : `api/learn.js` agrège **côté serveur** Wikipédia + GBIF + Gallica
   (cache CDN mutualisé entre utilisateurs). Le front l'appelle en priorité et se rabat
   sur son agrégation client si l'endpoint n'est pas déployé (hébergement statique).
