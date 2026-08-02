@@ -19,6 +19,10 @@ L'outillage de **développement** (lint, tests, CI) est optionnel et ne change r
   indépendamment**. Si l'article a disparu du flux entre-temps (un RSS ne garde
   que ses N derniers items), la reprise se rabat sur le repère temporel puis sur
   l'index, au lieu de retomber en tête du fil
+- Lisibilité sur photo : l'image n'est **jamais assombrie**, mais elle est floutée
+  localement derrière le bloc de texte, et les textes portent un halo discret. Un flou
+  supprime le détail sans changer la luminance — c'est le halo qui rend lisible sur un
+  fond clair (ciel, neige)
 - Titre, résumé, image, source et date tirés directement des flux RSS. Quand un
   article propose plusieurs tailles d'image, la **plus grande** est retenue (les
   flux listent la vignette en premier ; la prendre donnait des fonds flous)
