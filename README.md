@@ -331,6 +331,46 @@ cp logo-maskable-512.png resources/icon-foreground.png
 npm run android:assets
 ```
 
+### Build automatique de l'APK (GitHub Actions)
+
+Ce que Vercel fait pour le web, `.github/workflows/android.yml` le fait pour
+l'APK Capacitor : **chaque push sur `main` ou `staging`** (et chaque *pull
+request*) synchronise `index.html`/`src/*.js` dans le projet natif et lance
+Gradle. Aucun Android Studio n'est nécessaire — le SDK est installé sur le
+*runner*.
+
+Où récupérer le paquet :
+
+| Déclencheur          | Résultat                                                                      |
+| -------------------- | ----------------------------------------------------------------------------- |
+| push sur `main`      | release `android-v<version>` marquée « latest », APK attaché                   |
+| push sur `staging`   | préversion roulante `android-staging` — toujours la même adresse de téléchargement |
+| pull request         | artefact du run seulement, aucune release                                      |
+
+L'APK est aussi joint aux **artefacts** de chaque run (90 jours), y compris sur
+`main` et `staging`.
+
+`versionCode` vaut le numéro de run et `versionName` la version de
+`package.json` suffixée de ce numéro : deux builds ne se marchent jamais dessus,
+et Android accepte d'installer la plus récente par-dessus l'ancienne.
+
+**Signature.** Sans clé, le workflow produit un APK *debug* : installable pour
+tester, mais signé d'une clé jetable régénérée à chaque run — impossible donc
+d'installer une build par-dessus la précédente, et rien n'est publié en release.
+Pour des paquets signés durablement, créer une clé **une fois** et la garder :
+
+```bash
+keytool -genkey -v -keystore release.keystore -alias swipernews \
+  -keyalg RSA -keysize 2048 -validity 10000
+base64 -w0 release.keystore    # valeur du secret ANDROID_KEYSTORE_BASE64
+```
+
+Puis, dans *Settings → Secrets and variables → Actions* du dépôt, ajouter
+`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`
+(`swipernews` ci-dessus) et `ANDROID_KEY_PASSWORD`. Le workflow bascule seul sur
+`assembleRelease` et publie la release. **Conserver `release.keystore` hors du
+dépôt** : perdue, plus aucune mise à jour de l'app installée n'est possible.
+
 ### Ce que le dépôt fournit déjà
 
 - `manifest.webmanifest` remplit les exigences d'une TWA : `id`, `name`,

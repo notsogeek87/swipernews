@@ -1,5 +1,15 @@
 apply plugin: 'com.android.application'
 
+// Version injectée par la CI (.github/workflows/android.yml) ; les valeurs de
+// repli servent aux builds locaux depuis Android Studio.
+def appVersionCode = (project.findProperty('versionCode') ?: '1') as Integer
+def appVersionName = project.findProperty('versionName') ?: '1.0'
+
+// Clé de signature fournie par la CI depuis les secrets du dépôt. Absente en
+// local : Gradle retombe alors sur la clé debug.
+def releaseKeystore = System.getenv('ANDROID_KEYSTORE_FILE')
+def hasReleaseKeystore = releaseKeystore && file(releaseKeystore).exists()
+
 android {
     namespace = "eu.lielu.news"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +17,8 @@ android {
         applicationId "eu.lielu.news"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +26,23 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            release {
+                storeFile file(releaseKeystore)
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (hasReleaseKeystore) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
