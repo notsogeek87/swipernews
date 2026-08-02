@@ -359,8 +359,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=7"></script>
-<script src="src/learn-core.js?v=7"></script>
+<script src="src/lib.js?v=8"></script>
+<script src="src/learn-core.js?v=8"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -599,7 +599,7 @@ function onCardChange(){
   updateRail();
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="7";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="8";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
   if(!DEBUG)return;
@@ -768,9 +768,9 @@ function cacheLoad(m){try{const e=(JSON.parse(localStorage.getItem(LS_CACHE)||"{
 /* ---------- Chargement principal ---------- */
 // Compteur de génération : chaque appel invalide le précédent (annule proprement
 // un chargement obsolète après un changement rapide de mode/catégorie).
-let loadSeq=0;
+let loadSeq=0,feedLoadStarted=false;
 async function loadFeeds(){
-  const my=++loadSeq;
+  const my=++loadSeq;feedLoadStarted=true;
   demobadge(false);
   const m=mode;                                   // capture : l'utilisateur peut changer de mode pendant le fetch
   const key=m==="learn"?("learn_"+cat):"news";    // cache distinct par catégorie
@@ -944,15 +944,57 @@ function endCardHTML(){
    changeait d'identité à chaque réponse. On réancre donc sur le lien de la
    carte visible — et, au démarrage seulement, sur l'article de la session
    précédente. */
+/* Crée l'élément d'une carte et l'enregistre. */
+function makeCardEl(it){
+  const id=cardSeq++;
+  cardReg.set(id,it);
+  const tpl=document.createElement("template");
+  tpl.innerHTML=cardHTML(it,id);
+  return tpl.content.firstElementChild;
+}
+/* Reconstruit le fil en gardant l'utilisateur SUR SON ARTICLE, et en
+   RÉUTILISANT les cartes déjà affichées.
+   Réassigner innerHTML détruisait puis recréait toutes les cartes à chaque
+   rendu — et le mode Actus rend progressivement, un rendu par flux qui répond.
+   L'élément d'image de la carte visible était donc détruit et recréé plusieurs
+   fois de suite : c'est ce qui faisait clignoter l'image au lancement.
+   Ici on réconcilie par clé (le lien de l'article) : les cartes déjà présentes
+   sont déplacées, jamais recréées, donc leur image reste posée. */
 function render(){
   const anchor=anchorLink();                    // avant mutation : où est l'utilisateur ?
-  cardReg.clear();cardSeq=0;
-  let html=items.map(renderCard).join("");
-  if(mode==="news"&&items.length)html+=endCardHTML();   // fin de fil explicite
-  feedEl.innerHTML=html;
-  // Pas de capDom() ici : sur ce chemin le DOM reflète `items` un pour un, ce
-  // dont dépendent l'ancrage et la reprise. Le fil Actus est borné par MAX_NEWS,
-  // et capDom ne sert qu'au fil infini du mode Apprendre (appendCards).
+
+  // La carte de fin est régénérée à part (elle n'a pas d'article associé).
+  const oldEnd=feedEl.querySelector(".endcard");
+  if(oldEnd)oldEnd.remove();
+
+  // Index des cartes déjà à l'écran, par lien d'article.
+  const existing=new Map();
+  for(const el of feedEl.children){
+    const it=cardReg.get(+el.dataset.id);
+    if(it&&it.link&&!existing.has(it.link))existing.set(it.link,el);
+  }
+
+  let cursor=feedEl.firstElementChild;
+  for(const it of items){
+    const el=it.link?existing.get(it.link):null;
+    if(el){
+      existing.delete(it.link);
+      cardReg.set(+el.dataset.id,it);           // rafraîchit l'article associé
+      if(el===cursor){cursor=cursor.nextElementSibling;continue;}   // déjà en place
+      feedEl.insertBefore(el,cursor);           // simple déplacement, pas de recréation
+    }else{
+      feedEl.insertBefore(makeCardEl(it),cursor);
+    }
+  }
+  // Tout ce qui reste après le curseur n'est plus dans le fil.
+  while(cursor){
+    const next=cursor.nextElementSibling;
+    cardReg.delete(+cursor.dataset.id);
+    cursor.remove();
+    cursor=next;
+  }
+  if(mode==="news"&&items.length)feedEl.insertAdjacentHTML("beforeend",endCardHTML());
+
   let top=0;
   if(anchor){
     const i=items.findIndex(it=>it.link===anchor);
@@ -969,7 +1011,10 @@ function render(){
       if(i>0){top=scrollToCard(i);resumePending[mode]=false;}
       else if(i===0)resumePending[mode]=false;} // i===-1 : pas encore là → on réessaiera
   }
-  if(!top)setScrollTopInstant(feedEl,0);        // innerHTML a déjà remis le scroll à 0
+  // Aucune cible retenue (nouveau fil, changement de mode…) : on repart en haut.
+  // Conserver le scroll d'un fil précédent laisserait l'utilisateur au milieu
+  // d'un contenu qui n'a rien à voir.
+  if(!top)setScrollTopInstant(feedEl,0);
   observeBackgrounds();
   if(DEBUG){const e=posEntry(mode),l=(e&&e.link)||"";const i=e?resolveResume(e):-1;
     dbg(`v${APP_VERSION}  mode=${mode}  items=${items.length}\n`+
@@ -1187,6 +1232,9 @@ function closeDialog(el){
   el.classList.remove("open");
   bgLayers().forEach(n=>{if(n)n.inert=false;});
   if(lastFocused){try{lastFocused.focus();}catch(_){}lastFocused=null;}
+  // Feuille des intérêts refermée sans valider au 1er lancement : le fil n'a
+  // encore rien chargé (on ne charge plus derrière la feuille), il faut le faire.
+  if(el===intSheet&&!feedLoadStarted)loadFeeds();
 }
 // Boucle de tabulation à l'intérieur du panneau ouvert
 document.addEventListener("keydown",e=>{
@@ -1361,15 +1409,21 @@ function saveInterests(){
   try{localStorage.setItem(LS_INT,JSON.stringify(interests));}catch(e){}
   try{localStorage.setItem(LS_SRC,JSON.stringify(sources));}catch(e){}
   cat="all";try{localStorage.setItem(LS_CAT,cat);}catch(e){}
-  closeDialog(intSheet);
   renderCats();
+  if(mode==="learn")loadFeeds();          // AVANT la fermeture : closeDialog ne
+  closeDialog(intSheet);                  // relancera donc pas un 2e chargement
   try{window.dispatchEvent(new Event("interests-validated"));}catch(e){} // autorise la bannière d'install
-  if(mode==="learn")loadFeeds();
 }
 intSheet.onclick=e=>{if(e.target===intSheet)closeDialog(intSheet);};
 document.getElementById("saveInterestsBtn").onclick=saveInterests;
 renderCats();
-if(mode==="learn"&&!interestsChosen())openInterests();  // 1er lancement direct en mode Apprendre
+/* Premier lancement : on ouvre le choix des intérêts AVANT de charger quoi que
+   ce soit. Charger un fil derrière la feuille était du réseau gaspillé, et
+   surtout le contenu était remplacé sous les yeux de l'utilisateur dès qu'il
+   validait. Le chargement est déclenché par saveInterests(), ou à la fermeture
+   de la feuille si elle est refermée sans valider. */
+const firstRun=(mode==="learn"&&!interestsChosen());
+if(firstRun)openInterests();
 function renderList(){document.getElementById("feedList").innerHTML=feeds.map((f,i)=>`
   <div class="feedrow"><input type="checkbox" ${f.on?"checked":""} data-toggle="${i}">
     <div><div class="name">${esc(f.name)}${unreachable.has(f.url)?'<span class="badge-ko">injoignable</span>':""}</div>
@@ -1467,7 +1521,7 @@ function demobadge(on){document.getElementById("demobadge").classList.toggle("hi
 let toastT;function toast(m,ms){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");
   clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),ms||1800);}
 
-loadFeeds();
+if(!firstRun)loadFeeds();
 </script>
 
 <script>

@@ -96,6 +96,12 @@ essaie donc, dans l'ordre :
 - Les cartes hors écran sont **ignorées par le moteur de rendu** (`content-visibility`) et
   leurs images ne sont chargées qu'à l'approche de l'écran : un fil de 120 cartes plein
   écran ne garde plus 120 images en mémoire.
+- Le fil est **réconcilié par clé** (le lien de l'article) au lieu d'être réécrit : les
+  cartes déjà affichées sont déplacées, jamais recréées. Sans cela, le rendu progressif
+  du mode Actus (un rendu par flux qui répond) détruisait et recréait l'image visible à
+  chaque réponse — elle clignotait.
+- Au tout premier lancement, rien n'est chargé derrière l'écran des centres d'intérêt :
+  le fil est chargé une seule fois, après le choix.
 - `/api/learn` répond sur l'une de quelques variantes tirées au sort, donc **cacheables
   par le CDN** et mutualisées entre utilisateurs (un nonce par requête empêchait tout cache).
 
