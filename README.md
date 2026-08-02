@@ -105,7 +105,22 @@ essaie donc, dans l'ordre :
 - `/api/learn` répond sur l'une de quelques variantes tirées au sort, donc **cacheables
   par le CDN** et mutualisées entre utilisateurs (un nonce par requête empêchait tout cache).
 
-Si toutes les sources échouent, l'app **n'affiche plus de contenu de démo** : elle montre
+### Quand le fil Actus se recharge-t-il ?
+
+- à l'ouverture de l'app (si vous étiez en Actus), au bouton **↻**, à la première
+  bascule vers Actus dans la session, via « Voir mon fil », après un import de
+  sources, ou depuis la carte de fin de fil ;
+- **au retour d'arrière-plan**, si le dernier chargement réussi date de plus de
+  **5 minutes**. Ce seuil s'aligne sur le cache CDN du proxy (`s-maxage=300`) :
+  en deçà, la requête renverrait de toute façon le même contenu. La position de
+  lecture est conservée (le fil se réancre sur l'article affiché), et le mode
+  Apprendre est exclu — son fil est un tirage aléatoire sans fin, le recharger
+  ferait perdre le lot en cours.
+
+Un rafraîchissement ne vide jamais un fil déjà affiché : si le réseau échoue, le
+contenu reste à l'écran avec un simple message.
+
+Si toutes les sources échouent au tout premier chargement, l'app **n'affiche plus de contenu de démo** : elle montre
 un message d'erreur avec les boutons *Réessayer* et *Ouvrir les sources*. Pour une fiabilité
 maximale (et pour ne dépendre d'aucun tiers), prévoir un petit backend qui récupère et
 parse le RSS côté serveur.

@@ -359,8 +359,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=8"></script>
-<script src="src/learn-core.js?v=8"></script>
+<script src="src/lib.js?v=9"></script>
+<script src="src/learn-core.js?v=9"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -599,7 +599,7 @@ function onCardChange(){
   updateRail();
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="8";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="9";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
   if(!DEBUG)return;
@@ -613,7 +613,13 @@ function dbg(msg){
 // Persiste sans attendre le debounce quand l'app passe en arrière-plan / se ferme
 function persistAll(){persistSeen();persistPos();}
 window.addEventListener("pagehide",persistAll);
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")persistAll();});
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="hidden"){persistAll();return;}
+  // Retour au premier plan : on rafraîchit les actus si elles ont vieilli.
+  if(mode!=="news"||!feedLoadStarted)return;
+  if(Date.now()-lastNewsLoad<AUTO_RELOAD_MS)return;
+  loadFeeds();
+});
 
 /* ---------- Récupération avec plusieurs proxys de secours ---------- */
 const PROXIES=[
@@ -769,14 +775,28 @@ function cacheLoad(m){try{const e=(JSON.parse(localStorage.getItem(LS_CACHE)||"{
 // Compteur de génération : chaque appel invalide le précédent (annule proprement
 // un chargement obsolète après un changement rapide de mode/catégorie).
 let loadSeq=0,feedLoadStarted=false;
+/* ---------- Rechargement au retour d'arrière-plan (mode Actus) ----------
+   Seulement en Actus : en Apprendre le fil est un tirage aléatoire sans fin,
+   le recharger remplacerait le lot en cours et ferait perdre sa lecture.
+   Le seuil de 5 min évite de repartir en réseau à chaque va-et-vient, et
+   s'aligne sur le cache CDN du proxy (s-maxage=300) — en deçà, la requête
+   renverrait de toute façon la même chose.
+   La position est préservée : render() se réancre sur l'article affiché. */
+const AUTO_RELOAD_MS=5*60*1000;
+let lastNewsLoad=0;
 async function loadFeeds(){
   const my=++loadSeq;feedLoadStarted=true;
   demobadge(false);
   const m=mode;                                   // capture : l'utilisateur peut changer de mode pendant le fetch
   const key=m==="learn"?("learn_"+cat):"news";    // cache distinct par catégorie
-  const cached=cacheLoad(key);
+  const hadContent=items.length>0;                // un fil est déjà à l'écran ?
+  // Le cache local sert à peindre INSTANTANÉMENT au démarrage. Si un fil est
+  // déjà affiché (rafraîchissement manuel ou automatique), on n'y touche pas :
+  // il ne contient que CACHE_ITEMS articles et écraserait un fil plus complet,
+  // faisant disparaître la carte en cours de lecture.
+  const cached=hadContent?null:cacheLoad(key);
   if(cached){items=cached;render();hideStates();}  // peinture immédiate depuis le cache
-  else show("loading");
+  else if(!hadContent)show("loading");
 
   if(m==="learn"){
     try{
@@ -793,9 +813,9 @@ async function loadFeeds(){
   }
 
   const active=feeds.filter(f=>f.on);
-  if(!active.length){if(!cached){items=[];render();showEmpty("no-feeds");}return;}
+  if(!active.length){if(!cached&&!hadContent){items=[];render();showEmpty("no-feeds");}return;}
   // Rendu progressif : chaque flux s'affiche dès qu'il répond, sans attendre le plus lent.
-  let all=[];const failed=[];let done=0,painted=!!cached;
+  let all=[];const failed=[];let done=0;
   active.forEach(f=>{
     fetchFeedRobust(f).then(res=>{
       if(my!==loadSeq)return;
@@ -804,16 +824,18 @@ async function loadFeeds(){
         all.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
         items=all.slice(0,CONFIG.MAX_NEWS);
         render();hideStates();   // render() réancre sur l'article lu (voir son commentaire)
-        painted=true;
       }else failed.push(f);
     }).catch(()=>{if(my===loadSeq)failed.push(f);})
       .finally(()=>{
         if(my!==loadSeq)return;
         if(++done<active.length)return;                     // pas encore tous terminés
         if(!all.length){
-          if(cached)toast("Réseau indisponible — affichage du cache");
+          // On ne vide JAMAIS un fil déjà affiché parce qu'un rafraîchissement a
+          // échoué : mieux vaut du contenu un peu ancien qu'un écran d'erreur.
+          if(cached||hadContent)toast("Réseau indisponible — le fil n'a pas été actualisé");
           else{items=[];render();showEmpty("all-failed");}
         }else{
+          lastNewsLoad=Date.now();
           cacheSave(key);
           unreachable=new Set(failed.map(f=>f.url));   // pour marquer le panneau Sources
           if(failed.length){
