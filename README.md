@@ -90,6 +90,23 @@ essaie donc, dans l'ordre :
    avec parsing XML dans le navigateur ;
 3. **rss2json** (`api.rss2json.com`) en dernier repli.
 
+### Beaucoup de sources (OPML importé)
+
+Un export Feedly peut contenir plusieurs centaines de flux. Trois garde-fous :
+
+- **au plus 40 sources interrogées par chargement**, en rotation d'un chargement
+  à l'autre pour que toutes finissent par passer ;
+- **6 flux récupérés à la fois** : sans cela, 300 sources lançaient 300 chaînes
+  de requêtes simultanées (chacune essayant le backend puis cinq proxys) et la
+  quasi-totalité échouait ;
+- **part maximale par source** = `MAX_NEWS / nombre de sources`, avec un minimum
+  de 10. Avec peu de sources il n'y a donc aucune limite pratique ; avec des
+  centaines, aucune ne peut occuper tout le fil.
+
+Les articles datés **dans le futur** de plus de deux jours (agendas de concerts,
+annonces de festivals) sont classés en fin de fil comme les articles sans date :
+ce ne sont pas des actualités récentes, et ils monopolisaient sinon la tête du fil.
+
 ### Rapidité
 
 - Les proxys de secours sont interrogés **en parallèle** (le premier qui répond gagne), au lieu d'un par un.

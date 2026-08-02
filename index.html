@@ -359,8 +359,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=15"></script>
-<script src="src/learn-core.js?v=15"></script>
+<script src="src/lib.js?v=16"></script>
+<script src="src/learn-core.js?v=16"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -418,6 +418,11 @@ const CONFIG = {
   FETCH_TIMEOUT: 7000,   // délai d'expiration réseau (ms)
   BATCH_SIZE: 20,        // articles par lot (mode Apprendre)
   MAX_NEWS: 120,         // articles conservés en mode Actus
+  MIN_PER_FEED: 10,      // part MINIMALE garantie à chaque source ; la part
+                         // réelle vaut MAX_NEWS / nombre de sources, donc aucune
+                         // limite artificielle quand elles sont peu nombreuses
+  MAX_PARALLEL: 6,       // flux récupérés simultanément (322 d'un coup = échec massif)
+  MAX_FEEDS_PER_LOAD: 40,// sources interrogées par chargement, en rotation
   MAX_CARDS: 60,         // cartes gardées dans le DOM (borne le fil infini)
   MAX_ITEMS: 300,        // items gardés en mémoire (dédoublonnage du scroll)
   CACHE_ITEMS: 40,       // articles mis en cache localStorage par catégorie
@@ -621,7 +626,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="15";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="16";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
   if(!DEBUG)return;
@@ -876,45 +881,108 @@ async function loadFeeds(){
     return;
   }
 
-  const active=feeds.filter(f=>f.on);
-  if(!active.length){if(!cached&&!sameFeed){items=[];render();showEmpty("no-feeds");}return;}
-  // Rendu progressif : chaque flux s'affiche dès qu'il répond, sans attendre le plus lent.
-  let all=[];const failed=[];let done=0;
-  active.forEach(f=>{
-    fetchFeedRobust(f).then(res=>{
-      if(my!==loadSeq)return;
-      if(res&&res.length){
-        all=all.concat(res);
-        all.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
-        items=all.slice(0,CONFIG.MAX_NEWS);
-        render();hideStates();feedKeyShown=key;   // render() réancre sur l'article lu
-      }else failed.push(f);
-    }).catch(()=>{if(my===loadSeq)failed.push(f);})
-      .finally(()=>{
+  const allActive=feeds.filter(f=>f.on);
+  if(!allActive.length){if(!cached&&!sameFeed){items=[];render();showEmpty("no-feeds");}return;}
+
+  /* Beaucoup de sources (un OPML importé peut en compter des centaines) : on
+     n'en interroge qu'un lot par chargement, en tournant d'un chargement à
+     l'autre pour que toutes finissent par passer. Sans cela, 322 sources
+     lançaient 322 chaînes de requêtes simultanées — chacune essayant le backend
+     puis cinq proxys — et presque tout échouait. */
+  const active=pickFeedBatch(allActive);
+
+  // Résultats par source : permet de PLAFONNER la contribution de chacune et de
+  // recomposer le fil à chaque réponse sans que l'ordre d'arrivée compte.
+  const collected=new Map();
+  const failed=[];
+  /* Part maximale d'une seule source. Avec peu de sources, elle dépasse
+     largement le fil : aucune limite en pratique. Avec des centaines de sources
+     importées, elle empêche l'une d'elles d'occuper toutes les places. */
+  const perFeed=Math.max(CONFIG.MIN_PER_FEED,Math.ceil(CONFIG.MAX_NEWS/active.length));
+  function rebuild(){
+    let all=[];
+    collected.forEach(list=>{all=all.concat(list);});
+    all.sort((a,b)=>itemTime(b)-itemTime(a));
+    items=all.slice(0,CONFIG.MAX_NEWS);
+  }
+
+  // Récupération par lots bornés plutôt que tout en parallèle.
+  let cursor=0,inFlight=0,done=0;
+  function pump(){
+    while(inFlight<CONFIG.MAX_PARALLEL&&cursor<active.length){
+      const f=active[cursor++];
+      inFlight++;
+      fetchFeedRobust(f).then(res=>{
         if(my!==loadSeq)return;
-        if(++done<active.length)return;                     // pas encore tous terminés
-        if(!all.length){
-          // On ne vide JAMAIS un fil déjà affiché parce qu'un rafraîchissement a
-          // échoué : mieux vaut du contenu un peu ancien qu'un écran d'erreur.
-          if(cached||sameFeed)toast("Réseau indisponible — le fil n'a pas été actualisé");
-          else{items=[];render();showEmpty("all-failed");}
-        }else{
-          lastNewsLoad=Date.now();
-          cacheSave(key);
-          unreachable=new Set(failed.map(f=>f.url));   // pour marquer le panneau Sources
-          if(failed.length){
-            // Nommer les flux : « 2 flux injoignables » n'indique pas lesquels
-            // supprimer. Au-delà de 3, on abrège pour rester lisible.
-            const noms=failed.map(f=>f.name);
-            const liste=noms.length>3
-              ? noms.slice(0,3).join(", ")+" +"+(noms.length-3)
-              : noms.join(", ");
-            toast(`Injoignable${noms.length>1?"s":""} : ${liste}`,4200);
-          }
-        }
-        resumePending[m]=false;   // chargement terminé : on n'essaie plus de reprendre (ex. refresh manuel)
-      });
-  });
+        if(res&&res.length){
+          // Plafond par source : on garde ses articles les plus récents.
+          const own=res.slice().sort((a,b)=>itemTime(b)-itemTime(a)).slice(0,perFeed);
+          collected.set(f.url,own);
+          rebuild();
+          render();hideStates();feedKeyShown=key;   // render() réancre sur l'article lu
+        }else failed.push(f);
+      }).catch(()=>{if(my===loadSeq)failed.push(f);})
+        .finally(()=>{
+          inFlight--;
+          if(my!==loadSeq)return;
+          if(++done<active.length){pump();return;}   // au suivant
+          finish();
+        });
+    }
+  }
+  function finish(){
+    if(!collected.size){
+      // On ne vide JAMAIS un fil déjà affiché parce qu'un rafraîchissement a
+      // échoué : mieux vaut du contenu un peu ancien qu'un écran d'erreur.
+      if(cached||sameFeed)toast("Réseau indisponible — le fil n'a pas été actualisé");
+      else{items=[];render();showEmpty("all-failed");}
+    }else{
+      lastNewsLoad=Date.now();
+      cacheSave(key);
+      unreachable=new Set(failed.map(f=>f.url));   // pour marquer le panneau Sources
+      if(failed.length){
+        // Nommer les flux : « 2 flux injoignables » n'indique pas lesquels
+        // supprimer. Au-delà de 3, on abrège pour rester lisible.
+        const noms=failed.map(f=>f.name);
+        const liste=noms.length>3
+          ? noms.slice(0,3).join(", ")+" +"+(noms.length-3)
+          : noms.join(", ");
+        toast(`Injoignable${noms.length>1?"s":""} : ${liste}`,4200);
+      }
+    }
+    resumePending[m]=false;   // chargement terminé : on n'essaie plus de reprendre
+  }
+  pump();
+}
+
+/* Date de tri d'un article.
+   Une date NETTEMENT future n'est pas une actualité récente : c'est une annonce
+   d'événement (festival, agenda de concerts). La ramener à « maintenant » ne
+   suffisait pas — elle restait plus récente que tout le reste et le flux
+   concerné occupait durablement la tête du fil. On la traite donc comme une date
+   absente : en fin de fil.
+   Tolérance de deux jours pour les horloges et fuseaux mal réglés, fréquents. */
+const FUTURE_TOLERANCE_MS=2*864e5;
+function itemTime(it){
+  const t=Date.parse(it&&it.date);
+  if(isNaN(t))return 0;
+  const now=Date.now();
+  return t>now+FUTURE_TOLERANCE_MS?0:Math.min(t,now);
+}
+
+/* Choisit le lot de sources à interroger, en tournant à chaque chargement.
+   En dessous du seuil, tout est interrogé et la rotation ne sert à rien. */
+const LS_ROT="fluxswipe.feedrot.v1";
+function pickFeedBatch(list){
+  const max=CONFIG.MAX_FEEDS_PER_LOAD;
+  if(list.length<=max)return list;
+  let start=0;
+  try{start=parseInt(localStorage.getItem(LS_ROT)||"0",10)||0;}catch(e){}
+  start%=list.length;
+  const batch=[];
+  for(let i=0;i<max;i++)batch.push(list[(start+i)%list.length]);
+  try{localStorage.setItem(LS_ROT,String((start+max)%list.length));}catch(e){}
+  return batch;
 }
 
 /* ---------- Rendu ---------- */
