@@ -258,6 +258,15 @@
     font-weight:600;font-size:13px;padding:9px 15px;border-radius:100px;cursor:pointer;
     white-space:nowrap;transition:background .2s,color .2s}
   .segbtns button.active{background:rgba(255,255,255,.16);color:var(--ink);box-shadow:0 1px 8px rgba(0,0,0,.28)}
+  /* Taille du texte : quatre « A » qui grandissent, plutôt que quatre mots. Le
+     réglage se montre au lieu de se décrire, et la rangée tient sans déborder.
+     Largeur fixe pour que les pastilles restent alignées malgré les corps. */
+  .segbtns--sizes button{font-family:Georgia,'Noto Serif',serif;padding:6px 0;width:44px;
+    display:flex;align-items:center;justify-content:center;min-height:38px}
+  .segbtns--sizes button:nth-child(1){font-size:13px}
+  .segbtns--sizes button:nth-child(2){font-size:16px}
+  .segbtns--sizes button:nth-child(3){font-size:19px}
+  .segbtns--sizes button:nth-child(4){font-size:23px}
 
   /* Bloc secondaire d'un réglage (liste de blocage) : décalé et plus discret,
      pour rester une précision et non un deuxième réglage. */
@@ -452,8 +461,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=40"></script>
-<script src="src/learn-core.js?v=40"></script>
+<script src="src/lib.js?v=41"></script>
+<script src="src/learn-core.js?v=41"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -719,7 +728,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="40";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="41";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -742,6 +751,21 @@ const LS_READ="fluxswipe.readpref.v1";
 const READ_MODES=["app","read","browser"];   // page complète / lecture / navigateur
 let readPref=(()=>{
   try{const v=localStorage.getItem(LS_READ);return READ_MODES.includes(v)?v:"app";}catch(e){return "app";}
+})();
+
+/* Habillage du mode lecture : taille du texte et fond. Deux réglages qui ne
+   valent que pour le mode "read" — en page complète, c'est la feuille du site
+   qui décide. Ils vivent ici (localStorage) et sont transmis au natif à chaque
+   ouverture, comme les autres : voir res/raw/reader_read.js pour les valeurs. */
+const LS_RSIZE="fluxswipe.readsize.v1";
+const READ_SIZES=["m","s","l","xl"];      // vals[0] = défaut
+let rSizePref=(()=>{
+  try{const v=localStorage.getItem(LS_RSIZE);return READ_SIZES.includes(v)?v:"m";}catch(e){return "m";}
+})();
+const LS_RTHEME="fluxswipe.readtheme.v1";
+const READ_THEMES=["dark","sepia","light"];
+let rThemePref=(()=>{
+  try{const v=localStorage.getItem(LS_RTHEME);return READ_THEMES.includes(v)?v:"dark";}catch(e){return "dark";}
 })();
 
 /* Bandeaux de consentement dans le lecteur : "hide" (défaut) les masque, "show"
@@ -826,7 +850,7 @@ function openArticle(url,title){
   // L'appel est asynchrone : en cas d'échec (URL refusée côté natif), on
   // rattrape en ouvrant le lien comme le ferait le web.
   iab.open({url,title:title||"",hideCmp:cmpPref==="hide",blockAds:adsPref==="block",
-            reader:readPref==="read"})
+            reader:readPref==="read",readerSize:rSizePref,readerTheme:rThemePref})
     .catch(()=>window.open(url,"_blank","noopener"));
   return true;
 }
@@ -1816,12 +1840,16 @@ document.getElementById("reloadBtn").onclick=()=>{toast("Actualisation…");load
    fils, il doit donc se trouver des deux côtés — un seul état, une seule
    fonction de rendu. Sur le web, les blocs restent vides : le choix n'existe
    pas, un lien y part forcément dans un onglet. */
-function prefRow(name,label,desc,opts,cur){
+/* `extra` : classe supplémentaire sur la rangée de boutons (voir segbtns--sizes).
+   `o.aria` : libellé parlé quand l'étiquette visible ne dit rien seule — quatre
+   « A » de tailles différentes se voient mais ne s'entendent pas. */
+function prefRow(name,label,desc,opts,cur,extra){
   return `<div class="prefrow">
     <div class="prefrow__txt"><b>${esc(label)}</b><span>${esc(desc)}</span></div>
-    <div class="segbtns" role="group" aria-label="${escAttr(label)}">
+    <div class="segbtns ${extra||""}" role="group" aria-label="${escAttr(label)}">
       ${opts.map(o=>`<button type="button" data-pref="${name}" data-val="${o.v}"
-        class="${cur===o.v?"active":""}" aria-pressed="${cur===o.v}">${esc(o.t)}</button>`).join("")}
+        class="${cur===o.v?"active":""}" aria-pressed="${cur===o.v}"
+        ${o.aria?`aria-label="${escAttr(o.aria)}"`:""}>${esc(o.t)}</button>`).join("")}
     </div>
   </div>`;
 }
@@ -1858,6 +1886,23 @@ function renderReadPref(){
   };
   let html=prefRow("read","Ouvrir les articles",desc[readPref],
     [{v:"app",t:"Dans l'app"},{v:"read",t:"Lecture"},{v:"browser",t:"Navigateur"}],readPref);
+  /* Taille et fond ne sont proposés qu'en mode Lecture : en page complète, c'est
+     la feuille de style du site qui décide, ces deux boutons n'auraient aucun
+     effet visible et ne feraient qu'allonger le panneau. */
+  if(readPref==="read"){
+    html+=prefRow("rsize","Taille du texte",
+      {s:"Compact : plus de mots par ligne, moins de défilement.",
+       m:"L'équilibre par défaut, pensé pour un téléphone tenu à bout de bras.",
+       l:"Confortable : lignes plus courtes, lecture plus posée.",
+       xl:"Très grand, pour lire sans lunettes ou de loin."}[rSizePref],
+      [{v:"s",t:"A",aria:"Compact"},{v:"m",t:"A",aria:"Normal"},
+       {v:"l",t:"A",aria:"Grand"},{v:"xl",t:"A",aria:"Très grand"}],rSizePref,"segbtns--sizes");
+    html+=prefRow("rtheme","Fond du lecteur",
+      {dark:"Sombre, comme le fil. Reposant le soir et sur écran OLED.",
+       sepia:"Sépia, comme du papier : moins de bleu, moins d'éblouissement en journée.",
+       light:"Clair, pour lire en plein soleil."}[rThemePref],
+      [{v:"dark",t:"Sombre"},{v:"sepia",t:"Sépia"},{v:"light",t:"Clair"}],rThemePref);
+  }
   // Sans lecteur intégré, la question des bandeaux ne se pose plus : c'est le
   // navigateur qui affiche la page, on n'a pas la main dessus.
   if(inApp){
@@ -1879,6 +1924,8 @@ const PREFS={
   read:{get:()=>readPref,set:v=>{readPref=v;},key:LS_READ,vals:READ_MODES},
   cmp: {get:()=>cmpPref, set:v=>{cmpPref=v;}, key:LS_CMP, vals:["hide","show"]},
   ads: {get:()=>adsPref, set:v=>{adsPref=v;}, key:LS_ADS, vals:["allow","block"]},   // vals[0] = défaut
+  rsize: {get:()=>rSizePref, set:v=>{rSizePref=v;}, key:LS_RSIZE, vals:READ_SIZES},
+  rtheme:{get:()=>rThemePref,set:v=>{rThemePref=v;},key:LS_RTHEME,vals:READ_THEMES},
 };
 function setPref(name,v){
   const p=PREFS[name];

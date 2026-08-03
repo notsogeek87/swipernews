@@ -309,8 +309,11 @@ Scripts injectés, dans `res/raw/` : `reader_cmp.js` (bandeaux de consentement),
 `reader_blocklist.txt` (178 domaines intégrés).
 
 **Les préférences vivent côté web** (localStorage) et sont transmises **à
-chaque ouverture** (`hideCmp`, `blockAds`, `reader`). Le natif ne garde aucun
-état de préférence — seul le cache de liste de blocage est persistant.
+chaque ouverture** (`hideCmp`, `blockAds`, `reader`, `readerSize`,
+`readerTheme`). Le natif ne garde aucun état de préférence — seul le cache de
+liste de blocage est persistant. Les deux dernières sont validées par `oneOf()`
+puis posées telles quelles dans `window.__snRead` juste avant l'injection de
+`reader_read.js` : c'est ce qui autorise à les concaténer sans les échapper.
 
 ---
 

@@ -42,6 +42,10 @@ public class InAppBrowserPlugin extends Plugin {
             Boolean.TRUE.equals(call.getBoolean("blockAds", Boolean.FALSE)));
         intent.putExtra(InAppBrowserActivity.EXTRA_READER,
             Boolean.TRUE.equals(call.getBoolean("reader", Boolean.FALSE)));
+        // Habillage du mode lecture (taille du texte, fond). Deux chaînes courtes,
+        // validées côté activité : le natif ne fait que les relayer au script.
+        intent.putExtra(InAppBrowserActivity.EXTRA_READER_SIZE, call.getString("readerSize", "m"));
+        intent.putExtra(InAppBrowserActivity.EXTRA_READER_THEME, call.getString("readerTheme", "dark"));
         activity.startActivity(intent);
         // API 34+ : l'animation est déclarée par l'activité entrante elle-même.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {

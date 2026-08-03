@@ -473,10 +473,9 @@ traitant des cookies et encart newsletter **préservés** ; défilement rendu.
 ### Mode lecture
 
 Troisième façon de lire, à côté de « Dans l'app » et « Navigateur » : le lecteur
-ne garde que **le titre, le texte et les images**, dans une colonne de liseuse
-(serif, 19 px, interligne large) sur le fond sombre de l'app. Un bouton dans la
-barre du lecteur bascule à tout moment entre l'article simplifié et la page
-complète.
+ne garde que **le titre, le texte et les images**, dans une colonne de liseuse.
+Un bouton dans la barre du lecteur bascule à tout moment entre l'article
+simplifié et la page complète.
 
 Le principe (`res/raw/reader_read.js`) est celui de Readability — le moteur
 derrière les vues lecteur de Firefox et Safari — mais réécrit court : chaque
@@ -507,6 +506,59 @@ Trois choix qui comptent :
 - **aucun attribut ne survit** à l'élagage (classes, id, styles en ligne) : la
   feuille du site étant supprimée, une classe résiduelle ne servirait qu'à
   réintroduire du hasard.
+
+#### La typographie, réglable
+
+Une vue lecteur ne vaut que par le confort qu'elle apporte, et le confort ne se
+décide pas à la place du lecteur : le corps du texte (**quatre tailles**) et le
+fond (**sombre, sépia, clair**) se choisissent dans le panneau ⚙ Sources, sous
+« Ouvrir les articles », et ne s'affichent qu'en mode Lecture — en page complète,
+c'est la feuille du site qui décide et ces boutons n'auraient aucun effet. Comme
+les autres réglages du lecteur, ils vivent dans le `localStorage` du web et sont
+transmis au natif **à chaque ouverture** ; l'activité ne conserve rien.
+
+Le reste de la mise en page vise la même chose, et tient à peu de décisions :
+
+- **la césure** (`hyphens: auto`), sans quoi le français, avec ses mots longs sur
+  une colonne étroite, laisse un bord droit en dents de scie et des lignes à
+  moitié vides — c'était le défaut le plus visible du lecteur ;
+- **un interlignage resserré** (1,6 et non 1,72) : sur une mesure courte, trop
+  d'air disperse le regard au lieu de le guider ;
+- **une mesure plafonnée** à 33 em, au-delà de quoi l'œil perd le début de la
+  ligne suivante — sans effet sur un téléphone, décisif sur une tablette ;
+- **des liens discrets** : dans un article on les suit rarement du doigt, et une
+  couleur vive à chaque ligne hache la lecture. Le soulignement suffit à les
+  désigner ;
+- **une jauge de lecture en bas de l'écran**, 2 px : la barre du haut s'escamote
+  pendant la lecture, et c'est justement là qu'on veut savoir où l'on en est ;
+- **le temps de lecture** à côté de la source, sur la même ligne : il ne sert pas
+  à mesurer mais à décider — « j'ai le temps, ou pas ».
+
+Les fonds clairs demandent deux précautions côté natif : la WebView porte la
+couleur de la page **avant le premier rendu** (sinon le fond sombre apparaît une
+fraction de seconde), et son assombrissement automatique — celui qui rend
+lisibles les sites sans thème sombre — est coupé, faute de quoi elle repeindrait
+le sépia en gris.
+
+Enfin, quelques défauts d'extraction que la remise à plat rendait voyants :
+
+- **les blancs** laissés par un conteneur vidé de son encart, qui garde sa boîte
+  et donne plusieurs lignes vides au milieu du texte : les blocs sans texte ni
+  image sont supprimés, en deux passes, un parent ne devenant vide qu'une fois
+  ses enfants partis ;
+- **le titre écrit deux fois**, la plupart des sites le répétant dans le corps de
+  l'article, juste sous celui que le lecteur affiche déjà ;
+- **les étiquettes d'habillage** (« Publicité », « Partager », « À lire aussi »)
+  quand elles forment le texte **entier** d'un bloc — la comparaison ne porte
+  jamais sur une occurrence, sans quoi un article traitant de publicité y
+  passerait ;
+- **le `<title>` de la page**, que le remplacement du `<head>` emportait : sans
+  lui, la WebView rapporte l'URL comme titre, et c'est l'URL brute qui
+  s'affichait dans la barre du lecteur ;
+- **le `<source>` d'un `<picture>`**, qui l'emporte sur le `src` rétabli et
+  ramenait l'image différée d'origine ;
+- **un tableau plus large que l'écran**, qui élargissait la page entière : il
+  défile désormais dans sa propre boîte.
 
 **Sites sur abonnement.** Le mode lecture ne touche **à rien** sur une page de
 connexion. C'est un cas qui casserait tout sans précaution : le script supprime

@@ -8,4 +8,9 @@
     <color name="reader_muted">#8A8A99</color>
     <color name="reader_accent">#FF3B6B</color>
     <color name="reader_accent2">#4AD9FF</color>
+    <!-- Fonds clairs du mode lecture, identiques au « bg » des thèmes sépia et
+         clair de res/raw/reader_read.js : la WebView les porte avant le premier
+         rendu, faute de quoi le fond sombre apparaît une fraction de seconde. -->
+    <color name="reader_page_sepia">#F3EBDC</color>
+    <color name="reader_page_light">#FCFBF9</color>
 </resources>

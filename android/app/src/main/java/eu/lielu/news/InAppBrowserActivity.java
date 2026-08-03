@@ -67,6 +67,8 @@ public class InAppBrowserActivity extends AppCompatActivity {
     public static final String EXTRA_HIDE_CMP = "eu.lielu.news.reader.HIDE_CMP";
     public static final String EXTRA_BLOCK_ADS = "eu.lielu.news.reader.BLOCK_ADS";
     public static final String EXTRA_READER = "eu.lielu.news.reader.READER_MODE";
+    public static final String EXTRA_READER_SIZE = "eu.lielu.news.reader.READER_SIZE";
+    public static final String EXTRA_READER_THEME = "eu.lielu.news.reader.READER_THEME";
 
     /** Réponse vide renvoyée aux requêtes bloquées (null = « charge normalement »). */
     private static final String BLOCKED_MIME = "text/plain";
@@ -94,6 +96,15 @@ public class InAppBrowserActivity extends AppCompatActivity {
     /** Mode lecture : ne garder que le titre, le texte et les images. */
     private boolean readerOn;
     private ImageButton readerBtn;
+
+    /**
+     * Habillage du mode lecture, choisi côté web et transmis à l'ouverture :
+     * taille du texte (s/m/l/xl) et fond (dark/sepia/light). Comme le reste des
+     * préférences, rien n'est conservé ici — ces deux champs ne vivent que le
+     * temps de l'activité, et repartent du localStorage à la prochaine ouverture.
+     */
+    private String readerSize = "m";
+    private String readerTheme = "dark";
 
     /**
      * Voile posé sur la WebView le temps que le mode lecture s'applique.
@@ -148,6 +159,8 @@ public class InAppBrowserActivity extends AppCompatActivity {
         // doit pas s'appliquer parce qu'un appelant a oublié de le préciser.
         blockAds = intent.getBooleanExtra(EXTRA_BLOCK_ADS, false);
         readerOn = intent.getBooleanExtra(EXTRA_READER, false);
+        readerSize = oneOf(intent.getStringExtra(EXTRA_READER_SIZE), "m", "s", "m", "l", "xl");
+        readerTheme = oneOf(intent.getStringExtra(EXTRA_READER_THEME), "dark", "dark", "sepia", "light");
         // Liste intégrée + liste téléchargée si l'utilisateur en a choisi une.
         if (blockAds) blockedHosts = BlocklistStore.load(this);
 
@@ -303,10 +316,42 @@ public class InAppBrowserActivity extends AppCompatActivity {
     private void toggleReader() {
         readerOn = !readerOn;
         updateReaderIcon();
+        applyReaderColors();
         // Pas de voile ici : la page est déjà affichée, la transformation est
         // immédiate. Le voile ne sert qu'au chargement, où elle vient après.
         if (readerOn) injectReadScript();
         else web.reload();
+    }
+
+    /**
+     * Fond de la WebView et assombrissement automatique, selon le mode en cours.
+     *
+     * <p>Le fond évite l'éclair blanc avant le premier rendu : il doit donc être
+     * celui de la page à venir — sombre par défaut, mais crème quand le mode
+     * lecture est demandé en sépia ou en clair.
+     *
+     * <p>L'assombrissement algorithmique de la WebView est le pendant : il rend
+     * lisibles les sites qui n'ont pas de thème sombre, mais repeindrait aussi le
+     * fond sépia du mode lecture. On le coupe donc exactement dans ce cas — le
+     * {@code color-scheme: only light} de la feuille injectée dit déjà la même
+     * chose, mais toutes les versions de WebView n'honorent pas le mot-clé.
+     */
+    private void applyReaderColors() {
+        if (web == null) return;
+        boolean lightPage = readerOn && !"dark".equals(readerTheme);
+        int bg = "sepia".equals(readerTheme) ? R.color.reader_page_sepia : R.color.reader_page_light;
+        web.setBackgroundColor(getResources().getColor(lightPage ? bg : R.color.reader_bg, getTheme()));
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+            WebSettingsCompat.setAlgorithmicDarkeningAllowed(web.getSettings(), !lightPage);
+        }
+    }
+
+    /** Première valeur admise, sinon le repli : rien d'inconnu n'atteint le script. */
+    private static String oneOf(String value, String fallback, String... allowed) {
+        if (value != null) {
+            for (String a : allowed) if (a.equals(value)) return a;
+        }
+        return fallback;
     }
 
     /** Masque la WebView (sans la démonter : elle continue de charger et de rendre). */
@@ -339,7 +384,12 @@ public class InAppBrowserActivity extends AppCompatActivity {
         if (!readerOn || web == null) { revealContent(); return; }
         if (readScript == null) readScript = readRaw(R.raw.reader_read);
         if (readScript == null) { revealContent(); return; }
-        web.evaluateJavascript(readScript, value -> web.evaluateJavascript(
+        // Les deux réglages voyagent dans une variable posée juste avant le script,
+        // qui la lit puis retombe sur ses valeurs par défaut si elle manque. Les
+        // chaînes sont passées par oneOf() : rien d'autre que les valeurs connues
+        // ne peut arriver ici, donc rien à échapper.
+        String prelude = "window.__snRead={size:\"" + readerSize + "\",theme:\"" + readerTheme + "\"};\n";
+        web.evaluateJavascript(prelude + readScript, value -> web.evaluateJavascript(
             "document.documentElement.dataset.snRead || ''", state -> {
                 // Quel que soit le verdict, la page redevient visible ici : c'est
                 // le seul endroit qui sait que la transformation est terminée.
@@ -429,14 +479,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
         String ua = s.getUserAgentString();
         if (ua != null) s.setUserAgentString(ua.replace("; wv", ""));
 
-        // Le fil est sombre : une page blanche en plein écran pique les yeux. Quand
-        // le site déclare un thème sombre (prefers-color-scheme), la WebView le
-        // choisit ; sinon elle assombrit elle-même. Le fond de la WebView est déjà
-        // à la couleur de l'app, pour éviter l'éclair blanc avant le premier rendu.
-        web.setBackgroundColor(getResources().getColor(R.color.reader_bg, getTheme()));
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
-            WebSettingsCompat.setAlgorithmicDarkeningAllowed(s, true);
-        }
+        applyReaderColors();
 
         // clipToPadding=false : la marge haute n'est pas une zone morte, le texte
         // la traverse en défilant et passe sous la barre au lieu d'être coupé.
