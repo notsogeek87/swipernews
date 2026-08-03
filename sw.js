@@ -19,7 +19,7 @@
 //
 // À CHAQUE modification de index.html ou de src/*.js : incrémenter APP_VERSION
 // dans index.html ET CACHE ci-dessous (garder les deux numéros alignés).
-const CACHE = "flux-v24";
+const CACHE = "flux-v25";
 
 // Mis en cache à l'installation : uniquement ce qui ne dépend pas de la version.
 const SHELL = [
