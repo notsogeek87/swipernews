@@ -4,4 +4,13 @@
     <string name="title_activity_main">SwiperNews</string>
     <string name="package_name">eu.lielu.news</string>
     <string name="custom_url_scheme">eu.lielu.news</string>
+
+    <!-- Navigateur intégré (InAppBrowserActivity) -->
+    <string name="reader_close">Fermer l\'article</string>
+    <string name="reader_share">Partager</string>
+    <string name="reader_external">Ouvrir dans le navigateur</string>
+    <string name="reader_retry">Réessayer</string>
+    <string name="reader_error">Page indisponible</string>
+    <string name="reader_error_sub">Le site n\'a pas répondu. Vérifie ta connexion, ou ouvre l\'article dans ton navigateur.</string>
+    <string name="reader_no_app">Aucune application pour ouvrir ce lien</string>
 </resources>

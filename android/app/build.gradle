@@ -58,6 +58,12 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    // Navigateur intégré : WebSettingsCompat.setAlgorithmicDarkeningAllowed, pour
+    // que les articles s'affichent en sombre comme le reste de l'app. La version
+    // est celle que Capacitor déclare déjà (variables.gradle) — aucune
+    // bibliothèque nouvelle n'entre dans le paquet, capacitor-android l'embarque
+    // déjà ; on la remonte simplement sur le classpath du module app.
+    implementation "androidx.webkit:webkit:$androidxWebkitVersion"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

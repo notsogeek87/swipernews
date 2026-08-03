@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Le fil reste immobile pendant que l'article glisse par-dessus : sans cela
+     Android applique sa propre sortie et les deux écrans bougent ensemble. -->
+<alpha xmlns:android="http://schemas.android.com/apk/res/android"
+    android:fromAlpha="1.0"
+    android:toAlpha="1.0"
+    android:duration="240" />

@@ -20,6 +20,16 @@
             </intent-filter>
         </activity>
 
+        <!-- Navigateur intégré : ouvert par-dessus le fil (pas de LAUNCHER, pas
+             d'export — seule l'app peut le lancer). configChanges reprend celui
+             de MainActivity pour qu'une rotation ne recharge pas l'article. -->
+        <activity
+            android:name=".InAppBrowserActivity"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:theme="@style/AppTheme.Reader"
+            android:parentActivityName=".MainActivity"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

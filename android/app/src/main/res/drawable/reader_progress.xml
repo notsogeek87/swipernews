@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Jauge de chargement : le dégradé rose vers cyan de l'app (accent, accent-2),
+     posé sur un fond transparent pour ne rien ajouter sous la barre. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@android:id/background">
+        <shape android:shape="rectangle">
+            <solid android:color="@android:color/transparent" />
+        </shape>
+    </item>
+    <item android:id="@android:id/progress">
+        <clip>
+            <shape android:shape="rectangle">
+                <gradient
+                    android:startColor="@color/reader_accent"
+                    android:endColor="@color/reader_accent2"
+                    android:angle="0" />
+            </shape>
+        </clip>
+    </item>
+</layer-list>

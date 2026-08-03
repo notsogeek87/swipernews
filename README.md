@@ -30,6 +30,11 @@ L'outillage de **développement** (lint, tests, CI) est optionnel et ne change r
 - Import / export des sources aux formats **OPML** (standard) et **JSON** — importe tes sources et lis-les directement
 - Partage d'un article (feuille de partage native, ou menu WhatsApp / Telegram / mail / X / copie du lien),
   depuis un rail unique qui agit sur la carte affichée
+- **App Android uniquement — navigateur intégré** : « Lire l'article » et
+  « Découvrir » ouvrent l'article *dans* l'app (fond sombre du fil, barre fine
+  sans URL, jauge bicolore), au lieu de basculer vers Chrome. Voir
+  [Navigateur intégré](#navigateur-intégré-app-android). Sur le web, le lien
+  s'ouvre dans un nouvel onglet comme avant
 - **Mode Apprendre** 🎓 : un sélecteur à deux onglets en haut (**📰 Actus** / **🎓 Apprendre**, l'actif surligné) bascule le fil vers des articles Wikipédia aléatoires pour swiper en apprenant. Le fil est **sans fin** — de nouveaux articles se chargent automatiquement en approchant du bas — le bouton **↻** repart sur une nouvelle fournée, et le mode est mémorisé entre les sessions.
 - Installable comme application (PWA) avec fonctionnement hors-ligne
 - En mode actus, si un flux est injoignable, le message le **nomme** (et le panneau
@@ -309,6 +314,50 @@ Contrairement à la TWA, la coquille embarquée ne se met **pas** à jour
 automatiquement avec le site : republier l'APK (nouvelle build signée avec la
 même clé) est nécessaire après toute modification de `index.html` ou de
 `src/*.js`.
+
+### Navigateur intégré (app Android)
+
+Dans l'APK, « Lire l'article » (Actus) et « Découvrir » (Apprendre) n'envoient
+plus vers Chrome : l'article s'ouvre **dans l'app**, dans une activité maison
+(`android/app/src/main/java/eu/lielu/news/InAppBrowserActivity.java`). On ne
+quitte donc plus SwiperNews pour lire, et le retour ramène exactement à la carte
+quittée sans recharger le fil.
+
+L'habillage est délibérément minimal, aux couleurs du fil (`:root` d'`index.html`
+recopié dans `res/values/colors_reader.xml`) : une barre fine avec le titre de la
+page et le nom de domaine — **jamais de barre d'URL** — un bouton fermer, un
+bouton partager, un bouton « ouvrir dans le navigateur » pour la sortie de
+secours, et la jauge de chargement rose → cyan de l'app. L'article monte depuis
+le bas comme les feuilles du fil, et le bouton retour remonte d'abord
+l'historique de la page avant de refermer le lecteur.
+
+Détails d'implémentation qui comptent :
+
+- **WebView maison plutôt qu'un _Custom Tab_** : un Custom Tab impose
+  l'habillage de Chrome (barre d'URL claire, menu du navigateur) et ajoute une
+  dépendance `androidx.browser` — l'inverse de « sobre et intégré ». Ici, rien
+  n'entre dans le paquet que du code de ce dépôt.
+- **Pages sombres** : `setAlgorithmicDarkeningAllowed` (androidx.webkit, version
+  déjà déclarée par Capacitor dans `variables.gradle`) laisse le site choisir son
+  thème sombre s'il en a un (`prefers-color-scheme`), et assombrit sinon. Le fond
+  de la WebView est déjà à la couleur de l'app, ce qui supprime l'éclair blanc
+  avant le premier rendu.
+- **Agent utilisateur** : le `; wv` qui signale une WebView est retiré, sinon
+  certains sites servent une page dégradée ou refusent la lecture.
+- **Ce qui sort du lecteur** : les schémas non-web (`mailto:`, `tel:`,
+  `intent:`…) et les téléchargements sont confiés à l'appareil ; une page
+  injoignable affiche un écran d'erreur avec « Réessayer » et « Ouvrir dans le
+  navigateur » plutôt qu'un écran noir.
+- **Bord à bord** géré à la main (`setDecorFitsSystemWindows(false)` + insets),
+  pour un rendu identique sur toutes les versions d'Android plutôt qu'un
+  comportement par défaut qui change avec `targetSdk`.
+
+Le pont est un plugin Capacitor local (`InAppBrowserPlugin`, enregistré dans
+`MainActivity`) : côté web, `index.html` appelle `openArticle()`, qui délègue à
+`Capacitor.Plugins.InAppBrowser` **si et seulement si** l'app est packagée. Hors
+APK le plugin n'existe pas, la fonction rend `false` et le lien garde son
+comportement de navigateur (`target="_blank"`) — c'est aussi le repli si le pont
+natif échouait.
 
 **Icône et écran de démarrage** : générés par [`@capacitor/assets`](https://github.com/ionic-team/capacitor-assets)
 à partir de `resources/` (icône `icon.png` = `logo-512.png`, calque adaptatif

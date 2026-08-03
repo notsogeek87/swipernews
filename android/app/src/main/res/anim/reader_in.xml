@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- L'article monte depuis le bas, comme les feuilles (.sheet) du fil. -->
+<translate xmlns:android="http://schemas.android.com/apk/res/android"
+    android:fromYDelta="100%p"
+    android:toYDelta="0"
+    android:duration="240"
+    android:interpolator="@android:anim/decelerate_interpolator" />

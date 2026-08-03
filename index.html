@@ -414,8 +414,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=29"></script>
-<script src="src/learn-core.js?v=29"></script>
+<script src="src/lib.js?v=30"></script>
+<script src="src/learn-core.js?v=30"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -681,7 +681,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="29";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="30";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -693,6 +693,24 @@ const APP_VERSION="29";   // doit correspondre au ?v= des <script> et à CACHE (
 // qui n'en avait pourtant pas besoin — d'où capacitor.config.json qui ne
 // l'active plus globalement.
 const isNativeApp=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
+
+/* App native uniquement : « Lire l'article » / « Découvrir » ouvrent le
+   navigateur INTÉGRÉ (plugin maison InAppBrowser, voir
+   android/app/src/main/java/eu/lielu/news/InAppBrowserActivity.java) au lieu de
+   basculer vers Chrome. On ne quitte plus l'app pour lire : le retour ramène à
+   la carte quittée, sans recharger le fil.
+   Sur le web, le plugin n'existe pas — la fonction rend false et le lien garde
+   son comportement normal (target=_blank), ce qui vaut aussi de repli si le
+   pont natif échouait. */
+function openArticle(url,title){
+  if(!isNativeApp)return false;
+  const iab=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
+  if(!iab||!iab.open)return false;
+  // L'appel est asynchrone : en cas d'échec (URL refusée côté natif), on
+  // rattrape en ouvrant le lien comme le ferait le web.
+  iab.open({url,title:title||""}).catch(()=>window.open(url,"_blank","noopener"));
+  return true;
+}
 const DEBUG=/[?&]debug/.test(location.search);
 function dbg(msg){
   if(!DEBUG)return;
@@ -1454,6 +1472,15 @@ function cardHTML(it,id){
 // Délégation unique : un seul écouteur pour tout le fil (au lieu de ré-attacher
 // un handler à chaque carte → supprime le coût O(n²) du scroll infini).
 feedEl.addEventListener("click",e=>{
+  // Lien d'un article : dans l'app packagée, il s'ouvre dans le navigateur
+  // intégré plutôt que dans Chrome (le lien reste un vrai <a> pour le web et
+  // pour l'appui long « ouvrir dans un nouvel onglet / copier le lien »).
+  const openLink=e.target.closest("a.card__open");
+  if(openLink&&openLink.href){
+    const card=openLink.closest(".card"),t=card&&card.querySelector(".card__title");
+    if(openArticle(openLink.href,t?t.textContent:""))e.preventDefault();
+    return;
+  }
   // Boutons de la carte de fin (mode Actus)
   const end=e.target.closest("[data-end]");
   if(end){e.stopPropagation();
