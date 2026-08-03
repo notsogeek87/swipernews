@@ -9,10 +9,8 @@
 # pour produire l'APK GitHub — la recette F-Droid doit rester équivalente,
 # sans dépendre de GitHub Actions ni d'un token.
 
-# « News » n'est pas une catégorie F-Droid : leur liste officielle n'en compte
-# pas, les lecteurs de flux se rangent sous Internet et Reading.
 Categories:
-  - Internet
+  - News
   - Reading
 License: MIT
 AuthorName: lielu.eu
@@ -82,7 +80,10 @@ Builds:
 # donc F-Droid sait les lire : une nouvelle entrée Builds s'ajoute toute seule à
 # chaque tag de version, sans merge request. C'est ce qui oblige à garder ces
 # valeurs littérales là-bas (voir le commentaire du fichier).
-AutoUpdateMode: Version v%v
+#
+# « Version » tout court, sans le « v%v » d'antan : leur schéma ne l'accepte
+# plus, fdroidserver déduit seul le motif du tag depuis UpdateCheckMode.
+AutoUpdateMode: Version
 # Restreint aux tags de version : le dépôt porte aussi des tags android-v*
 # posés par la CI à chaque build, qui ne sont pas des versions publiées.
 UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$

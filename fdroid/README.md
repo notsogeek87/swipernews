@@ -77,6 +77,17 @@ mais les sources de `fdroidserver` sont lisibles sur GitLab — c'est la référ
   masque aucune erreur sont tous deux signalés comme des erreurs.
 - **`UpdateCheckMode: Tags` accepte une expression régulière** en argument
   (`checkupdates.py` : `pattern = mode[5:]`).
+- **Le fichier de recette est validé par un schéma JSON**, `schemas/metadata.json`
+  dans `fdroiddata` — la référence à consulter avant d'inventer une valeur. Il
+  donne la liste exacte des catégories (108 aujourd'hui, `News` comprise) et
+  n'accepte plus `AutoUpdateMode: Version v%v`, seulement `Version` : le motif
+  du tag se déduit désormais d'`UpdateCheckMode`. Se valider soi-même évite un
+  aller-retour de pipeline :
+
+  ```bash
+  curl -sO https://gitlab.com/fdroid/fdroiddata/-/raw/master/schemas/metadata.json
+  check-jsonschema --schemafile metadata.json metadata/eu.lielu.news.yml
+  ```
 - **La version doit être un littéral dans `build.gradle`.** Leur analyseur
   (`common.py`, `vcsearch_g` / `vnsearch_g`) ne lit que `versionCode 10200` et
   `versionName "1.2.0"` ; toute expression Groovy — une variable, un
