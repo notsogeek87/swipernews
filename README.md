@@ -423,12 +423,51 @@ traitant des cookies et encart newsletter **préservés** ; défilement rendu.
    conteneur nommé `ad-…` mais qui porte du texte ou une image est laissé
    tranquille.
 
-La liste est **écrite à la main** (178 domaines) plutôt qu'importée : EasyList
-et consorts sont sous CC BY-SA, incompatible avec le MIT de ce dépôt sans
-traîner leur licence, et pèsent des mégaoctets là où quelques centaines de
-lignes suffisent pour un lecteur d'articles. Deux exclusions volontaires, parce
-que les bloquer casse l'article lui-même : `googletagmanager.com` (beaucoup de
-sites y font transiter le chargement du contenu) et les CDN d'images.
+La liste **intégrée** est écrite à la main (178 domaines) : elle sert de
+plancher, disponible hors-ligne dès l'installation. Deux exclusions
+volontaires, parce que les bloquer casse l'article lui-même :
+`googletagmanager.com` (beaucoup de sites y font transiter le chargement du
+contenu) et les CDN d'images.
+
+### Liste de blocage distante (facultative)
+
+Une liste intégrée ne bouge qu'au rythme des publications de l'app. Le réglage
+Publicités propose donc de télécharger une **liste de référence**, mise à jour
+sans republier l'APK (`BlocklistStore.java`, méthode `syncBlocklist` du plugin) :
+
+| Liste | Format | Poids réel | Domaines retenus | Licence |
+| --- | --- | --- | --- | --- |
+| EasyList `easylist_adservers.txt` | `\|\|domaine^` | 1,16 Mo | 50 047 | GPL-3 / CC BY-SA 3.0 |
+| StevenBlack `hosts` | `hosts` | 2,98 Mo | 99 275 | MIT |
+
+Points de conception :
+
+- **rien n'est téléchargé** tant qu'une source n'a pas été choisie : l'app ne
+  contacte que ce que l'utilisateur a décidé, comme pour les flux RSS ;
+- les deux listes sont **fusionnées**, jamais substituées — sans réseau ou en
+  cas d'échec, l'intégrée reste en service, et un téléchargement raté ne
+  dégrade rien (remplacement du cache en une fois, jamais à moitié écrit) ;
+- **télécharger à l'exécution n'est pas redistribuer** : c'est ce qui permet
+  d'utiliser une liste CC BY-SA ou GPL sans changer la licence MIT du dépôt.
+  Elle n'entre jamais dans le paquet, seulement dans le cache de l'appareil, et
+  la source est créditée dans les réglages. L'embarquer, elle, aurait imposé sa
+  licence — c'est pourquoi la liste intégrée reste maison ;
+- rafraîchissement hebdomadaire en silence, garde-fous à 12 Mo et
+  300 000 domaines pour qu'une URL mal choisie ne sature pas la mémoire.
+
+Le parseur (`BlocklistStore.parseLine`) reconnaît les trois formats répandus —
+`||domaine^`, `0.0.0.0 domaine`, domaine brut — et **ignore délibérément** tout
+le reste : règles à chemin, joker ou options (`$third-party`), qui ne se
+ramènent pas à un domaine, et exceptions (`@@`), qui bloqueraient l'inverse de
+ce qu'elles disent. Deux pièges vérifiés sur les vrais fichiers :
+
+- une règle **cosmétique** `lemonde.fr##.banniere` ressemble à une ligne hosts
+  suivie d'un commentaire. La couper naïvement au `#` donnerait `lemonde.fr` —
+  et ferait bloquer le site lui-même. Le `#` n'est traité comme un commentaire
+  que détaché d'un mot ;
+- les fichiers hosts contiennent des lignes `0.0.0.0 0.0.0.0` : une adresse IP
+  n'est pas un domaine, un TLD fait au moins deux caractères et n'est jamais
+  entièrement numérique (`xn--p1ai` reste accepté).
 
 Le revers, assumé et affiché dans le réglage : cela prive de revenu les
 éditeurs dont on lit les flux, et certains sites détectent le blocage et

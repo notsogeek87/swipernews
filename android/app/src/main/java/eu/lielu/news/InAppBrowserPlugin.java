@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Build;
 
+import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -43,5 +44,35 @@ public class InAppBrowserPlugin extends Plugin {
             activity.overridePendingTransition(R.anim.reader_in, R.anim.reader_hold);
         }
         call.resolve();
+    }
+
+    /**
+     * Télécharge une liste de blocage et remplace le cache local.
+     *
+     * <p>Sur un fil séparé : la liste pèse plus d'un mégaoctet et le pont
+     * Capacitor s'exécute sur le fil principal — la télécharger là gèlerait le
+     * fil pendant tout le transfert.
+     */
+    @PluginMethod
+    public void syncBlocklist(PluginCall call) {
+        String url = call.getString("url");
+        new Thread(() -> {
+            try {
+                int count = BlocklistStore.sync(getContext(), url);
+                JSObject res = new JSObject();
+                res.put("count", count);
+                call.resolve(res);
+            } catch (Exception e) {
+                String msg = e.getMessage();
+                call.reject(msg == null ? "téléchargement impossible" : msg);
+            }
+        }, "blocklist-sync").start();
+    }
+
+    /** Revient à la seule liste intégrée. */
+    @PluginMethod
+    public void clearBlocklist(PluginCall call) {
+        if (BlocklistStore.clear(getContext())) call.resolve();
+        else call.reject("cache non supprimable");
     }
 }

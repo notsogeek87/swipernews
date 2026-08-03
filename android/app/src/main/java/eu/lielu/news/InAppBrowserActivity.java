@@ -35,7 +35,6 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -121,7 +120,8 @@ public class InAppBrowserActivity extends AppCompatActivity {
         if (cardTitle == null) cardTitle = "";
         hideCmp = intent.getBooleanExtra(EXTRA_HIDE_CMP, true);
         blockAds = intent.getBooleanExtra(EXTRA_BLOCK_ADS, true);
-        if (blockAds) blockedHosts = loadBlocklist();
+        // Liste intégrée + liste téléchargée si l'utilisateur en a choisi une.
+        if (blockAds) blockedHosts = BlocklistStore.load(this);
 
         // API 34+ : l'animation d'ouverture/fermeture se déclare ici (côté activité
         // entrante). En dessous, c'est overridePendingTransition, appelé par
@@ -275,22 +275,6 @@ public class InAppBrowserActivity extends AppCompatActivity {
        données, moins de batterie, et le pistage ne part pas — et le cosmétique
        (res/raw/reader_ads.js) referme les trous que laisse un emplacement
        réservé mais resté vide. */
-
-    private Set<String> loadBlocklist() {
-        Set<String> hosts = new HashSet<>();
-        try (BufferedReader r = new BufferedReader(new InputStreamReader(
-                getResources().openRawResource(R.raw.reader_blocklist), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = r.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty() || line.charAt(0) == '#') continue;
-                hosts.add(line.toLowerCase());
-            }
-        } catch (Exception e) {
-            return Collections.emptySet();   // sans liste, on n'empêche rien : la page reste lisible
-        }
-        return Collections.unmodifiableSet(hosts);
-    }
 
     /**
      * Bloqué si l'hôte, ou l'un de ses domaines parents, figure dans la liste :

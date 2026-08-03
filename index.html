@@ -258,6 +258,15 @@
     white-space:nowrap;transition:background .2s,color .2s}
   .segbtns button.active{background:rgba(255,255,255,.16);color:var(--ink);box-shadow:0 1px 8px rgba(0,0,0,.28)}
 
+  /* Bloc secondaire d'un réglage (liste de blocage) : décalé et plus discret,
+     pour rester une précision et non un deuxième réglage. */
+  .prefsub{width:100%;margin-top:-2px;padding-left:12px;border-left:2px solid rgba(255,255,255,.1);
+    display:flex;flex-direction:column;gap:9px}
+  .prefsub__state{color:var(--muted);font-size:12.5px;line-height:1.45}
+  .prefsub__credit{color:var(--muted);font-size:11.5px;opacity:.75}
+  .prefsub__acts{display:flex;flex-wrap:wrap;gap:8px}
+  .prefsub__acts .iobtn{flex:0 1 auto;min-width:0;padding:9px 13px;font-size:12.5px}
+
   /* Carte de fin du fil Actus (le RSS est fini : on marque clairement la fin) */
   .endcard{justify-content:center}
   .endcard .card__body{display:flex;flex-direction:column;align-items:center;text-align:center}
@@ -442,8 +451,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=33"></script>
-<script src="src/learn-core.js?v=33"></script>
+<script src="src/lib.js?v=34"></script>
+<script src="src/learn-core.js?v=34"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -709,7 +718,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="33";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="34";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -745,6 +754,59 @@ let cmpPref=(()=>{try{return localStorage.getItem(LS_CMP)==="show"?"show":"hide"
    certains sites détectent le blocage et refusent de s'afficher. */
 const LS_ADS="fluxswipe.ads.v1";
 let adsPref=(()=>{try{return localStorage.getItem(LS_ADS)==="allow"?"allow":"block";}catch(e){return "block";}})();
+
+/* Liste de blocage distante (facultative). La liste intégrée à l'APK (178
+   domaines, res/raw/reader_blocklist.txt) ne bouge qu'au rythme des
+   publications ; une liste distante se met à jour sans republier, et donne
+   accès aux listes de référence, autrement plus complètes. Les deux sont
+   FUSIONNÉES côté natif : sans réseau, l'intégrée reste le plancher.
+   Rien n'est téléchargé tant qu'une source n'a pas été choisie ici.
+   Télécharger à l'exécution n'est pas redistribuer : une liste sous CC BY-SA
+   ou GPL peut donc servir sans changer la licence MIT du dépôt — elle n'entre
+   jamais dans le paquet, seulement dans le cache de l'appareil. */
+const LS_BL="fluxswipe.blocklist.v1";
+const BL_REFRESH=7*24*3600*1000;   // une mise à jour par semaine suffit
+const BL_SOURCES=[
+  {name:"EasyList",
+   sub:"La référence d'uBlock Origin — ~52 000 domaines publicitaires",
+   credit:"EasyList (easylist.to), GPL-3 / CC BY-SA 3.0",
+   url:"https://raw.githubusercontent.com/easylist/easylist/master/easylist/easylist_adservers.txt"},
+  {name:"StevenBlack",
+   sub:"Fichier hosts unifié — ~106 000 entrées, pub et traceurs",
+   credit:"StevenBlack/hosts, MIT",
+   url:"https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"},
+];
+let blState=(()=>{try{return JSON.parse(localStorage.getItem(LS_BL)||"{}")||{};}catch(e){return {};}})();
+function saveBl(patch){
+  blState={...blState,...patch};
+  try{localStorage.setItem(LS_BL,JSON.stringify(blState));}catch(e){warn("save blocklist",e);}
+}
+function iabPlugin(){
+  return window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
+}
+async function syncBlocklist(url,silent){
+  const p=iabPlugin();
+  if(!p||!p.syncBlocklist)return;
+  if(!silent)toast("Téléchargement de la liste…");
+  try{
+    const r=await p.syncBlocklist({url});
+    saveBl({url,at:Date.now(),count:(r&&r.count)||0});
+    // Pas de toast de succès : il se poserait devant le bloc, qui affiche déjà
+    // le nouveau décompte. Seuls l'attente et l'échec méritent un message.
+    renderReadPref();
+  }catch(e){
+    // La liste précédente reste en service : un échec ne dégrade rien.
+    if(!silent)toast("Liste indisponible — "+((e&&e.message)||"réessaie plus tard"));
+  }
+}
+async function dropBlocklist(){
+  const p=iabPlugin();
+  try{if(p&&p.clearBlocklist)await p.clearBlocklist();}catch(e){warn("clear blocklist",e);}
+  blState={};
+  try{localStorage.removeItem(LS_BL);}catch(e){}
+  renderReadPref();
+  toast("Retour à la liste intégrée");
+}
 
 /* Rend false quand le lien doit garder son comportement normal (target=_blank) :
    sur le web, si l'utilisateur a choisi son navigateur, ou si le pont natif
@@ -1754,6 +1816,30 @@ function prefRow(name,label,desc,opts,cur){
     </div>
   </div>`;
 }
+/* Bloc « liste de blocage », sous le réglage Publicités. Deux états : aucune
+   source choisie (on propose les listes de référence) ou une source active
+   (on montre ce qu'elle apporte, et comment s'en défaire). */
+function blocklistHTML(){
+  const src=BL_SOURCES.find(s=>s.url===blState.url);
+  if(!blState.url){
+    return `<div class="prefsub">
+      <span class="prefsub__state">Liste intégrée à l'app : 178 domaines. Une liste publique en bloque bien davantage, et se met à jour sans réinstaller l'app.</span>
+      <div class="prefsub__acts">
+        ${BL_SOURCES.map(s=>`<button type="button" class="iobtn" data-blsrc="${escAttr(s.url)}" title="${escAttr(s.sub)}">↓ ${esc(s.name)}</button>`).join("")}
+      </div>
+    </div>`;
+  }
+  const when=blState.at?relTime(new Date(blState.at).toISOString()):"";
+  const n=(blState.count||0).toLocaleString("fr-FR");
+  return `<div class="prefsub">
+    <span class="prefsub__state">${esc(src?src.name:hostOf(blState.url))} — ${n} domaines${when?", mis à jour il y a "+esc(when):""}, plus les 178 intégrés.</span>
+    ${src?`<span class="prefsub__credit">Source : ${esc(src.credit)}</span>`:""}
+    <div class="prefsub__acts">
+      <button type="button" class="iobtn" data-blsrc="${escAttr(blState.url)}">↻ Mettre à jour</button>
+      <button type="button" class="iobtn" data-bldrop>Retirer</button>
+    </div>
+  </div>`;
+}
 function renderReadPref(){
   const inApp=readPref==="app",hideCmp=cmpPref==="hide";
   let html=prefRow("read","Ouvrir les articles",
@@ -1771,6 +1857,7 @@ function renderReadPref(){
       adsPref==="block"?"Bloqués avant même d'être chargés : page plus légère, pistage en moins. Certains sites le détectent et refusent de s'afficher."
                        :"Chargés normalement, comme dans un navigateur.",
       [{v:"block",t:"Bloqués"},{v:"allow",t:"Affichés"}],adsPref);
+    if(adsPref==="block")html+=blocklistHTML();
   }
   document.querySelectorAll("[data-readmount]").forEach(el=>{
     el.innerHTML=isNativeApp?html:"";
@@ -1797,9 +1884,18 @@ function setPref(name,v){
 // serait à ré-attacher à chaque fois.
 document.addEventListener("click",e=>{
   const b=e.target.closest("[data-pref]");
-  if(b)setPref(b.dataset.pref,b.dataset.val);
+  if(b){setPref(b.dataset.pref,b.dataset.val);return;}
+  const src=e.target.closest("[data-blsrc]");
+  if(src){syncBlocklist(src.dataset.blsrc,false);return;}
+  if(e.target.closest("[data-bldrop]"))dropBlocklist();
 });
 renderReadPref();
+/* Rafraîchissement hebdomadaire, en silence : une liste de blocage vieille de
+   plusieurs mois laisse passer les régies apparues depuis. Rien ne part si
+   aucune source n'a été choisie, ni si le blocage est désactivé. */
+if(isNativeApp&&blState.url&&adsPref==="block"&&Date.now()-(blState.at||0)>BL_REFRESH){
+  syncBlocklist(blState.url,true);
+}
 sheet.onclick=e=>{if(e.target===sheet)closeDialog(sheet);};
 // Boutons du panneau Sources (remplacent les anciens onclick inline → CSP possible)
 document.getElementById("addFeedBtn").onclick=addFeed;
