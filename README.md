@@ -1,8 +1,23 @@
-# Flux — actus RSS en swipe
+# SwiperNews — apprendre & suivre l'actu en swipe
 
-Une application web (PWA) qui affiche des flux RSS en mode swipe vertical, à la TikTok.
+Une application (PWA + APK Android) qui fait lire des articles au **swipe
+vertical plein écran**, comme un fil de réseau social. Deux fils, entre lesquels
+on bascule au balayage horizontal :
+
+- **📰 Actus** — les flux RSS que **vous** choisissez. Pas d'algorithme, pas de
+  recommandation, pas de compte : le fil est exactement la liste de sources
+  cochées, importable et exportable en OPML.
+- **🎓 Apprendre** — des articles Wikipédia tirés au hasard, filtrables par
+  centres d'intérêt, en défilement infini.
+
+L'idée : reprendre le geste des réseaux sociaux **sans** ce qui va avec. Aucun
+compte, aucune télémétrie, aucun appel à un service que vous n'avez pas choisi.
+
 Côté **exécution**, tout tient dans `index.html` : aucune dépendance, aucun build, ouvrable tel quel.
 L'outillage de **développement** (lint, tests, CI) est optionnel et ne change rien au déploiement.
+Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
+**navigateur intégré** pour lire les articles sans quitter l'app — voir
+[Navigateur intégré](#navigateur-intégré-app-android).
 
 ## Fonctionnalités
 
@@ -180,6 +195,29 @@ npm test          # tests unitaires (assainissement, parsing, noyau Apprendre, a
 
 La CI GitHub Actions (`.github/workflows/ci.yml`) rejoue lint + format + tests sur chaque PR.
 
+### Contribuer
+
+Quatre choses à savoir avant une première contribution :
+
+1. **Versionner la coquille.** Toute modification d'`index.html` ou de
+   `src/*.js` impose d'incrémenter `APP_VERSION`, le `?v=` des deux `<script>`
+   **et** `CACHE` dans `sw.js`, ensemble. C'est la règle la plus facile à
+   oublier et la plus visible quand on l'oublie ; le pourquoi est détaillé plus
+   bas, section « Versionner la coquille à chaque modification ». Une
+   modification purement native (`android/`) n'en demande pas.
+2. **`index.html` est hors lint et hors formatage** (voir `.prettierignore`) :
+   son JS/CSS en ligne est dense à dessein, s'aligner sur le style existant
+   plutôt que sur celui de `src/`.
+3. **Les workflows ne se déclenchent que sur `main`, `staging` ou une _pull
+   request_.** Pousser une branche seule ne lance ni les tests ni la
+   compilation de l'APK : ouvrez une PR pour faire compiler du code natif.
+4. **Le dépôt est en français** — commentaires, messages de commit, textes
+   d'interface. Les commentaires y expliquent le *pourquoi*, pas le *quoi*.
+
+[`CLAUDE.md`](CLAUDE.md) rassemble en un seul endroit la carte du code, les
+décisions à ne pas défaire et les pièges déjà payés. Écrit pour un assistant de
+code, il se lit très bien pour prendre le dépôt en main.
+
 ### Diagnostiquer une image floue
 
 Ouvrir l'app avec `?debug=1` : un encadré affiche, pour la carte visible, la
@@ -315,6 +353,27 @@ npm run android:open   # ouvre android/ dans Android Studio pour builder/signer
 Après la première génération, `npm run cap:sync` (prepare + `cap sync
 android`) suffit à répercuter une modification de `index.html`/`src/*.js` dans
 le projet natif avant de rebuilder.
+
+**Builder en ligne de commande**, sans Android Studio (il faut le SDK Android
+et un JDK 21) :
+
+```bash
+npm ci
+npm run cap:sync                      # ⚠ indispensable : sans lui, le projet
+                                      #   natif garde la version précédente
+                                      #   d'index.html et on débogue un fichier
+                                      #   qui n'est pas celui qu'on a modifié
+cd android && ./gradlew assembleDebug
+# → android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Sans les variables d'environnement de signature (`ANDROID_KEYSTORE_FILE`,
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`),
+Gradle retombe sur la clé debug : l'APK s'installe pour tester, mais ne pourra
+pas être mis à jour par-dessus, la clé debug étant régénérée à chaque machine.
+`assembleRelease` avec ces variables produit le paquet signé, comme en CI. Le
+numéro de version se passe en propriétés Gradle
+(`-PversionCode=N -PversionName=X`) ; sans elles, `1` / `1.0`.
 
 Contrairement à la TWA, la coquille embarquée ne se met **pas** à jour
 automatiquement avec le site : republier l'APK (nouvelle build signée avec la
