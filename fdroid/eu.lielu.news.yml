@@ -22,6 +22,11 @@ Changelog: https://github.com/notsogeek87/swipernews/releases
 # Ni Name ni Description ici : F-Droid reprend le titre et les descriptions
 # depuis fastlane/metadata/ du dépôt source, qui sont la version faisant foi.
 # Les déclarer ici les figerait, et les deux textes divergeraient.
+#
+# AutoName, lui, n'est pas un choix : « fdroid checkupdates » le remplit tout
+# seul depuis l'android:label de l'app, et leur CI échoue si le fichier n'est
+# pas déjà dans l'état qu'elle produirait.
+AutoName: SwiperNews
 
 RepoType: git
 Repo: https://github.com/notsogeek87/swipernews.git
