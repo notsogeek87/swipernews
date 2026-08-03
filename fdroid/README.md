@@ -15,11 +15,11 @@ soit ensuite rapide à faire manuellement.
   longue et icône (512×512) au format `fastlane`, que F-Droid (et d'autres
   stores) peuvent reprendre automatiquement pour la fiche de l'application.
 - **`fdroid/eu.lielu.news.yml`** : recette de build, épinglée sur le tag
-  `v1.1.0`, à coller dans `metadata/eu.lielu.news.yml` sur `fdroiddata`.
+  `v1.2.0`, à coller dans `metadata/eu.lielu.news.yml` sur `fdroiddata`.
 - **Captures d'écran** dans
   `fastlane/metadata/android/fr-FR/images/phoneScreenshots/` : les deux modes,
   Actus et Apprendre. F-Droid en demande au moins une.
-- **Le tag `v1.1.0`**, posé sur le `main` publié.
+- **Le tag `v1.2.0`**, posé sur le `main` publié.
 - Licence MIT, permission Android unique (`INTERNET`), aucune dépendance
   Google Play Services / Firebase / SDK propriétaire — l'app remplit déjà les
   critères de base d'inclusion (logiciel libre, buildable sans service tiers
@@ -41,12 +41,12 @@ est rejeté :
 
 L'ordre compte : le tag se pose **après** le commit qui aligne les deux
 premiers, puisque F-Droid ne voit du dépôt que ce que contient le commit tagué.
-Un tag posé trop tôt embarque l'ancien repli de `build.gradle` et fait échouer
+Un tag posé trop tôt embarque l'ancienne version de `build.gradle` et fait échouer
 la vérification de version — il faut alors le déplacer (`git tag -f`) plutôt
 que de retoucher la recette.
 
 Le `versionCode` se déduit de la version — majeur × 10000 + mineur × 100 +
-correctif, soit `10100` pour 1.1.0 — donc il croît tout seul, sans compteur à
+correctif, soit `10200` pour 1.2.0 — donc il croît tout seul, sans compteur à
 tenir. `package.json` suit aussi la version, mais seulement pour nommer les
 APK produits par la CI.
 
@@ -94,7 +94,7 @@ mais les sources de `fdroidserver` sont lisibles sur GitLab — c'est la référ
   `project.findProperty(…) ?: …` — lui fait rendre un charabia et
   `fdroid checkupdates` s'arrête sur « Couldn't find any version information ».
   D'où l'écrasement par la CI écrit **après** le bloc `android`, et non dedans.
-  C'est aussi ce qui rend `AutoUpdateMode: Version v%v` possible : une fois la
+  C'est aussi ce qui rend `AutoUpdateMode: Version` possible : une fois la
   version lisible, F-Droid ajoute lui-même l'entrée `Builds` de chaque nouveau
   tag, et une version publiée ne demande plus de merge request.
 
