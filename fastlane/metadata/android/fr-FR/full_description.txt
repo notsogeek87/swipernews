@@ -1,0 +1,13 @@
+SwiperNews affiche vos flux RSS en plein écran, en swipe vertical, comme un fil de réseau social — sans algorithme, sans publicité et sans traceur. L'application ne contacte que les flux RSS que vous choisissez, et l'API publique de Wikipédia pour le mode Apprendre.
+
+Fonctionnalités principales :
+
+• Navigation par swipe vertical plein écran (ou flèches / espace au clavier)
+• Ajout, suppression et activation des sources RSS
+• Import et export des sources aux formats OPML et JSON
+• Reprise de lecture par source, à l'endroit où vous l'avez laissée
+• Partage d'un article vers l'application de votre choix
+• Mode Apprendre : des articles Wikipédia aléatoires à swiper, avec des centres d'intérêt (sciences, histoire, art, géographie, nature, espace, technologie, sport, cinéma, musique, philosophie…)
+• Fonctionnement hors-ligne pour l'application déjà chargée
+
+SwiperNews est un logiciel libre (licence MIT). Le code source est entièrement disponible, et l'application ne demande aucune permission réseau au-delà de l'accès Internet nécessaire pour récupérer les flux.

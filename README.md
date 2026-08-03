@@ -397,6 +397,15 @@ dépôt** : perdue, plus aucune mise à jour de l'app installée n'est possible.
   `vercel.json` le réécrit vers `/.well-known/assetlinks.json` — le chemin exact
   qu'Android va interroger.
 
+### F-Droid
+
+F-Droid compile lui-même chaque application depuis ses sources : il n'y a pas
+de simple envoi d'APK, contrairement à GitHub Releases. Le dossier
+[`fdroid/`](fdroid/README.md) prépare ce qui dépend de ce dépôt (fiche
+`fastlane`, brouillon de recette de build) et détaille ce qu'il reste à faire
+à la main — poser un tag par version, ajouter des captures d'écran, puis
+ouvrir la demande d'inclusion sur `gitlab.com/fdroid/fdroiddata`.
+
 ## Sécurité
 
 - Le proxy `api/feed.js` valide l'URL demandée et **refuse le réseau interne**
