@@ -9,20 +9,21 @@
 # pour produire l'APK GitHub — la recette F-Droid doit rester équivalente,
 # sans dépendre de GitHub Actions ni d'un token.
 
+# « News » n'est pas une catégorie F-Droid : leur liste officielle n'en compte
+# pas, les lecteurs de flux se rangent sous Internet et Reading.
 Categories:
-  - News
+  - Internet
+  - Reading
 License: MIT
 AuthorName: lielu.eu
+WebSite: https://news.lielu.eu
 SourceCode: https://github.com/notsogeek87/swipernews
 IssueTracker: https://github.com/notsogeek87/swipernews/issues
 Changelog: https://github.com/notsogeek87/swipernews/releases
-WebSite: https://news.lielu.eu
 
-AutoName: SwiperNews
-Description: |-
-  Voir fastlane/metadata/android/fr-FR/full_description.txt dans le dépôt
-  source — F-Droid la reprend automatiquement si le dépôt est déclaré comme
-  source des métadonnées fastlane.
+# Ni Name ni Description ici : F-Droid reprend le titre et les descriptions
+# depuis fastlane/metadata/ du dépôt source, qui sont la version faisant foi.
+# Les déclarer ici les figerait, et les deux textes divergeraient.
 
 RepoType: git
 Repo: https://github.com/notsogeek87/swipernews.git
@@ -40,9 +41,14 @@ Builds:
     # Le versionCode suit la version (majeur × 10000 + mineur × 100 + correctif).
     commit: v1.1.0
     subdir: android
+    # Le nodejs de Debian est trop vieux : la CLI Capacitor 8 exige Node 22 et
+    # refuse Node 20 (d'où le setup-node@22 d'android.yml). On passe donc par
+    # le dépôt NodeSource, sinon cap sync s'arrête avant d'avoir rien recopié.
     sudo:
       - apt-get update
-      - apt-get install -y nodejs npm
+      - apt-get install -y curl ca-certificates
+      - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+      - apt-get install -y nodejs
     # Les scripts npm (cap:prepare, cap:sync) vivent dans le package.json à la
     # racine du dépôt, où « init » s'exécute — pas dans subdir. cap:sync
     # régénère www/ (non versionné) puis le recopie dans le projet natif :
