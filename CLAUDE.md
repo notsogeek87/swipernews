@@ -133,12 +133,24 @@ Conséquence pratique : **tout ce qui est nécessaire au build doit venir des
 sources**, ce qui interdit d'embarquer quoi que ce soit sous une licence
 incompatible avec le MIT (voir « décisions à ne pas défaire »).
 
-La version en fait partie : F-Droid compile depuis un tag avec un Gradle nu,
-sans les `-PversionCode/-PversionName` de la CI, puis vérifie que l'APK porte
-la version annoncée par la recette. Les valeurs de repli d'`android/app/
-build.gradle` ne sont donc **pas** décoratives — publier une version, c'est
-aligner d'un seul geste ces valeurs, la recette et le tag `vX.Y.Z`. Le mode
-d'emploi est dans `fdroid/README.md`.
+L'app est **acceptée chez eux depuis la 1.2.0**, avec `AutoUpdateMode: Version` :
+F-Droid suit les tags `vX.Y.Z` du dépôt, lit la version **dans les sources** et
+ajoute lui-même l'entrée de build. Plus aucune démarche chez eux à chaque
+version — mais cela ne tient qu'à une chose :
+
+> **Publier une version = bumper `versionCode` et `versionName` dans
+> `android/app/build.gradle`, dans le commit qui précède le tag `vX.Y.Z`.**
+>
+> `versionCode` = majeur × 10000 + mineur × 100 + correctif (1.3.0 → 10300).
+> Les deux valeurs sont écrites **en clair** dans `defaultConfig` : c'est la
+> seule forme que sait lire l'analyseur de F-Droid. Ne jamais les remplacer par
+> une variable Groovy ni par un `project.findProperty(…) ?: …` — l'écrasement
+> par la CI vit exprès *après* le bloc `android`, ne pas le remonter dedans.
+
+Taguer sans avoir bumpé ne casse rien, mais ne publie rien non plus : F-Droid
+relit la même version, conclut « up to date » et ignore le tag — un silence
+qu'on met des semaines à remarquer. Le détail est dans `fdroid/README.md`,
+avec ce que les quatre premiers passages de leur CI ont appris.
 
 ---
 
