@@ -1,17 +1,5 @@
 apply plugin: 'com.android.application'
 
-// Version injectée par la CI (.github/workflows/android.yml), qui dérive le
-// versionCode du numéro de run. Les valeurs de repli ne sont PAS arbitraires :
-// F-Droid compile depuis un tag avec un Gradle nu, sans -PversionCode, et
-// vérifie ensuite que l'APK porte bien la version déclarée dans sa recette
-// (fdroid/eu.lielu.news.yml). Elles doivent donc rester le reflet exact du
-// dernier tag publié — les bouger, c'est casser le build F-Droid.
-//
-// Le versionCode suit la version : majeur × 10000 + mineur × 100 + correctif
-// (1.1.0 → 10100). Il croît donc tout seul à chaque tag, sans compteur à tenir.
-def appVersionCode = (project.findProperty('versionCode') ?: '10100') as Integer
-def appVersionName = project.findProperty('versionName') ?: '1.1.0'
-
 // Clé de signature fournie par la CI depuis les secrets du dépôt. Absente en
 // local : Gradle retombe alors sur la clé debug.
 def releaseKeystore = System.getenv('ANDROID_KEYSTORE_FILE')
@@ -24,8 +12,17 @@ android {
         applicationId "eu.lielu.news"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode appVersionCode
-        versionName appVersionName
+        // La version de l'app, écrite en clair et NON en variable Groovy : c'est
+        // la seule forme que sait lire l'analyseur de F-Droid (fdroidserver,
+        // common.py, vcsearch_g/vnsearch_g — un littéral, rien d'autre). Sans
+        // ça, « fdroid checkupdates » ne trouve aucune version et abandonne.
+        //
+        // Ces deux valeurs sont donc la version publiée, à aligner avec le tag
+        // git et la recette (fdroid/eu.lielu.news.yml) — voir fdroid/README.md.
+        // Le versionCode se déduit de la version : majeur × 10000 + mineur × 100
+        // + correctif (1.2.0 → 10200), donc il croît sans compteur à tenir.
+        versionCode 10200
+        versionName "1.2.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -52,6 +49,18 @@ android {
             }
         }
     }
+}
+
+// La CI (.github/workflows/android.yml) écrase la version ci-dessus par le
+// numéro de run, pour qu'un APK GitHub s'installe par-dessus le précédent.
+// Écrit ici, après le bloc android, et non dans defaultConfig : là-haut, une
+// expression Groovy rendrait la version illisible pour F-Droid, qui compile
+// sans ces propriétés et exige un littéral.
+if (project.hasProperty('versionCode')) {
+    android.defaultConfig.versionCode = project.property('versionCode') as Integer
+}
+if (project.hasProperty('versionName')) {
+    android.defaultConfig.versionName = project.property('versionName')
 }
 
 repositories {

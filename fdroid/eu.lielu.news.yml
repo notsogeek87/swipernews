@@ -29,17 +29,17 @@ RepoType: git
 Repo: https://github.com/notsogeek87/swipernews.git
 
 Builds:
-  - versionName: "1.1.0"
-    versionCode: 10100
+  - versionName: "1.2.0"
+    versionCode: 10200
     # Tag git exact du commit à compiler. F-Droid recompile depuis les sources
     # à ce commit précis : le numéro de run GitHub (dont android.yml tire son
     # versionCode) n'existe pas ici, d'où un tag par version publiée.
     #
     # Le couple ci-dessus doit correspondre à ce que produit un Gradle nu à ce
-    # tag : android/app/build.gradle porte les mêmes valeurs en repli, faute de
-    # -PversionCode/-PversionName ici. Les deux se bougent ensemble.
+    # tag : android/app/build.gradle porte les mêmes valeurs, écrites en clair,
+    # faute de -PversionCode/-PversionName ici. Les deux se bougent ensemble.
     # Le versionCode suit la version (majeur × 10000 + mineur × 100 + correctif).
-    commit: v1.1.0
+    commit: v1.2.0
     subdir: android
     # Le nodejs de Debian est trop vieux : la CLI Capacitor 8 exige Node 22 et
     # refuse Node 20 (d'où le setup-node@22 d'android.yml). On passe donc par
@@ -78,12 +78,13 @@ Builds:
       - node_modules/@typescript/typescript-linux-x64
       - node_modules/sharp
 
-# Pas d'AutoUpdate : le versionCode ne se lit pas dans les sources (build.gradle
-# le prend d'une propriété de projet), donc chaque version veut une entrée
-# Builds écrite à la main.
-AutoUpdateMode: None
+# versionName et versionCode sont écrits en clair dans android/app/build.gradle,
+# donc F-Droid sait les lire : une nouvelle entrée Builds s'ajoute toute seule à
+# chaque tag de version, sans merge request. C'est ce qui oblige à garder ces
+# valeurs littérales là-bas (voir le commentaire du fichier).
+AutoUpdateMode: Version v%v
 # Restreint aux tags de version : le dépôt porte aussi des tags android-v*
 # posés par la CI à chaque build, qui ne sont pas des versions publiées.
 UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$
-CurrentVersion: "1.1.0"
-CurrentVersionCode: 10100
+CurrentVersion: "1.2.0"
+CurrentVersionCode: 10200

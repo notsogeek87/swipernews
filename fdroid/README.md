@@ -32,8 +32,9 @@ en CI — puis **vérifie que l'APK obtenu porte bien la version annoncée par l
 recette**. Trois endroits doivent donc dire la même chose, sans quoi le build
 est rejeté :
 
-1. `android/app/build.gradle` : les valeurs de repli `appVersionCode` /
-   `appVersionName` (c'est ce que produit le Gradle nu de F-Droid) ;
+1. `android/app/build.gradle` : `versionCode` et `versionName` dans
+   `defaultConfig`, **écrits en clair** (c'est ce que produit le Gradle nu de
+   F-Droid, et la seule forme que sait lire leur analyseur) ;
 2. `fdroid/eu.lielu.news.yml` : `versionName`, `versionCode`, `commit`,
    `CurrentVersion`, `CurrentVersionCode` ;
 3. le tag git lui-même, `vX.Y.Z`, posé sur le commit publié.
@@ -76,6 +77,15 @@ mais les sources de `fdroidserver` sont lisibles sur GitLab — c'est la référ
   masque aucune erreur sont tous deux signalés comme des erreurs.
 - **`UpdateCheckMode: Tags` accepte une expression régulière** en argument
   (`checkupdates.py` : `pattern = mode[5:]`).
+- **La version doit être un littéral dans `build.gradle`.** Leur analyseur
+  (`common.py`, `vcsearch_g` / `vnsearch_g`) ne lit que `versionCode 10200` et
+  `versionName "1.2.0"` ; toute expression Groovy — une variable, un
+  `project.findProperty(…) ?: …` — lui fait rendre un charabia et
+  `fdroid checkupdates` s'arrête sur « Couldn't find any version information ».
+  D'où l'écrasement par la CI écrit **après** le bloc `android`, et non dedans.
+  C'est aussi ce qui rend `AutoUpdateMode: Version v%v` possible : une fois la
+  version lisible, F-Droid ajoute lui-même l'entrée `Builds` de chaque nouveau
+  tag, et une version publiée ne demande plus de merge request.
 
 ## Anti-fonctionnalités à déclarer
 
