@@ -49,15 +49,34 @@ Builds:
       - apt-get install -y curl ca-certificates
       - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
       - apt-get install -y nodejs
-    # Les scripts npm (cap:prepare, cap:sync) vivent dans le package.json à la
-    # racine du dépôt, où « init » s'exécute — pas dans subdir. cap:sync
-    # régénère www/ (non versionné) puis le recopie dans le projet natif :
-    # sans lui, l'APK embarque un assets/public vide.
+    # cap:sync régénère www/ (non versionné) puis le recopie dans le projet
+    # natif : sans lui, l'APK embarque un assets/public vide.
+    #
+    # « init » s'exécute dans subdir, donc dans android/ — pas à la racine, où
+    # vit le package.json. Ne pas ajouter de « cd .. » pour autant : npm remonte
+    # tout seul jusqu'au package.json le plus proche, et la commande nue marche
+    # donc depuis l'un comme depuis l'autre.
     init:
       - npm ci && npm run cap:sync
     gradle:
       - yes
     output: app/build/outputs/apk/release/app-release-unsigned.apk
+    # F-Droid refuse tout binaire pré-compilé trouvé dans l'arbre des sources,
+    # et npm ci en dépose quatorze dans node_modules. Aucun n'entre dans l'APK :
+    # ce sont les outils de build de Capacitor (générateur d'icônes, analyseur
+    # de build.gradle, gabarits de projet). On les désigne un par un plutôt que
+    # d'ignorer node_modules en bloc — et il le faut, le scanner signalant aussi
+    # bien un chemin inexistant qu'un chemin qui ne sert à rien.
+    #
+    # Ces cinq entrées disparaîtraient presque toutes en sortant @capacitor/
+    # assets des devDependencies (il n'est utilisé que par npm run android:assets,
+    # pour régénérer les icônes) : il apporte sharp, tsc et les JAR de trapezedev.
+    scanignore:
+      - node_modules/@capacitor/assets/node_modules/@capacitor/cli/assets
+      - node_modules/@capacitor/cli/assets
+      - node_modules/@trapezedev/gradle-parse
+      - node_modules/@typescript/typescript-linux-x64
+      - node_modules/sharp
 
 # Pas d'AutoUpdate : le versionCode ne se lit pas dans les sources (build.gradle
 # le prend d'une propriété de projet), donc chaque version veut une entrée

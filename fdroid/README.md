@@ -57,10 +57,25 @@ une merge request — ou, plus simple pour un premier envoi, passer par leur
 "Request For Packaging" : <https://gitlab.com/fdroid/rfp/-/issues>. Cette étape
 ne peut pas être faite depuis ce dépôt GitHub.
 
-Deux points à confirmer sur place, leur documentation étant inaccessible depuis
-l'environnement de développement de ce dépôt (`f-droid.org` bloqué) :
-`init:` s'exécute bien à la racine du dépôt cloné et non dans `subdir:`, et
-`UpdateCheckMode: Tags` accepte bien une expression régulière en argument.
+## Ce que le premier build F-Droid a appris
+
+`f-droid.org` est bloqué depuis l'environnement de développement de ce dépôt,
+mais les sources de `fdroidserver` sont lisibles sur GitLab — c'est la référence
+à consulter en cas de doute sur un champ de recette.
+
+- **`init:` s'exécute dans `subdir:`**, donc dans `android/`, et non à la racine
+  du dépôt (`INFO: Running 'init' commands in build/eu.lielu.news/android`).
+  `npm ci` fonctionne quand même, npm remontant jusqu'au `package.json` le plus
+  proche ; ne pas « corriger » par un `cd ..`, qui ne marcherait plus si leur
+  outil changeait de répertoire de travail.
+- **Le scanner refuse tout binaire pré-compilé dans l'arbre des sources**, et
+  `npm ci` en dépose quatorze dans `node_modules` (sharp, `tsc`, les JAR de
+  `@trapezedev/gradle-parse`, les gabarits `.tar.gz` de la CLI Capacitor). D'où
+  le `scanignore:` de la recette, qui les désigne un par un. Attention, il est
+  strict dans les deux sens : un chemin qui n'existe pas **et** un chemin qui ne
+  masque aucune erreur sont tous deux signalés comme des erreurs.
+- **`UpdateCheckMode: Tags` accepte une expression régulière** en argument
+  (`checkupdates.py` : `pattern = mode[5:]`).
 
 ## Anti-fonctionnalités à déclarer
 
