@@ -73,7 +73,7 @@ les deux univers, et un nouvel appui sur **📰 Actus** revient aux flux RSS.
 Une **barre de centres d'intérêt** (chips défilables sous les onglets) permet de choisir
 ce qu'on veut apprendre : **Aléatoire** (défaut), Sciences, Histoire, Art & Culture,
 Artistes, Géographie, Nature, Espace, Technologie, Sport, Cinéma, Films, Musique,
-Jeux vidéo, Philosophie. Chaque
+Jeux vidéo, Cuisine, Philosophie. Chaque
 catégorie utilise le moteur de recherche de Wikipédia (`generator=search`,
 `gsrsort=random`, `deepcategory:"…"`) pour tirer des articles au hasard dans la catégorie
 et ses sous-catégories. Le choix est mémorisé et chaque catégorie a son propre cache.

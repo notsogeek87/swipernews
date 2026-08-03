@@ -38,6 +38,12 @@
     { key: "films", label: "🎥 Films", q: 'deepcategory:"Film"' },
     { key: "musique", label: "🎵 Musique", q: 'deepcategory:"Musique"' },
     { key: "jeuxvideo", label: "🎮 Jeux vidéo", q: 'deepcategory:"Jeu vidéo"' },
+    // Wikipédia n'est pas un livre de recettes (règle de fond du projet) : ce sont
+    // des articles SUR les plats — origine, histoire, variantes — pas des marches
+    // à suivre. Les vraies recettes sont sur Wikilivres, autre hôte, autre
+    // extraction. Si le fil dérive trop vers les chefs et les ustensiles, resserrer
+    // sur "Spécialité culinaire", sous-catégorie de celle-ci.
+    { key: "cuisine", label: "🍲 Cuisine", q: 'deepcategory:"Cuisine"' },
     { key: "philo", label: "🧠 Philosophie", q: 'deepcategory:"Philosophie"' },
   ];
   const catByKey = (key) => CATEGORIES.find((c) => c.key === key) || CATEGORIES[0];
