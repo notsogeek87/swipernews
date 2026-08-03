@@ -6,6 +6,8 @@ import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
@@ -92,6 +94,21 @@ public class InAppBrowserActivity extends AppCompatActivity {
     /** Mode lecture : ne garder que le titre, le texte et les images. */
     private boolean readerOn;
     private ImageButton readerBtn;
+
+    /**
+     * Voile posé sur la WebView le temps que le mode lecture s'applique.
+     *
+     * <p>L'extraction ne peut avoir lieu qu'une fois le DOM complet (plus tôt,
+     * l'article serait tronqué) : la page du site est donc forcément peinte
+     * avant. Sans ce voile, on voyait le site en clair pendant une fraction de
+     * seconde puis la bascule — l'effet le plus visible du mode lecture était
+     * son propre retard. On masque, on transforme, on révèle.
+     */
+    private final Handler revealHandler = new Handler(Looper.getMainLooper());
+
+    /** Filet : une page qui ne finit jamais de charger ne doit pas rester noire. */
+    private static final long REVEAL_TIMEOUT_MS = 6000;
+    private final Runnable revealTask = this::revealContent;
 
     /** Scripts d'habillage, lus une fois depuis res/raw. */
     private String cmpScript;
@@ -222,6 +239,9 @@ public class InAppBrowserActivity extends AppCompatActivity {
             }
         });
 
+        // Avant même le premier octet : ouvrir en mode lecture ne doit jamais
+        // laisser entrevoir la page du site.
+        if (readerOn) coverContent();
         if (savedInstanceState != null) {
             web.restoreState(savedInstanceState);
         } else {
@@ -283,8 +303,29 @@ public class InAppBrowserActivity extends AppCompatActivity {
     private void toggleReader() {
         readerOn = !readerOn;
         updateReaderIcon();
+        // Pas de voile ici : la page est déjà affichée, la transformation est
+        // immédiate. Le voile ne sert qu'au chargement, où elle vient après.
         if (readerOn) injectReadScript();
         else web.reload();
+    }
+
+    /** Masque la WebView (sans la démonter : elle continue de charger et de rendre). */
+    private void coverContent() {
+        if (web == null) return;
+        web.setAlpha(0f);
+        revealHandler.removeCallbacks(revealTask);
+        revealHandler.postDelayed(revealTask, REVEAL_TIMEOUT_MS);
+    }
+
+    private void revealContent() {
+        revealHandler.removeCallbacks(revealTask);
+        if (web == null || web.getAlpha() >= 1f) return;
+        // Court délai : le remplacement du DOM par le script est fait, mais son
+        // rendu tient sur la ou les frames suivantes. Révéler dans la même
+        // frame laisserait voir une page à moitié peinte.
+        web.postDelayed(() -> {
+            if (web != null) web.animate().alpha(1f).setDuration(140).start();
+        }, 50);
     }
 
     private void updateReaderIcon() {
@@ -295,11 +336,14 @@ public class InAppBrowserActivity extends AppCompatActivity {
     }
 
     private void injectReadScript() {
-        if (!readerOn || web == null) return;
+        if (!readerOn || web == null) { revealContent(); return; }
         if (readScript == null) readScript = readRaw(R.raw.reader_read);
-        if (readScript == null) return;
+        if (readScript == null) { revealContent(); return; }
         web.evaluateJavascript(readScript, value -> web.evaluateJavascript(
             "document.documentElement.dataset.snRead || ''", state -> {
+                // Quel que soit le verdict, la page redevient visible ici : c'est
+                // le seul endroit qui sait que la transformation est terminée.
+                revealContent();
                 // evaluateJavascript rend du JSON : la chaîne arrive entre guillemets.
                 String s = state == null ? "" : state.replace("\"", "");
                 if ("1".equals(s)) return;                       // article simplifié
@@ -426,6 +470,9 @@ public class InAppBrowserActivity extends AppCompatActivity {
                 hostView.setText(prettyHost(url));
                 progress.setVisibility(View.VISIBLE);
                 showBar();          // nouvelle page : on se resitue avant de replonger
+                // En mode lecture, on masque dès le départ : la page du site ne
+                // doit pas apparaître le temps que l'extraction ait lieu.
+                if (readerOn) coverContent();
                 injectCmpScript();  // au plus tôt : le bandeau ne doit pas clignoter
             }
 
@@ -474,6 +521,10 @@ public class InAppBrowserActivity extends AppCompatActivity {
         errorView.setVisibility(View.VISIBLE);
         web.setVisibility(View.GONE);
         progress.setVisibility(View.GONE);
+        // Le voile du mode lecture n'a plus lieu d'être, et il ne doit pas rester
+        // en travers d'un rechargement réussi plus tard.
+        revealHandler.removeCallbacks(revealTask);
+        web.setAlpha(1f);
         showBar();   // sans la barre, on serait coincé devant l'erreur
     }
 
@@ -546,6 +597,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        revealHandler.removeCallbacks(revealTask);   // rien ne doit survivre à l'activité
         if (web != null) {
             web.stopLoading();
             // Détacher avant destroy() : une WebView détruite encore attachée à sa

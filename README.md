@@ -435,6 +435,15 @@ Trois choix qui comptent :
 - **on ne défait pas une transformation** : revenir à la page complète recharge
   l'URL, ce qui réaffiche exactement ce que le site sert — plutôt que de tenter
   de reconstruire une page déjà jetée ;
+- **on masque, on transforme, on révèle** : l'extraction exige un DOM complet
+  (plus tôt, l'article serait tronqué), donc la page du site est forcément
+  peinte avant. La WebView est rendue transparente dès le départ du chargement
+  et réapparaît en fondu une fois le verdict connu — sans quoi on voyait le site
+  en clair une fraction de seconde puis la bascule, et l'effet le plus visible
+  du mode lecture était son propre retard. La jauge de chargement, elle, reste
+  visible : l'attente se lit comme un chargement, pas comme un écran figé. Un
+  filet de 6 s révèle la page quoi qu'il arrive, pour qu'un site qui ne finit
+  jamais de charger ne laisse pas un écran noir ;
 - **aucun attribut ne survit** à l'élagage (classes, id, styles en ligne) : la
   feuille du site étant supprimée, une classe résiduelle ne servirait qu'à
   réintroduire du hasard.
