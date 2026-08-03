@@ -35,6 +35,7 @@
     { key: "sport", label: "⚽ Sport", q: 'deepcategory:"Sport"' },
     { key: "cinema", label: "🎬 Cinéma", q: 'deepcategory:"Cinéma"' },
     { key: "musique", label: "🎵 Musique", q: 'deepcategory:"Musique"' },
+    { key: "jeuxvideo", label: "🎮 Jeux vidéo", q: 'deepcategory:"Jeu vidéo"' },
     { key: "philo", label: "🧠 Philosophie", q: 'deepcategory:"Philosophie"' },
   ];
   const catByKey = (key) => CATEGORIES.find((c) => c.key === key) || CATEGORIES[0];
