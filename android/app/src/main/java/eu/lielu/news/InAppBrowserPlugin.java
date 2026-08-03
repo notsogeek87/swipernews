@@ -1,6 +1,7 @@
 package eu.lielu.news;
 
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.os.Build;
 
@@ -50,6 +51,43 @@ public class InAppBrowserPlugin extends Plugin {
         // API 34+ : l'animation est déclarée par l'activité entrante elle-même.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             activity.overridePendingTransition(R.anim.reader_in, R.anim.reader_hold);
+        }
+        call.resolve();
+    }
+
+    /**
+     * Feuille de partage du système : celle du téléphone, avec ses applications.
+     *
+     * <p>La WebView d'Android n'implémente pas {@code navigator.share} — dans
+     * l'APK, le partage retombait donc sur le menu de repli d'{@code index.html},
+     * une grille de cinq services web codés en dur. C'est pourtant la seule
+     * plateforme où l'appareil sait faire mieux : {@code ACTION_SEND} propose
+     * tout ce qui est installé, dans l'ordre des habitudes de l'utilisateur.
+     */
+    @PluginMethod
+    public void share(PluginCall call) {
+        String text = call.getString("text", "");
+        String title = call.getString("title", "");
+        if (text == null || text.trim().isEmpty()) {
+            call.reject("rien à partager");
+            return;
+        }
+        Activity activity = getActivity();
+        if (activity == null) {
+            call.reject("activité indisponible");
+            return;
+        }
+        Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType("text/plain");
+        // EXTRA_SUBJECT : l'objet du courriel, ignoré par les messageries.
+        if (title != null && !title.isEmpty()) send.putExtra(Intent.EXTRA_SUBJECT, title);
+        send.putExtra(Intent.EXTRA_TEXT, text);
+        try {
+            activity.startActivity(
+                Intent.createChooser(send, activity.getString(R.string.share_chooser)));
+        } catch (ActivityNotFoundException e) {
+            call.reject("aucune application de partage");   // le web reprend la main
+            return;
         }
         call.resolve();
     }

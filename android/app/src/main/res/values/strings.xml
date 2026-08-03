@@ -5,6 +5,9 @@
     <string name="package_name">eu.lielu.news</string>
     <string name="custom_url_scheme">eu.lielu.news</string>
 
+    <!-- Feuille de partage du système (InAppBrowserPlugin.share) -->
+    <string name="share_chooser">Partager l\'article</string>
+
     <!-- Navigateur intégré (InAppBrowserActivity) -->
     <string name="reader_close">Fermer l\'article</string>
     <string name="reader_share">Partager</string>

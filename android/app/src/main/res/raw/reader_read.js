@@ -10,10 +10,16 @@
  * (galerie, page d'accueil, application web), la page est laissée intacte.
  * Mieux vaut une page normale qu'un article vide.
  *
- * La mise en page se règle depuis l'app : window.__snRead = {size, theme} est
- * posé par InAppBrowserActivity juste avant l'injection (le natif ne stocke
+ * La mise en page se règle depuis l'app : window.__snRead = {size, theme, top}
+ * est posé par InAppBrowserActivity juste avant l'injection (le natif ne stocke
  * rien, il relaie le localStorage du web à chaque ouverture). Valeurs inconnues
  * ou objet absent : on retombe sur « m » et « dark ».
+ *
+ * « top » est la hauteur de la barre du lecteur, en pixels CSS : l'article la
+ * réserve lui-même en marge haute, sinon le titre commence DERRIÈRE la barre et
+ * ses premières lignes sont invisibles. C'est la page qui porte cette marge, et
+ * plus la WebView (voir applyWebPadding côté activité) : une seule marge, posée
+ * là où le texte est mis en page.
  */
 (function () {
   try {
@@ -196,13 +202,31 @@
       if (!isNaN(d)) when = d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
     }
 
-    /* 7. Le titre écrit deux fois. La plupart des sites répètent le titre dans
-       l'article ; affiché sous le nôtre, il donne un doublon en tête de page. */
+    /* 7. Le titre : celui de la page d'abord, celui de l'article s'il dit mieux.
+       Beaucoup de sites servent en og:title une version RACCOURCIE, écrite pour
+       les réseaux : « Zelensky limoge l'ambassadrice… » là où l'article titre
+       « Guerre en Ukraine : le président Volodymyr Zelensky limoge… ». Le début
+       manquait donc, alors que le <h1> de la page l'avait. Quand ce <h1> contient
+       le titre retenu et le dépasse, c'est lui le titre complet.
+       Dans l'autre sens, un <title> se termine souvent par « — Le Monde » : le
+       <h1> en donne alors la même chose sans l'enseigne.
+       Puis le doublon : la plupart des sites répètent le titre dans le corps de
+       l'article ; affiché sous le nôtre, il donne deux fois la même ligne. */
     function norm(t) {
       return (t || "").replace(/\s+/g, " ").trim().toLowerCase().replace(/[«»"'’.,:;!?—–-]/g, "");
     }
     var firstHead = art.querySelector("h1,h2,h3");
-    if (firstHead && title && norm(firstHead.textContent) === norm(title) && firstHead.parentNode) {
+    var headText = firstHead ? (firstHead.textContent || "").replace(/\s+/g, " ").trim() : "";
+    // 200 caractères : au-delà ce n'est plus un titre mais un paragraphe balisé.
+    if (headText && headText.length <= 200) {
+      var nh = norm(headText), nt = norm(title);
+      if (!nt                                                        // aucun titre de page
+          || (nh.indexOf(nt) >= 0 && headText.length > title.length) // le <h1> englobe et complète
+          || (nt.indexOf(nh) === 0 && headText.length >= 20)) {      // la page ajoute l'enseigne
+        title = headText;
+      }
+    }
+    if (firstHead && title && norm(headText) === norm(title) && firstHead.parentNode) {
       firstHead.parentNode.removeChild(firstHead);
     }
 
@@ -237,6 +261,9 @@
     var opt = window.__snRead || {};
     var T = THEMES[opt.theme] || THEMES.dark;
     var FS = SIZES[opt.size] || SIZES.m;
+    // Barre du lecteur : bornée, elle vient du natif mais rien n'oblige à la
+    // croire. 0 hors app packagée, où la page n'a pas de barre au-dessus d'elle.
+    var TOP = Math.max(0, Math.min(300, Number(opt.top) || 0));
 
     /* Typographie de liseuse : une colonne, du serif, des marges franches.
        Deux réglages font l'essentiel du confort et manquaient :
@@ -251,7 +278,10 @@
       'html{-webkit-text-size-adjust:100%}' +
       'html,body{margin:0;padding:0;background:' + T.bg + ';color:' + T.ink + '}' +
       '::selection{background:' + T.sel + '}' +
-      '.sn-read{max-width:33em;margin:0 auto;padding:22px 20px 92px;' +
+      /* La marge haute réserve la place de la barre du lecteur : elle passe par
+         une variable pour que l'activité puisse la corriger sans réinjecter
+         (rotation, encoche — la barre n'a pas toujours la même hauteur). */
+      '.sn-read{max-width:33em;margin:0 auto;padding:calc(22px + var(--sn-top,0px)) 20px 92px;' +
         'font:' + FS + 'px/1.6 Georgia,"Noto Serif","Times New Roman",serif;' +
         'hyphens:auto;-webkit-hyphens:auto;overflow-wrap:break-word;word-break:normal}' +
       '.sn-read h1{font-size:1.62em;line-height:1.18;margin:0 0 12px;color:' + T.strong + ';' +
@@ -296,6 +326,9 @@
         'z-index:2147483647;pointer-events:none}';
 
     document.documentElement.dataset.snRead = "1";
+    // Posée sur <html> et non dans la feuille : c'est la seule déclaration que
+    // l'activité sait remplacer d'un setProperty quand la barre change de taille.
+    document.documentElement.style.setProperty("--sn-top", TOP + "px");
     document.head.innerHTML =
       '<meta name="viewport" content="width=device-width,initial-scale=1">';
     // Le titre repart avec le <head> : sans lui, la WebView rapporte l'URL comme

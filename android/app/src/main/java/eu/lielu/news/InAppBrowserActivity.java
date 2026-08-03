@@ -107,6 +107,18 @@ public class InAppBrowserActivity extends AppCompatActivity {
     private String readerTheme = "dark";
 
     /**
+     * Article simplifié effectivement à l'écran.
+     *
+     * <p>La marge haute posée sur la WebView ne dégageait pas le titre du mode
+     * lecture : ses premières lignes se lisaient derrière la barre. C'est
+     * désormais la page elle-même qui réserve cette place ({@code --sn-top},
+     * voir res/raw/reader_read.js), là où le texte est mis en page. Les deux
+     * marges s'additionneraient : celle de la WebView passe donc à zéro tant que
+     * l'article simplifié est affiché, et revient dès la page suivante.
+     */
+    private boolean readerApplied;
+
+    /**
      * Voile posé sur la WebView le temps que le mode lecture s'applique.
      *
      * <p>L'extraction ne peut avoir lieu qu'une fois le DOM complet (plus tôt,
@@ -215,6 +227,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
             if (h > 0 && h != barHeight) {
                 barHeight = h;
                 applyWebPadding();
+                pushReaderTop();
                 if (!barShown) barWrap.setTranslationY(-barHeight);
             }
         });
@@ -262,10 +275,27 @@ public class InAppBrowserActivity extends AppCompatActivity {
         }
     }
 
-    /** Marges de la WebView : la barre en haut, les barres système sur les côtés. */
+    /**
+     * Marges de la WebView : la barre en haut, les barres système sur les côtés.
+     * En mode lecture, la marge haute est celle de la page (voir readerApplied) —
+     * en remettre une ici la doublerait.
+     */
     private void applyWebPadding() {
         if (web == null) return;
-        web.setPadding(insetLeft, barHeight, insetRight, insetBottom);
+        web.setPadding(insetLeft, readerApplied ? 0 : barHeight, insetRight, insetBottom);
+    }
+
+    /** Hauteur de la barre en pixels CSS, la seule unité que comprend la page. */
+    private int barCssHeight() {
+        float d = getResources().getDisplayMetrics().density;
+        return d > 0 ? Math.round(barHeight / d) : barHeight;
+    }
+
+    /** Redit sa marge haute à l'article simplifié, sans avoir à le réinjecter. */
+    private void pushReaderTop() {
+        if (!readerApplied || web == null) return;
+        web.evaluateJavascript(
+            "document.documentElement.style.setProperty('--sn-top','" + barCssHeight() + "px')", null);
     }
 
     /* ---------- Barre escamotable ----------
@@ -388,7 +418,8 @@ public class InAppBrowserActivity extends AppCompatActivity {
         // qui la lit puis retombe sur ses valeurs par défaut si elle manque. Les
         // chaînes sont passées par oneOf() : rien d'autre que les valeurs connues
         // ne peut arriver ici, donc rien à échapper.
-        String prelude = "window.__snRead={size:\"" + readerSize + "\",theme:\"" + readerTheme + "\"};\n";
+        String prelude = "window.__snRead={size:\"" + readerSize + "\",theme:\"" + readerTheme
+            + "\",top:" + barCssHeight() + "};\n";
         web.evaluateJavascript(prelude + readScript, value -> web.evaluateJavascript(
             "document.documentElement.dataset.snRead || ''", state -> {
                 // Quel que soit le verdict, la page redevient visible ici : c'est
@@ -396,7 +427,11 @@ public class InAppBrowserActivity extends AppCompatActivity {
                 revealContent();
                 // evaluateJavascript rend du JSON : la chaîne arrive entre guillemets.
                 String s = state == null ? "" : state.replace("\"", "");
-                if ("1".equals(s)) return;                       // article simplifié
+                // La page simplifiée porte sa propre marge haute : la WebView
+                // lâche la sienne, sinon les deux s'ajoutent.
+                readerApplied = "1".equals(s);
+                applyWebPadding();
+                if (readerApplied) return;                       // article simplifié
                 if ("auth".equals(s)) {
                     // Page de connexion laissée intacte : ce n'est pas un échec, le
                     // mode reste actif pour l'article qui suit. On le dit quand même,
@@ -512,6 +547,10 @@ public class InAppBrowserActivity extends AppCompatActivity {
                 currentUrl = url;
                 hostView.setText(prettyHost(url));
                 progress.setVisibility(View.VISIBLE);
+                // Nouvelle page : celle du site, pas encore simplifiée. La marge
+                // haute redevient celle de la WebView jusqu'à preuve du contraire.
+                readerApplied = false;
+                applyWebPadding();
                 showBar();          // nouvelle page : on se resitue avant de replonger
                 // En mode lecture, on masque dès le départ : la page du site ne
                 // doit pas apparaître le temps que l'extraction ait lieu.

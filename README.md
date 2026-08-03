@@ -43,7 +43,7 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
   flux listent la vignette en premier ; la prendre donnait des fonds flous)
 - Gestion des sources : ajout, suppression, activation/désactivation
 - Import / export des sources aux formats **OPML** (standard) et **JSON** — importe tes sources et lis-les directement
-- Partage d'un article (feuille de partage native, ou menu WhatsApp / Telegram / mail / X / copie du lien),
+- Partage d'un article (feuille de partage du système — celle de l'appareil, avec ses applications — ou, à défaut, menu WhatsApp / Telegram / mail / X / copie du lien),
   depuis un rail unique qui agit sur la carte affichée
 - **App Android uniquement — navigateur intégré** : « Lire l'article » et
   « Découvrir » ouvrent l'article *dans* l'app (fond sombre du fil, barre fine
@@ -397,6 +397,15 @@ secours, et la jauge de chargement rose → cyan de l'app. L'article monte depui
 le bas comme les feuilles du fil, et le bouton retour remonte d'abord
 l'historique de la page avant de refermer le lecteur.
 
+**Partage.** La WebView d'Android n'implémente pas `navigator.share` : dans
+l'APK, le bouton partager du fil tombait donc sur le menu de repli
+d'`index.html`, une grille de cinq services web codés en dur — alors que c'est
+justement la plateforme où l'appareil sait faire beaucoup mieux. Le pont expose
+une méthode `share` qui déclenche un `ACTION_SEND` : la feuille de partage du
+système s'ouvre, avec **les applications installées**, dans l'ordre des
+habitudes de l'utilisateur. Le web garde sa cascade inchangée —
+`navigator.share` quand le navigateur l'a, la grille sinon.
+
 **Lecture immersive.** La barre s'efface dès qu'on descend dans l'article et
 revient au premier geste vers le haut — même règle que la barre du fil, qui se
 masque pendant le swipe. La barre d'état d'Android part avec elle : il ne reste
@@ -548,6 +557,19 @@ Enfin, quelques défauts d'extraction que la remise à plat rendait voyants :
   ses enfants partis ;
 - **le titre écrit deux fois**, la plupart des sites le répétant dans le corps de
   l'article, juste sous celui que le lecteur affiche déjà ;
+- **le titre raccourci**, quand la page sert en `og:title` une version écrite
+  pour les réseaux — « Zelensky limoge l'ambassadrice… » là où l'article titre
+  « Guerre en Ukraine : le président Volodymyr Zelensky limoge… » : le début
+  manquait, alors que le `<h1>` de la page l'avait. Il est donc préféré dès
+  qu'il contient le titre retenu et le dépasse ; et dans l'autre sens, quand le
+  `<title>` n'ajoute qu'une enseigne (« — Le Monde »), c'est encore le `<h1>`
+  qui donne la bonne version. Bornée à 200 caractères, pour qu'un paragraphe
+  balisé en `<h1>` ne devienne pas un titre ;
+- **les premières lignes du titre cachées derrière la barre** du lecteur : la
+  place de la barre est désormais réservée par la page elle-même
+  (`--sn-top`, transmis à l'injection et corrigeable à chaud pour la rotation),
+  et non plus par la marge de la WebView — une seule marge, posée là où le
+  texte est mis en page ;
 - **les étiquettes d'habillage** (« Publicité », « Partager », « À lire aussi »)
   quand elles forment le texte **entier** d'un bloc — la comparaison ne porte
   jamais sur une occurrence, sans quoi un article traitant de publicité y

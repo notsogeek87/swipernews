@@ -461,8 +461,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=41"></script>
-<script src="src/learn-core.js?v=41"></script>
+<script src="src/lib.js?v=42"></script>
+<script src="src/learn-core.js?v=42"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -728,7 +728,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="41";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="42";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1654,15 +1654,25 @@ function shareParts(it){
 }
 async function shareItem(it){
   const {full}=shareParts(it);
-  // 1) partage natif (ouvre la feuille de partage du téléphone : Messages, WhatsApp, Mail…)
+  /* 1) app packagée : la feuille de partage d'Android, par le pont natif. La
+     WebView du système n'implémente PAS navigator.share — sans ce détour, le
+     téléphone qui sait tout partager se retrouvait devant notre grille de
+     repli. On passe donc en premier, avant même navigator.share. */
+  const iab=iabPlugin();
+  if(isNativeApp&&iab&&iab.share){
+    // Résolu dès que la feuille est ouverte : annuler ensuite n'est pas un échec
+    // et ne doit rien rouvrir. Seule une vraie panne rejette, et rend la main ici.
+    try{await iab.share({title:it.title,text:full});return;}catch(e){warn("partage natif",e);}
+  }
+  // 2) partage natif du navigateur (Android/iOS mobile, Safari) : même feuille
   if(navigator.share){
     try{await navigator.share({title:it.title,text:full});return;}catch(err){if(err&&err.name==="AbortError")return;}
   }
-  // 2) repli : menu maison avec destinations courantes
+  // 3) repli : menu maison avec destinations courantes
   openShareMenu(it);
 }
 
-/* Menu de partage de repli (desktop ou si le partage natif est absent) */
+/* Menu de partage de repli (desktop, ou si aucune feuille de partage n'existe) */
 function openShareMenu(it){
   const {link,full}=shareParts(it);
   const enc=encodeURIComponent;
