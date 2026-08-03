@@ -9,11 +9,29 @@ documentation. S'y tenir.
 
 ---
 
+## À quoi sert ce projet
+
+**SwiperNews** (`news.lielu.eu`) fait lire des articles au **swipe vertical
+plein écran**, comme un fil de réseau social — une carte par article, un geste
+pour passer à la suivante. Deux fils, entre lesquels on bascule au balayage
+horizontal :
+
+- **📰 Actus** — les flux RSS que l'utilisateur choisit lui-même. Pas
+  d'algorithme, pas de recommandation, pas de compte : le fil est exactement la
+  liste de sources cochées, et elle s'importe/s'exporte en OPML.
+- **🎓 Apprendre** — des articles Wikipédia tirés au hasard, filtrables par
+  centres d'intérêt (sciences, histoire, espace…), en défilement infini.
+
+L'intention produit, qui explique beaucoup de décisions techniques : reprendre
+le geste des réseaux sociaux **sans** ce qui va avec. D'où l'absence de compte
+et de télémétrie, la reprise de lecture mémorisée par mode, le lecteur intégré
+sans barre d'URL, et le refus de tout appel à un tiers non choisi.
+
 ## Ce qu'est ce dépôt
 
-Une PWA de lecture en swipe vertical (flux RSS + Wikipédia), **sans build ni
-dépendance à l'exécution** : `index.html` s'ouvre tel quel dans un navigateur.
-Autour, quatre choses seulement :
+Une PWA **sans build ni dépendance à l'exécution** : `index.html` s'ouvre tel
+quel dans un navigateur, y compris en `file://`. Autour, quatre choses
+seulement :
 
 | Dossier | Rôle |
 | --- | --- |
@@ -23,6 +41,97 @@ Autour, quatre choses seulement :
 | `android/` | Projet natif Capacitor (APK autonome, sans backend) |
 
 L'outillage (lint, tests, CI) est optionnel et ne change rien au déploiement.
+
+---
+
+## Sur quoi ça tourne
+
+Le **même** `index.html` sert les deux cibles. Ce qui change, c'est uniquement
+la façon d'aller chercher les données — tout est branché sur `isNativeApp`.
+
+### Web (PWA)
+
+Hébergé sur **Vercel** : fichiers statiques + les fonctions de `api/`. Un
+service worker (`sw.js`) sert l'app hors-ligne — `index.html` en **réseau
+d'abord** (le cache ne sert que hors-ligne), les icônes et polices en cache
+d'abord. `vercel.json` pose les en-têtes : CSP stricte, `Cache-Control`
+immuable pour les polices et logos, `must-revalidate` pour `index.html` et
+`sw.js`.
+
+Un navigateur ne peut pas lire un flux RSS tiers (pas de CORS chez la plupart
+des sources) : d'où `api/feed.js`, avec repli sur des proxys publics si le
+backend est absent (GitHub Pages, `file://`). Wikipédia, elle, autorise le CORS
+et se lit en direct.
+
+### Natif (Android, Capacitor)
+
+**Capacitor** empaquette `index.html`, `src/*.js`, le manifeste et les icônes
+**dans l'APK** : l'app s'ouvre sans réseau. Elle tourne dans une WebView
+système, avec un pont JS↔Java pour ce que le web ne peut pas faire.
+
+Deux différences de fond avec le web :
+
+- **aucun appel à `news.lielu.eu`** : l'APK ne dépend d'aucun backend. Les flux
+  RSS passent par `nativeGet()`, qui appelle explicitement le plugin
+  `CapacitorHttp` — le réseau natif Android, où le CORS (une politique de
+  navigateur) ne s'applique pas ;
+- **un navigateur intégré maison** pour lire les articles sans quitter l'app,
+  avec ses modes et réglages (voir plus bas).
+
+`webDir` pointe sur `www/`, un miroir **régénéré et non versionné** des
+fichiers racine : `npm run cap:prepare` le recopie avant chaque `cap sync`. Ne
+jamais éditer `www/`.
+
+Cibles : `minSdk 24`, `compile/targetSdk 36` (`android/variables.gradle`).
+
+---
+
+## Compiler et publier
+
+### Web
+
+Rien à compiler. `python3 -m http.server 8000` suffit pour tester en local (le
+service worker et l'installation PWA exigent HTTP, pas `file://`). Vercel
+déploie `main` automatiquement.
+
+### APK Android
+
+`npm run cap:sync` d'abord — **toujours** : sans lui, le projet natif contient
+encore la version précédente d'`index.html`, et on débogue un fichier qui n'est
+pas celui qu'on vient de modifier.
+
+```bash
+npm ci
+npm run cap:sync                # www/ régénéré puis recopié dans android/
+cd android && ./gradlew assembleDebug
+# → android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Version : `-PversionCode=N -PversionName=X` sont injectés par la CI ; en local,
+`android/app/build.gradle` retombe sur `1` / `1.0`. Sans variables
+d'environnement de signature (`ANDROID_KEYSTORE_FILE`, `…_PASSWORD`,
+`ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`), Gradle utilise la clé debug :
+installable pour tester, mais impossible à mettre à jour par-dessus.
+
+**Rien de tout cela n'est faisable dans l'environnement de développement de ce
+dépôt** (`dl.google.com` bloqué, donc pas de SDK) — voir la section suivante
+pour ce qui reste vérifiable, et faire compiler par la CI.
+
+### Ce que fait la CI (`.github/workflows/android.yml`)
+
+`npm ci` → `npm run cap:sync` → `./gradlew assembleRelease` avec le
+`versionCode` tiré du numéro de run (il doit croître à chaque publication pour
+qu'Android accepte l'installation par-dessus), APK signé depuis les secrets du
+dépôt, puis publication en **release** : une par build sur `main`, une
+préversion roulante sur `staging`.
+
+### F-Droid
+
+`fdroid/eu.lielu.news.yml` est un brouillon de recette à recopier dans
+`fdroiddata` ; il doit rester équivalent à `android.yml`, sans dépendre de
+GitHub Actions. Conséquence pratique : **tout ce qui est nécessaire au build
+doit venir des sources**, ce qui interdit d'embarquer quoi que ce soit sous une
+licence incompatible avec le MIT (voir « décisions à ne pas défaire »).
 
 ---
 
