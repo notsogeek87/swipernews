@@ -25,8 +25,13 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewFeature;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Navigateur intégré de l'app packagée.
@@ -41,23 +46,45 @@ import androidx.webkit.WebViewFeature;
  * dernier impose l'habillage de Chrome (barre d'URL claire, menu du navigateur)
  * et ajoute une dépendance {@code androidx.browser}. Ici tout l'habillage est
  * celui de l'app, et rien n'est ajouté au paquet que du code de ce dépôt.
+ *
+ * <p>Lecture immersive : la barre s'efface dès qu'on descend dans l'article et
+ * revient au premier geste vers le haut — comme la barre du fil, qui se masque
+ * pendant le swipe. La barre d'état d'Android suit le même sort, il ne reste
+ * alors que le texte à l'écran.
  */
 public class InAppBrowserActivity extends AppCompatActivity {
 
     public static final String EXTRA_URL = "eu.lielu.news.reader.URL";
     public static final String EXTRA_TITLE = "eu.lielu.news.reader.TITLE";
+    public static final String EXTRA_HIDE_CMP = "eu.lielu.news.reader.HIDE_CMP";
 
-    private WebView web;
+    private ReaderWebView web;
     private ProgressBar progress;
     private TextView titleView;
     private TextView hostView;
     private View errorView;
+    private View barWrap;
+    private WindowInsetsControllerCompat insetsController;
 
     /** Dernière URL affichée : sert au partage et au repli « navigateur système ». */
     private String currentUrl = "";
 
     /** Titre fourni par la carte : évite une barre vide le temps du chargement. */
     private String cardTitle = "";
+
+    /** Masquer les bandeaux de consentement (choix de l'utilisateur, voir res/raw/reader_cmp.js). */
+    private boolean hideCmp = true;
+
+    /** Script de masquage, lu une fois depuis res/raw. */
+    private String cmpScript;
+
+    /** Hauteur du bloc barre + jauge, connue seulement après la mise en page. */
+    private int barHeight;
+
+    private boolean barShown = true;
+
+    /** Marges horizontales/basse dues aux barres système, à conserver sur la WebView. */
+    private int insetLeft, insetRight, insetBottom;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,6 +99,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
         currentUrl = url;
         cardTitle = intent.getStringExtra(EXTRA_TITLE);
         if (cardTitle == null) cardTitle = "";
+        hideCmp = intent.getBooleanExtra(EXTRA_HIDE_CMP, true);
 
         // API 34+ : l'animation d'ouverture/fermeture se déclare ici (côté activité
         // entrante). En dessous, c'est overridePendingTransition, appelé par
@@ -87,25 +115,46 @@ public class InAppBrowserActivity extends AppCompatActivity {
         // au lieu de dépendre du comportement par défaut, qui change selon l'API.
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
 
-        final View root = findViewById(R.id.reader_root);
-        final View bar = findViewById(R.id.reader_bar);
-        final View content = findViewById(R.id.reader_content);
-        final int barPad = Math.round(4 * getResources().getDisplayMetrics().density);
-        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
-            Insets s = insets.getInsets(
-                WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
-            // La barre monte jusque sous l'heure/la batterie, le contenu s'arrête
-            // au-dessus de la barre de navigation.
-            bar.setPadding(s.left + barPad, s.top, s.right + barPad, 0);
-            content.setPadding(s.left, 0, s.right, s.bottom);
-            return insets;
-        });
-
         titleView = findViewById(R.id.reader_title);
         hostView = findViewById(R.id.reader_host);
         progress = findViewById(R.id.reader_progress);
         errorView = findViewById(R.id.reader_error);
         web = findViewById(R.id.reader_web);
+        barWrap = findViewById(R.id.reader_barwrap);
+
+        final View root = findViewById(R.id.reader_root);
+        insetsController = WindowCompat.getInsetsController(getWindow(), root);
+        // La barre d'état revient d'un glissement depuis le haut, sans forcer à
+        // remonter dans l'article.
+        insetsController.setSystemBarsBehavior(
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+            // getInsetsIgnoringVisibility, et non getInsets : escamoter la barre
+            // d'état change sinon les marges, donc la taille de la zone de rendu,
+            // donc la mise en page du site — à chaque geste. Ici les marges
+            // restent celles de « barres visibles », quoi qu'il arrive à l'écran.
+            Insets s = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars());
+            Insets cut = insets.getInsets(WindowInsetsCompat.Type.displayCutout());
+            insetLeft = Math.max(s.left, cut.left);
+            insetRight = Math.max(s.right, cut.right);
+            insetBottom = s.bottom;
+            barWrap.setPadding(insetLeft, Math.max(s.top, cut.top), insetRight, 0);
+            applyWebPadding();
+            return insets;
+        });
+
+        // La hauteur du bloc barre + jauge n'est connue qu'une fois mesuré ; elle
+        // devient la marge haute de la WebView, pour que l'article commence sous
+        // la barre et non derrière.
+        barWrap.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            int h = b - t;
+            if (h > 0 && h != barHeight) {
+                barHeight = h;
+                applyWebPadding();
+                if (!barShown) barWrap.setTranslationY(-barHeight);
+            }
+        });
 
         titleView.setText(cardTitle);
         hostView.setText(prettyHost(url));
@@ -143,6 +192,68 @@ public class InAppBrowserActivity extends AppCompatActivity {
         }
     }
 
+    /** Marges de la WebView : la barre en haut, les barres système sur les côtés. */
+    private void applyWebPadding() {
+        if (web == null) return;
+        web.setPadding(insetLeft, barHeight, insetRight, insetBottom);
+    }
+
+    /* ---------- Barre escamotable ----------
+       Même règle que le fil : on lit, la barre s'efface ; on revient vers le
+       haut, elle réapparaît. Elle coulisse (translationY) sans changer la taille
+       de la WebView, sinon le site referait sa mise en page à chaque geste. */
+
+    private void onWebScroll(int y, int dy) {
+        if (barHeight <= 0) return;
+        if (y <= barHeight / 2) {   // en haut de l'article : barre toujours là
+            showBar();
+        } else if (dy > 6) {        // seuil : absorbe le tremblement et le rebond
+            hideBar();
+        } else if (dy < -6) {
+            showBar();
+        }
+    }
+
+    private void showBar() {
+        if (barShown) return;
+        barShown = true;
+        barWrap.animate().translationY(0).setDuration(180).start();
+        if (insetsController != null) insetsController.show(WindowInsetsCompat.Type.statusBars());
+    }
+
+    private void hideBar() {
+        if (!barShown) return;
+        barShown = false;
+        barWrap.animate().translationY(-barHeight).setDuration(180).start();
+        // L'heure et la batterie partent avec la barre : plus rien que l'article.
+        if (insetsController != null) insetsController.hide(WindowInsetsCompat.Type.statusBars());
+    }
+
+    /* ---------- Bandeaux de consentement ----------
+       Le script (res/raw/reader_cmp.js) MASQUE sans jamais accepter : ne pas
+       répondre vaut refus, cliquer « Tout accepter » à la place de
+       l'utilisateur serait l'inverse de ce qu'il demande en activant l'option.
+       Injecté à plusieurs moments car les CMP arrivent souvent après la page ;
+       le script est idempotent. */
+
+    private void injectCmpScript() {
+        if (!hideCmp || web == null) return;
+        if (cmpScript == null) cmpScript = readRaw(R.raw.reader_cmp);
+        if (cmpScript != null) web.evaluateJavascript(cmpScript, null);
+    }
+
+    private String readRaw(int resId) {
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader r = new BufferedReader(
+                new InputStreamReader(getResources().openRawResource(resId), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = r.readLine()) != null) sb.append(line).append('\n');
+        } catch (Exception e) {
+            return null;   // sans le script, la page reste lisible, bandeau compris
+        }
+        return sb.toString();
+    }
+
     private void setUpWebView() {
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);          // sans JS, la moitié des sites d'actu est vide
@@ -170,6 +281,11 @@ public class InAppBrowserActivity extends AppCompatActivity {
             WebSettingsCompat.setAlgorithmicDarkeningAllowed(s, true);
         }
 
+        // clipToPadding=false : la marge haute n'est pas une zone morte, le texte
+        // la traverse en défilant et passe sous la barre au lieu d'être coupé.
+        web.setClipToPadding(false);
+        web.setOnScrollListener(this::onWebScroll);
+
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest request) {
@@ -184,6 +300,8 @@ public class InAppBrowserActivity extends AppCompatActivity {
                 currentUrl = url;
                 hostView.setText(prettyHost(url));
                 progress.setVisibility(View.VISIBLE);
+                showBar();          // nouvelle page : on se resitue avant de replonger
+                injectCmpScript();  // au plus tôt : le bandeau ne doit pas clignoter
             }
 
             @Override
@@ -191,6 +309,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
                 currentUrl = url;
                 hostView.setText(prettyHost(url));
                 progress.setVisibility(View.GONE);
+                injectCmpScript();
             }
 
             @Override
@@ -206,6 +325,9 @@ public class InAppBrowserActivity extends AppCompatActivity {
             public void onProgressChanged(WebView v, int newProgress) {
                 progress.setProgress(newProgress, true);
                 progress.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
+                // Les CMP se greffent en cours de chargement : une passe au milieu
+                // du parcours les attrape avant qu'ils ne s'affichent.
+                if (newProgress >= 35 && newProgress < 100) injectCmpScript();
             }
 
             @Override
@@ -224,6 +346,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
         errorView.setVisibility(View.VISIBLE);
         web.setVisibility(View.GONE);
         progress.setVisibility(View.GONE);
+        showBar();   // sans la barre, on serait coincé devant l'erreur
     }
 
     private void hideError() {

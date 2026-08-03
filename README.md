@@ -34,7 +34,9 @@ L'outillage de **développement** (lint, tests, CI) est optionnel et ne change r
   « Découvrir » ouvrent l'article *dans* l'app (fond sombre du fil, barre fine
   sans URL, jauge bicolore), au lieu de basculer vers Chrome — et un réglage
   **Ouvrir les articles : dans l'app / navigateur** permet de revenir au
-  comportement d'avant. Voir [Navigateur intégré](#navigateur-intégré-app-android).
+  comportement d'avant. La barre s'efface pendant la lecture (barre d'état
+  comprise) et les **bandeaux cookies sont masqués — jamais acceptés**, ce qui
+  se désactive aussi. Voir [Navigateur intégré](#navigateur-intégré-app-android).
   Sur le web, le lien s'ouvre dans un nouvel onglet comme avant
 - **Mode Apprendre** 🎓 : un sélecteur à deux onglets en haut (**📰 Actus** / **🎓 Apprendre**, l'actif surligné) bascule le fil vers des articles Wikipédia aléatoires pour swiper en apprenant. Le fil est **sans fin** — de nouveaux articles se chargent automatiquement en approchant du bas — le bouton **↻** repart sur une nouvelle fournée, et le mode est mémorisé entre les sessions.
 - Installable comme application (PWA) avec fonctionnement hors-ligne
@@ -332,6 +334,22 @@ secours, et la jauge de chargement rose → cyan de l'app. L'article monte depui
 le bas comme les feuilles du fil, et le bouton retour remonte d'abord
 l'historique de la page avant de refermer le lecteur.
 
+**Lecture immersive.** La barre s'efface dès qu'on descend dans l'article et
+revient au premier geste vers le haut — même règle que la barre du fil, qui se
+masque pendant le swipe. La barre d'état d'Android part avec elle : il ne reste
+alors que le texte, et un glissement depuis le haut la ramène sans quitter sa
+place dans l'article. Deux détails rendent la chose fluide :
+
+- la barre **coulisse** (`translationY`) au lieu d'être retirée de la mise en
+  page — un changement de hauteur de vue relancerait la mise en page du site à
+  chaque geste. D'où le `FrameLayout` : la barre flotte au-dessus de la WebView,
+  qui ne bouge jamais ;
+- les marges viennent de `getInsetsIgnoringVisibility` et non de `getInsets` :
+  escamoter la barre d'état changerait sinon les marges, donc la zone de rendu,
+  donc… la mise en page du site, à nouveau. La WebView reçoit une marge haute
+  égale à la hauteur de la barre, avec `clipToPadding=false` pour que le texte
+  passe *sous* la barre en défilant au lieu d'être coupé.
+
 Détails d'implémentation qui comptent :
 
 - **WebView maison plutôt qu'un _Custom Tab_** : un Custom Tab impose
@@ -360,11 +378,43 @@ APK le plugin n'existe pas, la fonction rend `false` et le lien garde son
 comportement de navigateur (`target="_blank"`) — c'est aussi le repli si le pont
 natif échouait.
 
+**Bandeaux de consentement.** Le lecteur masque à l'ouverture les bandeaux
+cookies (`res/raw/reader_cmp.js`, injecté au début, en cours et en fin de
+chargement — les CMP arrivent souvent après la page, le script est donc
+idempotent et rejoué).
+
+> **Il masque, il n'accepte jamais.** Aucun bouton n'est cliqué, aucun
+> consentement n'est donné au nom de l'utilisateur : ne pas répondre à une
+> demande de consentement vaut refus, c'est l'option la plus protectrice. Un
+> script qui cliquerait « Tout accepter » pour faire disparaître le bandeau
+> ferait exactement l'inverse — c'est pour cela qu'on s'y refuse.
+
+Deux passes complémentaires, plus un déverrouillage du défilement (beaucoup de
+bandeaux figent la page derrière eux) :
+
+1. une feuille de style listant les conteneurs racines des CMP connus
+   (OneTrust, Didomi, Quantcast, Sourcepoint, Cookiebot, Axeptio,
+   Tarteaucitron, AppConsent, Usercentrics, Osano, Klaro, Iubenda…) : des
+   identifiants stables, donc quasiment aucun risque de faux positif ;
+2. une heuristique courte pour les bandeaux maison, à **trois** conditions
+   cumulatives — élément fixe ou collant à trois niveaux au plus sous `<body>`,
+   texte parlant de cookies/consentement, et présence d'un bouton d'acceptation.
+   Les trois ensemble évitent de faire disparaître un article qui *parlerait* de
+   cookies. Le parcours est borné (400 éléments) pour rester gratuit sur une
+   longue page.
+
+Vérifié sur une page piégée (`test` manuel en Chromium) : bandeau OneTrust,
+bandeau Didomi et bandeau maison masqués ; barre de navigation fixe, article
+traitant des cookies et encart newsletter **préservés** ; défilement rendu.
+
 **Le lecteur intégré se refuse** : un réglage « Ouvrir les articles » propose
 *Dans l'app* (défaut) ou *Navigateur*, mémorisé dans
 `fluxswipe.readpref.v1`. Sur *Navigateur*, `openArticle()` rend `false` et le
 lien repart au navigateur du téléphone, exactement comme avant l'ajout du
-lecteur. Le réglage figure dans **les deux** panneaux — Sources et Centres
+lecteur. Un second réglage, « Bandeaux cookies : Masqués / Affichés »
+(`fluxswipe.cookiebanner.v1`), n'apparaît que quand le lecteur est actif — sans
+lui, la question ne se pose plus. Les deux préférences vivent côté web et sont
+transmises à chaque ouverture (`hideCmp`) : le natif ne garde aucun état. Le réglage figure dans **les deux** panneaux — Sources et Centres
 d'intérêt — parce qu'ils ne sont jamais atteignables en même temps (⚙ Sources
 n'existe qu'en mode Actus, ✎ Modifier qu'en mode Apprendre) et que le choix vaut
 pour les deux fils : `renderReadPref()` remplit les deux points de montage

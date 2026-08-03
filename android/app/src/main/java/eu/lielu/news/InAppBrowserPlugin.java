@@ -31,6 +31,10 @@ public class InAppBrowserPlugin extends Plugin {
         Intent intent = new Intent(activity, InAppBrowserActivity.class);
         intent.putExtra(InAppBrowserActivity.EXTRA_URL, url);
         intent.putExtra(InAppBrowserActivity.EXTRA_TITLE, call.getString("title", ""));
+        // Réglage porté par le web (localStorage) et transmis à chaque ouverture :
+        // le natif ne garde aucun état de préférence de son côté.
+        intent.putExtra(InAppBrowserActivity.EXTRA_HIDE_CMP,
+            Boolean.TRUE.equals(call.getBoolean("hideCmp", Boolean.TRUE)));
         activity.startActivity(intent);
         // API 34+ : l'animation est déclarée par l'activité entrante elle-même.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {

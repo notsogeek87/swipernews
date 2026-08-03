@@ -243,9 +243,12 @@
      Segmenté plutôt qu'un interrupteur : les deux destinations sont nommées, on
      n'a pas à deviner ce que « activé » veut dire. Même langage visuel que le
      sélecteur de mode en haut de l'écran. */
-  .prefrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  /* En colonne, et non en ligne avec retour automatique : selon la longueur de
+     la phrase, le sélecteur passait tantôt à droite, tantôt dessous, et deux
+     réglages voisins ne s'alignaient plus. */
+  .prefrow{display:flex;flex-direction:column;align-items:flex-start;gap:11px;
     margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,.08)}
-  .prefrow__txt{flex:1 1 170px;min-width:0}
+  .prefrow__txt{min-width:0}
   .prefrow__txt b{display:block;font-size:15px;margin-bottom:3px}
   .prefrow__txt span{display:block;color:var(--muted);font-size:12.5px;line-height:1.4}
   .segbtns{display:inline-flex;gap:4px;padding:4px;border-radius:100px;
@@ -439,8 +442,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=31"></script>
-<script src="src/learn-core.js?v=31"></script>
+<script src="src/lib.js?v=32"></script>
+<script src="src/learn-core.js?v=32"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -706,7 +709,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="31";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="32";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -728,6 +731,14 @@ const isNativeApp=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window
 const LS_READ="fluxswipe.readpref.v1";
 let readPref=(()=>{try{return localStorage.getItem(LS_READ)==="browser"?"browser":"app";}catch(e){return "app";}})();
 
+/* Bandeaux de consentement dans le lecteur : "hide" (défaut) les masque, "show"
+   les laisse. Masquer n'est PAS accepter — le script natif ne clique aucun
+   bouton (voir res/raw/reader_cmp.js) : ne rien répondre vaut refus, alors
+   qu'un « Tout accepter » automatique donnerait un consentement que personne
+   n'a voulu. */
+const LS_CMP="fluxswipe.cookiebanner.v1";
+let cmpPref=(()=>{try{return localStorage.getItem(LS_CMP)==="show"?"show":"hide";}catch(e){return "hide";}})();
+
 /* Rend false quand le lien doit garder son comportement normal (target=_blank) :
    sur le web, si l'utilisateur a choisi son navigateur, ou si le pont natif
    manque à l'appel. L'appelant ne fait alors rien de spécial. */
@@ -737,7 +748,7 @@ function openArticle(url,title){
   if(!iab||!iab.open)return false;
   // L'appel est asynchrone : en cas d'échec (URL refusée côté natif), on
   // rattrape en ouvrant le lien comme le ferait le web.
-  iab.open({url,title:title||""}).catch(()=>window.open(url,"_blank","noopener"));
+  iab.open({url,title:title||"",hideCmp:cmpPref==="hide"}).catch(()=>window.open(url,"_blank","noopener"));
   return true;
 }
 const DEBUG=/[?&]debug/.test(location.search);
@@ -1726,28 +1737,43 @@ document.getElementById("reloadBtn").onclick=()=>{toast("Actualisation…");load
    fils, il doit donc se trouver des deux côtés — un seul état, une seule
    fonction de rendu. Sur le web, les blocs restent vides : le choix n'existe
    pas, un lien y part forcément dans un onglet. */
+function prefRow(name,label,desc,opts,cur){
+  return `<div class="prefrow">
+    <div class="prefrow__txt"><b>${esc(label)}</b><span>${esc(desc)}</span></div>
+    <div class="segbtns" role="group" aria-label="${escAttr(label)}">
+      ${opts.map(o=>`<button type="button" data-pref="${name}" data-val="${o.v}"
+        class="${cur===o.v?"active":""}" aria-pressed="${cur===o.v}">${esc(o.t)}</button>`).join("")}
+    </div>
+  </div>`;
+}
 function renderReadPref(){
-  const inApp=readPref==="app";
+  const inApp=readPref==="app",hideCmp=cmpPref==="hide";
+  let html=prefRow("read","Ouvrir les articles",
+    inApp?"Lecteur intégré : fond sombre, sans barre d'URL, retour direct au fil."
+         :"Dans ton navigateur habituel (Chrome, Firefox…), comme un lien normal.",
+    [{v:"app",t:"Dans l'app"},{v:"browser",t:"Navigateur"}],readPref);
+  // Sans lecteur intégré, la question des bandeaux ne se pose plus : c'est le
+  // navigateur qui affiche la page, on n'a pas la main dessus.
+  if(inApp)html+=prefRow("cmp","Bandeaux cookies",
+    hideCmp?"Masqués à l'ouverture. Masqués, jamais acceptés : aucun consentement n'est donné en ton nom."
+           :"Affichés tels quels, comme dans un navigateur.",
+    [{v:"hide",t:"Masqués"},{v:"show",t:"Affichés"}],cmpPref);
   document.querySelectorAll("[data-readmount]").forEach(el=>{
-    if(!isNativeApp){el.innerHTML="";return;}
-    el.innerHTML=`<div class="prefrow">
-      <div class="prefrow__txt">
-        <b>Ouvrir les articles</b>
-        <span>${inApp?"Lecteur intégré : fond sombre, sans barre d'URL, retour direct au fil."
-                     :"Dans ton navigateur habituel (Chrome, Firefox…), comme un lien normal."}</span>
-      </div>
-      <div class="segbtns" role="group" aria-label="Ouvrir les articles">
-        <button type="button" data-readpref="app" class="${inApp?"active":""}" aria-pressed="${inApp}">Dans l'app</button>
-        <button type="button" data-readpref="browser" class="${inApp?"":"active"}" aria-pressed="${!inApp}">Navigateur</button>
-      </div>
-    </div>`;
+    el.innerHTML=isNativeApp?html:"";
   });
 }
-function setReadPref(v){
-  const next=v==="browser"?"browser":"app";
-  if(next===readPref)return;
-  readPref=next;
-  try{localStorage.setItem(LS_READ,readPref);}catch(e){warn("save readpref",e);}
+function setPref(name,v){
+  if(name==="read"){
+    const next=v==="browser"?"browser":"app";
+    if(next===readPref)return;
+    readPref=next;
+    try{localStorage.setItem(LS_READ,readPref);}catch(e){warn("save readpref",e);}
+  }else{
+    const next=v==="show"?"show":"hide";
+    if(next===cmpPref)return;
+    cmpPref=next;
+    try{localStorage.setItem(LS_CMP,cmpPref);}catch(e){warn("save cmppref",e);}
+  }
   // Pas de toast : il se poserait juste devant le sélecteur qu'on vient de
   // toucher. La pastille active et la phrase qui change sous le titre disent
   // déjà ce qui a été retenu.
@@ -1756,8 +1782,8 @@ function setReadPref(v){
 // Délégation : les blocs sont réécrits à chaque rendu, un écouteur par bouton
 // serait à ré-attacher à chaque fois.
 document.addEventListener("click",e=>{
-  const b=e.target.closest("[data-readpref]");
-  if(b)setReadPref(b.dataset.readpref);
+  const b=e.target.closest("[data-pref]");
+  if(b)setPref(b.dataset.pref,b.dataset.val);
 });
 renderReadPref();
 sheet.onclick=e=>{if(e.target===sheet)closeDialog(sheet);};

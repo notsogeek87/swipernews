@@ -1,154 +1,165 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Navigateur intégré (InAppBrowserActivity). Habillage volontairement sobre :
      une barre fine reprenant les couleurs du fil, le trait de progression
-     bicolore de l'app, et rien d'autre — surtout pas de barre d'URL. -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+     bicolore de l'app, et rien d'autre — surtout pas de barre d'URL.
+
+     La barre FLOTTE au-dessus de la WebView (FrameLayout, et non plus une
+     colonne) : c'est ce qui lui permet de glisser hors de l'écran pendant la
+     lecture sans redimensionner la page — un changement de hauteur de vue
+     relancerait la mise en page du site à chaque geste. La WebView reçoit en
+     compensation une marge haute de la hauteur de la barre (posée dans le code)
+     avec clipToPadding=false, pour que le texte commence sous la barre et passe
+     dessous en défilant. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/reader_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="@color/reader_bg">
 
-    <LinearLayout
-        android:id="@+id/reader_bar"
+    <eu.lielu.news.ReaderWebView
+        android:id="@+id/reader_web"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:background="@color/reader_bar"><!-- padding posé dans le code : il
-        s'ajoute aux encoches/barres système (voir setOnApplyWindowInsetsListener) -->
+        android:layout_height="match_parent" />
 
-        <ImageButton
-            android:id="@+id/reader_close"
-            android:layout_width="44dp"
-            android:layout_height="52dp"
-            android:scaleType="center"
-            android:src="@drawable/ic_reader_close"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/reader_close" />
+    <!-- Page injoignable : plutôt qu'un écran noir, on dit ce qui se passe et
+         on laisse deux issues (réessayer, ou passer au navigateur système —
+         utile quand le site refuse la WebView). -->
+    <LinearLayout
+        android:id="@+id/reader_error"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp"
+        android:background="@color/reader_bg"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/reader_error"
+            android:textSize="16sp"
+            android:textColor="@color/reader_ink" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:text="@string/reader_error_sub"
+            android:textSize="13sp"
+            android:textColor="@color/reader_muted" />
 
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp">
+            android:layout_marginTop="22dp"
+            android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/reader_title"
-                android:layout_width="match_parent"
+            <Button
+                android:id="@+id/reader_retry"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:textColor="@color/reader_ink" />
+                android:text="@string/reader_retry"
+                android:textAllCaps="false"
+                android:textColor="@color/reader_ink"
+                android:background="@drawable/reader_button" />
 
-            <TextView
-                android:id="@+id/reader_host"
-                android:layout_width="match_parent"
+            <Button
+                android:id="@+id/reader_error_external"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:textSize="11sp"
-                android:textColor="@color/reader_muted" />
+                android:layout_marginStart="10dp"
+                android:text="@string/reader_external"
+                android:textAllCaps="false"
+                android:textColor="@color/reader_ink"
+                android:background="@drawable/reader_button" />
         </LinearLayout>
-
-        <ImageButton
-            android:id="@+id/reader_share"
-            android:layout_width="44dp"
-            android:layout_height="52dp"
-            android:scaleType="center"
-            android:src="@drawable/ic_reader_share"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/reader_share" />
-
-        <ImageButton
-            android:id="@+id/reader_external"
-            android:layout_width="44dp"
-            android:layout_height="52dp"
-            android:scaleType="center"
-            android:src="@drawable/ic_reader_external"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/reader_external" />
     </LinearLayout>
 
-    <!-- 2 dp, sans fond : le trait avance sur la barre, comme la jauge du fil. -->
-    <ProgressBar
-        android:id="@+id/reader_progress"
-        style="?android:attr/progressBarStyleHorizontal"
+    <!-- Dernier enfant = au-dessus de tout le reste. Le bloc entier (barre +
+         jauge) coulisse d'un seul tenant. -->
+    <LinearLayout
+        android:id="@+id/reader_barwrap"
         android:layout_width="match_parent"
-        android:layout_height="2dp"
-        android:max="100"
-        android:progress="0"
-        android:progressDrawable="@drawable/reader_progress"
-        android:background="@color/reader_bar" />
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:orientation="vertical"
+        android:background="@color/reader_bar">
 
-    <FrameLayout
-        android:id="@+id/reader_content"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <WebView
-            android:id="@+id/reader_web"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <!-- Page injoignable : plutôt qu'un écran noir, on dit ce qui se passe et
-             on laisse deux issues (réessayer, ou passer au navigateur système —
-             utile quand le site refuse la WebView). -->
         <LinearLayout
-            android:id="@+id/reader_error"
+            android:id="@+id/reader_bar"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:padding="32dp"
-            android:visibility="gone">
+            android:layout_height="52dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/reader_error"
-                android:textSize="16sp"
-                android:textColor="@color/reader_ink" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:text="@string/reader_error_sub"
-                android:textSize="13sp"
-                android:textColor="@color/reader_muted" />
+            <ImageButton
+                android:id="@+id/reader_close"
+                android:layout_width="44dp"
+                android:layout_height="match_parent"
+                android:scaleType="center"
+                android:src="@drawable/ic_reader_close"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/reader_close" />
 
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="22dp"
-                android:orientation="horizontal">
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp">
 
-                <Button
-                    android:id="@+id/reader_retry"
-                    android:layout_width="wrap_content"
+                <TextView
+                    android:id="@+id/reader_title"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/reader_retry"
-                    android:textAllCaps="false"
-                    android:textColor="@color/reader_ink"
-                    android:background="@drawable/reader_button" />
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/reader_ink" />
 
-                <Button
-                    android:id="@+id/reader_error_external"
-                    android:layout_width="wrap_content"
+                <TextView
+                    android:id="@+id/reader_host"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
-                    android:text="@string/reader_external"
-                    android:textAllCaps="false"
-                    android:textColor="@color/reader_ink"
-                    android:background="@drawable/reader_button" />
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:textSize="11sp"
+                    android:textColor="@color/reader_muted" />
             </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/reader_share"
+                android:layout_width="44dp"
+                android:layout_height="match_parent"
+                android:scaleType="center"
+                android:src="@drawable/ic_reader_share"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/reader_share" />
+
+            <ImageButton
+                android:id="@+id/reader_external"
+                android:layout_width="44dp"
+                android:layout_height="match_parent"
+                android:scaleType="center"
+                android:src="@drawable/ic_reader_external"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/reader_external" />
         </LinearLayout>
-    </FrameLayout>
-</LinearLayout>
+
+        <!-- 2 dp, sans fond : le trait avance sur la barre, comme la jauge du fil. -->
+        <ProgressBar
+            android:id="@+id/reader_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:max="100"
+            android:progress="0"
+            android:progressDrawable="@drawable/reader_progress" />
+    </LinearLayout>
+</FrameLayout>

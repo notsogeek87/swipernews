@@ -7,6 +7,7 @@ Fonctionnalités principales :
 • Import et export des sources aux formats OPML et JSON
 • Reprise de lecture par source, à l'endroit où vous l'avez laissée
 • Lecture des articles dans un navigateur intégré, sombre et sans barre d'URL : on ne quitte jamais l'application, et le retour ramène à la carte quittée — au choix, les articles peuvent aussi s'ouvrir dans votre navigateur habituel
+• Lecture immersive : la barre du lecteur s'efface dès que vous descendez dans l'article, et les bandeaux cookies sont masqués — masqués, jamais acceptés : aucun consentement n'est donné en votre nom (option désactivable)
 • Partage d'un article vers l'application de votre choix
 • Mode Apprendre : des articles Wikipédia aléatoires à swiper, avec des centres d'intérêt (sciences, histoire, art, géographie, nature, espace, technologie, sport, cinéma, musique, philosophie…)
 • Fonctionnement hors-ligne pour l'application déjà chargée
