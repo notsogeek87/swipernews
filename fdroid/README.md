@@ -32,13 +32,7 @@ soit ensuite rapide à faire manuellement.
 2. **Ajouter des captures d'écran** dans
    `fastlane/metadata/android/fr-FR/images/phoneScreenshots/` — F-Droid en
    demande au moins une pour la fiche. Aucune n'existe encore dans le dépôt.
-3. **Vérifier la police distante** : `index.html` charge Space Grotesk et
-   Newsreader depuis `fonts.googleapis.com` / `fonts.gstatic.com` à l'exécution.
-   F-Droid tolère ça, mais le classe généralement comme anti-fonctionnalité
-   *NonFreeNet* (dépendance réseau à un service non-libre) dans la fiche du
-   store. Pour l'éviter, il faudrait embarquer les polices en local — non fait
-   ici, à décider séparément.
-4. **Ouvrir la demande d'inclusion** : sur GitLab, forker
+3. **Ouvrir la demande d'inclusion** : sur GitLab, forker
    `fdroid/fdroiddata`, ajouter `metadata/eu.lielu.news.yml` (à partir du
    brouillon ci-contre) et ouvrir une merge request — ou, plus simple pour un
    premier envoi, passer par leur "Request For Packaging" :
@@ -47,8 +41,7 @@ soit ensuite rapide à faire manuellement.
 
 ## Anti-fonctionnalités à déclarer
 
-- `NonFreeNet` (probable) : à cause des polices Google Fonts chargées à
-  distance (voir point 3 ci-dessus), tant qu'elles ne sont pas embarquées
-  localement.
-- Rien d'autre identifié : pas de pub, pas de tracking, pas de dépendance
-  propriétaire dans le code embarqué sur Android.
+Aucune identifiée : les polices (Inter, Source Serif 4, licence OFL) sont
+auto-hébergées dans `fonts/` depuis [le remplacement de Google Fonts](../fonts/),
+donc plus de dépendance réseau à un service non-libre. Pas de pub, pas de
+tracking, pas de dépendance propriétaire dans le code embarqué sur Android.

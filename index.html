@@ -27,17 +27,20 @@
 <meta name="twitter:description" content="Le swipe qui rend plus malin.">
 <meta name="twitter:image" content="https://news.lielu.eu/logo-512.png?v=28">
 
-<!-- Polices : un @import dans le <style> est le pire emplacement (le navigateur
-     doit parser le CSS avant même de découvrir la requête). preconnect + link
-     parallélisent la chaîne HTML → CSS → WOFF2. -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400&display=swap">
 <style>
+  /* Polices auto-hébergées (fonts/, licence OFL) : zéro requête vers un tiers,
+     contrairement à un @import/link Google Fonts. Un seul poids par fichier
+     (pas de variable font) : plus simple, et évite l'axe optique de
+     Newsreader qui donnait des déliés trop fins dans les titres (voir
+     .card__title plus bas, désormais en coupe Display statique). */
+  @font-face{font-family:'Inter';src:url('fonts/Inter-Regular.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}
+  @font-face{font-family:'Inter';src:url('fonts/Inter-SemiBold.woff2') format('woff2');font-weight:600;font-style:normal;font-display:swap}
+  @font-face{font-family:'Inter';src:url('fonts/Inter-Bold.woff2') format('woff2');font-weight:700;font-style:normal;font-display:swap}
+  @font-face{font-family:'Source Serif 4';src:url('fonts/SourceSerif4Display-Semibold.woff2') format('woff2');font-weight:600;font-style:normal;font-display:swap}
   :root{
     --bg:#0a0a0f;--ink:#f5f3ef;--muted:#8a8a99;
     --accent:#ff3b6b;--accent-2:#4ad9ff;
-    --sans:'Space Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--sans);overscroll-behavior:none}
@@ -108,11 +111,10 @@
   .card__cat{display:flex;width:fit-content;align-items:center;gap:6px;
     background:rgba(74,217,255,.14);border:1px solid rgba(74,217,255,.42);color:#bff0ff;
     font-size:12px;font-weight:600;padding:5px 12px;border-radius:100px;margin-bottom:12px}
-  .card__title{font-family:'Newsreader',serif;font-size:clamp(26px,7vw,40px);line-height:1.1;
-    /* opsz neutralisé : à cette taille la fonte passe en coupe « display » aux
-       déliés très fins, le pire cas sur une photo. 20 donne des fûts pleins. */
-    font-weight:600;font-optical-sizing:none;font-variation-settings:'opsz' 20;
-    letter-spacing:-.01em;margin-bottom:14px}
+  .card__title{font-family:'Source Serif 4',serif;font-size:clamp(26px,7vw,40px);line-height:1.1;
+    /* Coupe Display statique (pas de variable font) : fûts pleins d'emblée,
+       lisible sur une photo — pas besoin de forcer un axe optique. */
+    font-weight:600;letter-spacing:-.01em;margin-bottom:14px}
   .card__desc{font-size:15px;line-height:1.5;color:#e4e2dd;max-width:46ch;
     display:-webkit-box;-webkit-line-clamp:10;-webkit-box-orient:vertical;overflow:hidden}
   .card__meta{margin-top:16px;display:flex;align-items:center;gap:14px;color:var(--muted);font-size:13px}
@@ -412,8 +414,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=28"></script>
-<script src="src/learn-core.js?v=28"></script>
+<script src="src/lib.js?v=29"></script>
+<script src="src/learn-core.js?v=29"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -679,7 +681,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="28";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="29";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
