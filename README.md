@@ -312,9 +312,14 @@ même clé) est nécessaire après toute modification de `index.html` ou de
 
 **Icône et écran de démarrage** : générés par [`@capacitor/assets`](https://github.com/ionic-team/capacitor-assets)
 à partir de `resources/` (icône `icon.png` = `logo-512.png`, calque adaptatif
-`icon-foreground.png` = `logo-maskable-512.png` déjà en zone de sécurité,
-fond uni `icon-background.png`/écran de démarrage `splash*.png` à la couleur du
-thème `#0a0a0f`). Après une mise à jour du logo à la racine, régénérer avec :
+`icon-foreground.png` = `logo-maskable-512.png` déjà en zone de sécurité —
+tous deux à fond **transparent** par choix produit, `icon-background.png`
+transparent lui aussi — et écran de démarrage `splash*.png` à la couleur du
+thème `#0a0a0f`). Un fond transparent sur l'icône adaptative n'est pas garanti
+par la plateforme : le lanceur Android peut afficher le fond d'écran ou son
+propre repli derrière le logo selon l'OEM — c'est le compromis accepté pour
+éviter tout aplat de couleur imposé autour du logo. Après une mise à jour du
+logo à la racine, régénérer avec :
 
 ```bash
 cp logo-512.png resources/icon.png
