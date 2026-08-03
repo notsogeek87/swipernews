@@ -32,9 +32,10 @@ L'outillage de **développement** (lint, tests, CI) est optionnel et ne change r
   depuis un rail unique qui agit sur la carte affichée
 - **App Android uniquement — navigateur intégré** : « Lire l'article » et
   « Découvrir » ouvrent l'article *dans* l'app (fond sombre du fil, barre fine
-  sans URL, jauge bicolore), au lieu de basculer vers Chrome. Voir
-  [Navigateur intégré](#navigateur-intégré-app-android). Sur le web, le lien
-  s'ouvre dans un nouvel onglet comme avant
+  sans URL, jauge bicolore), au lieu de basculer vers Chrome — et un réglage
+  **Ouvrir les articles : dans l'app / navigateur** permet de revenir au
+  comportement d'avant. Voir [Navigateur intégré](#navigateur-intégré-app-android).
+  Sur le web, le lien s'ouvre dans un nouvel onglet comme avant
 - **Mode Apprendre** 🎓 : un sélecteur à deux onglets en haut (**📰 Actus** / **🎓 Apprendre**, l'actif surligné) bascule le fil vers des articles Wikipédia aléatoires pour swiper en apprenant. Le fil est **sans fin** — de nouveaux articles se chargent automatiquement en approchant du bas — le bouton **↻** repart sur une nouvelle fournée, et le mode est mémorisé entre les sessions.
 - Installable comme application (PWA) avec fonctionnement hors-ligne
 - En mode actus, si un flux est injoignable, le message le **nomme** (et le panneau
@@ -358,6 +359,19 @@ Le pont est un plugin Capacitor local (`InAppBrowserPlugin`, enregistré dans
 APK le plugin n'existe pas, la fonction rend `false` et le lien garde son
 comportement de navigateur (`target="_blank"`) — c'est aussi le repli si le pont
 natif échouait.
+
+**Le lecteur intégré se refuse** : un réglage « Ouvrir les articles » propose
+*Dans l'app* (défaut) ou *Navigateur*, mémorisé dans
+`fluxswipe.readpref.v1`. Sur *Navigateur*, `openArticle()` rend `false` et le
+lien repart au navigateur du téléphone, exactement comme avant l'ajout du
+lecteur. Le réglage figure dans **les deux** panneaux — Sources et Centres
+d'intérêt — parce qu'ils ne sont jamais atteignables en même temps (⚙ Sources
+n'existe qu'en mode Actus, ✎ Modifier qu'en mode Apprendre) et que le choix vaut
+pour les deux fils : `renderReadPref()` remplit les deux points de montage
+`[data-readmount]` depuis un état unique. Il n'apparaît pas sur le web, où un
+lien s'ouvre forcément dans un onglet, ni pendant l'accueil du premier
+lancement, où l'on ne demande qu'une chose à la fois. Le lecteur garde par
+ailleurs son bouton « ouvrir dans le navigateur » pour les cas ponctuels.
 
 **Icône et écran de démarrage** : générés par [`@capacitor/assets`](https://github.com/ionic-team/capacitor-assets)
 à partir de `resources/` (icône `icon.png` = `logo-512.png`, calque adaptatif

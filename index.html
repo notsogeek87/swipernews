@@ -239,6 +239,22 @@
     font-family:var(--sans);font-weight:600;font-size:13px;padding:12px 14px;border-radius:12px;cursor:pointer}
   .iobtn:active{transform:scale(.97)}
 
+  /* Réglage « Ouvrir les articles » (app packagée uniquement, voir renderReadPref).
+     Segmenté plutôt qu'un interrupteur : les deux destinations sont nommées, on
+     n'a pas à deviner ce que « activé » veut dire. Même langage visuel que le
+     sélecteur de mode en haut de l'écran. */
+  .prefrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,.08)}
+  .prefrow__txt{flex:1 1 170px;min-width:0}
+  .prefrow__txt b{display:block;font-size:15px;margin-bottom:3px}
+  .prefrow__txt span{display:block;color:var(--muted);font-size:12.5px;line-height:1.4}
+  .segbtns{display:inline-flex;gap:4px;padding:4px;border-radius:100px;
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12)}
+  .segbtns button{border:none;background:transparent;color:var(--muted);font-family:var(--sans);
+    font-weight:600;font-size:13px;padding:9px 15px;border-radius:100px;cursor:pointer;
+    white-space:nowrap;transition:background .2s,color .2s}
+  .segbtns button.active{background:rgba(255,255,255,.16);color:var(--ink);box-shadow:0 1px 8px rgba(0,0,0,.28)}
+
   /* Carte de fin du fil Actus (le RSS est fini : on marque clairement la fin) */
   .endcard{justify-content:center}
   .endcard .card__body{display:flex;flex-direction:column;align-items:center;text-align:center}
@@ -378,6 +394,12 @@
     </div>
     <input id="importFile" type="file" accept=".opml,.xml,.json,application/json,text/xml" style="display:none">
 
+    <!-- Réglage de lecture : présent dans les DEUX panneaux (celui-ci et les
+         centres d'intérêt), car ils ne sont jamais accessibles en même temps —
+         le bouton ⚙ Sources disparaît en mode Apprendre. Un seul état, deux
+         points de montage remplis par renderReadPref(). Vide hors app packagée. -->
+    <div data-readmount></div>
+
     <button class="applybtn" id="applyFeeds">Voir mon fil</button>
   </div>
 </div>
@@ -389,6 +411,9 @@
     <h2>Tes centres d'intérêt</h2>
     <p class="sub">Choisis ce que tu veux apprendre. Tu pourras les modifier à tout moment.</p>
     <div class="intgrid" id="intGrid"></div>
+    <!-- Voir le commentaire du même bloc dans le panneau Sources. Masqué pendant
+         l'accueil du 1er lancement : on ne demande qu'une chose à la fois. -->
+    <div data-readmount></div>
     <button class="applybtn" id="saveInterestsBtn">Valider</button>
   </div>
 </div>
@@ -414,8 +439,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=30"></script>
-<script src="src/learn-core.js?v=30"></script>
+<script src="src/lib.js?v=31"></script>
+<script src="src/learn-core.js?v=31"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -681,7 +706,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="30";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="31";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -694,16 +719,20 @@ const APP_VERSION="30";   // doit correspondre au ?v= des <script> et à CACHE (
 // l'active plus globalement.
 const isNativeApp=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
 
-/* App native uniquement : « Lire l'article » / « Découvrir » ouvrent le
-   navigateur INTÉGRÉ (plugin maison InAppBrowser, voir
-   android/app/src/main/java/eu/lielu/news/InAppBrowserActivity.java) au lieu de
-   basculer vers Chrome. On ne quitte plus l'app pour lire : le retour ramène à
-   la carte quittée, sans recharger le fil.
-   Sur le web, le plugin n'existe pas — la fonction rend false et le lien garde
-   son comportement normal (target=_blank), ce qui vaut aussi de repli si le
-   pont natif échouait. */
+/* Où s'ouvre un article, dans l'app packagée : "app" = navigateur INTÉGRÉ
+   (plugin maison InAppBrowser, voir
+   android/app/src/main/java/eu/lielu/news/InAppBrowserActivity.java), "browser"
+   = navigateur du téléphone, comme avant. Réglage offert dans les deux
+   panneaux (voir renderReadPref) et sans objet sur le web, où un lien s'ouvre
+   forcément dans un onglet. */
+const LS_READ="fluxswipe.readpref.v1";
+let readPref=(()=>{try{return localStorage.getItem(LS_READ)==="browser"?"browser":"app";}catch(e){return "app";}})();
+
+/* Rend false quand le lien doit garder son comportement normal (target=_blank) :
+   sur le web, si l'utilisateur a choisi son navigateur, ou si le pont natif
+   manque à l'appel. L'appelant ne fait alors rien de spécial. */
 function openArticle(url,title){
-  if(!isNativeApp)return false;
+  if(!isNativeApp||readPref!=="app")return false;
   const iab=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
   if(!iab||!iab.open)return false;
   // L'appel est asynchrone : en cas d'échec (URL refusée côté natif), on
@@ -1687,8 +1716,50 @@ document.addEventListener("keydown",e=>{
   if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
   else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
 });
-document.getElementById("openSheet").onclick=()=>{renderList();renderSuggest();openDialog(sheet);};
+document.getElementById("openSheet").onclick=()=>{renderList();renderSuggest();renderReadPref();openDialog(sheet);};
 document.getElementById("reloadBtn").onclick=()=>{toast("Actualisation…");loadFeeds();};
+
+/* ---------- Réglage « Ouvrir les articles » (app packagée) ----------
+   Deux points de montage (panneau Sources et panneau Centres d'intérêt) parce
+   qu'ils ne sont jamais atteignables en même temps : ⚙ Sources n'existe qu'en
+   mode Actus, ✎ Modifier qu'en mode Apprendre. Le réglage vaut pour les deux
+   fils, il doit donc se trouver des deux côtés — un seul état, une seule
+   fonction de rendu. Sur le web, les blocs restent vides : le choix n'existe
+   pas, un lien y part forcément dans un onglet. */
+function renderReadPref(){
+  const inApp=readPref==="app";
+  document.querySelectorAll("[data-readmount]").forEach(el=>{
+    if(!isNativeApp){el.innerHTML="";return;}
+    el.innerHTML=`<div class="prefrow">
+      <div class="prefrow__txt">
+        <b>Ouvrir les articles</b>
+        <span>${inApp?"Lecteur intégré : fond sombre, sans barre d'URL, retour direct au fil."
+                     :"Dans ton navigateur habituel (Chrome, Firefox…), comme un lien normal."}</span>
+      </div>
+      <div class="segbtns" role="group" aria-label="Ouvrir les articles">
+        <button type="button" data-readpref="app" class="${inApp?"active":""}" aria-pressed="${inApp}">Dans l'app</button>
+        <button type="button" data-readpref="browser" class="${inApp?"":"active"}" aria-pressed="${!inApp}">Navigateur</button>
+      </div>
+    </div>`;
+  });
+}
+function setReadPref(v){
+  const next=v==="browser"?"browser":"app";
+  if(next===readPref)return;
+  readPref=next;
+  try{localStorage.setItem(LS_READ,readPref);}catch(e){warn("save readpref",e);}
+  // Pas de toast : il se poserait juste devant le sélecteur qu'on vient de
+  // toucher. La pastille active et la phrase qui change sous le titre disent
+  // déjà ce qui a été retenu.
+  renderReadPref();
+}
+// Délégation : les blocs sont réécrits à chaque rendu, un écouteur par bouton
+// serait à ré-attacher à chaque fois.
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-readpref]");
+  if(b)setReadPref(b.dataset.readpref);
+});
+renderReadPref();
 sheet.onclick=e=>{if(e.target===sheet)closeDialog(sheet);};
 // Boutons du panneau Sources (remplacent les anciens onclick inline → CSP possible)
 document.getElementById("addFeedBtn").onclick=addFeed;
@@ -1849,7 +1920,12 @@ let pendingInt=new Set();
 function openInterests(){
   pendingInt=new Set(interests);
   renderIntGrid();
-  document.getElementById("introWelcome").classList.toggle("hidden",interestsChosen()); // intro visible seulement la 1ère fois
+  const firstRun=!interestsChosen();
+  document.getElementById("introWelcome").classList.toggle("hidden",!firstRun); // intro visible seulement la 1ère fois
+  renderReadPref();
+  // Accueil du 1er lancement : on ne demande qu'une chose à la fois. Le réglage
+  // de lecture attendra la prochaine ouverture du panneau.
+  intSheet.querySelector("[data-readmount]").classList.toggle("hidden",firstRun);
   openDialog(intSheet);
 }
 function renderIntGrid(){
