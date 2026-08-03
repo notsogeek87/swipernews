@@ -35,6 +35,8 @@ public class InAppBrowserPlugin extends Plugin {
         // le natif ne garde aucun état de préférence de son côté.
         intent.putExtra(InAppBrowserActivity.EXTRA_HIDE_CMP,
             Boolean.TRUE.equals(call.getBoolean("hideCmp", Boolean.TRUE)));
+        intent.putExtra(InAppBrowserActivity.EXTRA_BLOCK_ADS,
+            Boolean.TRUE.equals(call.getBoolean("blockAds", Boolean.TRUE)));
         activity.startActivity(intent);
         // API 34+ : l'animation est déclarée par l'activité entrante elle-même.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {

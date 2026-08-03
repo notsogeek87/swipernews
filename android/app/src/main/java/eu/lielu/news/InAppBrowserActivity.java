@@ -12,6 +12,7 @@ import android.view.ViewGroup;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -30,8 +31,12 @@ import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewFeature;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Navigateur intégré de l'app packagée.
@@ -57,6 +62,10 @@ public class InAppBrowserActivity extends AppCompatActivity {
     public static final String EXTRA_URL = "eu.lielu.news.reader.URL";
     public static final String EXTRA_TITLE = "eu.lielu.news.reader.TITLE";
     public static final String EXTRA_HIDE_CMP = "eu.lielu.news.reader.HIDE_CMP";
+    public static final String EXTRA_BLOCK_ADS = "eu.lielu.news.reader.BLOCK_ADS";
+
+    /** Réponse vide renvoyée aux requêtes bloquées (null = « charge normalement »). */
+    private static final String BLOCKED_MIME = "text/plain";
 
     private ReaderWebView web;
     private ProgressBar progress;
@@ -75,8 +84,19 @@ public class InAppBrowserActivity extends AppCompatActivity {
     /** Masquer les bandeaux de consentement (choix de l'utilisateur, voir res/raw/reader_cmp.js). */
     private boolean hideCmp = true;
 
-    /** Script de masquage, lu une fois depuis res/raw. */
+    /** Bloquer publicités et traceurs (choix de l'utilisateur). */
+    private boolean blockAds = true;
+
+    /** Scripts d'habillage, lus une fois depuis res/raw. */
     private String cmpScript;
+    private String adsScript;
+
+    /**
+     * Domaines bloqués, chargés une fois avant le premier chargement de page.
+     * volatile : {@code shouldInterceptRequest} est appelé depuis un autre fil
+     * que celui qui construit l'ensemble.
+     */
+    private volatile Set<String> blockedHosts = Collections.emptySet();
 
     /** Hauteur du bloc barre + jauge, connue seulement après la mise en page. */
     private int barHeight;
@@ -100,6 +120,8 @@ public class InAppBrowserActivity extends AppCompatActivity {
         cardTitle = intent.getStringExtra(EXTRA_TITLE);
         if (cardTitle == null) cardTitle = "";
         hideCmp = intent.getBooleanExtra(EXTRA_HIDE_CMP, true);
+        blockAds = intent.getBooleanExtra(EXTRA_BLOCK_ADS, true);
+        if (blockAds) blockedHosts = loadBlocklist();
 
         // API 34+ : l'animation d'ouverture/fermeture se déclare ici (côté activité
         // entrante). En dessous, c'est overridePendingTransition, appelé par
@@ -237,9 +259,56 @@ public class InAppBrowserActivity extends AppCompatActivity {
        le script est idempotent. */
 
     private void injectCmpScript() {
-        if (!hideCmp || web == null) return;
-        if (cmpScript == null) cmpScript = readRaw(R.raw.reader_cmp);
-        if (cmpScript != null) web.evaluateJavascript(cmpScript, null);
+        if (web == null) return;
+        if (hideCmp) {
+            if (cmpScript == null) cmpScript = readRaw(R.raw.reader_cmp);
+            if (cmpScript != null) web.evaluateJavascript(cmpScript, null);
+        }
+        if (blockAds) {
+            if (adsScript == null) adsScript = readRaw(R.raw.reader_ads);
+            if (adsScript != null) web.evaluateJavascript(adsScript, null);
+        }
+    }
+
+    /* ---------- Blocage des publicités et des traceurs ----------
+       Deux étages : le réseau (ici) empêche la pub de se charger — moins de
+       données, moins de batterie, et le pistage ne part pas — et le cosmétique
+       (res/raw/reader_ads.js) referme les trous que laisse un emplacement
+       réservé mais resté vide. */
+
+    private Set<String> loadBlocklist() {
+        Set<String> hosts = new HashSet<>();
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(
+                getResources().openRawResource(R.raw.reader_blocklist), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = r.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty() || line.charAt(0) == '#') continue;
+                hosts.add(line.toLowerCase());
+            }
+        } catch (Exception e) {
+            return Collections.emptySet();   // sans liste, on n'empêche rien : la page reste lisible
+        }
+        return Collections.unmodifiableSet(hosts);
+    }
+
+    /**
+     * Bloqué si l'hôte, ou l'un de ses domaines parents, figure dans la liste :
+     * « doubleclick.net » couvre ainsi « stats.g.doubleclick.net » sans avoir à
+     * énumérer les sous-domaines.
+     */
+    private boolean isBlockedHost(String host) {
+        if (host == null) return false;
+        Set<String> list = blockedHosts;
+        if (list.isEmpty()) return false;
+        String h = host.toLowerCase();
+        while (true) {
+            if (list.contains(h)) return true;
+            int dot = h.indexOf('.');
+            if (dot < 0) return false;
+            h = h.substring(dot + 1);
+            if (h.indexOf('.') < 0) return false;   // « net », « com » : on s'arrête
+        }
     }
 
     private String readRaw(int resId) {
@@ -287,6 +356,18 @@ public class InAppBrowserActivity extends AppCompatActivity {
         web.setOnScrollListener(this::onWebScroll);
 
         web.setWebViewClient(new WebViewClient() {
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest request) {
+                // Appelé sur un fil de fond, pour CHAQUE ressource : on reste sur
+                // une poignée de recherches dans un HashSet, rien de plus.
+                if (!blockAds || request.isForMainFrame()) return null;
+                if (isBlockedHost(request.getUrl().getHost())) {
+                    return new WebResourceResponse(BLOCKED_MIME, "utf-8",
+                        new ByteArrayInputStream(new byte[0]));
+                }
+                return null;   // null = charge normalement
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest request) {
                 Uri target = request.getUrl();

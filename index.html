@@ -442,8 +442,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=32"></script>
-<script src="src/learn-core.js?v=32"></script>
+<script src="src/lib.js?v=33"></script>
+<script src="src/learn-core.js?v=33"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -709,7 +709,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="32";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="33";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -739,6 +739,13 @@ let readPref=(()=>{try{return localStorage.getItem(LS_READ)==="browser"?"browser
 const LS_CMP="fluxswipe.cookiebanner.v1";
 let cmpPref=(()=>{try{return localStorage.getItem(LS_CMP)==="show"?"show":"hide";}catch(e){return "hide";}})();
 
+/* Publicités et traceurs dans le lecteur : "block" (défaut) ou "allow". Le
+   blocage est d'abord réseau (liste de domaines côté natif), le cosmétique ne
+   servant qu'à refermer les emplacements restés vides. Désactivable parce que
+   certains sites détectent le blocage et refusent de s'afficher. */
+const LS_ADS="fluxswipe.ads.v1";
+let adsPref=(()=>{try{return localStorage.getItem(LS_ADS)==="allow"?"allow":"block";}catch(e){return "block";}})();
+
 /* Rend false quand le lien doit garder son comportement normal (target=_blank) :
    sur le web, si l'utilisateur a choisi son navigateur, ou si le pont natif
    manque à l'appel. L'appelant ne fait alors rien de spécial. */
@@ -748,7 +755,8 @@ function openArticle(url,title){
   if(!iab||!iab.open)return false;
   // L'appel est asynchrone : en cas d'échec (URL refusée côté natif), on
   // rattrape en ouvrant le lien comme le ferait le web.
-  iab.open({url,title:title||"",hideCmp:cmpPref==="hide"}).catch(()=>window.open(url,"_blank","noopener"));
+  iab.open({url,title:title||"",hideCmp:cmpPref==="hide",blockAds:adsPref==="block"})
+    .catch(()=>window.open(url,"_blank","noopener"));
   return true;
 }
 const DEBUG=/[?&]debug/.test(location.search);
@@ -1754,26 +1762,32 @@ function renderReadPref(){
     [{v:"app",t:"Dans l'app"},{v:"browser",t:"Navigateur"}],readPref);
   // Sans lecteur intégré, la question des bandeaux ne se pose plus : c'est le
   // navigateur qui affiche la page, on n'a pas la main dessus.
-  if(inApp)html+=prefRow("cmp","Bandeaux cookies",
-    hideCmp?"Masqués à l'ouverture. Masqués, jamais acceptés : aucun consentement n'est donné en ton nom."
-           :"Affichés tels quels, comme dans un navigateur.",
-    [{v:"hide",t:"Masqués"},{v:"show",t:"Affichés"}],cmpPref);
+  if(inApp){
+    html+=prefRow("cmp","Bandeaux cookies",
+      hideCmp?"Masqués à l'ouverture. Masqués, jamais acceptés : aucun consentement n'est donné en ton nom."
+             :"Affichés tels quels, comme dans un navigateur.",
+      [{v:"hide",t:"Masqués"},{v:"show",t:"Affichés"}],cmpPref);
+    html+=prefRow("ads","Publicités et traceurs",
+      adsPref==="block"?"Bloqués avant même d'être chargés : page plus légère, pistage en moins. Certains sites le détectent et refusent de s'afficher."
+                       :"Chargés normalement, comme dans un navigateur.",
+      [{v:"block",t:"Bloqués"},{v:"allow",t:"Affichés"}],adsPref);
+  }
   document.querySelectorAll("[data-readmount]").forEach(el=>{
     el.innerHTML=isNativeApp?html:"";
   });
 }
+const PREFS={
+  read:{get:()=>readPref,set:v=>{readPref=v;},key:LS_READ,vals:["app","browser"]},
+  cmp: {get:()=>cmpPref, set:v=>{cmpPref=v;}, key:LS_CMP, vals:["hide","show"]},
+  ads: {get:()=>adsPref, set:v=>{adsPref=v;}, key:LS_ADS, vals:["block","allow"]},
+};
 function setPref(name,v){
-  if(name==="read"){
-    const next=v==="browser"?"browser":"app";
-    if(next===readPref)return;
-    readPref=next;
-    try{localStorage.setItem(LS_READ,readPref);}catch(e){warn("save readpref",e);}
-  }else{
-    const next=v==="show"?"show":"hide";
-    if(next===cmpPref)return;
-    cmpPref=next;
-    try{localStorage.setItem(LS_CMP,cmpPref);}catch(e){warn("save cmppref",e);}
-  }
+  const p=PREFS[name];
+  if(!p)return;
+  const next=p.vals.includes(v)?v:p.vals[0];   // valeur inconnue → on retombe sur le défaut
+  if(next===p.get())return;
+  p.set(next);
+  try{localStorage.setItem(p.key,next);}catch(e){warn("save pref "+name,e);}
   // Pas de toast : il se poserait juste devant le sélecteur qu'on vient de
   // toucher. La pastille active et la phrase qui change sous le titre disent
   // déjà ce qui a été retenu.

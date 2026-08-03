@@ -35,8 +35,9 @@ L'outillage de **développement** (lint, tests, CI) est optionnel et ne change r
   sans URL, jauge bicolore), au lieu de basculer vers Chrome — et un réglage
   **Ouvrir les articles : dans l'app / navigateur** permet de revenir au
   comportement d'avant. La barre s'efface pendant la lecture (barre d'état
-  comprise) et les **bandeaux cookies sont masqués — jamais acceptés**, ce qui
-  se désactive aussi. Voir [Navigateur intégré](#navigateur-intégré-app-android).
+  comprise), les **bandeaux cookies sont masqués — jamais acceptés** et les
+  **publicités et traceurs bloqués avant chargement** ; tout cela se désactive.
+  Voir [Navigateur intégré](#navigateur-intégré-app-android).
   Sur le web, le lien s'ouvre dans un nouvel onglet comme avant
 - **Mode Apprendre** 🎓 : un sélecteur à deux onglets en haut (**📰 Actus** / **🎓 Apprendre**, l'actif surligné) bascule le fil vers des articles Wikipédia aléatoires pour swiper en apprenant. Le fil est **sans fin** — de nouveaux articles se chargent automatiquement en approchant du bas — le bouton **↻** repart sur une nouvelle fournée, et le mode est mémorisé entre les sessions.
 - Installable comme application (PWA) avec fonctionnement hors-ligne
@@ -407,14 +408,42 @@ Vérifié sur une page piégée (`test` manuel en Chromium) : bandeau OneTrust,
 bandeau Didomi et bandeau maison masqués ; barre de navigation fixe, article
 traitant des cookies et encart newsletter **préservés** ; défilement rendu.
 
+**Publicités et traceurs.** Bloqués à deux étages, complémentaires :
+
+1. **le réseau**, dans `shouldInterceptRequest` : toute ressource dont l'hôte
+   figure dans `res/raw/reader_blocklist.txt` reçoit une réponse vide. C'est le
+   vrai gain — la pub n'est jamais téléchargée, et le pistage ne part pas. Un
+   domaine couvre ses sous-domaines (`doubleclick.net` bloque
+   `stats.g.doubleclick.net`), par remontée des domaines parents ; la remontée
+   s'arrête avant le TLD, pour qu'une liste mal saisie ne puisse pas bloquer
+   `.com`. Le document principal n'est **jamais** bloqué : l'article doit
+   toujours s'afficher ;
+2. **le cosmétique** (`res/raw/reader_ads.js`), qui referme les emplacements
+   réservés restés vides après le blocage — et uniquement ceux-là : un
+   conteneur nommé `ad-…` mais qui porte du texte ou une image est laissé
+   tranquille.
+
+La liste est **écrite à la main** (178 domaines) plutôt qu'importée : EasyList
+et consorts sont sous CC BY-SA, incompatible avec le MIT de ce dépôt sans
+traîner leur licence, et pèsent des mégaoctets là où quelques centaines de
+lignes suffisent pour un lecteur d'articles. Deux exclusions volontaires, parce
+que les bloquer casse l'article lui-même : `googletagmanager.com` (beaucoup de
+sites y font transiter le chargement du contenu) et les CDN d'images.
+
+Le revers, assumé et affiché dans le réglage : cela prive de revenu les
+éditeurs dont on lit les flux, et certains sites détectent le blocage et
+refusent de s'afficher — d'où l'option « Affichés ».
+
 **Le lecteur intégré se refuse** : un réglage « Ouvrir les articles » propose
 *Dans l'app* (défaut) ou *Navigateur*, mémorisé dans
 `fluxswipe.readpref.v1`. Sur *Navigateur*, `openArticle()` rend `false` et le
 lien repart au navigateur du téléphone, exactement comme avant l'ajout du
-lecteur. Un second réglage, « Bandeaux cookies : Masqués / Affichés »
-(`fluxswipe.cookiebanner.v1`), n'apparaît que quand le lecteur est actif — sans
-lui, la question ne se pose plus. Les deux préférences vivent côté web et sont
-transmises à chaque ouverture (`hideCmp`) : le natif ne garde aucun état. Le réglage figure dans **les deux** panneaux — Sources et Centres
+lecteur. Deux autres réglages, « Bandeaux cookies : Masqués / Affichés »
+(`fluxswipe.cookiebanner.v1`) et « Publicités et traceurs : Bloqués / Affichés »
+(`fluxswipe.ads.v1`), n'apparaissent que quand le lecteur est actif — sans lui,
+la question ne se pose plus. Les trois préférences vivent côté web et sont
+transmises à chaque ouverture (`hideCmp`, `blockAds`) : le natif ne garde aucun
+état. Le réglage figure dans **les deux** panneaux — Sources et Centres
 d'intérêt — parce qu'ils ne sont jamais atteignables en même temps (⚙ Sources
 n'existe qu'en mode Actus, ✎ Modifier qu'en mode Apprendre) et que le choix vaut
 pour les deux fils : `renderReadPref()` remplit les deux points de montage
