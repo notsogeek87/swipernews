@@ -1,9 +1,16 @@
 apply plugin: 'com.android.application'
 
-// Version injectée par la CI (.github/workflows/android.yml) ; les valeurs de
-// repli servent aux builds locaux depuis Android Studio.
-def appVersionCode = (project.findProperty('versionCode') ?: '1') as Integer
-def appVersionName = project.findProperty('versionName') ?: '1.0'
+// Version injectée par la CI (.github/workflows/android.yml), qui dérive le
+// versionCode du numéro de run. Les valeurs de repli ne sont PAS arbitraires :
+// F-Droid compile depuis un tag avec un Gradle nu, sans -PversionCode, et
+// vérifie ensuite que l'APK porte bien la version déclarée dans sa recette
+// (fdroid/eu.lielu.news.yml). Elles doivent donc rester le reflet exact du
+// dernier tag publié — les bouger, c'est casser le build F-Droid.
+//
+// Le versionCode suit la version : majeur × 10000 + mineur × 100 + correctif
+// (1.1.0 → 10100). Il croît donc tout seul à chaque tag, sans compteur à tenir.
+def appVersionCode = (project.findProperty('versionCode') ?: '10100') as Integer
+def appVersionName = project.findProperty('versionName') ?: '1.1.0'
 
 // Clé de signature fournie par la CI depuis les secrets du dépôt. Absente en
 // local : Gradle retombe alors sur la clé debug.

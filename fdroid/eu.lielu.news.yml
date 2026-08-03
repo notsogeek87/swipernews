@@ -28,24 +28,37 @@ RepoType: git
 Repo: https://github.com/notsogeek87/swipernews.git
 
 Builds:
-  - versionName: "1.0.0"
-    versionCode: 1
-    # Remplacer par le tag git exact du commit à builder (ex: v1.0.0).
-    # F-Droid recompile depuis les sources à ce commit précis : le numéro de
-    # run GitHub (utilisé par android.yml) n'existe pas ici, il faut donc un
-    # tag par version, avec un versionCode qui n'augmente qu'à chaque tag.
-    commit: v1.0.0
+  - versionName: "1.1.0"
+    versionCode: 10100
+    # Tag git exact du commit à compiler. F-Droid recompile depuis les sources
+    # à ce commit précis : le numéro de run GitHub (dont android.yml tire son
+    # versionCode) n'existe pas ici, d'où un tag par version publiée.
+    #
+    # Le couple ci-dessus doit correspondre à ce que produit un Gradle nu à ce
+    # tag : android/app/build.gradle porte les mêmes valeurs en repli, faute de
+    # -PversionCode/-PversionName ici. Les deux se bougent ensemble.
+    # Le versionCode suit la version (majeur × 10000 + mineur × 100 + correctif).
+    commit: v1.1.0
     subdir: android
     sudo:
       - apt-get update
       - apt-get install -y nodejs npm
+    # Les scripts npm (cap:prepare, cap:sync) vivent dans le package.json à la
+    # racine du dépôt, où « init » s'exécute — pas dans subdir. cap:sync
+    # régénère www/ (non versionné) puis le recopie dans le projet natif :
+    # sans lui, l'APK embarque un assets/public vide.
     init:
-      - cd .. && npm ci && npm run cap:sync
+      - npm ci && npm run cap:sync
     gradle:
       - yes
     output: app/build/outputs/apk/release/app-release-unsigned.apk
 
+# Pas d'AutoUpdate : le versionCode ne se lit pas dans les sources (build.gradle
+# le prend d'une propriété de projet), donc chaque version veut une entrée
+# Builds écrite à la main.
 AutoUpdateMode: None
-UpdateCheckMode: Tags
-CurrentVersion: "1.0.0"
-CurrentVersionCode: 1
+# Restreint aux tags de version : le dépôt porte aussi des tags android-v*
+# posés par la CI à chaque build, qui ne sont pas des versions publiées.
+UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$
+CurrentVersion: "1.1.0"
+CurrentVersionCode: 10100

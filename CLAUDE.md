@@ -127,11 +127,18 @@ préversion roulante sur `staging`.
 
 ### F-Droid
 
-`fdroid/eu.lielu.news.yml` est un brouillon de recette à recopier dans
-`fdroiddata` ; il doit rester équivalent à `android.yml`, sans dépendre de
-GitHub Actions. Conséquence pratique : **tout ce qui est nécessaire au build
-doit venir des sources**, ce qui interdit d'embarquer quoi que ce soit sous une
-licence incompatible avec le MIT (voir « décisions à ne pas défaire »).
+`fdroid/eu.lielu.news.yml` est la recette à recopier dans `fdroiddata` ; elle
+doit rester équivalente à `android.yml`, sans dépendre de GitHub Actions.
+Conséquence pratique : **tout ce qui est nécessaire au build doit venir des
+sources**, ce qui interdit d'embarquer quoi que ce soit sous une licence
+incompatible avec le MIT (voir « décisions à ne pas défaire »).
+
+La version en fait partie : F-Droid compile depuis un tag avec un Gradle nu,
+sans les `-PversionCode/-PversionName` de la CI, puis vérifie que l'APK porte
+la version annoncée par la recette. Les valeurs de repli d'`android/app/
+build.gradle` ne sont donc **pas** décoratives — publier une version, c'est
+aligner d'un seul geste ces valeurs, la recette et le tag `vX.Y.Z`. Le mode
+d'emploi est dans `fdroid/README.md`.
 
 ---
 
