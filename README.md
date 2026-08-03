@@ -36,6 +36,8 @@ L'outillage de **développement** (lint, tests, CI) est optionnel et ne change r
   **Ouvrir les articles : dans l'app / navigateur** permet de revenir au
   comportement d'avant. La barre s'efface pendant la lecture (barre d'état
   comprise) et les **bandeaux cookies sont masqués — jamais acceptés**. Un
+  **mode lecture** façon liseuse (titre, texte et images seulement) est
+  disponible en troisième option, et basculable depuis la barre du lecteur. Un
   **blocage des publicités et des traceurs** est disponible, désactivé par
   défaut. Voir [Navigateur intégré](#navigateur-intégré-app-android).
   Sur le web, le lien s'ouvre dans un nouvel onglet comme avant
@@ -408,6 +410,45 @@ Vérifié sur une page piégée (`test` manuel en Chromium) : bandeau OneTrust,
 bandeau Didomi et bandeau maison masqués ; barre de navigation fixe, article
 traitant des cookies et encart newsletter **préservés** ; défilement rendu.
 
+### Mode lecture
+
+Troisième façon de lire, à côté de « Dans l'app » et « Navigateur » : le lecteur
+ne garde que **le titre, le texte et les images**, dans une colonne de liseuse
+(serif, 19 px, interligne large) sur le fond sombre de l'app. Un bouton dans la
+barre du lecteur bascule à tout moment entre l'article simplifié et la page
+complète.
+
+Le principe (`res/raw/reader_read.js`) est celui de Readability — le moteur
+derrière les vues lecteur de Firefox et Safari — mais réécrit court : chaque
+bloc de la page est noté selon la quantité de texte qu'il porte, pondérée par
+sa **densité de liens** (un menu ou un sommaire tend vers 1, un article vers 0)
+et par sa signature de classe/id. Le meilleur bloc est élagué, puis la page est
+**remplacée** par une version propre. Jeter la feuille de style du site fait
+disparaître d'un coup habillage, colonnes, encarts et bandeaux, sans avoir à les
+nommer un par un.
+
+Trois choix qui comptent :
+
+- **jamais de force** : sous un certain seuil de texte (galerie, page d'accueil,
+  application web), la page est laissée intacte et le bouton le dit, plutôt que
+  d'afficher un article vide ;
+- **on ne défait pas une transformation** : revenir à la page complète recharge
+  l'URL, ce qui réaffiche exactement ce que le site sert — plutôt que de tenter
+  de reconstruire une page déjà jetée ;
+- **aucun attribut ne survit** à l'élagage (classes, id, styles en ligne) : la
+  feuille du site étant supprimée, une classe résiduelle ne servirait qu'à
+  réintroduire du hasard.
+
+Les images sont rétablies depuis leurs attributs de chargement différé
+(`data-src`, `srcset`), résolues en URL absolue, et les vignettes de moins de
+120 px comme les traceurs 1×1 sont écartés.
+
+Vérifié en Chromium sur une page d'article complète (menu, bandeau cookies,
+colonne latérale avec pub, boutons de partage, « À lire aussi », pied de page) :
+titre, date, 3 paragraphes, sous-titre, citation, liste, image d'illustration et
+sa légende conservés ; tout le reste supprimé ; zéro attribut résiduel, zéro
+erreur JS.
+
 **Publicités et traceurs.** Le blocage est **désactivé par défaut** : c'est une
 option qu'on active sciemment. Deux raisons, et aucune n'est technique — bloquer
 prive de revenu les éditeurs dont on lit justement les flux, et un site à mur
@@ -474,7 +515,7 @@ ce qu'elles disent. Deux pièges vérifiés sur les vrais fichiers :
   entièrement numérique (`xn--p1ai` reste accepté).
 
 **Le lecteur intégré se refuse** : un réglage « Ouvrir les articles » propose
-*Dans l'app* (défaut) ou *Navigateur*, mémorisé dans
+*Dans l'app* (défaut), *Lecture* ou *Navigateur*, mémorisé dans
 `fluxswipe.readpref.v1`. Sur *Navigateur*, `openArticle()` rend `false` et le
 lien repart au navigateur du téléphone, exactement comme avant l'ajout du
 lecteur. Deux autres réglages, « Bandeaux cookies : Masqués / Affichés »

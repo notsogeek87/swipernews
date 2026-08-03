@@ -134,6 +134,15 @@
             </LinearLayout>
 
             <ImageButton
+                android:id="@+id/reader_readmode"
+                android:layout_width="44dp"
+                android:layout_height="match_parent"
+                android:scaleType="center"
+                android:src="@drawable/ic_reader_read"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/reader_readmode" />
+
+            <ImageButton
                 android:id="@+id/reader_share"
                 android:layout_width="44dp"
                 android:layout_height="match_parent"

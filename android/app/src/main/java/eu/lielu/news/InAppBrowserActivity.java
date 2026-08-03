@@ -16,6 +16,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.ImageButton;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -62,6 +63,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
     public static final String EXTRA_TITLE = "eu.lielu.news.reader.TITLE";
     public static final String EXTRA_HIDE_CMP = "eu.lielu.news.reader.HIDE_CMP";
     public static final String EXTRA_BLOCK_ADS = "eu.lielu.news.reader.BLOCK_ADS";
+    public static final String EXTRA_READER = "eu.lielu.news.reader.READER_MODE";
 
     /** Réponse vide renvoyée aux requêtes bloquées (null = « charge normalement »). */
     private static final String BLOCKED_MIME = "text/plain";
@@ -86,9 +88,14 @@ public class InAppBrowserActivity extends AppCompatActivity {
     /** Bloquer publicités et traceurs (choix de l'utilisateur). */
     private boolean blockAds = true;
 
+    /** Mode lecture : ne garder que le titre, le texte et les images. */
+    private boolean readerOn;
+    private ImageButton readerBtn;
+
     /** Scripts d'habillage, lus une fois depuis res/raw. */
     private String cmpScript;
     private String adsScript;
+    private String readScript;
 
     /**
      * Domaines bloqués, chargés une fois avant le premier chargement de page.
@@ -122,6 +129,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
         // false par défaut : le blocage s'active sciemment côté réglages, il ne
         // doit pas s'appliquer parce qu'un appelant a oublié de le préciser.
         blockAds = intent.getBooleanExtra(EXTRA_BLOCK_ADS, false);
+        readerOn = intent.getBooleanExtra(EXTRA_READER, false);
         // Liste intégrée + liste téléchargée si l'utilisateur en a choisi une.
         if (blockAds) blockedHosts = BlocklistStore.load(this);
 
@@ -182,6 +190,10 @@ public class InAppBrowserActivity extends AppCompatActivity {
 
         titleView.setText(cardTitle);
         hostView.setText(prettyHost(url));
+
+        readerBtn = findViewById(R.id.reader_readmode);
+        readerBtn.setOnClickListener(v -> toggleReader());
+        updateReaderIcon();
 
         findViewById(R.id.reader_close).setOnClickListener(v -> finish());
         findViewById(R.id.reader_share).setOnClickListener(v -> share());
@@ -259,6 +271,45 @@ public class InAppBrowserActivity extends AppCompatActivity {
        l'utilisateur serait l'inverse de ce qu'il demande en activant l'option.
        Injecté à plusieurs moments car les CMP arrivent souvent après la page ;
        le script est idempotent. */
+
+    /* ---------- Mode lecture ----------
+       Le script (res/raw/reader_read.js) remplace la page par le seul article :
+       titre, texte, images. On ne peut pas « défaire » cette transformation —
+       la page d'origine a été jetée — donc revenir à la page normale passe par
+       un rechargement, ce qui est aussi le plus honnête : on réaffiche
+       exactement ce que le site sert. */
+
+    private void toggleReader() {
+        readerOn = !readerOn;
+        updateReaderIcon();
+        if (readerOn) injectReadScript();
+        else web.reload();
+    }
+
+    private void updateReaderIcon() {
+        if (readerBtn == null) return;
+        readerBtn.setColorFilter(getResources().getColor(
+            readerOn ? R.color.reader_accent2 : R.color.reader_ink, getTheme()));
+        readerBtn.setSelected(readerOn);
+    }
+
+    private void injectReadScript() {
+        if (!readerOn || web == null) return;
+        if (readScript == null) readScript = readRaw(R.raw.reader_read);
+        if (readScript == null) return;
+        web.evaluateJavascript(readScript, value -> {
+            // Le script ne transforme rien s'il ne trouve pas assez de texte
+            // (galerie, page d'accueil, application web). Le dire, plutôt que de
+            // laisser croire que le bouton n'a pas répondu.
+            web.evaluateJavascript("document.documentElement.dataset.snRead === '1'", ok -> {
+                if (!"true".equals(ok)) {
+                    readerOn = false;
+                    updateReaderIcon();
+                    Toast.makeText(this, R.string.reader_read_ko, Toast.LENGTH_SHORT).show();
+                }
+            });
+        });
+    }
 
     private void injectCmpScript() {
         if (web == null) return;
@@ -377,6 +428,9 @@ public class InAppBrowserActivity extends AppCompatActivity {
                 hostView.setText(prettyHost(url));
                 progress.setVisibility(View.GONE);
                 injectCmpScript();
+                // En dernier : le mode lecture remplace la page entière, il n'y
+                // aurait plus rien à nettoyer après lui.
+                injectReadScript();
             }
 
             @Override

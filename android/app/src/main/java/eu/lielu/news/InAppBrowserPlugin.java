@@ -40,6 +40,8 @@ public class InAppBrowserPlugin extends Plugin {
         // s'active sciemment (voir adsPref dans index.html).
         intent.putExtra(InAppBrowserActivity.EXTRA_BLOCK_ADS,
             Boolean.TRUE.equals(call.getBoolean("blockAds", Boolean.FALSE)));
+        intent.putExtra(InAppBrowserActivity.EXTRA_READER,
+            Boolean.TRUE.equals(call.getBoolean("reader", Boolean.FALSE)));
         activity.startActivity(intent);
         // API 34+ : l'animation est déclarée par l'activité entrante elle-même.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
