@@ -439,6 +439,23 @@ Trois choix qui comptent :
   feuille du site étant supprimée, une classe résiduelle ne servirait qu'à
   réintroduire du hasard.
 
+**Sites sur abonnement.** Le mode lecture ne touche **à rien** sur une page de
+connexion. C'est un cas qui casserait tout sans précaution : le script supprime
+`form`, `input` et `button` et remplace la page — il ne resterait pas un champ à
+remplir, et le gestionnaire de mots de passe n'aurait plus rien à autoremplir,
+l'Autofill d'Android ayant besoin des vrais champs dans le DOM. Deux
+détections, l'une sûre et l'autre en filet : présence d'un
+`input[type="password"]`, ou chemin d'URL évocateur (`/connexion`, `/login`,
+`/sso`, `/abonnement`…). La page est alors laissée intacte et marquée `auth`,
+pour que le lecteur sache qu'il ne s'agit pas d'un échec d'extraction : le mode
+reste actif pour l'article qui suit la connexion, et un message discret explique
+pourquoi cet écran-là n'est pas simplifié.
+
+Les cookies sont écrits sur disque à chaque mise en arrière-plan
+(`CookieManager.flush()`). Sans ce vidage explicite, une session peut être
+perdue quand le système récupère le processus — il faudrait alors se reconnecter
+à chaque lecture.
+
 Les images sont rétablies depuis leurs attributs de chargement différé
 (`data-src`, `srcset`), résolues en URL absolue, et les vignettes de moins de
 120 px comme les traceurs 1×1 sont écartés.

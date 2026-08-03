@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.CookieManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -297,18 +298,24 @@ public class InAppBrowserActivity extends AppCompatActivity {
         if (!readerOn || web == null) return;
         if (readScript == null) readScript = readRaw(R.raw.reader_read);
         if (readScript == null) return;
-        web.evaluateJavascript(readScript, value -> {
-            // Le script ne transforme rien s'il ne trouve pas assez de texte
-            // (galerie, page d'accueil, application web). Le dire, plutôt que de
-            // laisser croire que le bouton n'a pas répondu.
-            web.evaluateJavascript("document.documentElement.dataset.snRead === '1'", ok -> {
-                if (!"true".equals(ok)) {
-                    readerOn = false;
-                    updateReaderIcon();
-                    Toast.makeText(this, R.string.reader_read_ko, Toast.LENGTH_SHORT).show();
+        web.evaluateJavascript(readScript, value -> web.evaluateJavascript(
+            "document.documentElement.dataset.snRead || ''", state -> {
+                // evaluateJavascript rend du JSON : la chaîne arrive entre guillemets.
+                String s = state == null ? "" : state.replace("\"", "");
+                if ("1".equals(s)) return;                       // article simplifié
+                if ("auth".equals(s)) {
+                    // Page de connexion laissée intacte : ce n'est pas un échec, le
+                    // mode reste actif pour l'article qui suit. On le dit quand même,
+                    // sinon l'écran non simplifié passe pour un bogue.
+                    Toast.makeText(this, R.string.reader_read_auth, Toast.LENGTH_SHORT).show();
+                    return;
                 }
-            });
-        });
+                // Pas assez de texte (galerie, page d'accueil, application web) :
+                // le dire, plutôt que de laisser croire que le bouton n'a pas répondu.
+                readerOn = false;
+                updateReaderIcon();
+                Toast.makeText(this, R.string.reader_read_ko, Toast.LENGTH_SHORT).show();
+            }));
     }
 
     private void injectCmpScript() {
@@ -517,6 +524,10 @@ public class InAppBrowserActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         if (web != null) web.onPause();   // coupe le son et les minuteurs JS en arrière-plan
+        // Écrit les cookies sur disque : sans ce vidage explicite, une connexion
+        // à un site sur abonnement peut être perdue si le système récupère le
+        // processus, et il faudrait se reconnecter à chaque lecture.
+        CookieManager.getInstance().flush();
     }
 
     @Override

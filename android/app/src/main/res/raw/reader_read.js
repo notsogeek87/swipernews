@@ -12,7 +12,26 @@
  */
 (function () {
   try {
-    if (document.documentElement.dataset.snRead === "1") return;
+    if (document.documentElement.dataset.snRead) return;
+
+    /* Pages de connexion : on ne touche à RIEN.
+     *
+     * Le mode lecture supprime form/input/button et remplace la page : sur un
+     * écran de connexion il ne resterait pas un champ à remplir, et le
+     * gestionnaire de mots de passe n'aurait plus rien à autoremplir — l'Autofill
+     * d'Android a besoin des vrais champs dans le DOM. C'est le cas des sites
+     * sur abonnement (Le Monde, Courrier International…), où l'on passe par une
+     * connexion avant de lire.
+     *
+     * Deux détections, l'une sûre, l'autre en filet : un champ de mot de passe
+     * présent dans la page, ou une URL qui annonce la couleur. On sort en
+     * marquant « auth » pour que le lecteur sache que ce n'est pas un échec
+     * d'extraction et garde le mode actif pour l'article suivant. */
+    var AUTH_URL = /(^|\/)(login|log-in|signin|sign-in|connexion|se-connecter|auth|sso|oauth|account|compte|abonnement|subscribe|s-abonner|register|inscription|password|mot-de-passe)(\/|$|\?|#)/i;
+    if (document.querySelector('input[type="password"]') || AUTH_URL.test(location.pathname)) {
+      document.documentElement.dataset.snRead = "auth";
+      return;
+    }
 
     /* Signatures de blocs : ce qui entoure l'article, et ce qui le porte. */
     var UNLIKELY = /(comment|sidebar|side-bar|footer|nav|menu|masthead|share|social|promo|related|recommend|newsletter|banner|cookie|consent|advert|sponsor|breadcrumb|pagination|modal|popup|widget|teaser|abonn|paywall|subscri)/i;
