@@ -322,6 +322,15 @@ cp logo-maskable-512.png resources/icon-foreground.png
 npm run android:assets
 ```
 
+`/logo-*.png` est servi avec un `Cache-Control` **immutable** d'un an
+(`vercel.json`) : à URL identique, un logo mis à jour resterait invisible en
+cache CDN/navigateur pendant un an, même après un bump de `CACHE` (`sw.js`).
+Après toute modification des `logo-*.png` à la racine, incrémenter le `?v=`
+qui les accompagne partout où ils sont référencés (`index.html` : favicon,
+apple-touch-icon, og:image/twitter:image, logo de l'en-tête ;
+`manifest.webmanifest` ; `SHELL` dans `sw.js`) — même mécanisme que le `?v=`
+des modules `src/*.js`.
+
 ### Build automatique de l'APK (GitHub Actions)
 
 Ce que Vercel fait pour le web, `.github/workflows/android.yml` le fait pour

@@ -22,10 +22,14 @@
 const CACHE = "flux-v25";
 
 // Mis en cache à l'installation : uniquement ce qui ne dépend pas de la version.
+// Les logos portent `?v=` comme les modules `src/*.js` : `/logo-*.png` est
+// servi en Cache-Control immutable un an (vercel.json), donc un changement de
+// contenu à URL identique resterait invisible en cache HTTP jusqu'à expiration
+// — même après un bump de CACHE ci-dessus, qui ne purge que le cache du SW.
 const SHELL = [
-  "./logo-192.png",
-  "./logo-512.png",
-  "./logo-maskable-512.png",
+  "./logo-192.png?v=25",
+  "./logo-512.png?v=25",
+  "./logo-maskable-512.png?v=25",
   "./manifest.webmanifest",
 ];
 
