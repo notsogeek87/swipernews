@@ -985,8 +985,15 @@ async function loadFeeds(){
     rebuild();render();hideStates();feedKeyShown=key;   // render() réancre sur l'article lu
   }
   /* Fenêtre progressive : courte pour le tout premier rendu (le contenu doit
-     apparaître vite), large ensuite (le fil doit cesser de bouger). */
+     apparaître vite), large ensuite (le fil doit cesser de bouger).
+     Si un cache est déjà affiché, on ne repeint PAS au fil de l'eau : la
+     carte du haut se mettrait à changer d'article 2-3 fois en quelques
+     centaines de ms (cache → lot partiel → lot complet), ce qui se voit
+     comme un scintillement au lancement. Le cache reste affiché tel quel
+     (la barre de sync du haut signale le chargement en cours) jusqu'à
+     l'unique repeinture finale de finish(). */
   function scheduleRender(){
+    if(cached)return;
     if(renderT)return;
     renderT=setTimeout(paint,painted?CONFIG.RENDER_COALESCE_MS:CONFIG.FIRST_PAINT_MS);
   }
