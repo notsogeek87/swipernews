@@ -451,8 +451,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=34"></script>
-<script src="src/learn-core.js?v=34"></script>
+<script src="src/lib.js?v=35"></script>
+<script src="src/learn-core.js?v=35"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -718,7 +718,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="34";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="35";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -753,7 +753,11 @@ let cmpPref=(()=>{try{return localStorage.getItem(LS_CMP)==="show"?"show":"hide"
    servant qu'à refermer les emplacements restés vides. Désactivable parce que
    certains sites détectent le blocage et refusent de s'afficher. */
 const LS_ADS="fluxswipe.ads.v1";
-let adsPref=(()=>{try{return localStorage.getItem(LS_ADS)==="allow"?"allow":"block";}catch(e){return "block";}})();
+/* Désactivé par défaut, à dessein : bloquer prive de revenu les éditeurs dont
+   on lit justement les flux, et un site à mur anti-adblock donnerait une app
+   qui « ne marche pas » à quelqu'un qui n'a rien demandé. C'est une option à
+   activer sciemment, pas un comportement subi. */
+let adsPref=(()=>{try{return localStorage.getItem(LS_ADS)==="block"?"block":"allow";}catch(e){return "allow";}})();
 
 /* Liste de blocage distante (facultative). La liste intégrée à l'APK (178
    domaines, res/raw/reader_blocklist.txt) ne bouge qu'au rythme des
@@ -1866,7 +1870,7 @@ function renderReadPref(){
 const PREFS={
   read:{get:()=>readPref,set:v=>{readPref=v;},key:LS_READ,vals:["app","browser"]},
   cmp: {get:()=>cmpPref, set:v=>{cmpPref=v;}, key:LS_CMP, vals:["hide","show"]},
-  ads: {get:()=>adsPref, set:v=>{adsPref=v;}, key:LS_ADS, vals:["block","allow"]},
+  ads: {get:()=>adsPref, set:v=>{adsPref=v;}, key:LS_ADS, vals:["allow","block"]},   // vals[0] = défaut
 };
 function setPref(name,v){
   const p=PREFS[name];

@@ -119,7 +119,9 @@ public class InAppBrowserActivity extends AppCompatActivity {
         cardTitle = intent.getStringExtra(EXTRA_TITLE);
         if (cardTitle == null) cardTitle = "";
         hideCmp = intent.getBooleanExtra(EXTRA_HIDE_CMP, true);
-        blockAds = intent.getBooleanExtra(EXTRA_BLOCK_ADS, true);
+        // false par défaut : le blocage s'active sciemment côté réglages, il ne
+        // doit pas s'appliquer parce qu'un appelant a oublié de le préciser.
+        blockAds = intent.getBooleanExtra(EXTRA_BLOCK_ADS, false);
         // Liste intégrée + liste téléchargée si l'utilisateur en a choisi une.
         if (blockAds) blockedHosts = BlocklistStore.load(this);
 

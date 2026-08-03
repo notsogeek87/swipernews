@@ -8,7 +8,7 @@ Fonctionnalités principales :
 • Reprise de lecture par source, à l'endroit où vous l'avez laissée
 • Lecture des articles dans un navigateur intégré, sombre et sans barre d'URL : on ne quitte jamais l'application, et le retour ramène à la carte quittée — au choix, les articles peuvent aussi s'ouvrir dans votre navigateur habituel
 • Lecture immersive : la barre du lecteur s'efface dès que vous descendez dans l'article, et les bandeaux cookies sont masqués — masqués, jamais acceptés : aucun consentement n'est donné en votre nom (option désactivable)
-• Publicités et traceurs bloqués avant même d'être chargés : pages plus légères et moins de pistage (option désactivable, certains sites détectent le blocage). Une liste de blocage publique (EasyList, StevenBlack) peut être téléchargée en un tap et se met à jour toute seule — rien n'est téléchargé tant que vous n'avez rien choisi
+• Blocage des publicités et des traceurs, à activer si vous le souhaitez (désactivé par défaut) : les requêtes sont coupées avant même d'être chargées, pour des pages plus légères et moins de pistage. Une liste de blocage publique (EasyList, StevenBlack) peut alors être téléchargée en un tap et se met à jour toute seule — rien n'est téléchargé tant que vous n'avez rien choisi
 • Partage d'un article vers l'application de votre choix
 • Mode Apprendre : des articles Wikipédia aléatoires à swiper, avec des centres d'intérêt (sciences, histoire, art, géographie, nature, espace, technologie, sport, cinéma, musique, philosophie…)
 • Fonctionnement hors-ligne pour l'application déjà chargée

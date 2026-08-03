@@ -35,9 +35,9 @@ L'outillage de **développement** (lint, tests, CI) est optionnel et ne change r
   sans URL, jauge bicolore), au lieu de basculer vers Chrome — et un réglage
   **Ouvrir les articles : dans l'app / navigateur** permet de revenir au
   comportement d'avant. La barre s'efface pendant la lecture (barre d'état
-  comprise), les **bandeaux cookies sont masqués — jamais acceptés** et les
-  **publicités et traceurs bloqués avant chargement** ; tout cela se désactive.
-  Voir [Navigateur intégré](#navigateur-intégré-app-android).
+  comprise) et les **bandeaux cookies sont masqués — jamais acceptés**. Un
+  **blocage des publicités et des traceurs** est disponible, désactivé par
+  défaut. Voir [Navigateur intégré](#navigateur-intégré-app-android).
   Sur le web, le lien s'ouvre dans un nouvel onglet comme avant
 - **Mode Apprendre** 🎓 : un sélecteur à deux onglets en haut (**📰 Actus** / **🎓 Apprendre**, l'actif surligné) bascule le fil vers des articles Wikipédia aléatoires pour swiper en apprenant. Le fil est **sans fin** — de nouveaux articles se chargent automatiquement en approchant du bas — le bouton **↻** repart sur une nouvelle fournée, et le mode est mémorisé entre les sessions.
 - Installable comme application (PWA) avec fonctionnement hors-ligne
@@ -408,7 +408,11 @@ Vérifié sur une page piégée (`test` manuel en Chromium) : bandeau OneTrust,
 bandeau Didomi et bandeau maison masqués ; barre de navigation fixe, article
 traitant des cookies et encart newsletter **préservés** ; défilement rendu.
 
-**Publicités et traceurs.** Bloqués à deux étages, complémentaires :
+**Publicités et traceurs.** Le blocage est **désactivé par défaut** : c'est une
+option qu'on active sciemment. Deux raisons, et aucune n'est technique — bloquer
+prive de revenu les éditeurs dont on lit justement les flux, et un site à mur
+anti-adblock donnerait une app qui « ne marche pas » à quelqu'un qui n'a rien
+demandé. Une fois activé, le blocage opère à deux étages complémentaires :
 
 1. **le réseau**, dans `shouldInterceptRequest` : toute ressource dont l'hôte
    figure dans `res/raw/reader_blocklist.txt` reçoit une réponse vide. C'est le
@@ -469,18 +473,15 @@ ce qu'elles disent. Deux pièges vérifiés sur les vrais fichiers :
   n'est pas un domaine, un TLD fait au moins deux caractères et n'est jamais
   entièrement numérique (`xn--p1ai` reste accepté).
 
-Le revers, assumé et affiché dans le réglage : cela prive de revenu les
-éditeurs dont on lit les flux, et certains sites détectent le blocage et
-refusent de s'afficher — d'où l'option « Affichés ».
-
 **Le lecteur intégré se refuse** : un réglage « Ouvrir les articles » propose
 *Dans l'app* (défaut) ou *Navigateur*, mémorisé dans
 `fluxswipe.readpref.v1`. Sur *Navigateur*, `openArticle()` rend `false` et le
 lien repart au navigateur du téléphone, exactement comme avant l'ajout du
 lecteur. Deux autres réglages, « Bandeaux cookies : Masqués / Affichés »
-(`fluxswipe.cookiebanner.v1`) et « Publicités et traceurs : Bloqués / Affichés »
-(`fluxswipe.ads.v1`), n'apparaissent que quand le lecteur est actif — sans lui,
-la question ne se pose plus. Les trois préférences vivent côté web et sont
+(`fluxswipe.cookiebanner.v1`, masqués par défaut) et « Publicités et traceurs :
+Bloqués / Affichés » (`fluxswipe.ads.v1`, **affichés** par défaut),
+n'apparaissent que quand le lecteur est actif — sans lui, la question ne se
+pose plus. Les trois préférences vivent côté web et sont
 transmises à chaque ouverture (`hideCmp`, `blockAds`) : le natif ne garde aucun
 état. Le réglage figure dans **les deux** panneaux — Sources et Centres
 d'intérêt — parce qu'ils ne sont jamais atteignables en même temps (⚙ Sources
