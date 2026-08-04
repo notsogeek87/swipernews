@@ -92,21 +92,31 @@ La demande d'inclusion est **ouverte et en cours de revue** :
 GitLab est hors de portée de ce dépôt (aucun accès configuré ici) — ce qui suit
 se fait donc à la main, sur `fdroiddata` :
 
-1. **Recopier `fdroid/eu.lielu.news.yml`** (tel quel) dans
-   `metadata/eu.lielu.news.yml` sur la branche de la MR, et pousser.
+1. **Reporter le contenu de `fdroid/eu.lielu.news.yml`** dans
+   `metadata/eu.lielu.news.yml` sur la branche de la MR, et pousser. Attention,
+   ce n'est pas un copier-coller : là-bas le fichier est sous la forme
+   canonique de `fdroid rewritemeta` — **aucun commentaire**, `versionName` non
+   quoté. Seules les valeurs doivent correspondre.
 2. **Reprendre la description de la MR avec leur gabarit « App inclusion »** et
-   cocher toutes les cases obligatoires — c'est le dernier point demandé en
-   revue, et il ne concerne que GitLab, pas ce dépôt.
+   cocher toutes les cases obligatoires — demandé en revue, et cela ne concerne
+   que GitLab, pas ce dépôt.
 
 ## Ce que la revue de la MR a demandé (et où c'est corrigé)
 
-| Demande | Corrigé dans |
-| --- | --- |
-| `commit:` = hash complet, pas le tag `v1.2.0` | `eu.lielu.news.yml` |
-| Supprimer `output:` | `eu.lielu.news.yml` |
-| Ajouter `Binaries` et `AllowedAPKSigningKeys` (build reproductible) | `eu.lielu.news.yml` + `.github/workflows/release.yml` |
-| Ajouter un dossier `en-US` dans `fastlane` | `fastlane/metadata/android/en-US/` |
-| Utiliser le gabarit « App inclusion » et cocher les cases | à faire sur GitLab (voir ci-dessus) |
+| Demande | De qui | Corrigé dans |
+| --- | --- | --- |
+| `commit:` = hash complet, pas le tag `v1.2.0` | duckniii | `eu.lielu.news.yml` |
+| Supprimer `output:` | duckniii | `eu.lielu.news.yml` |
+| Ajouter `Binaries` et `AllowedAPKSigningKeys` (build reproductible) | duckniii | `eu.lielu.news.yml` + `.github/workflows/release.yml` |
+| Ajouter un dossier `en-US` dans `fastlane` | duckniii | `fastlane/metadata/android/en-US/` |
+| Utiliser le gabarit « App inclusion » et cocher les cases | duckniii | à faire sur GitLab (voir ci-dessus) |
+| Node depuis Debian `forky`, pas depuis un script NodeSource | licaon-kter | `eu.lielu.news.yml` |
+| `prebuild:` au lieu d'`init:`, `scandelete:` plutôt qu'une liste de `scanignore:` | licaon-kter | `eu.lielu.news.yml` |
+| Les binaires de `sharp`/vips ne devraient pas être là | licaon-kter | contournés par `scandelete:` ; supprimés pour de bon en sortant `@capacitor/assets` des `devDependencies`, à la 1.3.0 |
+
+Le bloc de suggestion de licaon-kter reconduisait `output:` — il l'avait
+simplement recopié du fichier d'alors. Ne pas l'appliquer tel quel : duckniii
+avait justement demandé sa suppression.
 
 ## Ce que le premier build F-Droid a appris
 
@@ -114,17 +124,50 @@ se fait donc à la main, sur `fdroiddata` :
 mais les sources de `fdroidserver` sont lisibles sur GitLab — c'est la référence
 à consulter en cas de doute sur un champ de recette.
 
-- **`init:` s'exécute dans `subdir:`**, donc dans `android/`, et non à la racine
-  du dépôt (`INFO: Running 'init' commands in build/eu.lielu.news/android`).
-  `npm ci` fonctionne quand même, npm remontant jusqu'au `package.json` le plus
-  proche ; ne pas « corriger » par un `cd ..`, qui ne marcherait plus si leur
-  outil changeait de répertoire de travail.
+- **`init:` comme `prebuild:` s'exécutent dans `subdir:`**, donc dans
+  `android/`, et non à la racine du dépôt (`INFO: Running 'init' commands in
+  build/eu.lielu.news/android`). `npm ci` fonctionne quand même, npm remontant
+  jusqu'au `package.json` le plus proche ; ne pas « corriger » par un `cd ..`,
+  qui ne marcherait plus si leur outil changeait de répertoire de travail. La
+  recette utilise `prebuild:`, demandé en revue : il s'exécute plus tard, juste
+  avant le scan et la compilation.
 - **Le scanner refuse tout binaire pré-compilé dans l'arbre des sources**, et
-  `npm ci` en dépose quatorze dans `node_modules` (sharp, `tsc`, les JAR de
-  `@trapezedev/gradle-parse`, les gabarits `.tar.gz` de la CLI Capacitor). D'où
-  le `scanignore:` de la recette, qui les désigne un par un. Attention, il est
-  strict dans les deux sens : un chemin qui n'existe pas **et** un chemin qui ne
-  masque aucune erreur sont tous deux signalés comme des erreurs.
+  `npm ci` en dépose une poignée dans `node_modules` (sharp, `tsc`, les JAR de
+  `@trapezedev/gradle-parse`, les gabarits `.tar.gz` de la CLI Capacitor). Deux
+  parades, et la recette utilise les deux :
+  - `scanignore:` désigne un fichier à ne pas signaler. Il est strict dans les
+    deux sens : un chemin qui n'existe pas **et** un chemin qui ne masque
+    aucune erreur sont tous deux des erreurs.
+  - `scandelete:` **ne supprime pas le dossier** qu'on lui donne — le scanner
+    efface uniquement les fichiers qu'il incrimine dedans (`scanner.py`,
+    `removeproblem`). Sans danger ici : le scan tourne après `prebuild` (donc
+    après `cap sync`), et `@capacitor/android` — le seul module de
+    `node_modules` dont Gradle dépende, via `android/capacitor.settings.gradle`
+    — ne contient aucun binaire.
+
+  `scanignore` est testé **avant** `scandelete` (`scanner.py`, `scanproblem`) :
+  un chemin couvert par les deux compte comme « utilisé » du côté `scanignore`,
+  et aucun des deux ne remonte d'erreur « unused ».
+- **Le nodejs de Debian stable est trop vieux** pour la CLI Capacitor 8 (Node 22
+  minimum), d'où le dépôt `forky` (testing) dans `sudo:`. Ne pas revenir à un
+  `curl https://deb.nodesource.com/… | bash` : faire exécuter un script tiers à
+  l'aveugle dans leur buildserver leur a été reproché en revue.
+- **La reproductibilité a été mesurée, pas supposée** : l'APK produit par leur
+  CI pour `10200` et celui publié par `release.yml` ont **490 entrées
+  identiques** — mêmes noms, même ordre, mêmes CRC, mêmes tailles, mêmes
+  horodatages, même compression. Seule diffère la signature. C'est exactement
+  ce que compare `fdroid verify`. À refaire à chaque version, avant de taguer
+  si possible :
+
+  ```bash
+  python3 - <<'EOF'
+  import zipfile, re
+  SIG = re.compile(r'^META-INF/[^/]*\.(SF|RSA|DSA|EC)$|^META-INF/MANIFEST\.MF$')
+  sig = lambda p: [(i.filename, i.CRC) for i in zipfile.ZipFile(p).infolist()
+                   if not SIG.match(i.filename)]
+  print(sig("swipernews-X.Y.Z.apk") == sig("eu.lielu.news_NNNNN.signed.apk"))
+  EOF
+  ```
 - **`UpdateCheckMode: Tags` accepte une expression régulière** en argument
   (`checkupdates.py` : `pattern = mode[5:]`).
 - **Le fichier de recette est validé par un schéma JSON**, `schemas/metadata.json`

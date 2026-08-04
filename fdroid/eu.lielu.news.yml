@@ -62,45 +62,51 @@ Builds:
     # + correctif).
     commit: 4e5c98b10bff8fb3cf4ad7bfccfa70b1c03a522d
     subdir: android
-    # Le nodejs de Debian est trop vieux : la CLI Capacitor 8 exige Node 22 et
-    # refuse Node 20 (d'où le setup-node@22 d'android.yml). On passe donc par
-    # le dépôt NodeSource, sinon cap sync s'arrête avant d'avoir rien recopié.
+    # Le nodejs de Debian stable est trop vieux : la CLI Capacitor 8 exige
+    # Node 22 et refuse Node 20 (d'où le setup-node@22 d'android.yml). D'où
+    # forky (testing), suffisamment récent — plutôt qu'un « curl | bash » vers
+    # NodeSource, qui ferait dépendre le build d'un script tiers exécuté à
+    # l'aveugle. C'est la forme demandée en revue par licaon-kter.
     sudo:
+      - echo "deb https://deb.debian.org/debian forky main" > /etc/apt/sources.list.d/forky.list
       - apt-get update
-      - apt-get install -y curl ca-certificates
-      - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-      - apt-get install -y nodejs
-    # cap:sync régénère www/ (non versionné) puis le recopie dans le projet
-    # natif : sans lui, l'APK embarque un assets/public vide.
-    #
-    # « init » s'exécute dans subdir, donc dans android/ — pas à la racine, où
-    # vit le package.json. Ne pas ajouter de « cd .. » pour autant : npm remonte
-    # tout seul jusqu'au package.json le plus proche, et la commande nue marche
-    # donc depuis l'un comme depuis l'autre.
-    init:
-      - npm ci && npm run cap:sync
+      - apt-get install -y -t forky npm
     gradle:
       - yes
     # Pas d'`output:` : ce champ ne sert qu'aux builds non-Gradle. Pour un build
     # Gradle, fdroidserver retrouve seul l'APK produit, et le déclarer n'aurait
-    # servi qu'à figer un chemin que l'AGP peut renommer.
+    # servi qu'à figer un chemin que l'AGP peut renommer. (Le bloc de suggestion
+    # de licaon-kter le reconduisait, mais c'est duckniii qui a demandé sa
+    # suppression — il ne revient pas.)
     #
+    # cap:sync régénère www/ (non versionné) puis le recopie dans le projet
+    # natif : sans lui, l'APK embarque un assets/public vide. « prebuild »
+    # s'exécute dans subdir, donc dans android/ — pas à la racine, où vit le
+    # package.json. Ne pas ajouter de « cd .. » pour autant : npm remonte tout
+    # seul jusqu'au package.json le plus proche.
+    prebuild:
+      - npm ci
+      - npm run cap:sync
     # F-Droid refuse tout binaire pré-compilé trouvé dans l'arbre des sources,
-    # et npm ci en dépose quatorze dans node_modules. Aucun n'entre dans l'APK :
-    # ce sont les outils de build de Capacitor (générateur d'icônes, analyseur
-    # de build.gradle, gabarits de projet). On les désigne un par un plutôt que
-    # d'ignorer node_modules en bloc — et il le faut, le scanner signalant aussi
-    # bien un chemin inexistant qu'un chemin qui ne sert à rien.
+    # et npm ci en dépose une poignée dans node_modules (gabarits .tar.gz de la
+    # CLI Capacitor, JAR de @trapezedev, binaires de sharp et de tsc). Aucun
+    # n'entre dans l'APK, et aucun n'est utilisé par Gradle — @capacitor/android,
+    # le seul module node_modules dont dépend le build (voir
+    # android/capacitor.settings.gradle), n'en contient pas.
     #
-    # Ces cinq entrées disparaîtraient presque toutes en sortant @capacitor/
-    # assets des devDependencies (il n'est utilisé que par npm run android:assets,
-    # pour régénérer les icônes) : il apporte sharp, tsc et les JAR de trapezedev.
+    # « scandelete » ne supprime pas le dossier : le scanner n'efface que les
+    # fichiers qu'il incrimine, et il tourne APRÈS prebuild, donc après cap sync.
+    # « scanignore » est testé avant lui (scanner.py), l'entrée ci-dessous reste
+    # donc « utilisée » et ne déclenche pas d'erreur « Unused scanignore path ».
+    #
+    # Tout ceci disparaîtrait en sortant @capacitor/assets des devDependencies
+    # (il n'est utilisé que par npm run android:assets, pour régénérer les
+    # icônes) : c'est lui qui apporte sharp, tsc et les JAR de trapezedev. À
+    # faire pour la 1.3.0 — la 1.2.0 est figée sur son commit.
     scanignore:
-      - node_modules/@capacitor/assets/node_modules/@capacitor/cli/assets
-      - node_modules/@capacitor/cli/assets
-      - node_modules/@trapezedev/gradle-parse
-      - node_modules/@typescript/typescript-linux-x64
-      - node_modules/sharp
+      - node_modules/@capacitor/assets/node_modules/@capacitor/cli/assets/capacitor-cordova-android-plugins.tar.gz
+    scandelete:
+      - node_modules
 
 # versionName et versionCode sont écrits en clair dans android/app/build.gradle,
 # donc F-Droid sait les lire : une nouvelle entrée Builds s'ajoute toute seule à
