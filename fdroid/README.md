@@ -11,11 +11,14 @@ soit ensuite rapide à faire manuellement.
 
 ## Ce qui est prêt
 
-- **`fastlane/metadata/android/fr-FR/`** : titre, description courte, description
-  longue et icône (512×512) au format `fastlane`, que F-Droid (et d'autres
-  stores) peuvent reprendre automatiquement pour la fiche de l'application.
-- **`fdroid/eu.lielu.news.yml`** : recette de build, épinglée sur le tag
-  `v1.2.0`, à coller dans `metadata/eu.lielu.news.yml` sur `fdroiddata`.
+- **`fastlane/metadata/android/en-US/` et `…/fr-FR/`** : titre, description
+  courte, description longue, icône (512×512) et captures au format `fastlane`,
+  que F-Droid (et d'autres stores) reprennent automatiquement pour la fiche de
+  l'application. `en-US` est le dossier de repli : sans lui, un utilisateur dont
+  la langue n'est pas le français voit une fiche vide — leur revue le réclame.
+- **`fdroid/eu.lielu.news.yml`** : recette de build, épinglée sur le **hash
+  complet** du commit de `v1.2.0`, à coller dans `metadata/eu.lielu.news.yml`
+  sur `fdroiddata`.
 - **Captures d'écran** dans
   `fastlane/metadata/android/fr-FR/images/phoneScreenshots/` : les deux modes,
   Actus et Apprendre. F-Droid en demande au moins une.
@@ -35,7 +38,8 @@ est rejeté :
 1. `android/app/build.gradle` : `versionCode` et `versionName` dans
    `defaultConfig`, **écrits en clair** (c'est ce que produit le Gradle nu de
    F-Droid, et la seule forme que sait lire leur analyseur) ;
-2. `fdroid/eu.lielu.news.yml` : `versionName`, `versionCode`, `commit`,
+2. `fdroid/eu.lielu.news.yml` : `versionName`, `versionCode`, `commit` (le
+   **hash complet**, pas le tag : un tag se déplace, ils le refusent),
    `CurrentVersion`, `CurrentVersionCode` ;
 3. le tag git lui-même, `vX.Y.Z`, posé sur le commit publié.
 
@@ -50,13 +54,59 @@ correctif, soit `10200` pour 1.2.0 — donc il croît tout seul, sans compteur �
 tenir. `package.json` suit aussi la version, mais seulement pour nommer les
 APK produits par la CI.
 
+## Build reproductible : l'APK publié doit exister, et coïncider
+
+Depuis la revue de leur MR, la recette déclare `Binaries:` et
+`AllowedAPKSigningKeys:`. F-Droid recompile alors le tag, **télécharge notre
+APK** et compare les deux (signature exclue) :
+
+- s'ils coïncident, c'est **notre** binaire, signé de **notre** clé, qui est
+  distribué — un paquet installé depuis GitHub se met à jour depuis F-Droid, et
+  réciproquement ;
+- s'ils diffèrent, ou si l'URL ne répond pas, **le build échoue** et la version
+  n'est pas publiée.
+
+D'où deux obligations nouvelles à chaque version :
+
+1. **`.github/workflows/release.yml` doit avoir tourné pour le tag.** Il compile
+   avec un **Gradle nu**, sans `-PversionCode`/`-PversionName` — contrairement à
+   `android.yml`, dont l'APK porte le numéro de run (`1.2.0.52`) et ne peut donc
+   pas servir ici. Il publie le fichier à l'adresse exacte qu'attend
+   `Binaries:` :
+   `releases/download/vX.Y.Z/swipernews-X.Y.Z.apk`. Renommer l'un ou l'autre
+   casse la vérification.
+2. **La clé de signature ne change pas.** `AllowedAPKSigningKeys` porte
+   l'empreinte SHA-256 du certificat des secrets `ANDROID_*`
+   (`cc849a79…6238`) ; un APK signé d'une autre clé est rejeté. Se relit sur un
+   APK publié avec `apksigner verify --print-certs`.
+
+Un tag posé avant que ce workflow n'existe ne l'a évidemment pas déclenché
+(Actions lit le fichier dans le ref choisi) : lancer alors le workflow à la main
+depuis `main`, en renseignant l'entrée `tag` — c'est ce qui a servi à publier
+l'APK de `v1.2.0` après coup.
+
 ## Ce qui reste à faire, à la main
 
-**Ouvrir la demande d'inclusion**, sur GitLab : forker `fdroid/fdroiddata`,
-ajouter `metadata/eu.lielu.news.yml` (le fichier ci-contre, tel quel) et ouvrir
-une merge request — ou, plus simple pour un premier envoi, passer par leur
-"Request For Packaging" : <https://gitlab.com/fdroid/rfp/-/issues>. Cette étape
-ne peut pas être faite depuis ce dépôt GitHub.
+La demande d'inclusion est **ouverte et en cours de revue** :
+[fdroiddata!44729](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/44729).
+GitLab est hors de portée de ce dépôt (aucun accès configuré ici) — ce qui suit
+se fait donc à la main, sur `fdroiddata` :
+
+1. **Recopier `fdroid/eu.lielu.news.yml`** (tel quel) dans
+   `metadata/eu.lielu.news.yml` sur la branche de la MR, et pousser.
+2. **Reprendre la description de la MR avec leur gabarit « App inclusion »** et
+   cocher toutes les cases obligatoires — c'est le dernier point demandé en
+   revue, et il ne concerne que GitLab, pas ce dépôt.
+
+## Ce que la revue de la MR a demandé (et où c'est corrigé)
+
+| Demande | Corrigé dans |
+| --- | --- |
+| `commit:` = hash complet, pas le tag `v1.2.0` | `eu.lielu.news.yml` |
+| Supprimer `output:` | `eu.lielu.news.yml` |
+| Ajouter `Binaries` et `AllowedAPKSigningKeys` (build reproductible) | `eu.lielu.news.yml` + `.github/workflows/release.yml` |
+| Ajouter un dossier `en-US` dans `fastlane` | `fastlane/metadata/android/en-US/` |
+| Utiliser le gabarit « App inclusion » et cocher les cases | à faire sur GitLab (voir ci-dessus) |
 
 ## Ce que le premier build F-Droid a appris
 

@@ -1,0 +1,19 @@
+SwiperNews shows your RSS feeds full screen, one article per card, swiped vertically like a social media timeline — with no algorithm, no ads and no trackers. The app only contacts the RSS feeds you pick yourself, plus Wikipedia's public API for the Learn mode.
+
+Main features:
+
+• Full-screen vertical swipe navigation (or arrow keys / space bar)
+• Add, remove and toggle your RSS sources
+• Import and export your sources as OPML or JSON
+• Reading position remembered per source, right where you left off
+• Articles open in a built-in browser, dark and without an address bar: you never leave the app, and going back returns to the card you came from — articles can also be opened in your usual browser instead
+• Reader mode, e-reader style: title, text and images only, in a comfortable column on a dark background — one button switches back to the full page at any time
+• Immersive reading: the reader bar slides away as soon as you scroll down, and cookie banners are hidden — hidden, never accepted: no consent is ever given on your behalf (can be turned off)
+• Ad and tracker blocking, on if you want it (off by default): requests are cut before they are even loaded, for lighter pages and less tracking. A public blocklist (EasyList, StevenBlack) can then be downloaded in one tap and keeps itself up to date — nothing is downloaded until you have chosen a source
+• Share an article to the app of your choice
+• Learn mode: random Wikipedia articles to swipe through, filtered by interests (science, history, art, geography, nature, space, technology, sport, cinema, films, music, video games, artists, cooking, philosophy…)
+• Works offline once the app has been loaded
+
+Note: the app interface is currently in French only.
+
+SwiperNews is free software (MIT licence). The source code is fully available, and the app requests no permission beyond the Internet access needed to fetch the feeds.

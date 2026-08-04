@@ -31,18 +31,36 @@ AutoName: SwiperNews
 RepoType: git
 Repo: https://github.com/notsogeek87/swipernews.git
 
+# Build reproductible (« RB »). F-Droid recompile depuis les sources, télécharge
+# l'APK publié ici et vérifie que les deux sont identiques (signature exclue) ;
+# si oui, c'est NOTRE binaire, signé de NOTRE clé, qui est distribué. Un même
+# paquet s'installe donc par-dessus l'autre, qu'il vienne de F-Droid ou de
+# GitHub — impossible quand F-Droid resigne avec sa propre clé.
+#
+# %v est remplacé par le versionName. L'URL est celle que produit
+# .github/workflows/release.yml sur un tag vX.Y.Z : ce workflow compile
+# exactement comme F-Droid (Gradle nu, sans -PversionCode/-PversionName), sinon
+# les deux APK divergeraient sur la version et la vérification échouerait.
+Binaries: https://github.com/notsogeek87/swipernews/releases/download/v%v/swipernews-%v.apk
+# Empreinte SHA-256 du certificat de signature (celui des secrets ANDROID_* du
+# dépôt). F-Droid refuse tout APK signé d'une autre clé, ce qui protège contre
+# une release GitHub contrefaite. Relevée sur l'APK publié :
+#   apksigner verify --print-certs swipernews-X.Y.Z.apk
+AllowedAPKSigningKeys: cc849a79fc39de5f8b4af5fcda1dbdb4230ad554aef85b484e5c7fd49caa6238
+
 Builds:
   - versionName: "1.2.0"
     versionCode: 10200
-    # Tag git exact du commit à compiler. F-Droid recompile depuis les sources
-    # à ce commit précis : le numéro de run GitHub (dont android.yml tire son
-    # versionCode) n'existe pas ici, d'où un tag par version publiée.
+    # Hash complet du commit à compiler, et non le tag `v1.2.0` : un tag peut
+    # être déplacé, un hash non — F-Droid l'exige pour que la recette désigne
+    # un arbre de sources immuable. (Ici, le commit du tag v1.2.0.)
     #
     # Le couple ci-dessus doit correspondre à ce que produit un Gradle nu à ce
-    # tag : android/app/build.gradle porte les mêmes valeurs, écrites en clair,
-    # faute de -PversionCode/-PversionName ici. Les deux se bougent ensemble.
-    # Le versionCode suit la version (majeur × 10000 + mineur × 100 + correctif).
-    commit: v1.2.0
+    # commit : android/app/build.gradle porte les mêmes valeurs, écrites en
+    # clair, faute de -PversionCode/-PversionName ici. Les deux se bougent
+    # ensemble. Le versionCode suit la version (majeur × 10000 + mineur × 100
+    # + correctif).
+    commit: 4e5c98b10bff8fb3cf4ad7bfccfa70b1c03a522d
     subdir: android
     # Le nodejs de Debian est trop vieux : la CLI Capacitor 8 exige Node 22 et
     # refuse Node 20 (d'où le setup-node@22 d'android.yml). On passe donc par
@@ -63,7 +81,10 @@ Builds:
       - npm ci && npm run cap:sync
     gradle:
       - yes
-    output: app/build/outputs/apk/release/app-release-unsigned.apk
+    # Pas d'`output:` : ce champ ne sert qu'aux builds non-Gradle. Pour un build
+    # Gradle, fdroidserver retrouve seul l'APK produit, et le déclarer n'aurait
+    # servi qu'à figer un chemin que l'AGP peut renommer.
+    #
     # F-Droid refuse tout binaire pré-compilé trouvé dans l'arbre des sources,
     # et npm ci en dépose quatorze dans node_modules. Aucun n'entre dans l'APK :
     # ce sont les outils de build de Capacitor (générateur d'icônes, analyseur

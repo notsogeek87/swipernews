@@ -133,7 +133,8 @@ Conséquence pratique : **tout ce qui est nécessaire au build doit venir des
 sources**, ce qui interdit d'embarquer quoi que ce soit sous une licence
 incompatible avec le MIT (voir « décisions à ne pas défaire »).
 
-L'app est **acceptée chez eux depuis la 1.2.0**, avec `AutoUpdateMode: Version` :
+La demande d'inclusion (`fdroiddata!44729`) est **ouverte, en cours de revue** —
+rien n'est encore publié chez eux. La recette vise `AutoUpdateMode: Version` :
 F-Droid suit les tags `vX.Y.Z` du dépôt, lit la version **dans les sources** et
 ajoute lui-même l'entrée de build. Plus aucune démarche chez eux à chaque
 version — mais cela ne tient qu'à une chose :
@@ -149,8 +150,18 @@ version — mais cela ne tient qu'à une chose :
 
 Taguer sans avoir bumpé ne casse rien, mais ne publie rien non plus : F-Droid
 relit la même version, conclut « up to date » et ignore le tag — un silence
-qu'on met des semaines à remarquer. Le détail est dans `fdroid/README.md`,
-avec ce que les quatre premiers passages de leur CI ont appris.
+qu'on met des semaines à remarquer.
+
+Second point non négociable depuis leur revue : la recette déclare `Binaries:`
+et `AllowedAPKSigningKeys:` (**build reproductible**). F-Droid recompile le tag,
+télécharge notre APK et refuse de publier si les deux diffèrent. Le tag doit
+donc avoir fait tourner `.github/workflows/release.yml` — le seul qui compile
+avec un **Gradle nu** (`android.yml`, lui, injecte le numéro de run dans la
+version) et qui publie sous le nom exact attendu :
+`releases/download/vX.Y.Z/swipernews-X.Y.Z.apk`.
+
+Le détail est dans `fdroid/README.md`, avec ce que les passages de leur CI et la
+revue de la MR ont appris.
 
 ---
 
@@ -192,7 +203,9 @@ reformater. Le style y est compact (peu d'espaces, accolades sur la même ligne)
 
 `.github/workflows/ci.yml` (lint + format + tests) et `android.yml` (APK signé
 + release) ne tournent **que** sur un push vers `main` ou `staging`, ou sur une
-*pull request*.
+*pull request*. `release.yml`, lui, ne se déclenche que sur un **tag** `vX.Y.Z`
+(ou à la main, en donnant le tag) : c'est le build de publication, celui que
+F-Droid vérifie.
 
 > **Pousser une branche de travail seule ne déclenche RIEN.** Aucune
 > compilation du code natif, aucun APK. Pour faire compiler du Java, il faut
