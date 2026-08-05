@@ -201,9 +201,18 @@ en mémoire : fermer complètement l'app ne la remet pas à zéro. C'est ce qui 
 le seuil efficace sur mobile, où chaque réouverture était auparavant un
 chargement complet.
 
-La position de lecture est conservée (le fil se réancre sur l'article affiché),
-et le mode Apprendre est exclu de tout ceci — son fil est un tirage aléatoire
-sans fin, le recharger ferait perdre le lot en cours.
+Quand un rafraîchissement se termine avec de vraies données (automatique ou
+↻), le fil remonte en tête : un rafraîchissement toutes les 30 minutes n'a de
+sens que si on finit par voir les nouveaux articles, pas seulement les savoir
+présents plus bas dans le fil. Cela l'emporte même sur la reprise de lecture au
+lancement — rouvrir l'app après une pause ramène en haut dès que le
+rafraîchissement (souvent déclenché par le cache périmé) se termine, plutôt que
+de rester sur l'article laissé la fois précédente.
+Seules les repeintures **progressives** pendant un chargement (un flux qui
+répond après l'autre) gardent l'ancrage sur l'article affiché — sans ça, la
+carte à l'écran changerait sous les yeux plusieurs fois par seconde.
+Le mode Apprendre est exclu de tout ceci — son fil est un tirage aléatoire sans
+fin, le recharger ferait perdre le lot en cours.
 
 Le cache Actus conserve le fil **entier** (120 articles, comme à l'écran) et non
 un extrait : puisqu'il est servi pendant 30 minutes, le tronquer reviendrait à

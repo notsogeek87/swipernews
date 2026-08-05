@@ -484,8 +484,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=47"></script>
-<script src="src/learn-core.js?v=47"></script>
+<script src="src/lib.js?v=48"></script>
+<script src="src/learn-core.js?v=48"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -755,7 +755,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="47";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="48";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1227,10 +1227,13 @@ async function loadFeeds(force){
      cartes bougeaient sans arrêt. On accumule et on repeint au plus une fois
      par fenêtre, ce qui correspond en pratique à un lot de MAX_PARALLEL. */
   let renderT=null,painted=false;
-  function paint(){
+  function paint(top){
     renderT=null;painted=true;
     if(my!==loadSeq)return;
-    rebuild();render();hideStates();feedKeyShown=key;   // render() réancre sur l'article lu
+    // `top` : uniquement passé `true` par flushRender (rendu final, voir plus
+    // bas). Les repeintures progressives (via scheduleRender→setTimeout(paint))
+    // n'en reçoivent aucun : elles gardent l'ancrage sur l'article lu.
+    rebuild();render(top);hideStates();feedKeyShown=key;
   }
   /* Fenêtre progressive : courte pour le tout premier rendu (le contenu doit
      apparaître vite), large ensuite (le fil doit cesser de bouger).
@@ -1247,7 +1250,10 @@ async function loadFeeds(force){
   }
   function flushRender(){
     if(renderT){clearTimeout(renderT);renderT=null;}
-    paint();
+    // Rafraîchissement RÉEL terminé (nouvelles données arrivées) : on remonte
+    // en tête. Couvre aussi bien l'automatique (seuil 30 min, filet, natif)
+    // que le bouton ↻ — les deux passent par ce même chemin.
+    paint(true);
   }
 
   // Récupération par lots bornés plutôt que tout en parallèle.
@@ -1572,8 +1578,16 @@ function makeCardEl(it){
    fois de suite : c'est ce qui faisait clignoter l'image au lancement.
    Ici on réconcilie par clé (le lien de l'article) : les cartes déjà présentes
    sont déplacées, jamais recréées, donc leur image reste posée. */
-function render(){
-  const anchor=anchorLink();                    // avant mutation : où est l'utilisateur ?
+/* forceTop : un vrai rafraîchissement Actus (automatique ou ↻) vient de se
+   terminer — on veut la 1ère carte, pas l'article en cours de lecture. Sans
+   ça, l'utilisateur pouvait ne JAMAIS voir le haut du fil pendant des heures
+   de lecture continue, alors que « les news sont à jour » est justement ce
+   que l'actualisation périodique doit garantir. N'affecte QUE le rendu final
+   (voir flushRender ci-dessous) : les repeintures progressives pendant le
+   chargement gardent l'ancrage, sinon la carte bougerait sous le doigt à
+   chaque lot de sources qui répond. */
+function render(forceTop){
+  const anchor=forceTop?null:anchorLink();      // avant mutation : où est l'utilisateur ?
 
   // La carte de fin est régénérée à part (elle n'a pas d'article associé).
   const oldEnd=feedEl.querySelector(".endcard");
@@ -1608,7 +1622,9 @@ function render(){
   if(mode==="news"&&items.length)feedEl.insertAdjacentHTML("beforeend",endCardHTML());
 
   let top=0;
-  if(anchor){
+  if(forceTop){
+    resumePending[mode]=false;                  // ordre explicite : pas de reprise à ignorer
+  }else if(anchor){
     const i=items.findIndex(it=>it.link===anchor);
     if(i>=0)top=scrollToCard(i);
     resumePending[mode]=false;                  // l'utilisateur a pris la main
