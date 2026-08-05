@@ -484,8 +484,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=45"></script>
-<script src="src/learn-core.js?v=45"></script>
+<script src="src/lib.js?v=46"></script>
+<script src="src/learn-core.js?v=46"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -755,7 +755,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="45";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="46";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -902,6 +902,23 @@ document.addEventListener("visibilitychange",()=>{
   if(mode!=="news"||!feedLoadStarted)return;
   loadFeeds();
 });
+/* Filet de sécurité : visibilitychange seul ne suffit pas. Le commentaire de
+   rememberPos() le dit déjà pour un autre cas — « quand l'app est tuée depuis
+   l'écran des tâches récentes, ni pagehide ni visibilitychange ne sont
+   garantis » — et sur Android une app mise en arrière-plan est presque
+   toujours SUSPENDUE, pas tuée : pas de rechargement à froid non plus. Sans
+   filet, une actualisation qui ne se déclenche jamais ne se rattrape JAMAIS,
+   même après des heures.
+   Solution : revérifier périodiquement pendant que l'app est au premier plan.
+   Sans coût réseau : loadFeeds() sans `force` fait déjà tout le travail de
+   vérifier l'âge du cache et ressort immédiatement si le seuil n'est pas
+   atteint — l'appeler chaque minute ne déclenche un vrai appel aux sources
+   qu'une fois toutes les AUTO_RELOAD_MS, comme prévu. */
+setInterval(()=>{
+  if(mode!=="news"||!feedLoadStarted)return;
+  if(document.visibilityState!=="visible")return;   // pas de réseau en arrière-plan
+  loadFeeds();
+},60*1000);
 
 /* ---------- Récupération avec plusieurs proxys de secours ---------- */
 const PROXIES=[

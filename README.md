@@ -174,10 +174,18 @@ Une seule règle : **les sources ne sont interrogées qu'une fois toutes les
 30 minutes**, sauf demande explicite.
 
 - **Automatiquement** — à l'ouverture de l'app, au retour d'arrière-plan, à la
-  bascule vers Actus — le fil n'est rechargé que si le dernier lot **réellement
+  bascule vers Actus, ou toutes les 60 secondes pendant que l'app reste au
+  premier plan — le fil n'est rechargé que si le dernier lot **réellement
   récupéré** date de plus de **30 minutes**. En deçà, le cache local est servi
   tel quel, **sans le moindre appel réseau** : rouvrir l'app dix fois en dix
   minutes ne déclenche qu'un seul aller-retour vers les sources.
+  La vérification périodique est un filet de sécurité : sur Android, une app
+  mise en arrière-plan est presque toujours **suspendue**, pas tuée — pas de
+  rechargement à froid, et `visibilitychange` n'est pas garanti au retour (le
+  code le documente déjà pour la sauvegarde de position). Sans ce filet, une
+  actualisation qui rate son déclencheur ne se rattraperait jamais, même après
+  des heures. La vérification elle-même ne coûte rien : `loadFeeds()` sans
+  `force` ressort immédiatement si le seuil n'est pas atteint.
 - **Sur demande** — bouton **↻**, *Réessayer*, changement de sources, import
   OPML, carte de fin de fil — le seuil est ignoré et les sources sont
   interrogées immédiatement.
