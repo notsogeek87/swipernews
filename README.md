@@ -165,15 +165,31 @@ ce ne sont pas des actualités récentes, et ils monopolisaient sinon la tête d
 
 ### Quand le fil Actus se recharge-t-il ?
 
-- à l'ouverture de l'app (si vous étiez en Actus), au bouton **↻**, à la première
-  bascule vers Actus dans la session, via « Voir mon fil », après un import de
-  sources, ou depuis la carte de fin de fil ;
-- **au retour d'arrière-plan**, si le dernier chargement réussi date de plus de
-  **5 minutes**. Ce seuil s'aligne sur le cache CDN du proxy (`s-maxage=300`) :
-  en deçà, la requête renverrait de toute façon le même contenu. La position de
-  lecture est conservée (le fil se réancre sur l'article affiché), et le mode
-  Apprendre est exclu — son fil est un tirage aléatoire sans fin, le recharger
-  ferait perdre le lot en cours.
+Une seule règle : **les sources ne sont interrogées qu'une fois toutes les
+30 minutes**, sauf demande explicite.
+
+- **Automatiquement** — à l'ouverture de l'app, au retour d'arrière-plan, à la
+  bascule vers Actus — le fil n'est rechargé que si le dernier lot **réellement
+  récupéré** date de plus de **30 minutes**. En deçà, le cache local est servi
+  tel quel, **sans le moindre appel réseau** : rouvrir l'app dix fois en dix
+  minutes ne déclenche qu'un seul aller-retour vers les sources.
+- **Sur demande** — bouton **↻**, *Réessayer*, changement de sources, import
+  OPML, carte de fin de fil — le seuil est ignoré et les sources sont
+  interrogées immédiatement.
+
+La date du dernier chargement est stockée **avec le cache** (localStorage), pas
+en mémoire : fermer complètement l'app ne la remet pas à zéro. C'est ce qui rend
+le seuil efficace sur mobile, où chaque réouverture était auparavant un
+chargement complet.
+
+La position de lecture est conservée (le fil se réancre sur l'article affiché),
+et le mode Apprendre est exclu de tout ceci — son fil est un tirage aléatoire
+sans fin, le recharger ferait perdre le lot en cours.
+
+Le cache Actus conserve le fil **entier** (120 articles, comme à l'écran) et non
+un extrait : puisqu'il est servi pendant 30 minutes, le tronquer reviendrait à
+perdre les deux tiers des articles à chaque relancement. Le cache Apprendre, lui,
+reste à 40 articles par centre d'intérêt (le défilement infini le complète).
 
 Un rafraîchissement ne vide jamais un fil déjà affiché : si le réseau échoue, le
 contenu reste à l'écran avec un simple message.

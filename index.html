@@ -461,8 +461,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=42"></script>
-<script src="src/learn-core.js?v=42"></script>
+<script src="src/lib.js?v=43"></script>
+<script src="src/learn-core.js?v=43"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -530,7 +530,11 @@ const CONFIG = {
                          // reconstructions du fil en quelques secondes
   MAX_CARDS: 60,         // cartes gardées dans le DOM (borne le fil infini)
   MAX_ITEMS: 300,        // items gardés en mémoire (dédoublonnage du scroll)
-  CACHE_ITEMS: 40,       // articles mis en cache localStorage par catégorie
+  CACHE_ITEMS: 40,       // articles Apprendre mis en cache localStorage par catégorie
+  // Le cache Actus n'est plus un simple « peindre vite » : pendant AUTO_RELOAD_MS
+  // il EST le fil servi (voir loadFeeds). Le tronquer à 40 ferait perdre les deux
+  // tiers des articles à chaque relancement — on garde donc le fil entier.
+  CACHE_ITEMS_NEWS: 120, // = MAX_NEWS
   SEEN_MAX: 2000,        // articles « déjà vus » mémorisés (mode Apprendre)
   // https obligatoire : ce lien part dans CHAQUE partage. En http, redirection
   // au mieux, avertissement « site non sécurisé » ou blocage au pire.
@@ -728,7 +732,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="42";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="43";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -870,8 +874,9 @@ window.addEventListener("pagehide",persistAll);
 document.addEventListener("visibilitychange",()=>{
   if(document.visibilityState==="hidden"){persistAll();return;}
   // Retour au premier plan : on rafraîchit les actus si elles ont vieilli.
+  // Le seuil (AUTO_RELOAD_MS) est appliqué par loadFeeds lui-même, pour que le
+  // retour d'arrière-plan et le lancement de l'app suivent la MÊME règle.
   if(mode!=="news"||!feedLoadStarted)return;
-  if(Date.now()-lastNewsLoad<AUTO_RELOAD_MS)return;
   loadFeeds();
 });
 
@@ -1052,29 +1057,48 @@ async function fetchLearn(count=CONFIG.BATCH_SIZE){
   return dropSeen(batch,seen).slice(0,count);
 }
 
-/* ---------- Cache local : affichage instantané au lancement ---------- */
+/* ---------- Cache local : affichage instantané au lancement ----------
+   Le cache porte sa DATE (`t`). C'est elle qui survit à la fermeture de l'app —
+   une variable en mémoire repartirait à zéro à chaque lancement, et chaque
+   réouverture rappellerait toutes les sources. Voir AUTO_RELOAD_MS. */
 const LS_CACHE="fluxswipe.cache.v1";
+function cacheEntry(m){try{const e=(JSON.parse(localStorage.getItem(LS_CACHE)||"{}"))[m];
+  if(e&&Array.isArray(e.items)&&e.items.length>=3)return e;}catch(e){}return null;} // ignore un cache minuscule
 function cacheSave(m){try{if(!items||items.length<3)return; // on ne met pas en cache un lot trop maigre
   const all=JSON.parse(localStorage.getItem(LS_CACHE)||"{}");
-  all[m]={t:Date.now(),items:items.slice(0,CONFIG.CACHE_ITEMS)};localStorage.setItem(LS_CACHE,JSON.stringify(all));}catch(e){warn("cache save",e);}}
-function cacheLoad(m){try{const e=(JSON.parse(localStorage.getItem(LS_CACHE)||"{}"))[m];
-  if(e&&Array.isArray(e.items)&&e.items.length>=3)return e.items;}catch(e){}return null;} // ignore un cache minuscule
+  const max=m==="news"?CONFIG.CACHE_ITEMS_NEWS:CONFIG.CACHE_ITEMS;
+  all[m]={t:Date.now(),items:items.slice(0,max)};localStorage.setItem(LS_CACHE,JSON.stringify(all));}catch(e){warn("cache save",e);}}
+function cacheLoad(m){const e=cacheEntry(m);return e?e.items:null;}
+// Date du dernier lot RÉELLEMENT récupéré pour ce fil, 0 si aucun cache utilisable.
+function cacheTime(m){const e=cacheEntry(m);return e?(e.t||0):0;}
 
 /* ---------- Chargement principal ---------- */
 // Compteur de génération : chaque appel invalide le précédent (annule proprement
 // un chargement obsolète après un changement rapide de mode/catégorie).
 let loadSeq=0,feedLoadStarted=false;
 let feedKeyShown=null;   // clé du fil actuellement affiché (mode + catégorie)
-/* ---------- Rechargement au retour d'arrière-plan (mode Actus) ----------
+/* ---------- Fraîcheur du fil Actus : une seule règle ----------
+   Un rafraîchissement AUTOMATIQUE des actus n'interroge les sources que si le
+   dernier lot a plus de AUTO_RELOAD_MS. En deçà, le cache local est servi tel
+   quel, sans le moindre appel réseau. Trois chemins passaient auparavant à
+   côté et rappelaient tout :
+     - le lancement de l'app (cold start), parce que le compteur vivait en
+       mémoire et repartait à zéro ;
+     - le retour d'arrière-plan ;
+     - la bascule Apprendre → Actus quand le fil n'était plus en mémoire.
+   Les trois vont maintenant chercher la date DANS le cache (cacheTime), donc
+   rouvrir l'app dix fois en dix minutes ne déclenche qu'un seul aller-retour.
+
    Seulement en Actus : en Apprendre le fil est un tirage aléatoire sans fin,
    le recharger remplacerait le lot en cours et ferait perdre sa lecture.
-   Le seuil de 5 min évite de repartir en réseau à chaque va-et-vient, et
-   s'aligne sur le cache CDN du proxy (s-maxage=300) — en deçà, la requête
-   renverrait de toute façon la même chose.
-   La position est préservée : render() se réancre sur l'article affiché. */
-const AUTO_RELOAD_MS=5*60*1000;
-let lastNewsLoad=0;
-async function loadFeeds(){
+
+   Une action EXPLICITE (bouton ↻, réessai, changement de sources, import OPML)
+   passe `force` et ignore le seuil : l'utilisateur qui demande une mise à jour
+   doit l'obtenir. La position est préservée : render() se réancre sur
+   l'article affiché. */
+const AUTO_RELOAD_MS=30*60*1000;
+let lastNewsLoad=cacheTime("news");   // repris du cache : survit à la fermeture de l'app
+async function loadFeeds(force){
   const my=++loadSeq;feedLoadStarted=true;
   demobadge(false);syncing(false);
   const m=mode;                                   // capture : l'utilisateur peut changer de mode pendant le fetch
@@ -1106,6 +1130,16 @@ async function loadFeeds(){
       warn("learn load",e);
       items=structuredClone(DEMO_LEARN);demobadge(true);render();hideStates();feedKeyShown=key;
     }
+    return;
+  }
+
+  /* Seuil de fraîcheur : rien à aller chercher, on garde ce qui est à l'écran
+     (cache tout juste peint, ou fil déjà affiché). Aucun appel aux sources. */
+  const age=Date.now()-lastNewsLoad;
+  if(!force&&(cached||sameFeed)&&age<AUTO_RELOAD_MS){
+    if(DEBUG)dbg(`v${APP_VERSION}  cache servi\n${items.length} articles, ${Math.round(age/60000)} min\n`+
+                 `prochaine actualisation dans ${Math.round((AUTO_RELOAD_MS-age)/60000)} min`);
+    resumePending[m]=false;   // aucun rendu ne suivra : inutile de guetter la reprise
     return;
   }
 
@@ -1627,7 +1661,7 @@ feedEl.addEventListener("click",e=>{
   // Boutons de la carte de fin (mode Actus)
   const end=e.target.closest("[data-end]");
   if(end){e.stopPropagation();
-    if(end.dataset.end==="reload")loadFeeds();
+    if(end.dataset.end==="reload")loadFeeds(true);   // demande explicite : on ignore le seuil
     else document.getElementById("openSheet").click();
     return;}
 });
@@ -1841,7 +1875,7 @@ document.addEventListener("keydown",e=>{
   else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
 });
 document.getElementById("openSheet").onclick=()=>{renderList();renderSuggest();renderReadPref();openDialog(sheet);};
-document.getElementById("reloadBtn").onclick=()=>{toast("Actualisation…");loadFeeds();};
+document.getElementById("reloadBtn").onclick=()=>{toast("Actualisation…");loadFeeds(true);};
 
 /* ---------- Réglage « Ouvrir les articles » (app packagée) ----------
    Deux points de montage (panneau Sources et panneau Centres d'intérêt) parce
@@ -1974,7 +2008,7 @@ document.getElementById("importBtn").onclick=()=>document.getElementById("import
 document.getElementById("importFile").onchange=importFromFile;
 document.getElementById("applyFeeds").onclick=applyAndClose;
 // État vide
-document.getElementById("emptyRetry").onclick=()=>loadFeeds();
+document.getElementById("emptyRetry").onclick=()=>loadFeeds(true);
 document.getElementById("emptyOpen").onclick=()=>document.getElementById("openSheet").click();
 // Délégation des lignes de flux générées (case à cocher + suppression)
 document.getElementById("feedList").addEventListener("click",e=>{
@@ -2184,7 +2218,8 @@ function addFeed(){const inp=document.getElementById("newUrl");const url=inp.val
   if(!/^https?:\/\//.test(url)){toast("URL invalide");return;}
   let name=url;try{name=new URL(url).hostname.replace("www.","");}catch(_){}
   feeds.push({name,url,on:true});save();inp.value="";renderList();renderSuggest();}
-function applyAndClose(){closeDialog(sheet);loadFeeds();}
+// Les sources ont changé : le cache ne correspond plus à ce qui est coché.
+function applyAndClose(){closeDialog(sheet);loadFeeds(true);}
 
 /* ---------- Import / Export des sources ---------- */
 function download(filename,content,mime){
@@ -2237,7 +2272,7 @@ function mergeFeeds(incoming){
   incoming.forEach(f=>{if(!existing.has(f.url)){feeds.push(f);existing.add(f.url);added++;}});
   save();renderList();renderSuggest();
   toast(added? `${added} source${added>1?"s":""} importée${added>1?"s":""}` : "Sources déjà présentes");
-  if(added&&mode==="news")loadFeeds();   // rafraîchit le fil avec les sources importées
+  if(added&&mode==="news")loadFeeds(true);   // rafraîchit le fil avec les sources importées
 }
 
 /* ---------- Utils ---------- */
