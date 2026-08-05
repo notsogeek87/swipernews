@@ -484,8 +484,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=46"></script>
-<script src="src/learn-core.js?v=46"></script>
+<script src="src/lib.js?v=47"></script>
+<script src="src/learn-core.js?v=47"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -755,7 +755,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="46";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="47";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -902,6 +902,19 @@ document.addEventListener("visibilitychange",()=>{
   if(mode!=="news"||!feedLoadStarted)return;
   loadFeeds();
 });
+/* App natif uniquement (@capacitor/app) : signal de reprise plus fiable que
+   visibilitychange dans cette WebView, car adossé DIRECTEMENT à onResume() de
+   l'Activity Android plutôt qu'à l'implémentation — parfois défaillante — de
+   la Page Visibility API par le WebView. Redondant AVEC visibilitychange, pas
+   à sa place : si les deux se déclenchent, loadFeeds() ignore le doublon via
+   loadSeq. Sur le web, window.Capacitor n'existe pas : ce bloc ne fait rien. */
+if(isNativeApp){
+  const CapApp=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
+  if(CapApp&&CapApp.addListener)CapApp.addListener("resume",()=>{
+    if(mode!=="news"||!feedLoadStarted)return;
+    loadFeeds();
+  });
+}
 /* Filet de sécurité : visibilitychange seul ne suffit pas. Le commentaire de
    rememberPos() le dit déjà pour un autre cas — « quand l'app est tuée depuis
    l'écran des tâches récentes, ni pagehide ni visibilitychange ne sont

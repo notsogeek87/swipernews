@@ -179,13 +179,19 @@ Une seule règle : **les sources ne sont interrogées qu'une fois toutes les
   récupéré** date de plus de **30 minutes**. En deçà, le cache local est servi
   tel quel, **sans le moindre appel réseau** : rouvrir l'app dix fois en dix
   minutes ne déclenche qu'un seul aller-retour vers les sources.
-  La vérification périodique est un filet de sécurité : sur Android, une app
-  mise en arrière-plan est presque toujours **suspendue**, pas tuée — pas de
-  rechargement à froid, et `visibilitychange` n'est pas garanti au retour (le
-  code le documente déjà pour la sauvegarde de position). Sans ce filet, une
-  actualisation qui rate son déclencheur ne se rattraperait jamais, même après
-  des heures. La vérification elle-même ne coûte rien : `loadFeeds()` sans
-  `force` ressort immédiatement si le seuil n'est pas atteint.
+  Dans l'app native, un signal supplémentaire s'ajoute : l'événement `resume`
+  de `@capacitor/app`, adossé directement à `onResume()` de l'Activity Android
+  — plus fiable que `visibilitychange` dans cette WebView. Les deux se
+  chevauchent volontairement (le doublon éventuel est ignoré par `loadFeeds`
+  via son compteur de génération), plutôt que de choisir l'un ou l'autre.
+  La vérification périodique est un filet de sécurité en dernier recours : sur
+  Android, une app mise en arrière-plan est presque toujours **suspendue**, pas
+  tuée — pas de rechargement à froid, et ni `visibilitychange` ni `resume` ne
+  sont formellement garantis au retour (le code le documente déjà pour la
+  sauvegarde de position). Sans ce filet, une actualisation qui rate ses deux
+  déclencheurs ne se rattraperait jamais, même après des heures. La
+  vérification elle-même ne coûte rien : `loadFeeds()` sans `force` ressort
+  immédiatement si le seuil n'est pas atteint.
 - **Sur demande** — bouton **↻**, *Réessayer*, changement de sources, import
   OPML, carte de fin de fil — le seuil est ignoré et les sources sont
   interrogées immédiatement.
