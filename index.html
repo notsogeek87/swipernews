@@ -213,6 +213,23 @@
   .hint .arrow{font-size:20px}
   @keyframes float{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,-8px)}}
 
+  /* Rappel du retour de la barre du haut. Une fois masquée par le swipe, plus
+     rien n'indiquait comment la rappeler : un appui n'importe où suffit, mais
+     personne ne le devine. Ce chevron est l'invitation.
+     Il ne capte AUCUN geste (pointer-events:none, comme .hint) : l'appui le
+     traverse jusqu'au fil, qui le traite déjà. En faire une vraie cible tactile
+     aurait avalé les swipes verticaux commencés en haut de l'écran — le geste
+     central de l'app — pour ne rien gagner.
+     Il s'anime tant que la barre n'est jamais revenue, puis reste, immobile et
+     plus discret, comme simple repère. */
+  .peek{position:fixed;top:calc(7px + env(safe-area-inset-top));left:50%;transform:translate(-50%,0);z-index:14;
+    width:46px;height:21px;display:grid;place-items:center;border-radius:100px;pointer-events:none;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(10px);
+    color:var(--ink);font-size:12px;line-height:1;opacity:0;transition:opacity .32s ease}
+  body.top-away .peek{opacity:.3}
+  body.top-away .peek--new{opacity:.62;animation:peekbob 2.4s ease-in-out infinite}
+  @keyframes peekbob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,3px)}}
+
   .sheet{position:fixed;inset:0;z-index:50;background:rgba(6,6,10,.6);backdrop-filter:blur(6px);display:none;align-items:flex-end}
   .sheet.open{display:flex}
   .sheet__panel{background:#111117;width:100%;border-radius:24px 24px 0 0;padding:22px 20px calc(28px + env(safe-area-inset-bottom));
@@ -347,6 +364,7 @@
     *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
       transition-duration:.001ms!important;scroll-behavior:auto!important}
     .hint{animation:none}
+    .peek{animation:none}
   }
 </style>
 </head>
@@ -383,6 +401,9 @@
 </div>
 
 <div class="hint" id="hint"><span class="arrow">⌃</span><span>Swipe</span></div>
+<!-- Invitation à retrouver la barre du haut. Décoratif (aria-hidden) : le geste
+     est « appuyer n'importe où », déjà accessible sans lui. -->
+<div class="peek" id="peek" aria-hidden="true">⌄</div>
 
 <div class="state hidden" id="loading" role="status">
   <div class="spinner"></div>
@@ -463,8 +484,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=44"></script>
-<script src="src/learn-core.js?v=44"></script>
+<script src="src/lib.js?v=45"></script>
+<script src="src/learn-core.js?v=45"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -734,7 +755,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="44";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="45";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1751,8 +1772,24 @@ const topEl=document.querySelector(".top");
 /* La barre du haut se masque au swipe et ne revient QUE sur un appui à
    l'écran — pas de réapparition automatique après un délai. */
 let lastScrollY=0;
-function showTop(){topEl.classList.remove("top--away");}
-function hideTop(){topEl.classList.add("top--away");}
+/* Repère « appuie pour retrouver la barre » (.peek) : visible seulement quand
+   la barre est masquée, d'où la classe posée sur <body> plutôt que sur .top —
+   le repère n'en est pas un descendant.
+   Il s'anime tant que l'utilisateur n'a jamais fait revenir la barre. Dès qu'il
+   y arrive, la leçon est apprise : l'animation s'arrête pour de bon (mémorisé),
+   et le repère reste en très discret pour qui l'aurait oublié. */
+const LS_PEEK="fluxswipe.peek.v1";
+const peekEl=document.getElementById("peek");
+try{if(localStorage.getItem(LS_PEEK)!=="1")peekEl.classList.add("peek--new");}
+catch(e){peekEl.classList.add("peek--new");}
+function showTop(){
+  topEl.classList.remove("top--away");document.body.classList.remove("top-away");
+  if(peekEl.classList.contains("peek--new")){
+    peekEl.classList.remove("peek--new");
+    try{localStorage.setItem(LS_PEEK,"1");}catch(e){warn("save peek",e);}
+  }
+}
+function hideTop(){topEl.classList.add("top--away");document.body.classList.add("top-away");}
 /* Le traitement du scroll est groupé dans un requestAnimationFrame : il lit la
    géométrie (dont scrollHeight, coûteux sur un fil de cartes plein écran) puis
    écrit des styles. En le faisant à chaque événement, on alternait lectures et

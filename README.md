@@ -23,7 +23,12 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
 
 - Navigation par swipe vertical plein écran (flèches ↑↓ / espace au clavier aussi)
 - La barre du haut se masque pendant le swipe et ne revient **que sur un appui à
-  l'écran** (aucune réapparition automatique)
+  l'écran** (aucune réapparition automatique). Un chevron discret apparaît alors
+  en haut, pour signaler ce geste que rien n'indiquait : il s'anime doucement
+  tant que l'utilisateur n'a jamais fait revenir la barre, puis s'efface presque
+  et reste comme simple repère. Il ne capte **aucun** geste — l'appui le
+  traverse jusqu'au fil. En faire une cible tactile aurait avalé les swipes
+  verticaux commencés en haut de l'écran, pour ne rien gagner.
 - Bascule **Actus / Apprendre au balayage horizontal**, mais uniquement quand la
   barre du haut est visible : pendant la lecture elle est masquée, et le geste
   est alors ignoré pour éviter tout changement de mode accidentel. Balayer vers
