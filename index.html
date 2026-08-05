@@ -180,8 +180,10 @@
     cursor:pointer;white-space:nowrap;backdrop-filter:blur(12px);transition:background .2s,color .2s,border-color .2s}
   .cats button.active{background:rgba(74,217,255,.16);border-color:rgba(74,217,255,.5);color:#bff0ff}
 
-  /* Bouton "Modifier mes centres d'intérêt" : en haut à droite, comme ⚙ Sources
-     (mode Actus) — les deux occupent le même emplacement, jamais visibles ensemble. */
+  /* Bouton "centres d'intérêt" : en haut à droite, à la place de ⚙ Sources
+     (mode Actus) — les deux occupent le même emplacement, jamais visibles
+     ensemble, et portent la même roue crantée. Seule la teinte change, comme
+     les chips de catégories, pour signaler qu'on est en mode Apprendre. */
   .top .actions .catedit{color:#7fe3ff;border-color:rgba(74,217,255,.35)}
 
   /* Sélecteur de centres d'intérêt (grille de chips à cocher) */
@@ -360,8 +362,8 @@
     <div class="brand"><span class="brand__logo"><img src="logo-192.png?v=28" alt="" width="28" height="28"></span>SwiperNews</div>
     <div class="actions">
       <button id="reloadBtn" class="iconbtn" title="Rafraîchir les articles" aria-label="Rafraîchir">↻</button>
-      <button id="openSheet" title="Gérer tes sources / réglages">⚙ Sources</button>
-      <button id="editIntBtn" class="catedit hidden" title="Choisir tes centres d'intérêt">✎ Modifier</button>
+      <button id="openSheet" class="iconbtn" title="Gérer tes sources / réglages" aria-label="Sources et réglages">⚙</button>
+      <button id="editIntBtn" class="iconbtn catedit hidden" title="Choisir tes centres d'intérêt" aria-label="Centres d'intérêt">⚙</button>
     </div>
   </div>
   <div class="modeswitch" role="tablist" aria-label="Choix du mode">
@@ -418,7 +420,7 @@
 
     <!-- Réglage de lecture : présent dans les DEUX panneaux (celui-ci et les
          centres d'intérêt), car ils ne sont jamais accessibles en même temps —
-         le bouton ⚙ Sources disparaît en mode Apprendre. Un seul état, deux
+         la roue ⚙ ouvre l'autre panneau en mode Apprendre. Un seul état, deux
          points de montage remplis par renderReadPref(). Vide hors app packagée. -->
     <div data-readmount></div>
 
@@ -461,8 +463,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=43"></script>
-<script src="src/learn-core.js?v=43"></script>
+<script src="src/lib.js?v=44"></script>
+<script src="src/learn-core.js?v=44"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -732,7 +734,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="43";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="44";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1879,8 +1881,8 @@ document.getElementById("reloadBtn").onclick=()=>{toast("Actualisation…");load
 
 /* ---------- Réglage « Ouvrir les articles » (app packagée) ----------
    Deux points de montage (panneau Sources et panneau Centres d'intérêt) parce
-   qu'ils ne sont jamais atteignables en même temps : ⚙ Sources n'existe qu'en
-   mode Actus, ✎ Modifier qu'en mode Apprendre. Le réglage vaut pour les deux
+   qu'ils ne sont jamais atteignables en même temps : la roue ⚙ ouvre Sources en
+   mode Actus, Centres d'intérêt en mode Apprendre. Le réglage vaut pour les deux
    fils, il doit donc se trouver des deux côtés — un seul état, une seule
    fonction de rendu. Sur le web, les blocs restent vides : le choix n'existe
    pas, un lien y part forcément dans un onglet. */
@@ -2141,7 +2143,10 @@ function renderCats(){
   }
   catsEl.innerHTML=chips.map(c=>`<button data-k="${c.k}" class="${c.k===cat?"active":""}">${c.label}</button>`).join("");
   catsEl.querySelectorAll("button").forEach(b=>{b.onclick=()=>setCat(b.dataset.k);});
-  editIntBtn.textContent=interests.length?"✎ Modifier":"✎ Choisir mes intérêts";
+  // Le bouton est une icône seule : la nuance « modifier / choisir » passe par
+  // l'infobulle et le nom accessible, jamais par le contenu (qui EST la roue).
+  const t=interests.length?"Modifier tes centres d'intérêt":"Choisir tes centres d'intérêt";
+  editIntBtn.title=t;editIntBtn.setAttribute("aria-label",t);
 }
 function setCat(k){
   if(k===cat)return;
