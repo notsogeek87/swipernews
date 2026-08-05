@@ -719,7 +719,7 @@ ce qu'elles disent. Deux pièges vérifiés sur les vrais fichiers :
   entièrement numérique (`xn--p1ai` reste accepté).
 
 **Le lecteur intégré se refuse** : un réglage « Ouvrir les articles » propose
-*Dans l'app* (défaut), *Lecture* ou *Navigateur*, mémorisé dans
+*Dans l'app*, *Lecture* (défaut) ou *Navigateur*, mémorisé dans
 `fluxswipe.readpref.v1`. Sur *Navigateur*, `openArticle()` rend `false` et le
 lien repart au navigateur du téléphone, exactement comme avant l'ajout du
 lecteur. Deux autres réglages, « Bandeaux cookies : Masqués / Affichés »
