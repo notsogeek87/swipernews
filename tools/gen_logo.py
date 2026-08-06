@@ -28,7 +28,7 @@ from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-SPLASH_BG = (10, 10, 15)  # #0a0a0f, la couleur de thème de l'app
+SPLASH_BG = (25, 24, 26)  # #19181a, la couleur de thème de l'app
 SPLASH_SIZE = 2732  # ce qu'attend @capacitor/assets
 SPLASH_LOGO_SCALE = 0.163  # redimensionnement en « cover » : rester près du centre
 
