@@ -73,10 +73,14 @@ jobs:
           set -euo pipefail
           name="$(sed -n 's/^ *versionName "\(.*\)"$/\1/p' android/app/build.gradle)"
           code="$(sed -n 's/^ *versionCode \([0-9]*\)$/\1/p' android/app/build.gradle)"
+          # Lancé sur une branche sans entrée « tag », le tag se déduit de la
+          # version des sources et sera CRÉÉ par « gh release create », sur le
+          # commit courant. C'est la voie de secours quand poser le tag en local
+          # est impossible ; le cas normal reste le push d'un tag vX.Y.Z.
           tag="${INPUT_TAG:-$GITHUB_REF_NAME}"
           if [ "${INPUT_TAG:-}" = "" ] && [ "$GITHUB_REF_TYPE" != "tag" ]; then
-            echo "::error::Ce workflow publie une version : le lancer sur un tag, ou renseigner l'entrée « tag »."
-            exit 1
+            tag="v$name"
+            echo "::notice::Lancé hors tag : publication de $tag sur $GITHUB_SHA."
           fi
           if [ "$name" != "${tag#v}" ]; then
             echo "::error::Tag $tag mais versionName $name dans android/app/build.gradle."
@@ -127,7 +131,10 @@ jobs:
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
+            # --target : le tag est créé sur le commit compilé, et pas sur la
+            # tête de la branche par défaut, qui a pu bouger entre-temps.
             gh release create "$TAG" "$APK" \
+              --target "$GITHUB_SHA" \
               --title "SwiperNews ${{ steps.version.outputs.name }}" \
               --notes "$notes"
           fi
