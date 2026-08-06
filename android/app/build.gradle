@@ -21,8 +21,8 @@ android {
         // git et la recette (fdroid/eu.lielu.news.yml) — voir fdroid/README.md.
         // Le versionCode se déduit de la version : majeur × 10000 + mineur × 100
         // + correctif (1.2.0 → 10200), donc il croît sans compteur à tenir.
-        versionCode 10300
-        versionName "1.3.0"
+        versionCode 10301
+        versionName "1.3.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -87,6 +87,11 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    // FileProvider, pour passer le fichier d'export à la feuille de partage
+    // (InAppBrowserPlugin.saveFile). La version est celle que Capacitor déclare
+    // déjà (variables.gradle) : rien de neuf n'entre dans le paquet, on rend
+    // seulement la dépendance explicite plutôt que transitive.
+    implementation "androidx.core:core:$androidxCoreVersion"
     // Navigateur intégré : WebSettingsCompat.setAlgorithmicDarkeningAllowed, pour
     // que les articles s'affichent en sombre comme le reste de l'app. La version
     // est celle que Capacitor déclare déjà (variables.gradle) — aucune

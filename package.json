@@ -1,6 +1,6 @@
 {
   "name": "swipernews",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Flux RSS et découverte Wikipédia en swipe vertical (PWA, un seul fichier, zéro build).",
   "private": true,
   "type": "commonjs",

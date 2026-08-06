@@ -312,7 +312,7 @@ genre de script dérape.
 | Fichier | Rôle |
 | --- | --- |
 | `MainActivity` | `registerPlugin(InAppBrowserPlugin)` **avant** `super.onCreate` |
-| `InAppBrowserPlugin` | Pont JS→natif : `open`, `syncBlocklist`, `clearBlocklist` |
+| `InAppBrowserPlugin` | Pont JS→natif : `open`, `share`, `saveFile`, `syncBlocklist`, `clearBlocklist` |
 | `InAppBrowserActivity` | Le lecteur : barre escamotable, insets, injections |
 | `ReaderWebView` | Sous-classe minimale, seulement pour exposer `onScrollChanged` |
 | `BlocklistStore` | Liste de blocage : parsing, téléchargement, cache, fusion |
@@ -373,7 +373,17 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 - **`getElementsByTagName("*")` ne rend pas la racine** : nettoyer aussi le
   nœud lui-même.
 - **Toasts** : ne pas en poser un juste après un réglage — il se place devant
-  le sélecteur qu'on vient de toucher. Faire parler l'interface à la place.
+  le sélecteur qu'on vient de toucher. Faire parler l'interface à la place. Ni
+  avant de savoir : l'export annonçait « Sources exportées » sans attendre, et
+  mentait donc dans l'APK pendant des mois.
+- **Un `<a download>` sur une URL `blob:` ne télécharge RIEN dans l'APK.** La
+  WebView d'Android n'implémente pas l'attribut `download`, ne sait pas naviguer
+  vers `blob:`, et Capacitor s'en désintéresse explicitement
+  (`Bridge.launchIntent` rend `false` pour les schémas `data` et `blob`). Seule
+  la WebView du lecteur a un `DownloadListener` ; celle du pont n'en a pas.
+  Écrire un fichier depuis l'app passe donc par `InAppBrowserPlugin.saveFile`,
+  qui l'écrit dans le cache, l'expose via le `FileProvider` du manifeste et
+  ouvre `ACTION_SEND`. Le chemin navigateur reste celui du web.
 - **Le mode lecture ne peut pas s'appliquer avant `onPageFinished`** (DOM
   incomplet ⇒ article tronqué). D'où le voile : on masque la WebView, on
   transforme, on révèle en fondu.

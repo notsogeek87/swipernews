@@ -3,7 +3,16 @@ package eu.lielu.news;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
+
+import androidx.core.content.FileProvider;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -90,6 +99,78 @@ public class InAppBrowserPlugin extends Plugin {
             return;
         }
         call.resolve();
+    }
+
+    /**
+     * Écrit un fichier et le passe à la feuille de partage du système.
+     *
+     * <p>L'export des sources (OPML, JSON) reposait sur un {@code <a download>}
+     * et une URL {@code blob:}. Ça marche dans un navigateur ; pas ici. La
+     * WebView d'Android n'implémente pas l'attribut {@code download}, ne sait
+     * pas naviguer vers une URL {@code blob:}, et Capacitor s'en lave
+     * explicitement les mains ({@code Bridge.launchIntent} rend {@code false}
+     * pour les schémas {@code data} et {@code blob}). Sans {@code DownloadListener}
+     * sur la WebView du pont — il n'y en a que sur celle du lecteur d'articles —
+     * le clic ne produisait donc rien du tout, et le toast « Sources exportées »
+     * mentait.
+     *
+     * <p>Le fichier est écrit dans le cache de l'app, exposé par le
+     * {@code FileProvider} déjà déclaré au manifeste, puis proposé en
+     * {@code ACTION_SEND} : à l'utilisateur de choisir Fichiers, Drive, une
+     * messagerie… Rien n'est écrit hors du bac à sable de l'app, donc aucune
+     * permission de stockage.
+     */
+    @PluginMethod
+    public void saveFile(PluginCall call) {
+        String name = call.getString("name");
+        String data = call.getString("data");
+        String mime = call.getString("mime", "application/octet-stream");
+        if (name == null || data == null || name.trim().isEmpty()) {
+            call.reject("fichier vide");
+            return;
+        }
+        // Le nom vient du web : n'en garder que la dernière composante, pour
+        // qu'un « ../ » ne puisse pas désigner un fichier hors du dossier.
+        name = new File(name).getName();
+        Activity activity = getActivity();
+        if (activity == null) {
+            call.reject("activité indisponible");
+            return;
+        }
+        try {
+            File dir = new File(getContext().getCacheDir(), "exports");
+            if (!dir.isDirectory() && !dir.mkdirs()) {
+                call.reject("dossier d'export non créé");
+                return;
+            }
+            // Un export chasse l'autre : le cache ne doit pas accumuler les
+            // sources de l'utilisateur, même à l'abri dans le bac à sable.
+            File[] previous = dir.listFiles();
+            if (previous != null) for (File f : previous) f.delete();
+
+            File out = new File(dir, name);
+            try (OutputStream os = new FileOutputStream(out)) {
+                os.write(data.getBytes(StandardCharsets.UTF_8));
+            }
+            Uri uri = FileProvider.getUriForFile(
+                getContext(), getContext().getPackageName() + ".fileprovider", out);
+
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType(mime);
+            send.putExtra(Intent.EXTRA_STREAM, uri);
+            send.putExtra(Intent.EXTRA_SUBJECT, name);
+            // Sans ce drapeau, l'application choisie reçoit une URI qu'elle n'a
+            // pas le droit de lire.
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            activity.startActivity(
+                Intent.createChooser(send, activity.getString(R.string.export_chooser)));
+            call.resolve();
+        } catch (ActivityNotFoundException e) {
+            call.reject("aucune application pour recevoir le fichier");
+        } catch (IOException e) {
+            String msg = e.getMessage();
+            call.reject(msg == null ? "écriture impossible" : msg);
+        }
     }
 
     /**

@@ -484,8 +484,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=49"></script>
-<script src="src/learn-core.js?v=49"></script>
+<script src="src/lib.js?v=50"></script>
+<script src="src/learn-core.js?v=50"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -755,7 +755,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="49";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="50";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2310,32 +2310,54 @@ function addFeed(){const inp=document.getElementById("newUrl");const url=inp.val
 function applyAndClose(){closeDialog(sheet);loadFeeds(true);}
 
 /* ---------- Import / Export des sources ---------- */
-function download(filename,content,mime){
+/* Rend true quand le fichier est parti, false sinon — l'appelant n'annonce
+   rien tant qu'il n'a pas la réponse.
+   Dans l'APK, le chemin du navigateur ne marche PAS : la WebView d'Android
+   n'implémente pas l'attribut download, ne navigue pas vers une URL blob:, et
+   Capacitor s'en désintéresse explicitement (Bridge.launchIntent rend false
+   pour blob:). Le clic ne produisait donc rien — d'où le passage par le pont,
+   qui écrit le fichier et ouvre la feuille de partage du système. */
+async function download(filename,content,mime){
+  const iab=iabPlugin();
+  if(isNativeApp&&iab&&iab.saveFile){
+    await iab.saveFile({name:filename,mime,data:content});
+    return true;
+  }
   const blob=new Blob([content],{type:mime});
   const url=URL.createObjectURL(blob);
   const a=document.createElement("a");a.href=url;a.download=filename;
   document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
+  return true;
 }
-function exportFeeds(format){
+async function exportFeeds(format){
   if(!feeds.length){toast("Aucune source à exporter");return;}
   const stamp=new Date().toISOString().slice(0,10);
+  let name,body,mime;
   if(format==="json"){
-    download(`flux-sources-${stamp}.json`,JSON.stringify(feeds,null,2),"application/json");
+    name=`flux-sources-${stamp}.json`;mime="application/json";
+    body=JSON.stringify(feeds,null,2);
   }else{
     const rows=feeds.map(f=>
       `    <outline type="rss" text="${escAttr(f.name)}" title="${escAttr(f.name)}" xmlUrl="${escAttr(f.url)}"/>`
     ).join("\n");
-    const opml=`<?xml version="1.0" encoding="UTF-8"?>
+    name=`flux-sources-${stamp}.opml`;mime="text/xml";
+    body=`<?xml version="1.0" encoding="UTF-8"?>
 <opml version="2.0">
   <head><title>SwiperNews — mes sources</title></head>
   <body>
 ${rows}
   </body>
 </opml>`;
-    download(`flux-sources-${stamp}.opml`,opml,"text/xml");
   }
-  toast("Sources exportées");
+  try{
+    await download(name,body,mime);
+  }catch(e){
+    warn("export",e);toast("Export impossible");return;
+  }
+  // Dans l'APK, la feuille de partage vient de s'ouvrir : elle dit déjà ce qui
+  // se passe, et un toast se glisserait devant.
+  if(!isNativeApp)toast("Sources exportées");
 }
 function importFromFile(ev){
   const file=ev.target.files&&ev.target.files[0];
