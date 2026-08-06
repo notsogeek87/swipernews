@@ -29,9 +29,9 @@ const CACHE = "flux-v54";
 // Plus de polices ici : l'app est passée aux polices système (v52), donc
 // plus aucun fichier fonts/*.woff2 n'est chargé.
 const SHELL = [
-  "./logo-192.png?v=31",
-  "./logo-512.png?v=31",
-  "./logo-maskable-512.png?v=31",
+  "./logo-192.png?v=32",
+  "./logo-512.png?v=32",
+  "./logo-maskable-512.png?v=32",
   "./manifest.webmanifest",
 ];
 
