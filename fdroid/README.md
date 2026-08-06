@@ -17,12 +17,12 @@ soit ensuite rapide à faire manuellement.
   l'application. `en-US` est le dossier de repli : sans lui, un utilisateur dont
   la langue n'est pas le français voit une fiche vide — leur revue le réclame.
 - **`fdroid/eu.lielu.news.yml`** : recette de build, épinglée sur le **hash
-  complet** du commit de `v1.2.0`, à coller dans `metadata/eu.lielu.news.yml`
+  complet** du commit de `v1.3.0`, à coller dans `metadata/eu.lielu.news.yml`
   sur `fdroiddata`.
 - **Captures d'écran** dans
   `fastlane/metadata/android/fr-FR/images/phoneScreenshots/` : les deux modes,
   Actus et Apprendre. F-Droid en demande au moins une.
-- **Le tag `v1.2.0`**, posé sur le `main` publié.
+- **Le tag `v1.3.0`**, posé sur le `main` publié.
 - Licence MIT, permission Android unique (`INTERNET`), aucune dépendance
   Google Play Services / Firebase / SDK propriétaire — l'app remplit déjà les
   critères de base d'inclusion (logiciel libre, buildable sans service tiers
@@ -50,7 +50,7 @@ la vérification de version — il faut alors le déplacer (`git tag -f`) plutô
 que de retoucher la recette.
 
 Le `versionCode` se déduit de la version — majeur × 10000 + mineur × 100 +
-correctif, soit `10200` pour 1.2.0 — donc il croît tout seul, sans compteur à
+correctif, soit `10300` pour 1.3.0 — donc il croît tout seul, sans compteur à
 tenir. `package.json` suit aussi la version, mais seulement pour nommer les
 APK produits par la CI.
 
@@ -70,7 +70,7 @@ D'où deux obligations nouvelles à chaque version :
 
 1. **`.github/workflows/release.yml` doit avoir tourné pour le tag.** Il compile
    avec un **Gradle nu**, sans `-PversionCode`/`-PversionName` — contrairement à
-   `android.yml`, dont l'APK porte le numéro de run (`1.2.0.52`) et ne peut donc
+   `android.yml`, dont l'APK porte le numéro de run (`1.3.0.57`) et ne peut donc
    pas servir ici. Il publie le fichier à l'adresse exacte qu'attend
    `Binaries:` :
    `releases/download/vX.Y.Z/swipernews-X.Y.Z.apk`. Renommer l'un ou l'autre
@@ -112,7 +112,7 @@ se fait donc à la main, sur `fdroiddata` :
 | Utiliser le gabarit « App inclusion » et cocher les cases | duckniii | à faire sur GitLab (voir ci-dessus) |
 | Node depuis Debian `forky`, pas depuis un script NodeSource | licaon-kter | `eu.lielu.news.yml` |
 | `prebuild:` au lieu d'`init:`, `scandelete:` plutôt qu'une liste de `scanignore:` | licaon-kter | `eu.lielu.news.yml` |
-| Les binaires de `sharp`/vips ne devraient pas être là | licaon-kter | contournés par `scandelete:` ; supprimés pour de bon en sortant `@capacitor/assets` des `devDependencies`, à la 1.3.0 |
+| Les binaires de `sharp`/vips ne devraient pas être là | licaon-kter | contournés par `scandelete:` ; à supprimer pour de bon en sortant `@capacitor/assets` des `devDependencies`, une fois la MR acceptée |
 
 Le bloc de suggestion de licaon-kter reconduisait `output:` — il l'avait
 simplement recopié du fichier d'alors. Ne pas l'appliquer tel quel : duckniii
@@ -170,6 +170,38 @@ mais les sources de `fdroidserver` sont lisibles sur GitLab — c'est la référ
   ```
 - **`UpdateCheckMode: Tags` accepte une expression régulière** en argument
   (`checkupdates.py` : `pattern = mode[5:]`).
+- **L'AGP ajoute un bloc de signature que F-Droid refuse.** Symptôme, au stade
+  du scan et non du build : `found extra signing block 'Dependency metadata'`,
+  sur `tmp/binaries/…binary.apk`, c'est-à-dire **notre** APK téléchargé pour la
+  vérification. C'est la liste chiffrée des dépendances que Gradle destine à
+  Google Play. Elle n'apparaît **que lorsque Gradle signe lui-même** : l'APK non
+  signé que compile F-Droid ne l'a pas, le nôtre si — d'où un rejet qui ne peut
+  pas se voir avant d'avoir publié un binaire. Le remède est dans les sources,
+  au niveau `android` de `android/app/build.gradle` (pas dans `defaultConfig`,
+  Gradle n'y connaît pas la méthode) :
+
+  ```gradle
+  dependenciesInfo {
+      includeInApk = false
+      includeInBundle = false
+  }
+  ```
+
+  Le bloc vit entre les entrées du zip et le catalogue central : il n'est donc
+  **pas** une entrée d'archive, et son retrait ne change rien à la comparaison
+  du build reproductible. Pour vérifier ce que contient un APK :
+
+  ```bash
+  python3 - <<'EOF'
+  import struct
+  d=open("swipernews-X.Y.Z.apk","rb").read(); i=d.rfind(b"APK Sig Block 42")
+  size=struct.unpack_from("<Q",d,i-8)[0]; q=i+16-8-size+8; ids=[]
+  while q < i-8:
+      ln=struct.unpack_from("<Q",d,q)[0]; q+=8
+      ids.append(hex(struct.unpack_from("<I",d,q)[0])); q+=ln
+  print(ids)   # 0x504b4453 = « Dependency metadata », à ne pas y trouver
+  EOF
+  ```
 - **`output:` est indispensable, même si on demande de l'enlever.** Le retirer
   fait échouer le build sur `Failed to find any output apks` — *après* un
   `BUILD SUCCESSFUL` de Gradle, ce qui égare. Sans ce champ, fdroidserver ne

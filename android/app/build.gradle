@@ -21,14 +21,27 @@ android {
         // git et la recette (fdroid/eu.lielu.news.yml) — voir fdroid/README.md.
         // Le versionCode se déduit de la version : majeur × 10000 + mineur × 100
         // + correctif (1.2.0 → 10200), donc il croît sans compteur à tenir.
-        versionCode 10200
-        versionName "1.2.0"
+        versionCode 10300
+        versionName "1.3.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
+    }
+    // Sans ça, l'AGP glisse dans le bloc de signature de l'APK la liste chiffrée
+    // de nos dépendances, destinée à Google Play. F-Droid la refuse (« found
+    // extra signing block 'Dependency metadata' ») et son scanner rejette le
+    // paquet. Ce bloc n'apparaît que lorsque Gradle signe lui-même : d'où son
+    // absence dans l'APK non signé que compile F-Droid, et sa présence dans
+    // celui de notre CI, le seul des deux qui soit publié.
+    //
+    // À déclarer ici, dans « android », et non dans « defaultConfig » : Gradle
+    // ne connaît pas la méthode là-bas.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
     signingConfigs {
         if (hasReleaseKeystore) {

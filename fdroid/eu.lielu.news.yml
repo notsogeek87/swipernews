@@ -54,11 +54,11 @@ Binaries: https://github.com/notsogeek87/swipernews/releases/download/v%v/swiper
 AllowedAPKSigningKeys: cc849a79fc39de5f8b4af5fcda1dbdb4230ad554aef85b484e5c7fd49caa6238
 
 Builds:
-  - versionName: "1.2.0"
-    versionCode: 10200
+  - versionName: "1.3.0"
+    versionCode: 10300
     # Hash complet du commit à compiler, et non le tag `v1.2.0` : un tag peut
     # être déplacé, un hash non — F-Droid l'exige pour que la recette désigne
-    # un arbre de sources immuable. (Ici, le commit du tag v1.2.0.)
+    # un arbre de sources immuable. (Ici, le commit du tag v1.3.0.)
     #
     # Le couple ci-dessus doit correspondre à ce que produit un Gradle nu à ce
     # commit : android/app/build.gradle porte les mêmes valeurs, écrites en
@@ -111,8 +111,10 @@ Builds:
     #
     # Tout ceci disparaîtrait en sortant @capacitor/assets des devDependencies
     # (il n'est utilisé que par npm run android:assets, pour régénérer les
-    # icônes) : c'est lui qui apporte sharp, tsc et les JAR de trapezedev. À
-    # faire pour la 1.3.0 — la 1.2.0 est figée sur son commit.
+    # icônes) : c'est lui qui apporte sharp, tsc et les JAR de trapezedev. Pas
+    # touché tant que la MR est en revue : ces deux entrées sont exactement
+    # celles qui ont passé leur scanner, et le champ est strict dans les deux
+    # sens (un chemin disparu comme un chemin devenu inutile est une erreur).
     scanignore:
       - node_modules/@capacitor/assets/node_modules/@capacitor/cli/assets/capacitor-cordova-android-plugins.tar.gz
     scandelete:
@@ -129,5 +131,5 @@ AutoUpdateMode: Version
 # Restreint aux tags de version : le dépôt porte aussi des tags android-v*
 # posés par la CI à chaque build, qui ne sont pas des versions publiées.
 UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$
-CurrentVersion: "1.2.0"
-CurrentVersionCode: 10200
+CurrentVersion: "1.3.0"
+CurrentVersionCode: 10300
