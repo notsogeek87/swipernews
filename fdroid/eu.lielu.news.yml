@@ -41,6 +41,11 @@ Repo: https://github.com/notsogeek87/swipernews.git
 # .github/workflows/release.yml sur un tag vX.Y.Z : ce workflow compile
 # exactement comme F-Droid (Gradle nu, sans -PversionCode/-PversionName), sinon
 # les deux APK divergeraient sur la version et la vérification échouerait.
+#
+# Chez eux, cette ligne est repliée — « Binaries: », UNE ESPACE, saut de ligne,
+# puis l'URL indentée de deux espaces : « fdroid rewritemeta » coupe à 80
+# colonnes et leur CI refuse tout écart. Ici, le repli n'a pas lieu d'être, ce
+# fichier n'étant pas celui qu'ils lisent (voir fdroid/README.md).
 Binaries: https://github.com/notsogeek87/swipernews/releases/download/v%v/swipernews-%v.apk
 # Empreinte SHA-256 du certificat de signature (celui des secrets ANDROID_* du
 # dépôt). F-Droid refuse tout APK signé d'une autre clé, ce qui protège contre

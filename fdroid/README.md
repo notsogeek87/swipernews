@@ -170,6 +170,36 @@ mais les sources de `fdroidserver` sont lisibles sur GitLab — c'est la référ
   ```
 - **`UpdateCheckMode: Tags` accepte une expression régulière** en argument
   (`checkupdates.py` : `pattern = mode[5:]`).
+- **Leur CI impose la forme canonique de `fdroid rewritemeta`**, au caractère
+  près : elle rejoue l'outil et refuse le moindre écart (« These files need
+  rewritemeta »). Trois règles s'en déduisent, toutes rencontrées :
+  - **l'ordre des champs** est celui de `yaml_app_field_order` (metadata.py) —
+    `Binaries` juste après `Repo`, `AllowedAPKSigningKeys` **après** le bloc
+    `Builds`, et dans un build : `sudo`, `gradle`, `prebuild`, `scanignore`,
+    `scandelete` ;
+  - **les lignes de plus de 80 colonnes sont repliées** : la valeur passe à la
+    ligne, indentée de deux espaces, et la clé garde **une espace finale**
+    (`Binaries: ` puis saut de ligne). Invisible à l'œil, fatal pour leur
+    comparaison — leur `.yamllint` ne classe d'ailleurs `trailing-spaces` qu'en
+    avertissement, justement parce que leur propre outil en produit ;
+  - **le fichier se termine par un saut de ligne.**
+
+  Se vérifier soi-même sans installer `fdroidserver` (impossible ici, `clint` ne
+  se compile plus) : leur image Debian trixie embarque `ruamel.yaml` 0.18.10, et
+  `write_yaml` n'est qu'un aller-retour avec des réglages précis. Le reproduire
+  suffit — attention, une autre version de `ruamel` replie *plus* de lignes et
+  donne un faux positif :
+
+  ```bash
+  pip install "ruamel.yaml==0.18.10"
+  python3 - <<'EOF'
+  import io, ruamel.yaml
+  src = open("metadata/eu.lielu.news.yml").read()
+  y = ruamel.yaml.YAML(typ="rt"); y.indent(mapping=2, sequence=4, offset=2)
+  out = io.StringIO(); y.dump(y.load(src), out)
+  print("canonique :", out.getvalue() == src)
+  EOF
+  ```
 - **Le fichier de recette est validé par un schéma JSON**, `schemas/metadata.json`
   dans `fdroiddata` — la référence à consulter avant d'inventer une valeur. Il
   donne la liste exacte des catégories (108 aujourd'hui, `News` comprise) et
