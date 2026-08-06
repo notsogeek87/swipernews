@@ -10,7 +10,7 @@
 <link rel="icon" href="logo-192.png?v=41">
 <link rel="apple-touch-icon" href="logo-192.png?v=41">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0d0d0d">
+<meta name="theme-color" content="#190501">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 
@@ -28,27 +28,30 @@
 <meta name="twitter:image" content="https://news.lielu.eu/logo-512.png?v=41">
 
 <style>
-  /* Habillage « Afrofuturisme » : palette large (violet/or/ambre/terracotta/
-     sarcelle/mauve électrique) sur noir obsidienne — jamais de noir pur, comme
-     l'exige la charte. Chaque teinte a un rôle sémantique fixe (voir --purple,
-     --gold… ci-dessous) plutôt que d'être piochée au hasard.
-     --ink (texte principal) et --surface (fond des panneaux) sont des ajouts :
-     la charte ne fournit ni neutre clair pour le texte ni fond de carte
-     distinct du canevas, seulement des couleurs sémantiques.
-     Josefin Sans est demandée en tête de pile sans être auto-hébergée (dans
-     la continuité du choix déjà fait pour ce dépôt de n'embarquer aucun
-     fichier de police) : elle s'affiche si le système la fournit, sinon repli
-     sur une géométrique proche puis sur le système. */
+  /* Habillage « Altius » : braises sur obsidienne. Fond quasi noir à chaleur
+     rouge-brun (jamais un noir neutre), un seul accent chromatique — le corail
+     « flare » — réservé au texte (bon contraste sur fond sombre) ; le rouge
+     « signal » ne sert qu'aux liserés/bordures, jamais au texte (sur ce fond
+     très sombre, corail-sur-corail serait quasi illisible). Coins « techniques »
+     (4px boutons/champs, 8px cartes), pas de pilule, pas de coin net. Seule
+     ombre du système : le halo intérieur des boutons pleins ; aucune autre
+     surface n'a d'ombre, la structure vient des liserés.
+     Matter est demandée en tête de pile sans être auto-hébergée (comme pour
+     les habillages précédents de ce dépôt, qui n'embarquent aucun fichier de
+     police) : elle s'affiche si le système la fournit, sinon repli sur une
+     géométrique proche puis sur le système. */
   :root{
-    --bg:#0d0d0d;--surface:#1a1420;--ink:#ede6d6;--sand:#c2b280;--line:rgba(194,178,128,.18);
-    --purple:#6a0dad;--gold:#e6a817;--amber:#ffbf00;--terracotta:#c1440e;--teal:#014d4e;--violet:#8f00ff;
-    --radius:12px;
-    --font-sans:'Josefin Sans','Poppins','Century Gothic',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
-    --font-mono:'JetBrains Mono',ui-monospace,'Fira Code','Roboto Mono','Cascadia Code',
+    --bg:#190501;--surface:#340a01;--molten:#631303;--redline:#951c04;
+    --flare:#fa5838;--blush:#fcac9c;--ink:#f7f6ff;--ash:#baadab;--black:#000;
+    --radius-sm:4px;--radius-md:8px;
+    --shadow-ember:inset 0 0 20px rgb(99,19,3);
+    --font-sans:'Matter','Inter','Söhne','Geist Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:'Fabrikatmono','JetBrains Mono','IBM Plex Mono','Berkeley Mono',ui-monospace,
       'SFMono-Regular',Consolas,'Liberation Mono',monospace;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--font-sans);overscroll-behavior:none}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--font-sans);
+    letter-spacing:-.01em;overscroll-behavior:none}
 
   /* Pas de scroll-behavior:smooth ici : par spec CSSOM View, le setter scrollTop
      défile avec le comportement calculé de l'élément, donc TOUTES les
@@ -74,20 +77,16 @@
      rendu qu'on obtient en ajustant le dégradé au-dessus */
   .card__bg{position:absolute;inset:0;background-size:cover;background-position:center;transform:scale(1.08)}
   .card__bg::after{content:"";position:absolute;inset:0;
-    background:linear-gradient(to top,rgba(13,13,13,.96) 0%,rgba(13,13,13,.82) 28%,rgba(13,13,13,.25) 60%,rgba(13,13,13,.55) 100%)}
-  /* Carte sans image : champ d'étoiles + lueurs violet/sarcelle en fond, motif
-     kente (diagonales dorées) en bas — le seul habillage décoratif du
+    background:linear-gradient(to top,rgba(25,5,1,.96) 0%,rgba(25,5,1,.82) 28%,rgba(25,5,1,.25) 60%,rgba(25,5,1,.55) 100%)}
+  /* Carte sans image : les barres verticales du hero Altius (spectre
+     thermique, le motif signature de la charte), en corail, pleine opacité au
+     centre et fondues aux deux bords — le seul habillage décoratif du
      système, réservé aux cartes qui n'ont de toute façon rien d'autre à montrer. */
-  .card__noimg{position:absolute;inset:0;overflow:hidden;
-    background:radial-gradient(120% 90% at 25% 0%,rgba(106,13,173,.35),transparent 60%),
-               radial-gradient(100% 70% at 85% 100%,rgba(1,77,78,.35),transparent 55%),var(--bg)}
-  .card__noimg::before{content:"";position:absolute;inset:0;
-    background-image:radial-gradient(rgba(237,230,214,.55) 1px,transparent 1px);
-    background-size:28px 28px;opacity:.35}
-  .card__noimg::after{content:"";position:absolute;left:0;right:0;bottom:0;height:38%;
-    background-image:repeating-linear-gradient(135deg,var(--gold) 0 4px,transparent 4px 18px);
-    -webkit-mask-image:linear-gradient(to top,#000 0%,transparent 90%);
-    mask-image:linear-gradient(to top,#000 0%,transparent 90%);opacity:.22}
+  .card__noimg{position:absolute;inset:0;overflow:hidden;background:var(--bg)}
+  .card__noimg::after{content:"";position:absolute;left:0;right:0;top:30%;bottom:30%;
+    background-image:repeating-linear-gradient(90deg,var(--flare) 0 5px,transparent 5px 17px);
+    -webkit-mask-image:linear-gradient(to top,transparent 0%,#000 50%,transparent 100%);
+    mask-image:linear-gradient(to top,transparent 0%,#000 50%,transparent 100%);opacity:.3}
 
   .card__body{position:relative;z-index:2;padding:28px 22px calc(44px + env(safe-area-inset-bottom))}
   /* Flou LOCAL derrière le texte, solidaire du bloc : il couvre exactement le
@@ -119,25 +118,31 @@
     paint-order:stroke fill;
     text-shadow:0 0 1px rgba(0,0,0,.95),0 0 2px rgba(0,0,0,.92),
                 0 0 4px rgba(0,0,0,.85),0 0 9px rgba(0,0,0,.6)}
+  /* Fabrikatmono + corail : l'« Eyebrow Tag » de la charte, repris tel quel
+     pour le nom de source. Le point utilise le corail lui aussi (seul accent
+     chromatique du système) plutôt qu'une deuxième teinte. */
   .card__source{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:12px;
-    letter-spacing:.03em;color:var(--sand);margin-bottom:14px}
-  .card__source .dot{width:6px;height:6px;border-radius:50%;background:var(--teal)}
-  /* Badge de catégorie (mode Apprendre) : identité mauve électrique propre à
-     ce mode (voir aussi .cats/.intchip/.modeswitch plus bas) — ici la charte
-     encourage au contraire les teintes multiples et l'énergie cosmique. */
+    letter-spacing:-.03em;text-transform:uppercase;color:var(--flare);margin-bottom:14px}
+  .card__source .dot{width:6px;height:6px;border-radius:50%;background:var(--flare)}
+  /* Badge de catégorie (mode Apprendre) : même « Eyebrow Tag », posé dans un
+     encadré (liseré signal-red, fond surface) pour rester lisible par-dessus
+     une photo — un simple texte nu s'y perdrait. */
   .card__cat{display:flex;width:fit-content;align-items:center;gap:6px;
-    background:transparent;border:1px solid var(--violet);color:var(--ink);font-family:var(--font-sans);
-    font-weight:500;font-size:12px;letter-spacing:.02em;padding:5px 13px;border-radius:var(--radius);margin-bottom:12px}
-  .card__title{font-size:clamp(24px,6.6vw,38px);line-height:1.15;
-    font-weight:700;letter-spacing:-.01em;margin-bottom:14px}
-  .card__desc{font-size:15px;line-height:1.5;color:var(--sand);max-width:46ch;
+    background:var(--surface);border:1px solid var(--redline);color:var(--flare);font-family:var(--font-mono);
+    font-size:12px;letter-spacing:-.03em;text-transform:uppercase;padding:5px 13px;border-radius:var(--radius-sm);margin-bottom:12px}
+  .card__title{font-family:var(--font-sans);font-size:clamp(24px,6.6vw,38px);line-height:1.15;
+    font-weight:700;letter-spacing:-.03em;margin-bottom:14px}
+  .card__desc{font-size:15px;line-height:1.5;color:var(--ink);max-width:46ch;
     display:-webkit-box;-webkit-line-clamp:10;-webkit-box-orient:vertical;overflow:hidden}
-  .card__meta{margin-top:16px;display:flex;align-items:center;gap:14px;color:var(--sand);font-size:13px}
+  .card__meta{margin-top:16px;display:flex;align-items:center;gap:14px;color:var(--ash);font-size:13px}
+  /* Bouton primaire plein : dégradé cocoa -> molten et halo intérieur « braise »
+     (seule ombre de tout le système), conformes à la charte au pixel près. */
   .card__open{margin-top:20px;display:inline-flex;align-items:center;gap:10px;
-    background:var(--purple);color:var(--amber);border:none;font-family:var(--font-sans);font-weight:600;font-size:15px;
-    padding:14px 22px;border-radius:var(--radius);text-decoration:none;cursor:pointer;
-    transition:transform .15s,filter .2s,box-shadow .2s}
-  .card__open:hover{filter:brightness(1.08);box-shadow:0 6px 18px rgba(106,13,173,.45)}
+    background:linear-gradient(135deg,var(--surface),var(--molten));color:var(--ink);border:none;
+    font-family:var(--font-sans);font-weight:500;font-size:15px;letter-spacing:-.01em;
+    padding:14px 22px;border-radius:var(--radius-sm);text-decoration:none;cursor:pointer;
+    box-shadow:var(--shadow-ember);transition:transform .15s,filter .2s}
+  .card__open:hover{filter:brightness(1.15)}
   .card__open svg{width:18px;height:18px;flex:0 0 auto}
   .card__open:active{transform:translateY(1px) scale(.98)}
 
@@ -148,10 +153,13 @@
   .rail{position:fixed;right:16px;bottom:calc(41px + env(safe-area-inset-bottom));z-index:3;
     display:flex;flex-direction:column;gap:18px;align-items:center}
   .rail.hidden{display:none}
-  .rail button{background:transparent;border:1.5px solid var(--gold);color:var(--gold);
-    width:52px;height:52px;border-radius:var(--radius);cursor:pointer;
+  /* Bouton fantôme (liseré signal-red) : le texte/icône reste en linen, pas
+     dans la couleur du bord — sur ce fond très sombre, une icône corail-signal
+     serait à peine visible ; le rôle de ce rouge est le trait, pas l'encre. */
+  .rail button{background:transparent;border:1.5px solid var(--redline);color:var(--ink);
+    width:52px;height:52px;border-radius:var(--radius-sm);cursor:pointer;
     display:grid;place-items:center;transition:transform .15s,background .2s}
-  .rail button:hover{background:rgba(230,168,23,.12)}
+  .rail button:hover{background:rgba(149,28,4,.15)}
   .rail button:active{transform:scale(.88)}
   .rail button svg{width:23px;height:23px;display:block}
 
@@ -164,79 +172,81 @@
   /* Fondu vers la transparence (une teinte, pas un dégradé de couleurs) pour
      qu'une barre indéterminée en mouvement se voie comme un balayage. */
   .syncbar::after{content:"";position:absolute;top:0;left:0;height:100%;width:40%;
-    background:linear-gradient(90deg,transparent,var(--purple),transparent);
+    background:linear-gradient(90deg,transparent,var(--flare),transparent);
     animation:sync 1.1s linear infinite}
   @keyframes sync{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
-  .progress__bar{width:100%;background:var(--purple);transition:height .2s}
+  .progress__bar{width:100%;background:var(--flare);transition:height .2s}
 
   .top{position:fixed;top:0;left:0;right:0;z-index:15;padding:calc(12px + env(safe-area-inset-top)) 16px 14px;
-    display:flex;flex-direction:column;gap:11px;background:linear-gradient(rgba(13,13,13,.82),rgba(13,13,13,.5) 65%,transparent);
+    display:flex;flex-direction:column;gap:11px;background:linear-gradient(rgba(25,5,1,.82),rgba(25,5,1,.5) 65%,transparent);
     transition:transform .32s ease,opacity .32s ease}
   .top.top--away{transform:translateY(-115%);opacity:0;pointer-events:none}  /* masqué pendant le swipe */
   .topline{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  .brand{font-weight:700;font-size:18px;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+  .brand{font-weight:700;font-size:18px;letter-spacing:-.03em;display:flex;align-items:center;gap:8px}
   .brand__logo{display:flex;align-items:center}
-  .brand__logo img{height:28px;width:28px;border-radius:var(--radius);display:block;object-fit:cover}
-  .brand__text{color:var(--gold)}
+  .brand__logo img{height:28px;width:28px;border-radius:var(--radius-sm);display:block;object-fit:cover}
+  .brand__text{color:var(--flare)}
   .top .actions{display:flex;gap:8px}
-  .top .actions button{background:transparent;border:1.5px solid var(--gold);color:var(--gold);
-    padding:9px 14px;border-radius:var(--radius);font-family:var(--font-sans);font-weight:500;font-size:13px;cursor:pointer;
-    transition:background .2s}
-  .top .actions button:hover{background:rgba(230,168,23,.12)}
+  .top .actions button{background:transparent;border:1.5px solid var(--redline);color:var(--ink);
+    padding:9px 14px;border-radius:var(--radius-sm);font-family:var(--font-sans);font-weight:500;font-size:13px;
+    letter-spacing:-.01em;cursor:pointer;transition:background .2s}
+  .top .actions button:hover{background:rgba(149,28,4,.15)}
   .iconbtn{width:38px;height:38px;padding:0!important;display:grid;place-items:center;font-size:17px}
 
-  /* Sélecteur de mode : deux onglets visibles, l'onglet actif en surbrillance
-     pleine — Actus en violet (identité par défaut), Apprendre en mauve
-     électrique (voir body.learn plus bas) : la charte encourage les teintes
-     multiples, contrairement à un système à accent unique. */
-  .modeswitch{align-self:center;display:inline-flex;gap:4px;padding:4px;border-radius:var(--radius);
-    background:transparent;border:1px solid var(--line)}
-  .modeswitch button{border:none;background:transparent;color:var(--sand);font-family:var(--font-sans);
-    font-weight:500;font-size:13.5px;padding:8px 18px;border-radius:var(--radius);cursor:pointer;
+  /* Sélecteur de mode : deux onglets visibles, l'onglet actif dans le même
+     dégradé cocoa -> molten que les boutons pleins (pas de deuxième accent :
+     la charte n'a qu'une seule couleur chromatique, le corail, à l'inverse
+     du système précédent qui multipliait les teintes par mode). */
+  .modeswitch{align-self:center;display:inline-flex;gap:4px;padding:4px;border-radius:var(--radius-sm);
+    background:transparent;border:1px solid var(--redline)}
+  .modeswitch button{border:none;background:transparent;color:var(--ash);font-family:var(--font-sans);
+    font-weight:500;font-size:13.5px;letter-spacing:-.01em;padding:8px 18px;border-radius:var(--radius-sm);cursor:pointer;
     display:flex;align-items:center;gap:7px;transition:background .2s,color .2s}
-  .modeswitch button.active{background:var(--purple);color:var(--ink)}
+  .modeswitch button.active{background:linear-gradient(135deg,var(--surface),var(--molten));color:var(--flare)}
   .modeswitch button .ic{font-size:15px}
 
   /* Barre de catégories (mode Apprendre) : chips défilables horizontalement */
   .cats{display:none;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px}
   .cats::-webkit-scrollbar{display:none}
   body.learn .cats{display:flex}
-  .cats button{flex:0 0 auto;background:transparent;border:1px solid var(--violet);
-    color:var(--ink);font-family:var(--font-sans);font-weight:500;font-size:13px;
-    padding:7px 14px;border-radius:var(--radius);
+  .cats button{flex:0 0 auto;background:transparent;border:1px solid var(--redline);
+    color:var(--ash);font-family:var(--font-sans);font-weight:500;font-size:13px;letter-spacing:-.01em;
+    padding:7px 14px;border-radius:var(--radius-sm);
     cursor:pointer;white-space:nowrap;transition:background .2s,color .2s}
-  .cats button.active{background:var(--violet);color:var(--ink)}
+  .cats button.active{background:var(--surface);color:var(--flare)}
 
   /* Bouton "centres d'intérêt" : en haut à droite, à la place de ⚙ Sources
      (mode Actus) — les deux occupent le même emplacement, jamais visibles
-     ensemble, et portent la même roue crantée. */
-  .top .actions .catedit{color:var(--violet);border-color:var(--violet)}
+     ensemble, et portent la même roue crantée. Aucune teinte propre à ce
+     bouton : un seul accent dans tout le système. */
 
   /* Sélecteur de centres d'intérêt (grille de chips à cocher) */
   .intgrid{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
-  .intchip{background:transparent;border:1px solid var(--violet);color:var(--ink);
-    font-family:var(--font-sans);font-weight:500;font-size:14px;padding:11px 16px;border-radius:var(--radius);
+  .intchip{background:transparent;border:1px solid var(--redline);color:var(--ash);
+    font-family:var(--font-sans);font-weight:500;font-size:14px;letter-spacing:-.01em;padding:11px 16px;border-radius:var(--radius-sm);
     cursor:pointer;transition:background .15s,color .15s}
-  .intchip.on{background:var(--violet);color:var(--ink)}
-  .intro{background:rgba(1,77,78,.16);border:1px solid var(--teal);color:var(--ink);
-    font-size:14px;line-height:1.45;padding:13px 15px;border-radius:var(--radius);margin-bottom:18px}
+  .intchip.on{background:var(--surface);color:var(--flare)}
+  /* « Warm Blush » : le lavis décoratif que la charte réserve aux zones de
+     respiration — ici pour l'encart d'accueil, jamais sous forme de texte coloré. */
+  .intro{background:rgba(252,172,156,.12);border:1px solid var(--redline);color:var(--ink);
+    font-size:14px;line-height:1.45;padding:13px 15px;border-radius:var(--radius-md);margin-bottom:18px}
 
-  /* Badge d'attention : ambre, la teinte que la charte réserve aux états
-     d'alerte/attention. */
+  /* Étiquette (mode démo) : même traitement que .card__cat. */
   .demobadge{position:fixed;top:calc(116px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:14;
-    background:transparent;border:1px solid var(--amber);color:var(--amber);
-    padding:6px 14px;border-radius:var(--radius);font-family:var(--font-sans);font-weight:500;font-size:12px}
+    background:var(--surface);border:1px solid var(--redline);color:var(--flare);
+    padding:6px 14px;border-radius:var(--radius-sm);font-family:var(--font-mono);letter-spacing:-.03em;
+    text-transform:uppercase;font-size:12px}
   .demobadge.hidden{display:none}
 
   /* Mode Apprendre : on privilégie le texte — titre plus compact, description
-     plus longue — et l'identité mauve électrique remplace le violet d'Actus. */
-  body.learn .modeswitch button.active{background:var(--violet)}
+     plus longue. Pas de changement de teinte : la charte n'a qu'un seul
+     accent chromatique, quel que soit le mode. */
   body.learn .card__title{font-size:clamp(22px,5.6vw,32px);margin-bottom:10px}
   body.learn .card__desc{-webkit-line-clamp:10;font-size:15px;line-height:1.55;max-width:60ch}
   body.learn .card__body{padding-top:20px}
 
   .hint{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translateX(-50%);
-    z-index:14;color:var(--sand);font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;
+    z-index:14;color:var(--ash);font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;
     animation:float 1.8s ease-in-out infinite;pointer-events:none;opacity:.9}
   .hint .arrow{font-size:20px}
   @keyframes float{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,-8px)}}
@@ -254,49 +264,50 @@
      élément qui n'est même pas une cible). */
   .peek{position:fixed;top:calc(7px + env(safe-area-inset-top));left:50%;transform:translate(-50%,0);z-index:14;
     width:46px;height:21px;display:grid;place-items:center;pointer-events:none;
-    color:var(--sand);font-size:14px;line-height:1;opacity:0;transition:opacity .32s ease}
+    color:var(--ash);font-size:14px;line-height:1;opacity:0;transition:opacity .32s ease}
   body.top-away .peek{opacity:.4}
-  body.top-away .peek--new{opacity:.85;color:var(--gold);animation:peekbob 2.4s ease-in-out infinite}
+  body.top-away .peek--new{opacity:.85;color:var(--flare);animation:peekbob 2.4s ease-in-out infinite}
   @keyframes peekbob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,3px)}}
 
   /* Panneaux (feuilles, menu de partage…) : fond « surface » distinct du
-     canevas, coins arrondis en haut, légère élévation par ombre (portée
-     recalibrée pour un fond sombre — la valeur littérale de la charte,
-     pensée pour une carte claire, serait invisible ici). */
+     canevas, coins arrondis en haut, liseré signal-red — jamais d'ombre
+     (la charte l'exclut explicitement pour cartes/panneaux : la structure
+     vient du liseré, l'ombre est réservée aux boutons pleins). */
   .sheet{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.78);display:none;align-items:flex-end}
   .sheet.open{display:flex}
-  .sheet__panel{background:var(--surface);width:100%;border-radius:var(--radius) var(--radius) 0 0;
+  .sheet__panel{background:var(--surface);width:100%;border-radius:var(--radius-md) var(--radius-md) 0 0;
     padding:22px 20px calc(28px + env(safe-area-inset-bottom));
-    max-height:82dvh;overflow-y:auto;border:1px solid var(--line);border-bottom:none;
-    box-shadow:0 -8px 30px rgba(0,0,0,.5)}
+    max-height:82dvh;overflow-y:auto;border:1px solid var(--redline);border-bottom:none}
   .sheet__panel:focus{outline:none}
-  .sheet__grip{width:44px;height:5px;border-radius:var(--radius);background:var(--sand);opacity:.4;margin:0 auto 20px}
-  .sheet h2{font-size:20px;font-weight:700;margin-bottom:4px;letter-spacing:-.01em}
-  .sheet p.sub{color:var(--sand);font-size:14px;margin-bottom:18px}
-  .feedrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
-  .feedrow input[type=checkbox]{width:20px;height:20px;accent-color:var(--purple)}
+  .sheet__grip{width:44px;height:5px;border-radius:var(--radius-sm);background:var(--ash);opacity:.4;margin:0 auto 20px}
+  .sheet h2{font-family:var(--font-sans);font-size:20px;font-weight:700;margin-bottom:4px;letter-spacing:-.02em}
+  .sheet p.sub{color:var(--ash);font-size:14px;margin-bottom:18px}
+  .feedrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(149,28,4,.3)}
+  .feedrow input[type=checkbox]{width:20px;height:20px;accent-color:var(--flare)}
   .feedrow .name{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   /* Signale une source injoignable au dernier chargement, là où on peut la
-     supprimer : la teinte terracotta que la charte réserve aux états d'erreur. */
-  .badge-ko{background:var(--terracotta);border:none;color:var(--ink);font-family:var(--font-sans);
-    font-weight:500;font-size:11px;padding:2px 9px;border-radius:var(--radius);white-space:nowrap}
+     supprimer : même « Eyebrow Tag » que .card__cat/.demobadge, en aplat
+     corail pour se détacher comme une alerte. */
+  .badge-ko{background:var(--flare);border:none;color:var(--bg);font-family:var(--font-mono);
+    letter-spacing:-.03em;text-transform:uppercase;font-size:11px;padding:2px 9px;border-radius:var(--radius-sm);white-space:nowrap}
   .feedrow .name{font-weight:500;font-size:15px}
-  .feedrow .url{color:var(--sand);font-size:12px;word-break:break-all}
-  .feedrow .del{margin-left:auto;background:none;border:none;color:var(--sand);font-size:18px;cursor:pointer}
+  .feedrow .url{color:var(--ash);font-size:12px;word-break:break-all}
+  .feedrow .del{margin-left:auto;background:none;border:none;color:var(--ash);font-size:18px;cursor:pointer}
   .addbox{display:flex;gap:8px;margin:18px 0 8px}
-  .addbox input{flex:1;background:var(--bg);border:1px solid var(--line);color:var(--ink);
-    padding:13px 16px;border-radius:var(--radius);font-family:var(--font-sans);font-size:14px}
-  .addbox input:focus{border-color:var(--gold);outline:none}
-  .addbox button,.applybtn{background:var(--purple);color:var(--amber);border:none;font-family:var(--font-sans);font-weight:600;
-    padding:13px 18px;border-radius:var(--radius);cursor:pointer;font-size:14px;
-    transition:filter .2s,box-shadow .2s}
-  .addbox button:hover,.applybtn:hover{filter:brightness(1.08);box-shadow:0 6px 18px rgba(106,13,173,.4)}
+  .addbox input{flex:1;background:transparent;border:1px solid var(--redline);color:var(--ink);
+    padding:13px 16px;border-radius:var(--radius-sm);font-family:var(--font-sans);font-size:14px}
+  .addbox input:focus{border-color:var(--flare);outline:none}
+  .addbox button,.applybtn{background:linear-gradient(135deg,var(--surface),var(--molten));color:var(--ink);border:none;
+    font-family:var(--font-sans);font-weight:500;letter-spacing:-.01em;
+    padding:13px 18px;border-radius:var(--radius-sm);cursor:pointer;font-size:14px;
+    box-shadow:var(--shadow-ember);transition:filter .2s}
+  .addbox button:hover,.applybtn:hover{filter:brightness(1.15)}
   .applybtn{width:100%;margin-top:16px;padding:15px;font-size:16px}
-  .iorow{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;padding-top:18px;border-top:1px solid var(--line)}
-  .iobtn{flex:1 1 auto;min-width:120px;background:transparent;border:1.5px solid var(--gold);color:var(--gold);
-    font-family:var(--font-sans);font-weight:500;font-size:13px;padding:12px 14px;border-radius:var(--radius);cursor:pointer;
+  .iorow{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;padding-top:18px;border-top:1px solid rgba(149,28,4,.3)}
+  .iobtn{flex:1 1 auto;min-width:120px;background:transparent;border:1.5px solid var(--redline);color:var(--ink);
+    font-family:var(--font-sans);font-weight:500;letter-spacing:-.01em;font-size:13px;padding:12px 14px;border-radius:var(--radius-sm);cursor:pointer;
     transition:background .2s}
-  .iobtn:hover{background:rgba(230,168,23,.1)}
+  .iobtn:hover{background:rgba(149,28,4,.15)}
   .iobtn:active{transform:scale(.97)}
 
   /* Réglage « Ouvrir les articles » (app packagée uniquement, voir renderReadPref).
@@ -307,17 +318,17 @@
      la phrase, le sélecteur passait tantôt à droite, tantôt dessous, et deux
      réglages voisins ne s'alignaient plus. */
   .prefrow{display:flex;flex-direction:column;align-items:flex-start;gap:11px;
-    margin-top:18px;padding-top:18px;border-top:1px solid var(--line)}
+    margin-top:18px;padding-top:18px;border-top:1px solid rgba(149,28,4,.3)}
   .prefrow__txt{min-width:0}
   .prefrow__txt b{display:block;font-weight:600;font-size:15px;margin-bottom:3px}
-  .prefrow__txt span{display:block;color:var(--sand);font-size:12.5px;line-height:1.4}
+  .prefrow__txt span{display:block;color:var(--ash);font-size:12.5px;line-height:1.4}
   /* flex-wrap : à trois options, la rangée déborde sur les écrans étroits */
-  .segbtns{display:inline-flex;flex-wrap:wrap;gap:4px;padding:4px;border-radius:var(--radius);
-    background:transparent;border:1px solid var(--line)}
-  .segbtns button{border:none;background:transparent;color:var(--sand);font-family:var(--font-sans);
-    font-weight:500;font-size:13px;padding:9px 15px;border-radius:var(--radius);cursor:pointer;
+  .segbtns{display:inline-flex;flex-wrap:wrap;gap:4px;padding:4px;border-radius:var(--radius-sm);
+    background:transparent;border:1px solid var(--redline)}
+  .segbtns button{border:none;background:transparent;color:var(--ash);font-family:var(--font-sans);
+    font-weight:500;letter-spacing:-.01em;font-size:13px;padding:9px 15px;border-radius:var(--radius-sm);cursor:pointer;
     white-space:nowrap;transition:background .2s,color .2s}
-  .segbtns button.active{background:var(--purple);color:var(--ink)}
+  .segbtns button.active{background:linear-gradient(135deg,var(--surface),var(--molten));color:var(--flare)}
   /* Taille du texte : quatre « A » qui grandissent, plutôt que quatre mots. Le
      réglage se montre au lieu de se décrire, et la rangée tient sans déborder.
      Largeur fixe pour que les pastilles restent alignées malgré les corps. */
@@ -329,12 +340,11 @@
   .segbtns--sizes button:nth-child(4){font-size:23px}
 
   /* Bloc secondaire d'un réglage (liste de blocage) : décalé et plus discret,
-     pour rester une précision et non un deuxième réglage — teinte sarcelle
-     (accent secondaire de la charte), réservée à ce genre de détail. */
-  .prefsub{width:100%;margin-top:-2px;padding-left:12px;border-left:2px solid var(--teal);
+     pour rester une précision et non un deuxième réglage. */
+  .prefsub{width:100%;margin-top:-2px;padding-left:12px;border-left:2px solid var(--redline);
     display:flex;flex-direction:column;gap:9px}
-  .prefsub__state{color:var(--sand);font-size:12.5px;line-height:1.45}
-  .prefsub__credit{color:var(--sand);font-size:11.5px;opacity:.75}
+  .prefsub__state{color:var(--ash);font-size:12.5px;line-height:1.45}
+  .prefsub__credit{color:var(--ash);font-size:11.5px;opacity:.75}
   .prefsub__acts{display:flex;flex-wrap:wrap;gap:8px}
   .prefsub__acts .iobtn{flex:0 1 auto;min-width:0;padding:9px 13px;font-size:12.5px}
 
@@ -343,60 +353,58 @@
   .endcard .card__body{display:flex;flex-direction:column;align-items:center;text-align:center}
 
   .state{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:16px;padding:40px;text-align:center;color:var(--sand)}
-  /* Carré : la charte proscrit les spinners circulaires (elle mise sur des
-     squelettes à effet de brillance, hors périmètre ici — le fil s'appuie sur
-     le scroll-snap, pas des listes à squelettiser). Piste neutre, segment
-     violet, comme le reste des indicateurs « primaires ». */
-  .spinner{width:38px;height:38px;border:3px solid var(--line);
-    border-top-color:var(--purple);border-radius:calc(var(--radius) / 3);
+    gap:16px;padding:40px;text-align:center;color:var(--ash)}
+  /* Carré, piste neutre, segment corail — le seul accent chromatique du système. */
+  .spinner{width:38px;height:38px;border:3px solid var(--surface);
+    border-top-color:var(--flare);border-radius:calc(var(--radius-sm) / 2);
     animation:spin .9s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
-  .state h3{color:var(--ink);font-weight:700;font-size:18px}
+  .state h3{font-family:var(--font-sans);color:var(--ink);font-weight:700;font-size:18px}
   .hidden{display:none!important}
   /* max-width + retour à la ligne : le message peut désormais citer des noms de
      flux, il ne doit pas déborder de l'écran. Fond plein (pas seulement
      délinéé) : contrairement à un badge, ce message doit rester lisible
-     par-dessus n'importe quelle carte, image comprise. */
+     par-dessus n'importe quelle carte, image comprise. Pas d'ombre (la charte
+     l'exclut pour toute surface qui n'est pas un bouton plein). */
   .toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);
-    background:var(--surface);border:1px solid var(--gold);color:var(--ink);padding:12px 18px;border-radius:var(--radius);
-    max-width:min(88vw,420px);text-align:center;line-height:1.4;box-shadow:0 8px 24px rgba(0,0,0,.5);
+    background:var(--surface);border:1px solid var(--redline);color:var(--ink);padding:12px 18px;border-radius:var(--radius-sm);
+    max-width:min(88vw,420px);text-align:center;line-height:1.4;
     font-size:14px;z-index:60;opacity:0;transition:opacity .25s;pointer-events:none}
   .toast.show{opacity:1}
 
   .sharemenu{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.78);
     display:flex;align-items:flex-end;opacity:0;transition:opacity .2s}
   .sharemenu.open{opacity:1}
-  .sharemenu__panel{background:var(--surface);width:100%;border-radius:var(--radius) var(--radius) 0 0;
-    padding:22px 20px calc(28px + env(safe-area-inset-bottom));border:1px solid var(--line);border-bottom:none;
-    box-shadow:0 -8px 30px rgba(0,0,0,.5);
+  .sharemenu__panel{background:var(--surface);width:100%;border-radius:var(--radius-md) var(--radius-md) 0 0;
+    padding:22px 20px calc(28px + env(safe-area-inset-bottom));border:1px solid var(--redline);border-bottom:none;
     transform:translateY(100%);transition:transform .25s}
   .sharemenu.open .sharemenu__panel{transform:translateY(0)}
-  .sharemenu h2{font-size:20px;font-weight:700;margin-bottom:4px;letter-spacing:-.01em}
-  .sharemenu .sub{color:var(--sand);font-size:14px;margin-bottom:18px;
+  .sharemenu h2{font-family:var(--font-sans);font-size:20px;font-weight:700;margin-bottom:4px;letter-spacing:-.02em}
+  .sharemenu .sub{color:var(--ash);font-size:14px;margin-bottom:18px;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .sharegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
   .sharedest{display:flex;align-items:center;justify-content:center;text-align:center;text-decoration:none;
-    background:transparent;border:1.5px solid var(--gold);color:var(--gold);font-family:var(--font-sans);font-weight:500;
-    font-size:14px;padding:16px 12px;border-radius:var(--radius);cursor:pointer;transition:background .2s}
-  .sharedest:hover{background:rgba(230,168,23,.1)}
+    background:transparent;border:1.5px solid var(--redline);color:var(--ink);font-family:var(--font-sans);font-weight:500;
+    letter-spacing:-.01em;font-size:14px;padding:16px 12px;border-radius:var(--radius-sm);cursor:pointer;transition:background .2s}
+  .sharedest:hover{background:rgba(149,28,4,.15)}
   .sharedest:active{transform:scale(.97)}
 
   /* Bannière d'incitation à installer la PWA */
   .installbar{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:66;
-    display:flex;align-items:center;gap:12px;padding:12px;border-radius:var(--radius);
-    background:var(--surface);border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.5);
+    display:flex;align-items:center;gap:12px;padding:12px;border-radius:var(--radius-md);
+    background:var(--surface);border:1px solid var(--redline);
     transform:translateY(160%);opacity:0;transition:transform .38s cubic-bezier(.2,.8,.2,1),opacity .38s}
   .installbar.show{transform:translateY(0);opacity:1}
-  .installbar__icon{width:42px;height:42px;flex:0 0 auto;border-radius:var(--radius);display:grid;place-items:center;
-    background:var(--purple);color:var(--amber);font-size:20px}
+  .installbar__icon{width:42px;height:42px;flex:0 0 auto;border-radius:var(--radius-sm);display:grid;place-items:center;
+    background:var(--molten);color:var(--flare);font-size:20px}
   .installbar__txt{display:flex;flex-direction:column;line-height:1.25;min-width:0;flex:1}
   .installbar__txt b{font-size:14px;font-weight:600}
-  .installbar__txt span{font-size:12px;color:var(--sand)}
-  .installbar__btn{flex:0 0 auto;background:var(--purple);color:var(--amber);border:none;font-family:var(--font-sans);font-weight:600;
-    font-size:13px;padding:11px 16px;border-radius:var(--radius);cursor:pointer}
+  .installbar__txt span{font-size:12px;color:var(--ash)}
+  .installbar__btn{flex:0 0 auto;background:linear-gradient(135deg,var(--surface),var(--molten));color:var(--ink);border:none;
+    font-family:var(--font-sans);font-weight:500;letter-spacing:-.01em;
+    font-size:13px;padding:11px 16px;border-radius:var(--radius-sm);cursor:pointer;box-shadow:var(--shadow-ember)}
   .installbar__btn:active{transform:scale(.96)}
-  .installbar__close{flex:0 0 auto;background:transparent;border:none;color:var(--sand);font-size:17px;cursor:pointer;padding:4px 6px}
+  .installbar__close{flex:0 0 auto;background:transparent;border:none;color:var(--ash);font-size:17px;cursor:pointer;padding:4px 6px}
 
   /* Bascule entre modes : glissement court + fondu, dans le sens du geste.
      Un glissement pleine largeur serait plus spectaculaire mais impliquerait de
@@ -535,8 +543,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=55"></script>
-<script src="src/learn-core.js?v=55"></script>
+<script src="src/lib.js?v=56"></script>
+<script src="src/learn-core.js?v=56"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -559,7 +567,7 @@
   console.error("[SwiperNews] modules incomplets :",missing.join(", "));
   if(already){                                   // déjà tenté : on n'en boucle pas
     document.addEventListener("DOMContentLoaded",()=>{
-      document.body.innerHTML='<div style="color:#ede6d6;font:15px/1.6 sans-serif;padding:32px;text-align:center">'+
+      document.body.innerHTML='<div style="color:#f7f6ff;font:15px/1.6 sans-serif;padding:32px;text-align:center">'+
         "<h2>Mise à jour incomplète</h2><p>Ferme complètement l'app puis rouvre-la.</p></div>";
     });
     return;
@@ -806,7 +814,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="55";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="56";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1761,7 +1769,7 @@ function cardHTML(it,id){
       <h2 class="card__title">${esc(it.title)}</h2>
       ${it.desc?`<p class="card__desc">${esc(it.desc)}</p>`:""}
       <div class="card__meta">${it.date?`<span>${relTime(it.date)}</span>`:""}</div>
-      ${link?`<a class="card__open" href="${escAttr(link)}" target="_blank" rel="noopener">${openIcon}<span>${openLabel}</span></a>`:`<span class="card__open" style="background:transparent;border:1px solid var(--line);color:var(--sand)">Article de démo</span>`}
+      ${link?`<a class="card__open" href="${escAttr(link)}" target="_blank" rel="noopener">${openIcon}<span>${openLabel}</span></a>`:`<span class="card__open" style="background:transparent;box-shadow:none;border:1px solid var(--redline);color:var(--ash)">Article de démo</span>`}
     </div>
   </article>`;
 }

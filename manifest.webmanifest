@@ -9,8 +9,8 @@
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
-  "background_color": "#0d0d0d",
-  "theme_color": "#0d0d0d",
+  "background_color": "#190501",
+  "theme_color": "#190501",
   "orientation": "portrait",
   "categories": ["news", "education"],
   "icons": [
