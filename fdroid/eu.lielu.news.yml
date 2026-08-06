@@ -65,7 +65,7 @@ Builds:
     # clair, faute de -PversionCode/-PversionName ici. Les deux se bougent
     # ensemble. Le versionCode suit la version (majeur × 10000 + mineur × 100
     # + correctif).
-    commit: 4e5c98b10bff8fb3cf4ad7bfccfa70b1c03a522d
+    commit: c0f70d8f0381fa52bb0d1f0b9bffff764d0dabc0
     subdir: android
     # Le nodejs de Debian stable est trop vieux : la CLI Capacitor 8 exige
     # Node 22 et refuse Node 20 (d'où le setup-node@22 d'android.yml). D'où
