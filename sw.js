@@ -19,7 +19,7 @@
 //
 // À CHAQUE modification de index.html ou de src/*.js : incrémenter APP_VERSION
 // dans index.html ET CACHE ci-dessous (garder les deux numéros alignés).
-const CACHE = "flux-v52";
+const CACHE = "flux-v53";
 
 // Mis en cache à l'installation : uniquement ce qui ne dépend pas de la version.
 // Les logos portent `?v=` comme les modules `src/*.js` : `/logo-*.png` est
@@ -29,9 +29,9 @@ const CACHE = "flux-v52";
 // Plus de polices ici : l'habillage rétro-futuriste (v52) est passé au
 // monospace système, donc plus aucun fichier fonts/*.woff2 n'est chargé.
 const SHELL = [
-  "./logo-192.png?v=29",
-  "./logo-512.png?v=29",
-  "./logo-maskable-512.png?v=29",
+  "./logo-192.png?v=30",
+  "./logo-512.png?v=30",
+  "./logo-maskable-512.png?v=30",
   "./manifest.webmanifest",
 ];
 
