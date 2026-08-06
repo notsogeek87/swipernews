@@ -78,11 +78,16 @@ Builds:
       - apt-get install -y -t forky npm
     gradle:
       - yes
-    # Pas d'`output:` : ce champ ne sert qu'aux builds non-Gradle. Pour un build
-    # Gradle, fdroidserver retrouve seul l'APK produit, et le déclarer n'aurait
-    # servi qu'à figer un chemin que l'AGP peut renommer. (Le bloc de suggestion
-    # de licaon-kter le reconduisait, mais c'est duckniii qui a demandé sa
-    # suppression — il ne revient pas.)
+    # `output:` est INDISPENSABLE ici, malgré la demande de duckniii de le
+    # supprimer — l'avoir retiré a fait échouer leur build sur « Failed to find
+    # any output apks », Gradle ayant pourtant réussi. Sans ce champ,
+    # fdroidserver ne regarde que trois chemins, tous relatifs à `subdir`
+    # (build.py, omethod == 'gradle') : `build/outputs/apk/release`,
+    # `build/outputs/apk` et `build/apk`. Or notre APK naît un cran plus bas,
+    # dans le module `app`. Renseigner `output:` bascule sur omethod == 'raw',
+    # qui prend le chemin tel quel. C'est pourquoi le bloc de suggestion de
+    # licaon-kter le conservait : ce n'était pas un oubli.
+    output: app/build/outputs/apk/release/app-release-unsigned.apk
     #
     # cap:sync régénère www/ (non versionné) puis le recopie dans le projet
     # natif : sans lui, l'APK embarque un assets/public vide. « prebuild »

@@ -106,7 +106,7 @@ se fait donc à la main, sur `fdroiddata` :
 | Demande | De qui | Corrigé dans |
 | --- | --- | --- |
 | `commit:` = hash complet, pas le tag `v1.2.0` | duckniii | `eu.lielu.news.yml` |
-| Supprimer `output:` | duckniii | `eu.lielu.news.yml` |
+| Supprimer `output:` | duckniii | **non applicable** — il est indispensable ici (voir ci-dessous) |
 | Ajouter `Binaries` et `AllowedAPKSigningKeys` (build reproductible) | duckniii | `eu.lielu.news.yml` + `.github/workflows/release.yml` |
 | Ajouter un dossier `en-US` dans `fastlane` | duckniii | `fastlane/metadata/android/en-US/` |
 | Utiliser le gabarit « App inclusion » et cocher les cases | duckniii | à faire sur GitLab (voir ci-dessus) |
@@ -170,6 +170,15 @@ mais les sources de `fdroidserver` sont lisibles sur GitLab — c'est la référ
   ```
 - **`UpdateCheckMode: Tags` accepte une expression régulière** en argument
   (`checkupdates.py` : `pattern = mode[5:]`).
+- **`output:` est indispensable, même si on demande de l'enlever.** Le retirer
+  fait échouer le build sur `Failed to find any output apks` — *après* un
+  `BUILD SUCCESSFUL` de Gradle, ce qui égare. Sans ce champ, fdroidserver ne
+  cherche l'APK que dans trois répertoires, tous relatifs à `subdir` (build.py,
+  `omethod == 'gradle'`) : `build/outputs/apk/release`, `build/outputs/apk`,
+  `build/apk`. Or un projet Capacitor produit le sien un niveau plus bas, dans
+  le module `app`. Renseigner `output:` bascule sur `omethod == 'raw'`, qui
+  prend le chemin tel quel — c'est le seul moyen de désigner un APK hors de ces
+  trois dossiers.
 - **Leur CI impose la forme canonique de `fdroid rewritemeta`**, au caractère
   près : elle rejoue l'outil et refuse le moindre écart (« These files need
   rewritemeta »). Trois règles s'en déduisent, toutes rencontrées :
