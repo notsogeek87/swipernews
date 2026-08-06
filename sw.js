@@ -19,20 +19,16 @@
 //
 // À CHAQUE modification de index.html ou de src/*.js : incrémenter APP_VERSION
 // dans index.html ET CACHE ci-dessous (garder les deux numéros alignés).
-const CACHE = "flux-v51";
+const CACHE = "flux-v52";
 
 // Mis en cache à l'installation : uniquement ce qui ne dépend pas de la version.
 // Les logos portent `?v=` comme les modules `src/*.js` : `/logo-*.png` est
 // servi en Cache-Control immutable un an (vercel.json), donc un changement de
 // contenu à URL identique resterait invisible en cache HTTP jusqu'à expiration
 // — même après un bump de CACHE ci-dessus, qui ne purge que le cache du SW.
-// Les polices sont dans le même cas (fonts/, immutables) : un remplacement de
-// fichier passerait par un nouveau nom, jamais une mutation sur place.
+// Plus de polices ici : l'habillage rétro-futuriste (v52) est passé au
+// monospace système, donc plus aucun fichier fonts/*.woff2 n'est chargé.
 const SHELL = [
-  "./fonts/Inter-Regular.woff2",
-  "./fonts/Inter-SemiBold.woff2",
-  "./fonts/Inter-Bold.woff2",
-  "./fonts/SourceSerif4Display-Semibold.woff2",
   "./logo-192.png?v=29",
   "./logo-512.png?v=29",
   "./logo-maskable-512.png?v=29",
