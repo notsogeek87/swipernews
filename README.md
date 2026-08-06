@@ -738,21 +738,50 @@ lancement, où l'on ne demande qu'une chose à la fois. Le lecteur garde par
 ailleurs son bouton « ouvrir dans le navigateur » pour les cas ponctuels.
 
 **Icône et écran de démarrage** : générés par [`@capacitor/assets`](https://github.com/ionic-team/capacitor-assets)
-à partir de `resources/` (icône `icon.png` = `logo-512.png`, calque adaptatif
-`icon-foreground.png` = `logo-maskable-512.png` déjà en zone de sécurité —
-tous deux à fond **transparent** par choix produit, `icon-background.png`
-transparent lui aussi — et écran de démarrage `splash*.png` à la couleur du
-thème `#0a0a0f`). Un fond transparent sur l'icône adaptative n'est pas garanti
-par la plateforme : le lanceur Android peut afficher le fond d'écran ou son
-propre repli derrière le logo selon l'OEM — c'est le compromis accepté pour
-éviter tout aplat de couleur imposé autour du logo. Après une mise à jour du
-logo à la racine, régénérer avec :
+à partir de `resources/`. Le logo est un carré à coins arrondis rempli d'un
+dégradé vertical orange → rouge, portant une carte blanche et une ampoule ;
+il en existe **trois formes**, et savoir laquelle va où est tout l'intérêt de
+cette section :
+
+| Forme | Où | Pourquoi |
+| --- | --- | --- |
+| **Coins arrondis** (coins transparents) | `logo-192/512.png`, écrans de démarrage, vignettes F-Droid | Personne ne masque ces images : elles doivent porter leur propre arrondi |
+| **Plein bord** (dégradé prolongé jusqu'aux bords du carré) | `logo-maskable-512.png`, `resources/icon.png`, `resources/icon-background.png` | Tout ce qui **subit un masque**. Un masque circulaire mord au-delà des coins arrondis : sans plein bord, il découperait dans le vide et laisserait des encoches transparentes |
+| **Contenu seul** (carte + ampoule sur fond transparent) | `resources/icon-foreground.png` | Calque avant de l'icône adaptative, posé sur le dégradé du calque arrière — c'est ce qui permet au lanceur de les animer séparément |
+
+Le fond de l'icône adaptative n'est donc plus transparent : le logo **apporte
+son propre fond**, et un aplat imposé par le lanceur n'est plus à craindre —
+c'est le dégradé du logo qui remplit le masque, quelle que soit la forme
+choisie par l'OEM.
+
+Deux marges de sécurité, à ne pas confondre :
+
+- **maskable (PWA)** — seul un cercle de 80 % de diamètre est garanti visible.
+  Le contenu du logo source monte à 0,452 de la largeur, au-delà des 0,40
+  admis : `logo-maskable-512.png` le réduit donc à **0,884** avant de le poser
+  sur le dégradé plein bord ;
+- **icône adaptative (Android)** — `mipmap-anydpi-v26/ic_launcher.xml` insère
+  les deux calques à 16,7 %, ce qui ramène 0,452 sous la limite. Le contenu
+  passe tel quel, sans réduction supplémentaire.
+
+Écrans de démarrage `splash*.png` : logo centré à 16,3 % de la largeur sur la
+couleur de thème `#0a0a0f` — `@capacitor/assets` les redimensionne en `cover`,
+donc tout ce qui compte doit rester près du centre.
+
+Après une mise à jour du logo à la racine, régénérer avec :
 
 ```bash
-cp logo-512.png resources/icon.png
-cp logo-maskable-512.png resources/icon-foreground.png
+python3 tools/gen_logo.py tools/logo-source-1024.png   # dépend de Pillow
 npm run android:assets
 ```
+
+`tools/gen_logo.py` fabrique les trois formes depuis un unique PNG source
+1024×1024 — `tools/logo-source-1024.png`, versionné pour que tout soit
+regénérable : il reconstitue le dégradé ligne par ligne (il est purement
+vertical) pour le prolonger jusqu'aux bords, et en déduit le contenu par
+écart au dégradé. Il produit aussi les vignettes Fastlane et les écrans de
+démarrage ; il ne touche ni au `?v=` ni à `android/`, d'où les deux rappels
+qu'il affiche en terminant.
 
 `/logo-*.png` est servi avec un `Cache-Control` **immutable** d'un an
 (`vercel.json`) : à URL identique, un logo mis à jour resterait invisible en
@@ -887,7 +916,9 @@ ouvrir la demande d'inclusion sur `gitlab.com/fdroid/fdroiddata`.
 - `index.html` reste volontairement hors du périmètre lint/format. La logique
   réutilisable en a été extraite vers `src/`, mais le rendu et les interactions y
   vivent encore.
-- Les icônes PNG ne sont pas optimisées (`logo-512.png` pèse ~260 Ko).
+- Les icônes PNG restent en couleurs vraies (`logo-512.png` pèse ~38 Ko). La
+  quantification par palette qui allégeait l'ancien logo fait border le dégradé
+  du nouveau : le gain de poids ne vaut pas la dégradation visible.
 
 ## Licence
 

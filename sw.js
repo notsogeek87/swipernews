@@ -19,7 +19,7 @@
 //
 // À CHAQUE modification de index.html ou de src/*.js : incrémenter APP_VERSION
 // dans index.html ET CACHE ci-dessous (garder les deux numéros alignés).
-const CACHE = "flux-v50";
+const CACHE = "flux-v51";
 
 // Mis en cache à l'installation : uniquement ce qui ne dépend pas de la version.
 // Les logos portent `?v=` comme les modules `src/*.js` : `/logo-*.png` est
@@ -33,9 +33,9 @@ const SHELL = [
   "./fonts/Inter-SemiBold.woff2",
   "./fonts/Inter-Bold.woff2",
   "./fonts/SourceSerif4Display-Semibold.woff2",
-  "./logo-192.png?v=28",
-  "./logo-512.png?v=28",
-  "./logo-maskable-512.png?v=28",
+  "./logo-192.png?v=29",
+  "./logo-512.png?v=29",
+  "./logo-maskable-512.png?v=29",
   "./manifest.webmanifest",
 ];
 
