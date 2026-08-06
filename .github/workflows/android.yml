@@ -160,8 +160,11 @@ jobs:
       #   signé + main    → une release par build, marquée « latest » ;
       #   signé + staging → préversion roulante, toujours à la même adresse ;
       #   non signé       → préversion roulante « debug », par branche.
+      # Pas de condition sur pull_request (une PR ne publie jamais). Un
+      # déclenchement manuel (workflow_dispatch) publie comme un push — c'est
+      # le seul recours quand le push lui-même ne relance pas l'action.
       - name: Publie la release
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
           APK: ${{ steps.build.outputs.apk }}
