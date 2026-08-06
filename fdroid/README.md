@@ -49,10 +49,23 @@ Un tag posé trop tôt embarque l'ancienne version de `build.gradle` et fait éc
 la vérification de version — il faut alors le déplacer (`git tag -f`) plutôt
 que de retoucher la recette.
 
-Le `versionCode` se déduit de la version — majeur × 10000 + mineur × 100 +
-correctif, soit `10300` pour 1.3.0 — donc il croît tout seul, sans compteur à
-tenir. `package.json` suit aussi la version, mais seulement pour nommer les
-APK produits par la CI.
+Le `versionCode` se déduit de la version — majeur × 10⁸ + mineur × 10⁶ +
+correctif × 10⁴, soit `103020000` pour 1.3.2 — donc il croît tout seul, sans
+compteur à tenir. `package.json` suit aussi la version, mais seulement pour
+nommer les APK produits par la CI.
+
+Les quatre chiffres de queue sont laissés à zéro **à dessein** : c'est le
+palier dans lequel `android.yml` range ses builds de `main`, sous le tag à
+venir (`103020000 − 10000 + numéro de run`). Le barème d'origine était plus
+serré — majeur × 10000 + mineur × 100 + correctif, `10300` pour 1.3.0 — et ne
+laissait aucune place à ces préversions : un APK de `main` portait alors le
+numéro de run nu, donc un `versionCode` inférieur à celui du dernier tag, donc
+ininstallable par-dessus une version publiée. L'élargissement a eu lieu en
+1.3.2 et fait sauter le `versionCode` de `10301` à `103020000`. Un saut est
+sans conséquence côté F-Droid — seule la croissance compte — mais il est
+**irréversible** : rien ne permet de revenir à des valeurs plus petites.
+Les entrées `Builds:` déjà écrites (1.3.0 → `10300`) restent telles quelles :
+elles décrivent ce que produit un Gradle nu à leur commit, qui n'a pas changé.
 
 ## Build reproductible : l'APK publié doit exister, et coïncider
 

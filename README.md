@@ -817,9 +817,26 @@ donc installable depuis le téléphone, sans détour par un ordinateur.
 L'APK reste malgré tout joint aux **artefacts** de chaque run (90 jours), y
 compris sur `main` et `staging`.
 
-`versionCode` vaut le numéro de run et `versionName` la version de
-`package.json` suffixée de ce numéro : deux builds ne se marchent jamais dessus,
-et Android accepte d'installer la plus récente par-dessus l'ancienne.
+`versionName` vaut la version de `package.json` suffixée du numéro de run, et
+`versionCode` place ce numéro **sous le palier** de la version que
+`android/app/build.gradle` prépare : un APK de `main` est une préversion de
+celle-ci, numérotée entre le tag précédent et celui à venir.
+
+```
+tag v1.3.1 ....... 10301        (ancienne échelle, avant élargissement)
+main build 77 .... 103010077    = 103020000 − 10000 + 77
+tag v1.3.2 ....... 103020000
+main build 80 .... 103020080    (préversion de 1.3.3)
+tag v1.3.3 ....... 103030000
+```
+
+Le numéro de run **seul** ne suffisait pas : il vit sur une échelle sans rapport
+avec celle des versions publiées. Un APK de `main` portant « 76 » face au
+« 10301 » du tag `v1.3.1` était une **rétrogradation** pour Android, donc
+impossible à installer par-dessus sans désinstaller d'abord — le symptôme qui a
+motivé l'élargissement. Ajouter au palier au lieu de soustraire aurait produit
+l'erreur inverse : des builds CI au-dessus du tag de leur propre version, qui
+serait devenu ininstallable par-dessus eux.
 
 **Signature.** Sans clé, le workflow produit un APK *debug* : installable pour
 tester, mais signé d'une clé jetable régénérée à chaque run — il faut donc

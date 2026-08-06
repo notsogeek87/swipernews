@@ -63,8 +63,13 @@ Builds:
     # Le couple ci-dessus doit correspondre à ce que produit un Gradle nu à ce
     # commit : android/app/build.gradle porte les mêmes valeurs, écrites en
     # clair, faute de -PversionCode/-PversionName ici. Les deux se bougent
-    # ensemble. Le versionCode suit la version (majeur × 10000 + mineur × 100
-    # + correctif).
+    # ensemble.
+    #
+    # Le versionCode suivait ici l'ancien barème (majeur × 10000 + mineur × 100
+    # + correctif). Élargi depuis en majeur × 10⁸ + mineur × 10⁶ + correctif ×
+    # 10⁴, pour laisser à android.yml un palier où ranger ses builds de main —
+    # voir fdroid/README.md. Cette entrée-ci n'est PAS à retoucher : elle décrit
+    # ce que produit un Gradle nu au commit ci-dessous, qui n'a pas bougé.
     commit: 6294b6f4b6904f38a014ebc4b44c3e4e43c028da
     subdir: android
     # Le nodejs de Debian stable est trop vieux : la CLI Capacitor 8 exige

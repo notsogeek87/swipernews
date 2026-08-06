@@ -57,19 +57,53 @@ jobs:
         run: npm run cap:sync
 
       # versionCode doit croître à chaque publication pour qu'Android accepte
-      # d'installer par-dessus : le numéro de run fait l'affaire.
+      # d'installer par-dessus. Le numéro de run seul ne suffit PAS : il vit sur
+      # une échelle sans rapport avec celle des versions publiées (build.gradle,
+      # majeur × 10⁸ + mineur × 10⁶ + correctif × 10⁴). Un APK de main portant
+      # « 76 » face au « 10301 » du tag v1.3.1 était une rétrogradation, donc
+      # impossible à installer par-dessus sans désinstaller d'abord.
+      #
+      # On le loge donc dans les quatre chiffres que le littéral des sources
+      # laisse libres, mais SOUS son palier : un build de main est une
+      # préversion de la version que build.gradle prépare, pas sa suite.
+      #
+      #   tag v1.3.1 ....... 10301        (ancienne échelle, déjà publié)
+      #   main build 77 .... 103010077    = 103020000 − 10000 + 77
+      #   tag v1.3.2 ....... 103020000
+      #   main build 80 .... 103020080    (préversion de 1.3.3)
+      #   tag v1.3.3 ....... 103030000
+      #
+      # Ajouter au palier plutôt que soustraire mettrait les builds CI AU-DESSUS
+      # du tag de leur propre version, qui deviendrait alors ininstallable par
+      # dessus eux — l'inverse exact du problème qu'on corrige.
       - name: Calcule la version
         id: version
         run: |
+          set -euo pipefail
           base="$(node -p "require('./package.json').version")"
-          code="${{ github.run_number }}"
+          build="${{ github.run_number }}"
+          release_code="$(sed -n 's/^ *versionCode \([0-9]*\)$/\1/p' android/app/build.gradle)"
+          if [ -z "$release_code" ]; then
+            echo "::error::versionCode introuvable dans android/app/build.gradle : il doit y rester un littéral (F-Droid le lit de la même façon)."
+            exit 1
+          fi
+          # À 10000 le build atteindrait le palier de la version préparée et
+          # entrerait en collision avec son tag. Le compteur de runs ne
+          # redescendant pas, il faudra alors élargir le palier (10⁵) plutôt
+          # que rogner ici.
+          if [ "$build" -ge 10000 ]; then
+            echo "::error::Numéro de run $build ≥ 10000 : le palier de versionCode est saturé, voir android/app/build.gradle."
+            exit 1
+          fi
+          code=$((release_code - 10000 + build))
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            name="$base.$code"
+            name="$base.$build"
           else
-            name="$base.$code-${{ github.ref_name }}"
+            name="$base.$build-${{ github.ref_name }}"
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "versionCode=$code, versionName=$name" >> "$GITHUB_STEP_SUMMARY"
 
       # Sans clé de signature en secret, on retombe sur un APK debug :
       # installable pour tester, mais impossible à mettre à jour par-dessus

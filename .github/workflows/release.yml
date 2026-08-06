@@ -1,8 +1,10 @@
 name: Release APK (F-Droid RB)
 
 # Le build de publication, et lui seul. À ne pas confondre avec android.yml, qui
-# produit un APK à chaque push (version = numéro de run, pour que deux builds
-# successifs s'installent l'un par-dessus l'autre).
+# produit un APK à chaque push : il en dérive le versionCode du littéral lu ici
+# même, moins un palier, plus le numéro de run — ses paquets sont donc des
+# préversions de CETTE version, et s'installent les uns par-dessus les autres
+# sans jamais dépasser le tag qu'ils préparent.
 #
 # Ici, on compile EXACTEMENT comme F-Droid : Gradle nu, sans -PversionCode ni
 # -PversionName, donc la version lue en clair dans android/app/build.gradle.

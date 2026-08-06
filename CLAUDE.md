@@ -119,11 +119,22 @@ pour ce qui reste vérifiable, et faire compiler par la CI.
 
 ### Ce que fait la CI (`.github/workflows/android.yml`)
 
-`npm ci` → `npm run cap:sync` → `./gradlew assembleRelease` avec le
-`versionCode` tiré du numéro de run (il doit croître à chaque publication pour
-qu'Android accepte l'installation par-dessus), APK signé depuis les secrets du
-dépôt, puis publication en **release** : une par build sur `main`, une
-préversion roulante sur `staging`.
+`npm ci` → `npm run cap:sync` → `./gradlew assembleRelease` avec un
+`versionCode` calculé (voir plus bas), APK signé depuis les secrets du dépôt,
+puis publication en **release** : une par build sur `main`, une préversion
+roulante sur `staging`.
+
+> **Le `versionCode` d'un build CI se calcule depuis le littéral des sources**,
+> il n'est pas le numéro de run : `versionCode(build.gradle) − 10000 + numéro
+> de run`. Un APK de `main` est ainsi une **préversion** de la version que
+> `build.gradle` prépare, rangée entre le tag précédent et celui à venir.
+>
+> Ne pas revenir au numéro de run nu, et ne pas l'*ajouter* au palier :
+> - numéro nu → il vit sur une échelle sans rapport avec celle des tags (76
+>   face à 10301), donc rétrogradation, donc APK ininstallable sans
+>   désinstaller — c'est précisément le bug corrigé ;
+> - ajout au lieu de soustraction → les builds CI passent au-dessus du tag de
+>   leur propre version, qui devient à son tour ininstallable.
 
 ### F-Droid
 
@@ -142,7 +153,12 @@ version — mais cela ne tient qu'à une chose :
 > **Publier une version = bumper `versionCode` et `versionName` dans
 > `android/app/build.gradle`, dans le commit qui précède le tag `vX.Y.Z`.**
 >
-> `versionCode` = majeur × 10000 + mineur × 100 + correctif (1.3.0 → 10300).
+> `versionCode` = majeur × 10⁸ + mineur × 10⁶ + correctif × 10⁴ (1.3.2 →
+> 103020000). Les quatre chiffres de queue restent à **zéro** ici : ils sont le
+> palier dans lequel `android.yml` loge le numéro de run (voir ci-dessus).
+> L'ancien barème (majeur × 10000 + mineur × 100 + correctif, 1.3.0 → 10300)
+> a été élargi en 1.3.2 ; l'inflation est irréversible, un `versionCode` ne
+> redescend jamais.
 > Les deux valeurs sont écrites **en clair** dans `defaultConfig` : c'est la
 > seule forme que sait lire l'analyseur de F-Droid. Ne jamais les remplacer par
 > une variable Groovy ni par un `project.findProperty(…) ?: …` — l'écrasement
