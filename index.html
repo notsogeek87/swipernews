@@ -565,8 +565,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=62"></script>
-<script src="src/learn-core.js?v=62"></script>
+<script src="src/lib.js?v=63"></script>
+<script src="src/learn-core.js?v=63"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -838,7 +838,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="62";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="63";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikidata et Wikipédia s'appellent déjà en
@@ -970,6 +970,19 @@ function dbg(msg){
   let el=document.getElementById("dbg");
   if(!el){el=document.createElement("div");el.id="dbg";
     el.style.cssText="position:fixed;left:6px;right:6px;bottom:6px;z-index:999;background:rgba(0,0,0,.88);color:#5f5;font:10.5px/1.35 monospace;padding:6px 8px;border-radius:6px;white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere;pointer-events:none";
+    document.body.appendChild(el);}
+  el.textContent=msg;
+}
+/* Panneau SÉPARÉ, en HAUT de l'écran : #dbg (ci-dessus) est réécrit à chaque
+   changement de carte (position, puis dbgImage()) — une erreur de chargement
+   Apprendre qui y passerait serait effacée en quelques millisecondes par le
+   diagnostic d'image suivant, avant d'être lisible. */
+function dbgTop(msg){
+  if(!DEBUG)return;
+  let el=document.getElementById("dbgTop");
+  if(!msg){if(el)el.remove();return;}
+  if(!el){el=document.createElement("div");el.id="dbgTop";
+    el.style.cssText="position:fixed;left:6px;right:6px;top:6px;z-index:999;background:rgba(120,0,0,.92);color:#ffdede;font:10.5px/1.35 monospace;padding:6px 8px;border-radius:6px;white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere;pointer-events:none";
     document.body.appendChild(el);}
   el.textContent=msg;
 }
@@ -1158,6 +1171,10 @@ function catKeysForBatch(){
   if(interests.length)return shuffle(interests.slice()).slice(0,3);
   return ["random"];
 }
+// Dernières erreurs par catégorie (mode Apprendre) : réutilisées par le
+// panneau ?debug=1 en cas de repli démo (voir loadFeeds) — sans accès à la
+// console, c'est le seul moyen de voir POURQUOI une catégorie a échoué.
+let lastLearnFailures=[];
 /* Agrégation côté client (repli si le backend /api/learn n'est pas disponible). */
 async function fetchLearnClient(keys,count){
   const tag=(p,catKey)=>p.then(list=>list.map(it=>({...it,cat:catKey}))); // marque la catégorie
@@ -1167,8 +1184,14 @@ async function fetchLearnClient(keys,count){
   // catégorie qui échoue systématiquement (Wikidata en erreur, CORS, etc.)
   // ne laisse AUCUNE trace, juste un fil plus pauvre — ou vide, et le repli
   // démo. Un rejet par catégorie reste normal (réseau flaky) ; tous rejetés
-  // en même temps signale un vrai problème (voir la console).
-  results.forEach((r,i)=>{if(r.status==="rejected")warn(`learn cat "${keys[i]}"`,r.reason);});
+  // en même temps signale un vrai problème.
+  lastLearnFailures=[];
+  results.forEach((r,i)=>{
+    if(r.status==="rejected"){
+      warn(`learn cat "${keys[i]}"`,r.reason);
+      lastLearnFailures.push(`${keys[i]}: ${(r.reason&&r.reason.message)||r.reason}`);
+    }
+  });
   const lists=results.filter(r=>r.status==="fulfilled").map(r=>r.value);
   return LEARN.dedupAndRank(lists,count);               // articles avec image d'abord, sources mélangées
 }
@@ -1278,6 +1301,7 @@ async function loadFeeds(force){
           if(items.length>CONFIG.MAX_ITEMS)items=items.slice(-CONFIG.MAX_ITEMS);
         }
       }else items=arr;
+      dbgTop(null);                                  // succès : efface une éventuelle erreur affichée avant
       render();hideStates();feedKeyShown=key;cacheSave(key);
     }catch(e){
       if(my!==loadSeq||cached)return;               // si on a déjà le cache, on le garde
@@ -1285,7 +1309,10 @@ async function loadFeeds(force){
       // ?debug=1 : sans ça, le repli démo est muet — impossible de savoir si
       // Wikidata/Wikipédia ont échoué ou juste n'ont rien renvoyé pour cette
       // catégorie (voir aussi les rejets par catégorie dans fetchLearnClient).
-      if(DEBUG)dbg(`v${APP_VERSION}  learn load ÉCHEC\ncats=${catKeysForBatch().join(",")}\n${e&&e.message||e}`);
+      // Panneau du HAUT (dbgTop), pas dbg() : celui du bas est réécrit par
+      // dbgImage() dès que la 1ère carte démo s'affiche, avant d'être lu.
+      const detail=lastLearnFailures.length?"\n"+lastLearnFailures.join("\n"):"";
+      dbgTop(`v${APP_VERSION}  learn load ÉCHEC\ncats=${catKeysForBatch().join(",")}\n${e&&e.message||e}${detail}`);
       items=structuredClone(DEMO_LEARN);demobadge(true);render();hideStates();feedKeyShown=key;
     }
     return;
