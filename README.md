@@ -86,13 +86,17 @@ mémorisé et chaque catégorie a son propre cache.
 Le tirage et le contenu affichés viennent de deux sources différentes :
 
 - **Wikidata** choisit QUELS articles apparaissent : chaque catégorie est un identifiant
-  Wikidata (`Q…`) racine, et une requête SPARQL (`query.wikidata.org/sparql`) tire au sort
-  des titres dans son arbre instance-of/subclass-of (`wdt:P31/wdt:P279*`), via
-  `ORDER BY RAND() LIMIT …` (SPARQL 1.1 standard). Sur un arbre énorme (Q5, humain : des
-  millions d'items), ça peut dépasser le délai — dans ce cas, seule CETTE catégorie échoue
-  pour le lot en cours (voir `Promise.allSettled` dans `fetchLearnClient`/`api/learn.js`),
-  pas le fil entier. Seule la catégorie **Aléatoire** échappe à Wikidata : tirage direct sur
-  Wikipédia (`generator=random`), sans arbre.
+  Wikidata (`Q…`), et une recherche (`www.wikidata.org/w/api.php`, `generator=search`,
+  `gsrsearch=haswbstatement:P31=…`, `gsrsort=random`) tire au sort des items déclarant ce
+  qid comme nature (`P31`). Même mécanisme que pour Wikipédia (CirrusSearch, `gsrsort=random`)
+  plutôt qu'une requête SPARQL sur `query.wikidata.org` : deux approches SPARQL ont été
+  essayées d'abord (`SERVICE bd:sample`, puis `wdt:P31/wdt:P279* + ORDER BY RAND()`) et
+  cassées chacune à sa façon en usage réel — la seconde, syntaxiquement correcte, dépassait
+  simplement le délai sur les catégories les plus larges. Contrepartie assumée : la recherche
+  ne filtre que les items DIRECTEMENT typés par le qid, sans remonter les sous-classes (voir
+  le détail catégorie par catégorie dans `wikidataUrl()`, `src/learn-core.js`). Seule la
+  catégorie **Aléatoire** échappe à Wikidata : tirage direct sur Wikipédia
+  (`generator=random`), sans filtre.
 - **Wikipédia** fournit le CONTENU affiché — extrait d'intro, image, lien — pour les titres
   que Wikidata vient de tirer (`action=query`, titres explicites, pas de recherche). C'est ce
   lien Wikipédia que « Découvrir » ouvre, quelle que soit la catégorie.

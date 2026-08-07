@@ -5,12 +5,13 @@
 // déjà divergé (12 catégories côté front, 11 côté serveur ; deux parseurs
 // Gallica différents). Tout est ici, en un seul exemplaire.
 //
-// Le fil défilable vient de **Wikidata** (arbre instance-of/subclass-of d'un
-// identifiant Q précis), pas de la recherche plein texte de Wikipédia : les
+// Le fil défilable vient de **Wikidata** (items déclarant `P31` = l'identifiant
+// Q de la catégorie), pas de la recherche plein texte de Wikipédia : les
 // catégories Wikipédia (« deepcategory ») dérivaient trop facilement hors
 // sujet. Wikidata ne sert que la LISTE des titres ; l'extrait, l'image et le
 // lien affichés (et ouverts par « Découvrir ») restent ceux de Wikipédia —
-// deux appels enchaînés, voir fetchCategoryItems.
+// deux appels enchaînés, voir fetchCategoryItems. Voir wikidataUrl() pour
+// l'historique des deux approches SPARQL essayées avant celle-ci (cassées).
 //
 // Chargé en <script src> classique dans index.html (l'app reste ouvrable en
 // file://) et en require() côté Node.
@@ -27,8 +28,9 @@
 
   /**
    * Source unique de vérité des centres d'intérêt.
-   * qid : identifiant Wikidata (Q…) racine de l'arbre instance-of/subclass-of.
-   *       null = tirage purement aléatoire (pas d'arbre Wikidata).
+   * qid : identifiant Wikidata (Q…) — les items déclarant ce type (P31) sont
+   *       la source du tirage (voir wikidataUrl). null = tirage purement
+   *       aléatoire, sans filtre Wikidata (voir wikiUrl).
    */
   const CATEGORIES = [
     { key: "random", label: "🎲 Aléatoire", qid: null },
@@ -62,8 +64,8 @@
 
   const WIKI_THUMB_PX = 1000; // suffisant pour un fond plein écran, même en DPR 3
 
-  // Tirage purement aléatoire (catégorie "random", sans arbre Wikidata) : on
-  // reste sur le générateur natif de Wikipédia, inchangé.
+  // Tirage purement aléatoire (catégorie "random", pas de filtre Wikidata) :
+  // on reste sur le générateur natif de Wikipédia, inchangé.
   function wikiUrl() {
     const params = new URLSearchParams({
       action: "query",
@@ -85,54 +87,82 @@
     return `https://${WIKI_LANG}.wikipedia.org/w/api.php?${params}`;
   }
 
-  const WIKIDATA_ENDPOINT = "https://query.wikidata.org/sparql";
   // Marge au-dessus des ~20 articles voulus par lot : normalizeWiki écarte les
   // extraits trop courts (< 120 caractères), et pas tous les titres tirés n'en
   // ont un assez long.
   const WIKIDATA_SAMPLE = 40;
 
-  /** URL de la requête SPARQL Wikidata : titres tirés au sort dans l'arbre
-   *  instance-of/subclass-of de la catégorie, restreints aux items ayant un
-   *  article Wikipédia dans WIKI_LANG.
+  /** URL de recherche Wikidata : items tirés au sort déclarant `P31` (nature
+   *  de l'élément) = le qid de la catégorie, restreints à ceux ayant un
+   *  article Wikipédia dans WIKI_LANG (`sitefilter`).
    *
-   *  `ORDER BY RAND() LIMIT N` plutôt que `SERVICE bd:sample` (échantillonnage
-   *  par réservoir, propre à Blazegraph) : ce dernier semble plus adapté en
-   *  théorie (pas besoin de trier tout l'arbre avant de piocher dedans), mais
-   *  sa syntaxe exacte n'a pas pu être vérifiée en direct depuis
-   *  l'environnement de développement (réseau sortant bloqué vers
-   *  query.wikidata.org) et provoquait un échec total. `ORDER BY RAND()` est
-   *  du SPARQL 1.1 standard, sans ambiguïté de syntaxe — au prix, sur un arbre
-   *  énorme (Q5, humain : des millions d'items), d'un risque réel de dépasser
-   *  le délai. Un tel dépassement n'échoue qu'UNE catégorie parmi celles
-   *  tirées pour un lot (voir fetchCategoryItems / Promise.allSettled côté
-   *  appelant) — dégradation, pas panne totale comme avec bd:sample cassé.
+   *  DEUX approches ont été essayées avant celle-ci, chacune cassée d'une
+   *  façon différente une fois en usage réel — SPARQL (`query.wikidata.org`)
+   *  n'a jamais pu être vérifié en direct depuis l'environnement de
+   *  développement (réseau sortant bloqué) :
+   *   1. `SERVICE bd:sample` (échantillonnage par réservoir, Blazegraph) :
+   *      syntaxe jamais vérifiable, échec total en usage réel (probablement
+   *      une requête malformée, indiscernable d'un simple timeout depuis les
+   *      messages d'erreur obtenus).
+   *   2. `wdt:P31/wdt:P279* + ORDER BY RAND()` (SPARQL 1.1 standard,
+   *      transitif sur les sous-classes) : syntaxe correcte, mais bien trop
+   *      lent en usage réel (>10s, y compris timeout sur certaines
+   *      catégories) — le chemin de propriété transitif, combiné au tri
+   *      complet avant LIMIT, n'a pas la performance qu'on lui prêtait pour
+   *      des classes larges.
+   *  Cette 3e version utilise le MÊME mécanisme déjà éprouvé pour Wikipédia
+   *  (`generator=search`, `gsrsort=random` — CirrusSearch, la même extension
+   *  MediaWiki, déployée à l'identique sur tous les wikis Wikimedia), avec le
+   *  mot-clé `haswbstatement` plutôt qu'une requête SPARQL : rapide (moteur de
+   *  recherche indexé, pas de graphe à parcourir), et syntaxiquement certain
+   *  puisqu'il s'agit du chemin déjà utilisé en production pour Wikipédia.
    *
-   *  Renvoie `null` pour "random", qui n'a pas d'arbre Wikidata (voir wikiUrl). */
+   *  Contrepartie ASSUMÉE : `haswbstatement:P31=…` ne filtre que les items
+   *  DIRECTEMENT typés ainsi, sans remonter les sous-classes (SPARQL le
+   *  permettait, en théorie). Pour des catégories concrètes (Jeux vidéo,
+   *  Films, Personnes historiques…) ça correspond déjà à l'essentiel des
+   *  articles. Pour des catégories plus abstraites (Œuvres littéraires,
+   *  Animaux, Histoire, Sciences, Art, Géographie, Mythologie…), le tirage
+   *  peut rester plus étroit/répétitif que souhaité — à affiner catégorie par
+   *  catégorie si besoin, une fois observé en usage réel plutôt que deviné.
+   *
+   *  Renvoie `null` pour "random", qui n'a pas de qid (voir wikiUrl). */
   function wikidataUrl(catKey) {
     const c = catByKey(catKey);
     if (!c.qid) return null;
-    const wiki = `https://${WIKI_LANG}.wikipedia.org/`;
-    // Préfixes déclarés explicitement : le service WDQS les prédéfinit pour
-    // l'éditeur web, mais rien ne garantit ça pour un appel HTTP direct comme
-    // celui-ci — autant ne pas en dépendre.
-    const query = `PREFIX wd: <http://www.wikidata.org/entity/>
-PREFIX wdt: <http://www.wikidata.org/prop/direct/>
-PREFIX schema: <http://schema.org/>
-SELECT ?title WHERE {
-  ?item wdt:P31/wdt:P279* wd:${c.qid} .
-  ?article schema:about ?item ;
-           schema:isPartOf <${wiki}> ;
-           schema:name ?title .
-}
-ORDER BY RAND()
-LIMIT ${WIKIDATA_SAMPLE}`;
-    return `${WIKIDATA_ENDPOINT}?format=json&query=${encodeURIComponent(query)}`;
+    const params = new URLSearchParams({
+      action: "query",
+      format: "json",
+      formatversion: "2",
+      origin: "*",
+      generator: "search",
+      gsrsearch: `haswbstatement:P31=${c.qid}`,
+      gsrnamespace: "0",
+      gsrsort: "random",
+      gsrlimit: String(WIKIDATA_SAMPLE),
+      prop: "sitelinks",
+      sitefilter: `${WIKI_LANG}wiki`,
+    });
+    return `https://www.wikidata.org/w/api.php?${params}`;
   }
 
-  /** Titres (dédoublonnés) extraits d'une réponse SPARQL JSON de wikidataUrl(). */
+  /** Titres (dédoublonnés) extraits d'une réponse de wikidataUrl() : le
+   *  sitelink WIKI_LANG de chaque item trouvé, quand il existe. */
   function normalizeWikidataTitles(data) {
-    const bindings = (data && data.results && data.results.bindings) || [];
-    const titles = bindings.map((b) => b.title && b.title.value).filter(Boolean);
+    const raw = data && data.query && data.query.pages ? data.query.pages : [];
+    const pages = Array.isArray(raw) ? raw : Object.values(raw);
+    const site = `${WIKI_LANG}wiki`;
+    const titles = pages
+      .map((p) => {
+        const links = p.sitelinks;
+        if (!links) return null;
+        // formatversion=2 renvoie un tableau ; l'ancien format, un objet indexé par site.
+        const link = Array.isArray(links)
+          ? links.find((s) => s.site === site)
+          : links[site];
+        return link && link.title;
+      })
+      .filter(Boolean);
     return Array.from(new Set(titles));
   }
 
@@ -181,9 +211,9 @@ LIMIT ${WIKIDATA_SAMPLE}`;
    *  délai) — c'est la SEULE différence entre les deux côtés, tout le reste
    *  (construction des URL, normalisation) est ici, en un seul exemplaire.
    *  - "random" : un aller simple vers le tirage aléatoire de Wikipédia.
-   *  - toute autre catégorie : Wikidata pour les titres (arbre de la
-   *    catégorie), puis Wikipédia pour l'extrait/l'image/le lien de ces
-   *    titres précis. C'est ce lien Wikipédia qu'ouvre « Découvrir ». */
+   *  - toute autre catégorie : Wikidata pour les titres (items typés par le
+   *    qid de la catégorie), puis Wikipédia pour l'extrait/l'image/le lien de
+   *    ces titres précis. C'est ce lien Wikipédia qu'ouvre « Découvrir ». */
   async function fetchCategoryItems(catKey, fetchJson) {
     const c = catByKey(catKey);
     if (!c.qid) return normalizeWiki(await fetchJson(wikiUrl()));

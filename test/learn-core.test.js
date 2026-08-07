@@ -26,32 +26,44 @@ test("wikiUrl (catégorie random) demande un thumbnail borné et un tirage aléa
   assert.ok(url.includes("generator=random"));
 });
 
-test("wikidataUrl construit une requête SPARQL sur l'identifiant Wikidata de la catégorie", () => {
+test("wikidataUrl cherche les items typés par le qid de la catégorie, triés au hasard", () => {
   const url = core.wikidataUrl("sciences");
-  assert.ok(url.startsWith("https://query.wikidata.org/sparql?"));
-  const query = decodeURIComponent(url.split("query=")[1]);
-  assert.ok(query.includes("wd:Q336"), "doit filtrer sur le qid de la catégorie");
-  assert.ok(query.includes("wdt:P31/wdt:P279*"), "arbre instance-of/subclass-of");
-  assert.ok(query.includes("ORDER BY RAND()"), "tirage aléatoire standard SPARQL 1.1");
-  assert.ok(query.includes("fr.wikipedia.org"));
+  assert.ok(url.startsWith("https://www.wikidata.org/w/api.php?"));
+  const params = new URL(url).searchParams;
+  assert.equal(params.get("generator"), "search");
+  assert.equal(params.get("gsrsearch"), "haswbstatement:P31=Q336");
+  assert.equal(params.get("gsrsort"), "random");
+  assert.equal(params.get("sitefilter"), "frwiki");
+  assert.equal(params.get("prop"), "sitelinks");
 });
 
-test("wikidataUrl renvoie null pour la catégorie random (pas d'arbre Wikidata)", () => {
+test("wikidataUrl renvoie null pour la catégorie random (pas de qid)", () => {
   assert.equal(core.wikidataUrl("random"), null);
 });
 
-test("normalizeWikidataTitles extrait et dédoublonne les titres d'une réponse SPARQL", () => {
+test("normalizeWikidataTitles extrait le sitelink frwiki et dédoublonne", () => {
   const data = {
-    results: {
-      bindings: [
-        { title: { value: "Effet tunnel" } },
-        { title: { value: "Tardigrade" } },
-        { title: { value: "Effet tunnel" } }, // doublon
-        {}, // binding sans titre : ignoré
+    query: {
+      pages: [
+        {
+          sitelinks: [
+            { site: "frwiki", title: "Effet tunnel" },
+            { site: "dewiki", title: "Tunneleffekt" },
+          ],
+        },
+        { sitelinks: [{ site: "frwiki", title: "Tardigrade" }] },
+        { sitelinks: [{ site: "frwiki", title: "Effet tunnel" }] }, // doublon
+        { sitelinks: [{ site: "dewiki", title: "Ohne frwiki" }] }, // pas de sitelink frwiki : ignoré
+        {}, // pas de sitelinks du tout : ignoré
       ],
     },
   };
   assert.deepEqual(core.normalizeWikidataTitles(data), ["Effet tunnel", "Tardigrade"]);
+});
+
+test("normalizeWikidataTitles accepte l'ancien format sitelinks indexé par site", () => {
+  const data = { query: { pages: [{ sitelinks: { frwiki: { title: "Tardigrade" } } }] } };
+  assert.deepEqual(core.normalizeWikidataTitles(data), ["Tardigrade"]);
 });
 
 test("normalizeWikidataTitles tolère une réponse vide ou mal formée", () => {
@@ -114,8 +126,10 @@ test("fetchCategoryItems (catégorie Wikidata) enchaîne Wikidata puis Wikipédi
   const calls = [];
   const fetchJson = async (url) => {
     calls.push(url);
-    if (url.includes("query.wikidata.org")) {
-      return { results: { bindings: [{ title: { value: "Tardigrade" } }] } };
+    if (url.includes("www.wikidata.org")) {
+      return {
+        query: { pages: [{ sitelinks: [{ site: "frwiki", title: "Tardigrade" }] }] },
+      };
     }
     return {
       query: { pages: [{ title: "Tardigrade", extract: "z".repeat(130) }] },
@@ -123,7 +137,7 @@ test("fetchCategoryItems (catégorie Wikidata) enchaîne Wikidata puis Wikipédi
   };
   const out = await core.fetchCategoryItems("sciences", fetchJson);
   assert.equal(calls.length, 2);
-  assert.ok(calls[0].includes("query.wikidata.org"));
+  assert.ok(calls[0].includes("www.wikidata.org"));
   assert.ok(calls[1].includes("fr.wikipedia.org"));
   assert.ok(decodeURIComponent(calls[1]).includes("titles=Tardigrade"));
   assert.equal(out.length, 1);
@@ -132,7 +146,7 @@ test("fetchCategoryItems (catégorie Wikidata) enchaîne Wikidata puis Wikipédi
 
 test("fetchCategoryItems renvoie une liste vide si Wikidata ne trouve aucun titre", async () => {
   const fetchJson = async (url) => {
-    if (url.includes("query.wikidata.org")) return { results: { bindings: [] } };
+    if (url.includes("www.wikidata.org")) return { query: { pages: [] } };
     throw new Error("ne devrait pas être appelé sans titre");
   };
   const out = await core.fetchCategoryItems("sciences", fetchJson);
