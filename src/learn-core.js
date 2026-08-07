@@ -93,12 +93,21 @@
 
   /** URL de la requête SPARQL Wikidata : titres tirés au sort dans l'arbre
    *  instance-of/subclass-of de la catégorie, restreints aux items ayant un
-   *  article Wikipédia dans WIKI_LANG. `SERVICE bd:sample` (échantillonnage
-   *  par réservoir, propre à Blazegraph/WDQS) évite l'`ORDER BY RAND()`, qui
-   *  matérialiserait et trierait TOUT l'arbre avant de piocher dedans — sur
-   *  une classe comme Q5 (humain, des millions d'items), c'est le seul moyen
-   *  de rester sous le délai du service. Renvoie `null` pour "random", qui n'a
-   *  pas d'arbre Wikidata (voir wikiUrl). */
+   *  article Wikipédia dans WIKI_LANG.
+   *
+   *  `ORDER BY RAND() LIMIT N` plutôt que `SERVICE bd:sample` (échantillonnage
+   *  par réservoir, propre à Blazegraph) : ce dernier semble plus adapté en
+   *  théorie (pas besoin de trier tout l'arbre avant de piocher dedans), mais
+   *  sa syntaxe exacte n'a pas pu être vérifiée en direct depuis
+   *  l'environnement de développement (réseau sortant bloqué vers
+   *  query.wikidata.org) et provoquait un échec total. `ORDER BY RAND()` est
+   *  du SPARQL 1.1 standard, sans ambiguïté de syntaxe — au prix, sur un arbre
+   *  énorme (Q5, humain : des millions d'items), d'un risque réel de dépasser
+   *  le délai. Un tel dépassement n'échoue qu'UNE catégorie parmi celles
+   *  tirées pour un lot (voir fetchCategoryItems / Promise.allSettled côté
+   *  appelant) — dégradation, pas panne totale comme avec bd:sample cassé.
+   *
+   *  Renvoie `null` pour "random", qui n'a pas d'arbre Wikidata (voir wikiUrl). */
   function wikidataUrl(catKey) {
     const c = catByKey(catKey);
     if (!c.qid) return null;
@@ -108,21 +117,15 @@
     // celui-ci — autant ne pas en dépendre.
     const query = `PREFIX wd: <http://www.wikidata.org/entity/>
 PREFIX wdt: <http://www.wikidata.org/prop/direct/>
-PREFIX bd: <http://www.bigdata.com/rdf#>
 PREFIX schema: <http://schema.org/>
 SELECT ?title WHERE {
-  SERVICE bd:sample {
-    ?item bd:sample.sampleSize ${WIKIDATA_SAMPLE} ;
-          bd:sample.sampleType "RANDOM" .
-    {
-      SELECT ?item WHERE {
-        ?item wdt:P31/wdt:P279* wd:${c.qid} .
-        ?a0 schema:about ?item ; schema:isPartOf <${wiki}> .
-      }
-    }
-  }
-  ?article schema:about ?item ; schema:isPartOf <${wiki}> ; schema:name ?title .
-}`;
+  ?item wdt:P31/wdt:P279* wd:${c.qid} .
+  ?article schema:about ?item ;
+           schema:isPartOf <${wiki}> ;
+           schema:name ?title .
+}
+ORDER BY RAND()
+LIMIT ${WIKIDATA_SAMPLE}`;
     return `${WIKIDATA_ENDPOINT}?format=json&query=${encodeURIComponent(query)}`;
   }
 

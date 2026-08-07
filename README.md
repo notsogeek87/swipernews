@@ -88,9 +88,11 @@ Le tirage et le contenu affichés viennent de deux sources différentes :
 - **Wikidata** choisit QUELS articles apparaissent : chaque catégorie est un identifiant
   Wikidata (`Q…`) racine, et une requête SPARQL (`query.wikidata.org/sparql`) tire au sort
   des titres dans son arbre instance-of/subclass-of (`wdt:P31/wdt:P279*`), via
-  `SERVICE bd:sample` (échantillonnage par réservoir — un `ORDER BY RAND()` matérialiserait
-  et trierait tout l'arbre, ingérable sur une classe comme « humain »). Seule la catégorie
-  **Aléatoire** y échappe : tirage direct sur Wikipédia (`generator=random`), sans arbre.
+  `ORDER BY RAND() LIMIT …` (SPARQL 1.1 standard). Sur un arbre énorme (Q5, humain : des
+  millions d'items), ça peut dépasser le délai — dans ce cas, seule CETTE catégorie échoue
+  pour le lot en cours (voir `Promise.allSettled` dans `fetchLearnClient`/`api/learn.js`),
+  pas le fil entier. Seule la catégorie **Aléatoire** échappe à Wikidata : tirage direct sur
+  Wikipédia (`generator=random`), sans arbre.
 - **Wikipédia** fournit le CONTENU affiché — extrait d'intro, image, lien — pour les titres
   que Wikidata vient de tirer (`action=query`, titres explicites, pas de recherche). C'est ce
   lien Wikipédia que « Découvrir » ouvre, quelle que soit la catégorie.

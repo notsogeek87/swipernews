@@ -32,10 +32,7 @@ test("wikidataUrl construit une requête SPARQL sur l'identifiant Wikidata de la
   const query = decodeURIComponent(url.split("query=")[1]);
   assert.ok(query.includes("wd:Q336"), "doit filtrer sur le qid de la catégorie");
   assert.ok(query.includes("wdt:P31/wdt:P279*"), "arbre instance-of/subclass-of");
-  assert.ok(
-    query.includes("bd:sample"),
-    "échantillonnage aléatoire côté serveur, pas ORDER BY RAND()"
-  );
+  assert.ok(query.includes("ORDER BY RAND()"), "tirage aléatoire standard SPARQL 1.1");
   assert.ok(query.includes("fr.wikipedia.org"));
 });
 

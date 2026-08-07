@@ -565,8 +565,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=63"></script>
-<script src="src/learn-core.js?v=63"></script>
+<script src="src/lib.js?v=64"></script>
+<script src="src/learn-core.js?v=64"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -838,7 +838,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="63";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="64";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikidata et Wikipédia s'appellent déjà en
@@ -1157,8 +1157,17 @@ function findImage(node,raw){
    catégorie) puis Wikipédia (extrait/image/lien — le lien qu'ouvre « Découvrir »). */
 async function learnFetchJson(url){
   try{const res=await fetchWithTimeout(url,{cache:"no-store"},CONFIG.FETCH_TIMEOUT);
-    if(!res.ok)throw new Error("http");return await res.json();}
-  catch(e){warn("wikidata/wikipedia direct",e);return JSON.parse(await fetchText(url));}
+    if(!res.ok)throw new Error("http "+res.status);return await res.json();}
+  catch(e){
+    warn("wikidata/wikipedia direct",e);
+    // Repli par proxy : au-delà, "no-proxy" ne dit RIEN d'utile (voir
+    // fetchText) — on garde donc la raison du tout premier essai (direct),
+    // le plus révélateur (statut HTTP, ou timeout si AbortError), pour le
+    // panneau ?debug=1 (voir lastLearnFailures dans fetchLearnClient).
+    const direct=e&&e.name==="AbortError"?"timeout":(e&&e.message)||String(e);
+    try{return JSON.parse(await fetchText(url));}
+    catch(e2){throw new Error(`${direct} (direct) / ${(e2&&e2.message)||e2} (proxy)`);}
+  }
 }
 async function srcWikipedia(catKey){
   return LEARN.fetchCategoryItems(catKey,learnFetchJson);
