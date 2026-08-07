@@ -565,8 +565,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=67"></script>
-<script src="src/learn-core.js?v=67"></script>
+<script src="src/lib.js?v=68"></script>
+<script src="src/learn-core.js?v=68"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -575,7 +575,7 @@
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
   const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds"],
-              SwiperLearn:["CATEGORIES","wikiUrl","wikidataUrl","normalizeWiki","fetchCategoryItems","randomBucket"]};
+              SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","fetchCategoryItems","randomBucket"]};
   const missing=[];
   for(const ns in need){
     const mod=self[ns];
@@ -838,11 +838,11 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="67";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="68";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
-// news.lielu.eu pour les données) : Wikidata et Wikipédia s'appellent déjà en
-// direct dans un navigateur (CORS ouvert chez eux, voir srcWikipedia), et
+// news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
+// navigateur (CORS ouvert chez eux, voir srcWikipedia), et
 // seuls les flux RSS (pas de CORS chez eux) ont besoin d'un contournement —
 // géré par nativeGet ci-dessous, qui appelle explicitement le plugin
 // CapacitorHttp (réseau natif Android, aucun CORS) SEULEMENT pour ce cas. Sans
@@ -1149,17 +1149,18 @@ function findImage(node,raw){
 }
 // relTime : voir src/lib.js
 
-/* ---------- Mode Apprendre : contenu Wikidata + Wikipédia ----------
+/* ---------- Mode Apprendre : contenu Wikipédia filtré par Wikidata ----------
    URL et normaliseurs viennent de src/learn-core.js : une seule implémentation,
    partagée avec /api/learn (elles avaient divergé). Ici on ne garde que la
    politique de récupération propre au navigateur (direct si CORS, sinon proxy),
-   injectée dans LEARN.fetchCategoryItems qui enchaîne Wikidata (titres de la
-   catégorie) puis Wikipédia (extrait/image/lien — le lien qu'ouvre « Découvrir »). */
+   injectée dans LEARN.fetchCategoryItems (un seul appel Wikipédia, filtré par
+   `haswbstatement:P31=…` — le lien affiché et ouvert par « Découvrir » est
+   donc toujours celui de l'article lui-même). */
 async function learnFetchJson(url){
   try{const res=await fetchWithTimeout(url,{cache:"no-store"},CONFIG.FETCH_TIMEOUT);
     if(!res.ok)throw new Error("http "+res.status);return await res.json();}
   catch(e){
-    warn("wikidata/wikipedia direct",e);
+    warn("wikipedia direct",e);
     // Repli par proxy : au-delà, "no-proxy" ne dit RIEN d'utile (voir
     // fetchText) — on garde donc la raison du tout premier essai (direct),
     // le plus révélateur (statut HTTP, ou timeout si AbortError), pour le

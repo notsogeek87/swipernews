@@ -83,23 +83,31 @@ mémorisé et chaque catégorie a son propre cache.
 
 ### Source du mode Apprendre
 
-Le tirage et le contenu affichés viennent de deux sources différentes :
+Le fil s'appuie sur **Wikipédia** pour tout — extrait d'intro, image, lien (celui que
+« Découvrir » ouvre) — mais **Wikidata choisit quels articles apparaissent** : chaque
+catégorie est un identifiant Wikidata (`Q…`), et la recherche Wikipédia elle-même
+(`generator=search`, `gsrsearch=haswbstatement:P31=…`, `gsrsort=random` — CirrusSearch,
+comme pour Wikipédia) ne retient que les articles dont l'item Wikidata associé déclare ce
+qid comme nature (`P31`). Un seul appel réseau, à Wikipédia uniquement — jamais à
+`wikidata.org`. Seule la catégorie **Aléatoire** ignore ce filtre : tirage direct
+(`generator=random`).
 
-- **Wikidata** choisit QUELS articles apparaissent : chaque catégorie est un identifiant
-  Wikidata (`Q…`), et une recherche (`www.wikidata.org/w/api.php`, `generator=search`,
-  `gsrsearch=haswbstatement:P31=…`, `gsrsort=random`) tire au sort des items déclarant ce
-  qid comme nature (`P31`). Même mécanisme que pour Wikipédia (CirrusSearch, `gsrsort=random`)
-  plutôt qu'une requête SPARQL sur `query.wikidata.org` : deux approches SPARQL ont été
-  essayées d'abord (`SERVICE bd:sample`, puis `wdt:P31/wdt:P279* + ORDER BY RAND()`) et
-  cassées chacune à sa façon en usage réel — la seconde, syntaxiquement correcte, dépassait
-  simplement le délai sur les catégories les plus larges. Contrepartie assumée : la recherche
-  ne filtre que les items DIRECTEMENT typés par le qid, sans remonter les sous-classes (voir
-  le détail catégorie par catégorie dans `wikidataUrl()`, `src/learn-core.js`). Seule la
-  catégorie **Aléatoire** échappe à Wikidata : tirage direct sur Wikipédia
-  (`generator=random`), sans filtre.
-- **Wikipédia** fournit le CONTENU affiché — extrait d'intro, image, lien — pour les titres
-  que Wikidata vient de tirer (`action=query`, titres explicites, pas de recherche). C'est ce
-  lien Wikipédia que « Découvrir » ouvre, quelle que soit la catégorie.
+Cette conception est la 4e essayée ; les trois précédentes ont chacune cassé différemment en
+usage réel (détaillé dans `wikiUrl()`, `src/learn-core.js`) : une requête SPARQL
+(`SERVICE bd:sample`) à la syntaxe jamais vérifiable faute d'accès réseau en développement,
+puis une version SPARQL standard (`wdt:P31/wdt:P279* + ORDER BY RAND()`) correcte mais trop
+lente sur les classes larges, puis une recherche Wikidata suivie d'un second appel Wikipédia
+pour les sitelinks trouvés — rapide, mais un échantillon de 40 items pris AVANT de savoir
+lesquels ont un article Wikipédia tombait couramment sur zéro pour les classes énormes (`Q5`,
+humain : environ 30 millions d'items sur Wikidata, dont l'immense majorité sans le moindre
+article, provenant d'imports de bases d'autorité). Chercher directement sur Wikipédia élimine
+ce problème plutôt que de le contourner.
+
+Contrepartie assumée : `haswbstatement:P31=…` ne filtre que les items DIRECTEMENT typés par
+le qid, sans remonter les sous-classes. Certaines catégories ont donc un `qid` principal
+complété par des `extraQids` (même fichier) — ex. Animaux accepte aussi le P31 « taxon », la
+plupart des articles animaliers étant des espèces plutôt que des instances directes
+d'« animal ». Affiné catégorie par catégorie selon l'usage réel, pas deviné à l'avance.
 
 Le tout en français par défaut. Quand plusieurs catégories sont interrogées pour un même lot
 (mode « Tous »), les résultats sont dédoublonnés et mélangés (les cartes avec image d'abord).
@@ -924,7 +932,7 @@ ouvrir la demande d'inclusion sur `gitlab.com/fdroid/fdroiddata`.
   pointe vers la version pleine taille. Appelé uniquement si l'image du flux est
   réellement petite, résultat mémorisé côté client et mis en cache 24 h par le CDN.
 - **Mode Apprendre** : `api/learn.js` agrège **côté serveur** les catégories demandées
-  (Wikidata pour les titres, Wikipédia pour le contenu — cache CDN mutualisé entre
+  (Wikipédia, filtré par le P31 Wikidata de chaque article — cache CDN mutualisé entre
   utilisateurs). Le front l'appelle en priorité et se rabat sur son agrégation client si
   l'endpoint n'est pas déployé (hébergement statique).
 - **Code partagé** : `src/lib.js` (fonctions pures : assainissement, parsing OPML/JSON,

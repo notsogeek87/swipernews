@@ -5,13 +5,34 @@
 // déjà divergé (12 catégories côté front, 11 côté serveur ; deux parseurs
 // Gallica différents). Tout est ici, en un seul exemplaire.
 //
-// Le fil défilable vient de **Wikidata** (items déclarant `P31` = l'identifiant
-// Q de la catégorie), pas de la recherche plein texte de Wikipédia : les
-// catégories Wikipédia (« deepcategory ») dérivaient trop facilement hors
-// sujet. Wikidata ne sert que la LISTE des titres ; l'extrait, l'image et le
-// lien affichés (et ouverts par « Découvrir ») restent ceux de Wikipédia —
-// deux appels enchaînés, voir fetchCategoryItems. Voir wikidataUrl() pour
-// l'historique des deux approches SPARQL essayées avant celle-ci (cassées).
+// Le fil défilable est choisi par **Wikidata** : chaque catégorie est un
+// identifiant Q, et seuls les articles Wikipédia dont l'item Wikidata déclare
+// ce type (`P31`) apparaissent — les catégories Wikipédia (« deepcategory »)
+// dérivaient trop facilement hors sujet. Contenu affiché (extrait, image,
+// lien — celui qu'ouvre « Découvrir ») et filtrage Wikidata viennent d'UN SEUL
+// appel à l'API Wikipédia (voir wikiUrl) : la recherche plein texte de
+// Wikipédia comprend le mot-clé `haswbstatement`, qui interroge directement le
+// P31 de l'item Wikidata associé à chaque page. Pas d'appel séparé à
+// wikidata.org.
+//
+// Cette conception est la 4e essayée, les trois précédentes ayant chacune
+// cassé différemment en usage réel (voir le détail dans wikiUrl) :
+//  1. SPARQL + SERVICE bd:sample (query.wikidata.org) — jamais vérifiable en
+//     direct depuis l'environnement de développement (réseau sortant bloqué),
+//     échec total.
+//  2. SPARQL + wdt:P31/wdt:P279* + ORDER BY RAND() — syntaxe correcte, mais
+//     bien trop lent (>10s, timeouts) sur les classes larges.
+//  3. Recherche Wikidata (haswbstatement) PUIS sitelinks vers Wikipédia, en
+//     deux appels — rapide, mais échantillonne 40 items AVANT de savoir
+//     lesquels ont un article Wikipédia. Sur une classe énorme comme Q5
+//     (humain, ~30M d'items sur Wikidata, dont l'immense majorité sans le
+//     moindre article — imports d'autorité, bases généalogiques…), un
+//     échantillon de 40 tombe couramment sur zéro item ayant un sitelink
+//     frwiki. Confirmé en usage réel : "40 item(s) trouvé(s), aucun avec
+//     sitelink frwiki".
+// Chercher directement SUR Wikipédia avec le même mot-clé élimine le
+// problème plutôt que de le contourner : un résultat de recherche Wikipédia
+// EST déjà un article Wikipédia, la question ne se pose plus.
 //
 // Chargé en <script src> classique dans index.html (l'app reste ouvrable en
 // file://) et en require() côté Node.
@@ -28,18 +49,18 @@
 
   /**
    * Source unique de vérité des centres d'intérêt.
-   * qid : identifiant Wikidata (Q…) — les items déclarant ce type (P31) sont
-   *       la source du tirage (voir wikidataUrl). null = tirage purement
-   *       aléatoire, sans filtre Wikidata (voir wikiUrl).
+   * qid : identifiant Wikidata (Q…) — seuls les articles dont l'item associé
+   *       déclare ce type (P31) apparaissent (voir wikiUrl). null = tirage
+   *       purement aléatoire, sans filtre.
    * extraQids : identifiants supplémentaires acceptés en P31, OR-combinés au
    *       principal. `haswbstatement:P31=…` ne filtre QUE les items
-   *       directement typés ainsi (voir wikidataUrl) : pour certaines
-   *       catégories, la plupart des articles Wikipédia concernés ne sont PAS
+   *       directement typés ainsi, sans remonter les sous-classes : pour
+   *       certaines catégories, la plupart des articles concernés ne sont PAS
    *       P31 direct du concept général — ex. la plupart des livres sont P31
    *       "roman", pas P31 "œuvre littéraire" ; la plupart des articles
    *       animaliers sont P31 "taxon" (espèce), pas P31 "animal". Constaté en
    *       usage réel (catégorie vide malgré une recherche qui répond), pas
-   *       deviné à l'avance — SI une autre catégorie s'avère trop
+   *       deviné à l'avance — si une autre catégorie s'avère trop
    *       étroite/répétitive, c'est le même correctif : trouver le(s) P31 le
    *       plus fréquent des articles concernés et l'ajouter ici.
    */
@@ -82,121 +103,19 @@
   /* ---------- Construction des URL ---------- */
 
   const WIKI_THUMB_PX = 1000; // suffisant pour un fond plein écran, même en DPR 3
-
-  // Tirage purement aléatoire (catégorie "random", pas de filtre Wikidata) :
-  // on reste sur le générateur natif de Wikipédia, inchangé.
-  function wikiUrl() {
-    const params = new URLSearchParams({
-      action: "query",
-      format: "json",
-      formatversion: "2",
-      origin: "*",
-      prop: "extracts|pageimages|info",
-      explaintext: "1",
-      exintro: "1",
-      exlimit: "20",
-      piprop: "thumbnail",
-      pithumbsize: String(WIKI_THUMB_PX),
-      pilimit: "20",
-      inprop: "url",
-      generator: "random",
-      grnnamespace: "0",
-      grnlimit: "20",
-    });
-    return `https://${WIKI_LANG}.wikipedia.org/w/api.php?${params}`;
-  }
-
   // Marge au-dessus des ~20 articles voulus par lot : normalizeWiki écarte les
-  // extraits trop courts (< 120 caractères), et pas tous les titres tirés n'en
+  // extraits trop courts (< 120 caractères), et pas tous les résultats n'en
   // ont un assez long.
-  const WIKIDATA_SAMPLE = 40;
+  const WIKI_CATEGORY_LIMIT = 30;
 
-  /** URL de recherche Wikidata : items tirés au sort déclarant `P31` (nature
-   *  de l'élément) = le qid de la catégorie, restreints à ceux ayant un
-   *  article Wikipédia dans WIKI_LANG (`sitefilter`).
-   *
-   *  DEUX approches ont été essayées avant celle-ci, chacune cassée d'une
-   *  façon différente une fois en usage réel — SPARQL (`query.wikidata.org`)
-   *  n'a jamais pu être vérifié en direct depuis l'environnement de
-   *  développement (réseau sortant bloqué) :
-   *   1. `SERVICE bd:sample` (échantillonnage par réservoir, Blazegraph) :
-   *      syntaxe jamais vérifiable, échec total en usage réel (probablement
-   *      une requête malformée, indiscernable d'un simple timeout depuis les
-   *      messages d'erreur obtenus).
-   *   2. `wdt:P31/wdt:P279* + ORDER BY RAND()` (SPARQL 1.1 standard,
-   *      transitif sur les sous-classes) : syntaxe correcte, mais bien trop
-   *      lent en usage réel (>10s, y compris timeout sur certaines
-   *      catégories) — le chemin de propriété transitif, combiné au tri
-   *      complet avant LIMIT, n'a pas la performance qu'on lui prêtait pour
-   *      des classes larges.
-   *  Cette 3e version utilise le MÊME mécanisme déjà éprouvé pour Wikipédia
-   *  (`generator=search`, `gsrsort=random` — CirrusSearch, la même extension
-   *  MediaWiki, déployée à l'identique sur tous les wikis Wikimedia), avec le
-   *  mot-clé `haswbstatement` plutôt qu'une requête SPARQL : rapide (moteur de
-   *  recherche indexé, pas de graphe à parcourir), et syntaxiquement certain
-   *  puisqu'il s'agit du chemin déjà utilisé en production pour Wikipédia.
-   *
-   *  Contrepartie ASSUMÉE : `haswbstatement:P31=…` ne filtre que les items
-   *  DIRECTEMENT typés ainsi, sans remonter les sous-classes (SPARQL le
-   *  permettait, en théorie). Pour des catégories concrètes (Jeux vidéo,
-   *  Films, Personnes historiques… confirmé en usage réel pour Sport, qui
-   *  répond vite et correctement) ça correspond déjà à l'essentiel des
-   *  articles. Pour d'autres, un seul P31 direct s'est avéré quasi VIDE en
-   *  usage réel (Animaux : "empty", zéro article malgré une recherche qui
-   *  répondait) — `extraQids` (voir CATEGORIES) ajoute alors le(s) P31 le
-   *  plus fréquent des articles réellement concernés, constaté plutôt que
-   *  deviné à l'avance. Les catégories qui n'en ont pas encore mais
-   *  s'avéreraient trop étroites/répétitives (Histoire, Sciences, Art,
-   *  Géographie…) suivent le même correctif le jour où c'est observé.
-   *
-   *  Renvoie `null` pour "random", qui n'a pas de qid (voir wikiUrl). */
-  function wikidataUrl(catKey) {
+  /** URL Wikipédia : extrait d'intro + image + lien, pour un tirage aléatoire
+   *  (catégorie "random", `generator=random`) ou filtré par catégorie
+   *  (`generator=search`, mot-clé `haswbstatement:P31=…` — le P31 de l'item
+   *  Wikidata associé à chaque page, voir CATEGORIES). Un seul appel dans les
+   *  deux cas : voir l'en-tête du fichier pour l'historique des 3 approches
+   *  précédentes, cassées chacune différemment. */
+  function wikiUrl(catKey) {
     const c = catByKey(catKey);
-    if (!c.qid) return null;
-    // OR-combine qid + extraQids (voir leur doc sur CATEGORIES) : CirrusSearch,
-    // comme sur Wikipédia, accepte "OR" entre mots-clés de recherche.
-    const gsrsearch = [c.qid, ...(c.extraQids || [])]
-      .map((q) => `haswbstatement:P31=${q}`)
-      .join(" OR ");
-    const params = new URLSearchParams({
-      action: "query",
-      format: "json",
-      formatversion: "2",
-      origin: "*",
-      generator: "search",
-      gsrsearch,
-      gsrnamespace: "0",
-      gsrsort: "random",
-      gsrlimit: String(WIKIDATA_SAMPLE),
-      prop: "sitelinks",
-      sitefilter: `${WIKI_LANG}wiki`,
-    });
-    return `https://www.wikidata.org/w/api.php?${params}`;
-  }
-
-  /** Titres (dédoublonnés) extraits d'une réponse de wikidataUrl() : le
-   *  sitelink WIKI_LANG de chaque item trouvé, quand il existe. */
-  function normalizeWikidataTitles(data) {
-    const raw = data && data.query && data.query.pages ? data.query.pages : [];
-    const pages = Array.isArray(raw) ? raw : Object.values(raw);
-    const site = `${WIKI_LANG}wiki`;
-    const titles = pages
-      .map((p) => {
-        const links = p.sitelinks;
-        if (!links) return null;
-        // formatversion=2 renvoie un tableau ; l'ancien format, un objet indexé par site.
-        const link = Array.isArray(links)
-          ? links.find((s) => s.site === site)
-          : links[site];
-        return link && link.title;
-      })
-      .filter(Boolean);
-    return Array.from(new Set(titles));
-  }
-
-  /** URL Wikipédia pour récupérer extrait + image + lien d'une LISTE de titres
-   *  précise (pas une recherche) : c'est l'étape 2, après wikidataUrl(). */
-  function wikipediaTitlesUrl(titles) {
     const params = new URLSearchParams({
       action: "query",
       format: "json",
@@ -208,9 +127,22 @@
       piprop: "thumbnail",
       pithumbsize: String(WIKI_THUMB_PX),
       inprop: "url",
-      redirects: "1",
-      titles: titles.join("|"),
     });
+    if (c.qid) {
+      // OR-combine qid + extraQids (voir leur doc sur CATEGORIES).
+      const gsrsearch = [c.qid, ...(c.extraQids || [])]
+        .map((q) => `haswbstatement:P31=${q}`)
+        .join(" OR ");
+      params.set("generator", "search");
+      params.set("gsrsearch", gsrsearch);
+      params.set("gsrnamespace", "0");
+      params.set("gsrsort", "random");
+      params.set("gsrlimit", String(WIKI_CATEGORY_LIMIT));
+    } else {
+      params.set("generator", "random");
+      params.set("grnnamespace", "0");
+      params.set("grnlimit", "20");
+    }
     return `https://${WIKI_LANG}.wikipedia.org/w/api.php?${params}`;
   }
 
@@ -237,35 +169,9 @@
   /** Articles d'une catégorie, prêts pour dedupAndRank. `fetchJson` est fourni
    *  par l'appelant (navigateur : direct + repli proxy ; serveur : fetch avec
    *  délai) — c'est la SEULE différence entre les deux côtés, tout le reste
-   *  (construction des URL, normalisation) est ici, en un seul exemplaire.
-   *  - "random" : un aller simple vers le tirage aléatoire de Wikipédia.
-   *  - toute autre catégorie : Wikidata pour les titres (items typés par le
-   *    qid de la catégorie), puis Wikipédia pour l'extrait/l'image/le lien de
-   *    ces titres précis. C'est ce lien Wikipédia qu'ouvre « Découvrir ». */
+   *  (construction de l'URL, normalisation) est ici, en un seul exemplaire. */
   async function fetchCategoryItems(catKey, fetchJson) {
-    const c = catByKey(catKey);
-    if (!c.qid) return normalizeWiki(await fetchJson(wikiUrl()));
-    const wdData = await fetchJson(wikidataUrl(catKey));
-    const titles = normalizeWikidataTitles(wdData);
-    if (!titles.length) {
-      // Diagnostic : sans ça, "Wikidata n'a rien trouvé pour ce P31" et
-      // "Wikidata a répondu une erreur qu'on avalait en silence" se
-      // ressemblaient à l'écran (liste vide) — indiscernables sans jeter un
-      // œil au JSON brut à la main. On lève ici plutôt que de renvoyer []
-      // pour que ce soit visible dans lastLearnDetail (voir index.html).
-      const pages =
-        wdData && wdData.query && Array.isArray(wdData.query.pages)
-          ? wdData.query.pages
-          : null;
-      const err = wdData && wdData.error;
-      const detail = err
-        ? `erreur wikidata : ${err.code || ""} ${err.info || JSON.stringify(err)}`.trim()
-        : pages
-          ? `${pages.length} item(s) trouvé(s), aucun avec sitelink ${WIKI_LANG}wiki`
-          : "réponse wikidata inattendue (pas de query.pages)";
-      throw new Error(`wikidata 0 titre — ${detail}`);
-    }
-    return normalizeWiki(await fetchJson(wikipediaTitlesUrl(titles)));
+    return normalizeWiki(await fetchJson(wikiUrl(catKey)));
   }
 
   /**
@@ -286,9 +192,6 @@
     catByKey,
     catLabel,
     wikiUrl,
-    wikidataUrl,
-    normalizeWikidataTitles,
-    wikipediaTitlesUrl,
     normalizeWiki,
     fetchCategoryItems,
     dedupAndRank: lib.dedupAndRank,

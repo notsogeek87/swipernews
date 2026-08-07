@@ -19,75 +19,32 @@ test("chaque catégorie a un identifiant Wikidata, sauf l'aléatoire", () => {
 });
 
 test("wikiUrl (catégorie random) demande un thumbnail borné et un tirage aléatoire", () => {
-  const url = core.wikiUrl();
+  const url = core.wikiUrl("random");
+  assert.ok(url.includes("fr.wikipedia.org/w/api.php"));
   assert.ok(url.includes("piprop=thumbnail"));
   assert.ok(!url.includes("original"), "l'original Commons pèse plusieurs Mo");
   assert.ok(url.includes(`pithumbsize=${core.WIKI_THUMB_PX}`));
   assert.ok(url.includes("generator=random"));
+  assert.ok(!url.includes("gsrsearch"));
 });
 
-test("wikidataUrl cherche les items typés par le qid de la catégorie, triés au hasard", () => {
-  const url = core.wikidataUrl("sciences");
-  assert.ok(url.startsWith("https://www.wikidata.org/w/api.php?"));
+test("wikiUrl (catégorie Wikidata) cherche par haswbstatement, triés au hasard", () => {
+  const url = core.wikiUrl("sciences");
+  assert.ok(url.includes("fr.wikipedia.org/w/api.php"));
   const params = new URL(url).searchParams;
   assert.equal(params.get("generator"), "search");
   assert.equal(params.get("gsrsearch"), "haswbstatement:P31=Q336");
   assert.equal(params.get("gsrsort"), "random");
-  assert.equal(params.get("sitefilter"), "frwiki");
-  assert.equal(params.get("prop"), "sitelinks");
+  assert.ok(!url.includes("generator=random"));
 });
 
-test("wikidataUrl renvoie null pour la catégorie random (pas de qid)", () => {
-  assert.equal(core.wikidataUrl("random"), null);
-});
-
-test("wikidataUrl OR-combine qid et extraQids quand la catégorie en a", () => {
-  const url = core.wikidataUrl("animaux");
+test("wikiUrl OR-combine qid et extraQids quand la catégorie en a", () => {
+  const url = core.wikiUrl("animaux");
   const params = new URL(url).searchParams;
   assert.equal(
     params.get("gsrsearch"),
     "haswbstatement:P31=Q729 OR haswbstatement:P31=Q16521"
   );
-});
-
-test("normalizeWikidataTitles extrait le sitelink frwiki et dédoublonne", () => {
-  const data = {
-    query: {
-      pages: [
-        {
-          sitelinks: [
-            { site: "frwiki", title: "Effet tunnel" },
-            { site: "dewiki", title: "Tunneleffekt" },
-          ],
-        },
-        { sitelinks: [{ site: "frwiki", title: "Tardigrade" }] },
-        { sitelinks: [{ site: "frwiki", title: "Effet tunnel" }] }, // doublon
-        { sitelinks: [{ site: "dewiki", title: "Ohne frwiki" }] }, // pas de sitelink frwiki : ignoré
-        {}, // pas de sitelinks du tout : ignoré
-      ],
-    },
-  };
-  assert.deepEqual(core.normalizeWikidataTitles(data), ["Effet tunnel", "Tardigrade"]);
-});
-
-test("normalizeWikidataTitles accepte l'ancien format sitelinks indexé par site", () => {
-  const data = { query: { pages: [{ sitelinks: { frwiki: { title: "Tardigrade" } } }] } };
-  assert.deepEqual(core.normalizeWikidataTitles(data), ["Tardigrade"]);
-});
-
-test("normalizeWikidataTitles tolère une réponse vide ou mal formée", () => {
-  assert.deepEqual(core.normalizeWikidataTitles({}), []);
-  assert.deepEqual(core.normalizeWikidataTitles(null), []);
-});
-
-test("wikipediaTitlesUrl interroge des titres précis, pas une recherche", () => {
-  const url = core.wikipediaTitlesUrl(["Effet tunnel", "Tardigrade"]);
-  assert.ok(url.includes("fr.wikipedia.org/w/api.php"));
-  assert.ok(url.includes("piprop=thumbnail"));
-  assert.ok(!url.includes("generator="));
-  assert.ok(!url.includes("gsrsearch"));
-  const params = new URL(url).searchParams;
-  assert.equal(params.get("titles"), "Effet tunnel|Tardigrade");
 });
 
 test("normalizeWiki préfère le thumbnail et écarte les extraits trop courts", () => {
@@ -131,62 +88,26 @@ test("fetchCategoryItems (catégorie random) fait un seul aller Wikipédia", asy
   assert.equal(out.length, 1);
 });
 
-test("fetchCategoryItems (catégorie Wikidata) enchaîne Wikidata puis Wikipédia", async () => {
+test("fetchCategoryItems (catégorie Wikidata) fait aussi un seul aller Wikipédia, filtré", async () => {
   const calls = [];
   const fetchJson = async (url) => {
     calls.push(url);
-    if (url.includes("www.wikidata.org")) {
-      return {
-        query: { pages: [{ sitelinks: [{ site: "frwiki", title: "Tardigrade" }] }] },
-      };
-    }
     return {
       query: { pages: [{ title: "Tardigrade", extract: "z".repeat(130) }] },
     };
   };
   const out = await core.fetchCategoryItems("sciences", fetchJson);
-  assert.equal(calls.length, 2);
-  assert.ok(calls[0].includes("www.wikidata.org"));
-  assert.ok(calls[1].includes("fr.wikipedia.org"));
-  assert.ok(decodeURIComponent(calls[1]).includes("titles=Tardigrade"));
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].includes("fr.wikipedia.org"));
+  assert.ok(calls[0].includes("haswbstatement%3AP31%3DQ336"));
   assert.equal(out.length, 1);
   assert.equal(out[0].title, "Tardigrade");
 });
 
-test("fetchCategoryItems échoue explicitement si Wikidata ne trouve aucun item (pas une liste vide silencieuse)", async () => {
-  const fetchJson = async (url) => {
-    if (url.includes("www.wikidata.org")) return { query: { pages: [] } };
-    throw new Error("ne devrait pas être appelé sans titre");
-  };
-  await assert.rejects(
-    core.fetchCategoryItems("sciences", fetchJson),
-    /0 item\(s\) trouvé/
-  );
-});
-
-test("fetchCategoryItems distingue des items trouvés sans sitelink exploitable", async () => {
-  const fetchJson = async (url) => {
-    if (url.includes("www.wikidata.org")) {
-      return {
-        query: { pages: [{ sitelinks: [{ site: "dewiki", title: "Ohne frwiki" }] }] },
-      };
-    }
-    throw new Error("ne devrait pas être appelé sans titre");
-  };
-  await assert.rejects(
-    core.fetchCategoryItems("sciences", fetchJson),
-    /1 item\(s\) trouvé\(s\), aucun avec sitelink frwiki/
-  );
-});
-
-test("fetchCategoryItems remonte l'erreur Wikidata plutôt que de l'avaler", async () => {
-  const fetchJson = async (url) => {
-    if (url.includes("www.wikidata.org")) {
-      return { error: { code: "badvalue", info: "paramètre invalide" } };
-    }
-    throw new Error("ne devrait pas être appelé sans titre");
-  };
-  await assert.rejects(core.fetchCategoryItems("sciences", fetchJson), /badvalue/);
+test("fetchCategoryItems renvoie une liste vide si rien ne correspond (pas une erreur)", async () => {
+  const fetchJson = async () => ({ query: { pages: [] } });
+  const out = await core.fetchCategoryItems("sciences", fetchJson);
+  assert.deepEqual(out, []);
 });
 
 test("randomBucket reste dans la plage cacheable", () => {
