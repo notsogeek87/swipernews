@@ -565,8 +565,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=65"></script>
-<script src="src/learn-core.js?v=65"></script>
+<script src="src/lib.js?v=66"></script>
+<script src="src/learn-core.js?v=66"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -838,7 +838,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="65";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="66";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikidata et Wikipédia s'appellent déjà en
@@ -1163,7 +1163,7 @@ async function learnFetchJson(url){
     // Repli par proxy : au-delà, "no-proxy" ne dit RIEN d'utile (voir
     // fetchText) — on garde donc la raison du tout premier essai (direct),
     // le plus révélateur (statut HTTP, ou timeout si AbortError), pour le
-    // panneau ?debug=1 (voir lastLearnFailures dans fetchLearnClient).
+    // panneau ?debug=1 (voir lastLearnDetail dans fetchLearnClient).
     const direct=e&&e.name==="AbortError"?"timeout":(e&&e.message)||String(e);
     try{return JSON.parse(await fetchText(url));}
     catch(e2){throw new Error(`${direct} (direct) / ${(e2&&e2.message)||e2} (proxy)`);}
@@ -1180,26 +1180,28 @@ function catKeysForBatch(){
   if(interests.length)return shuffle(interests.slice()).slice(0,3);
   return ["random"];
 }
-// Dernières erreurs par catégorie (mode Apprendre) : réutilisées par le
-// panneau ?debug=1 en cas de repli démo (voir loadFeeds) — sans accès à la
-// console, c'est le seul moyen de voir POURQUOI une catégorie a échoué.
-let lastLearnFailures=[];
+// Résumé par catégorie (mode Apprendre) : réutilisé par le panneau ?debug=1
+// en cas de repli démo (voir loadFeeds) — sans accès à la console, c'est le
+// seul moyen de voir POURQUOI une catégorie a échoué. Une catégorie peut
+// échouer de deux façons bien distinctes, à ne pas confondre : REJETÉE (la
+// requête elle-même a échoué — réseau, timeout, statut HTTP) ou RÉSOLUE avec
+// zéro article (la requête a répondu, mais rien d'exploitable : Wikidata n'a
+// rien trouvé pour ce P31, ou aucun des titres trouvés n'avait un extrait
+// Wikipédia assez long). Promise.allSettled distingue déjà les deux ; sans ce
+// log, les deux cas se ressemblaient à l'écran ("mode démo") sans rien dire
+// de PLUS précis que "empty".
+let lastLearnDetail=[];
 /* Agrégation côté client (repli si le backend /api/learn n'est pas disponible). */
 async function fetchLearnClient(keys,count){
   const tag=(p,catKey)=>p.then(list=>list.map(it=>({...it,cat:catKey}))); // marque la catégorie
   const tasks=keys.map(catKey=>tag(srcWikipedia(catKey),catKey));
   const results=await Promise.allSettled(tasks);
-  // Promise.allSettled avale les erreurs individuelles : sans ce log, une
-  // catégorie qui échoue systématiquement (Wikidata en erreur, CORS, etc.)
-  // ne laisse AUCUNE trace, juste un fil plus pauvre — ou vide, et le repli
-  // démo. Un rejet par catégorie reste normal (réseau flaky) ; tous rejetés
-  // en même temps signale un vrai problème.
-  lastLearnFailures=[];
-  results.forEach((r,i)=>{
+  lastLearnDetail=results.map((r,i)=>{
     if(r.status==="rejected"){
       warn(`learn cat "${keys[i]}"`,r.reason);
-      lastLearnFailures.push(`${keys[i]}: ${(r.reason&&r.reason.message)||r.reason}`);
+      return `${keys[i]}: ÉCHEC — ${(r.reason&&r.reason.message)||r.reason}`;
     }
+    return `${keys[i]}: ${r.value.length} article(s)`;
   });
   const lists=results.filter(r=>r.status==="fulfilled").map(r=>r.value);
   return LEARN.dedupAndRank(lists,count);               // articles avec image d'abord, sources mélangées
@@ -1316,11 +1318,11 @@ async function loadFeeds(force){
       if(my!==loadSeq||cached)return;               // si on a déjà le cache, on le garde
       warn("learn load",e);
       // ?debug=1 : sans ça, le repli démo est muet — impossible de savoir si
-      // Wikidata/Wikipédia ont échoué ou juste n'ont rien renvoyé pour cette
-      // catégorie (voir aussi les rejets par catégorie dans fetchLearnClient).
+      // Wikidata/Wikipédia ont échoué (ÉCHEC) ou juste renvoyé 0 article pour
+      // cette catégorie (voir lastLearnDetail dans fetchLearnClient).
       // Panneau du HAUT (dbgTop), pas dbg() : celui du bas est réécrit par
       // dbgImage() dès que la 1ère carte démo s'affiche, avant d'être lu.
-      const detail=lastLearnFailures.length?"\n"+lastLearnFailures.join("\n"):"";
+      const detail=lastLearnDetail.length?"\n"+lastLearnDetail.join("\n"):"";
       dbgTop(`v${APP_VERSION}  learn load ÉCHEC\ncats=${catKeysForBatch().join(",")}\n${e&&e.message||e}${detail}`);
       items=structuredClone(DEMO_LEARN);demobadge(true);render();hideStates();feedKeyShown=key;
     }
@@ -1818,6 +1820,7 @@ async function loadMoreLearn(){
   loadingMore=true;
   try{
     const more=await fetchLearn(20);
+    dbgTop(null);                                   // succès : efface une éventuelle erreur affichée avant
     const have=new Set(items.map(i=>i.title));
     const fresh=more.filter(m=>!have.has(m.title));
     if(fresh.length){
@@ -1825,7 +1828,11 @@ async function loadMoreLearn(){
       if(items.length>MAX_ITEMS)items=items.slice(-MAX_ITEMS);
       appendCards(fresh);
     }
-  }catch(e){warn("load more",e);/* on réessaiera au prochain scroll */}
+  }catch(e){
+    warn("load more",e);                            // on réessaiera au prochain scroll
+    const detail=lastLearnDetail.length?"\n"+lastLearnDetail.join("\n"):"";
+    dbgTop(`v${APP_VERSION}  load more ÉCHEC\ncats=${catKeysForBatch().join(",")}\n${e&&e.message||e}${detail}`);
+  }
   finally{loadingMore=false;}
 }
 // Libellé (emoji + nom) d'une catégorie Apprendre à partir de sa clé

@@ -41,6 +41,15 @@ test("wikidataUrl renvoie null pour la catégorie random (pas de qid)", () => {
   assert.equal(core.wikidataUrl("random"), null);
 });
 
+test("wikidataUrl OR-combine qid et extraQids quand la catégorie en a", () => {
+  const url = core.wikidataUrl("animaux");
+  const params = new URL(url).searchParams;
+  assert.equal(
+    params.get("gsrsearch"),
+    "haswbstatement:P31=Q729 OR haswbstatement:P31=Q16521"
+  );
+});
+
 test("normalizeWikidataTitles extrait le sitelink frwiki et dédoublonne", () => {
   const data = {
     query: {

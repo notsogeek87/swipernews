@@ -31,22 +31,41 @@
    * qid : identifiant Wikidata (Q…) — les items déclarant ce type (P31) sont
    *       la source du tirage (voir wikidataUrl). null = tirage purement
    *       aléatoire, sans filtre Wikidata (voir wikiUrl).
+   * extraQids : identifiants supplémentaires acceptés en P31, OR-combinés au
+   *       principal. `haswbstatement:P31=…` ne filtre QUE les items
+   *       directement typés ainsi (voir wikidataUrl) : pour certaines
+   *       catégories, la plupart des articles Wikipédia concernés ne sont PAS
+   *       P31 direct du concept général — ex. la plupart des livres sont P31
+   *       "roman", pas P31 "œuvre littéraire" ; la plupart des articles
+   *       animaliers sont P31 "taxon" (espèce), pas P31 "animal". Constaté en
+   *       usage réel (catégorie vide malgré une recherche qui répond), pas
+   *       deviné à l'avance — SI une autre catégorie s'avère trop
+   *       étroite/répétitive, c'est le même correctif : trouver le(s) P31 le
+   *       plus fréquent des articles concernés et l'ajouter ici.
    */
   const CATEGORIES = [
     { key: "random", label: "🎲 Aléatoire", qid: null },
     { key: "jeuxvideo", label: "🎮 Jeux vidéo", qid: "Q7889" },
     { key: "films", label: "🎥 Films", qid: "Q11424" },
     { key: "series", label: "📺 Séries télévisées", qid: "Q5398426" },
-    { key: "litterature", label: "📚 Œuvres littéraires", qid: "Q7725634" },
-    { key: "animaux", label: "🐾 Animaux", qid: "Q729" },
+    // + "roman" (Q8261) : la plupart des livres ne sont pas P31 direct "œuvre littéraire".
+    {
+      key: "litterature",
+      label: "📚 Œuvres littéraires",
+      qid: "Q7725634",
+      extraQids: ["Q8261"],
+    },
+    // + "taxon" (Q16521) : la plupart des articles animaliers sont des espèces, pas P31 direct
+    // "animal" — contrepartie assumée, quelques plantes/champignons peuvent s'inviter aussi.
+    { key: "animaux", label: "🐾 Animaux", qid: "Q729", extraQids: ["Q16521"] },
     { key: "sport", label: "⚽ Sport", qid: "Q349" },
-    { key: "musique", label: "🎵 Musique", qid: "Q638" },
+    { key: "musique", label: "🎵 Musique", qid: "Q638", extraQids: ["Q7366"] }, // + "chanson" (Q7366)
     { key: "histoire", label: "📜 Histoire", qid: "Q309" },
     { key: "sciences", label: "🔬 Sciences", qid: "Q336" },
     { key: "tech", label: "💻 Technologie", qid: "Q11019" },
     { key: "art", label: "🎨 Art", qid: "Q735" },
     { key: "geo", label: "🌍 Géographie", qid: "Q1071" },
-    { key: "mythologie", label: "🔱 Mythologie", qid: "Q9134" },
+    { key: "mythologie", label: "🔱 Mythologie", qid: "Q9134", extraQids: ["Q178885"] }, // + "déité" (Q178885)
     { key: "inventions", label: "💡 Inventions", qid: "Q450" },
     {
       key: "personnalites",
@@ -120,23 +139,32 @@
    *  Contrepartie ASSUMÉE : `haswbstatement:P31=…` ne filtre que les items
    *  DIRECTEMENT typés ainsi, sans remonter les sous-classes (SPARQL le
    *  permettait, en théorie). Pour des catégories concrètes (Jeux vidéo,
-   *  Films, Personnes historiques…) ça correspond déjà à l'essentiel des
-   *  articles. Pour des catégories plus abstraites (Œuvres littéraires,
-   *  Animaux, Histoire, Sciences, Art, Géographie, Mythologie…), le tirage
-   *  peut rester plus étroit/répétitif que souhaité — à affiner catégorie par
-   *  catégorie si besoin, une fois observé en usage réel plutôt que deviné.
+   *  Films, Personnes historiques… confirmé en usage réel pour Sport, qui
+   *  répond vite et correctement) ça correspond déjà à l'essentiel des
+   *  articles. Pour d'autres, un seul P31 direct s'est avéré quasi VIDE en
+   *  usage réel (Animaux : "empty", zéro article malgré une recherche qui
+   *  répondait) — `extraQids` (voir CATEGORIES) ajoute alors le(s) P31 le
+   *  plus fréquent des articles réellement concernés, constaté plutôt que
+   *  deviné à l'avance. Les catégories qui n'en ont pas encore mais
+   *  s'avéreraient trop étroites/répétitives (Histoire, Sciences, Art,
+   *  Géographie…) suivent le même correctif le jour où c'est observé.
    *
    *  Renvoie `null` pour "random", qui n'a pas de qid (voir wikiUrl). */
   function wikidataUrl(catKey) {
     const c = catByKey(catKey);
     if (!c.qid) return null;
+    // OR-combine qid + extraQids (voir leur doc sur CATEGORIES) : CirrusSearch,
+    // comme sur Wikipédia, accepte "OR" entre mots-clés de recherche.
+    const gsrsearch = [c.qid, ...(c.extraQids || [])]
+      .map((q) => `haswbstatement:P31=${q}`)
+      .join(" OR ");
     const params = new URLSearchParams({
       action: "query",
       format: "json",
       formatversion: "2",
       origin: "*",
       generator: "search",
-      gsrsearch: `haswbstatement:P31=${c.qid}`,
+      gsrsearch,
       gsrnamespace: "0",
       gsrsort: "random",
       gsrlimit: String(WIKIDATA_SAMPLE),
