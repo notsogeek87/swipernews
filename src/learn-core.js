@@ -103,7 +103,14 @@
     const c = catByKey(catKey);
     if (!c.qid) return null;
     const wiki = `https://${WIKI_LANG}.wikipedia.org/`;
-    const query = `SELECT ?title WHERE {
+    // Préfixes déclarés explicitement : le service WDQS les prédéfinit pour
+    // l'éditeur web, mais rien ne garantit ça pour un appel HTTP direct comme
+    // celui-ci — autant ne pas en dépendre.
+    const query = `PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX bd: <http://www.bigdata.com/rdf#>
+PREFIX schema: <http://schema.org/>
+SELECT ?title WHERE {
   SERVICE bd:sample {
     ?item bd:sample.sampleSize ${WIKIDATA_SAMPLE} ;
           bd:sample.sampleType "RANDOM" .

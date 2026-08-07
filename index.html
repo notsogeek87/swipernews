@@ -565,8 +565,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=60"></script>
-<script src="src/learn-core.js?v=60"></script>
+<script src="src/lib.js?v=61"></script>
+<script src="src/learn-core.js?v=61"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -696,8 +696,10 @@ const CATEGORIES=LEARN.CATEGORIES;
 /* Intérêts choisis par l'utilisateur (sous-ensemble de clés CATEGORIES, hors "random"). */
 let interests=(()=>{try{const s=localStorage.getItem(LS_INT);return s?JSON.parse(s):[];}catch(e){return [];}})();
 function interestsChosen(){try{return localStorage.getItem(LS_INT)!==null;}catch(e){return false;}}
-/* Filtre courant : "all" = mélange des intérêts choisis, sinon une clé d'intérêt précise. */
-let cat=(()=>{try{const v=localStorage.getItem(LS_CAT);return (v&&v!=="random")?v:"all";}catch(e){return "all";}})();
+/* Filtre courant : "all" = mélange des intérêts choisis, "random" = tirage
+   pur (chip toujours disponible, indépendant des intérêts), sinon une clé
+   d'intérêt précise. */
+let cat=(()=>{try{const v=localStorage.getItem(LS_CAT);return v||"all";}catch(e){return "all";}})();
 /* Catégorie effective pour un lot : le filtre courant, ou un intérêt tiré au sort si "all". */
 function activeCatKey(){
   if(cat!=="all")return cat;
@@ -836,7 +838,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="60";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="61";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikidata et Wikipédia s'appellent déjà en
@@ -1236,7 +1238,7 @@ async function loadFeeds(force){
   const my=++loadSeq;feedLoadStarted=true;
   demobadge(false);syncing(false);
   const m=mode;                                   // capture : l'utilisateur peut changer de mode pendant le fetch
-  const key=m==="learn"?("learn_"+cat):"news";    // cache distinct par catégorie
+  const key=feedKey(m);                           // cache distinct par catégorie (et par intérêts choisis en "all")
   // « Même fil » = le contenu affiché appartient à la MÊME clé que celle qu'on
   // charge. Se contenter de « quelque chose est affiché » laissait le fil Actus
   // à l'écran pendant tout le chargement du mode Apprendre.
@@ -2235,7 +2237,14 @@ function applyModeUI(){
    Un fetch réel ne se fait plus qu'au 1er affichage, via ↻, ou sur un
    changement de catégorie. */
 const feedSnap={};
-function feedKey(m){return m==="learn"?("learn_"+cat):"news";}
+// "all" mélange les intérêts choisis : la clé doit varier avec EUX, sinon
+// changer d'intérêts sans changer `cat` (qui reste "all") ne se voit jamais —
+// le fil déjà affiché passe pour "le même", et le nouveau lot est juste
+// silencieusement ajouté après (voir sameFeed dans loadFeeds).
+function feedKey(m){
+  if(m!=="learn")return "news";
+  return "learn_"+cat+(cat==="all"?":"+interests.join(","):"");
+}
 function snapshotFeed(m){
   if(!feedEl.children.length)return;               // rien à mémoriser
   feedSnap[feedKey(m)]={
@@ -2309,15 +2318,19 @@ applyModeUI();
 const catsEl=document.getElementById("cats");
 const editIntBtn=document.getElementById("editIntBtn");
 editIntBtn.onclick=openInterests;
+// "🎲 Aléatoire" reste TOUJOURS sélectionnable, avec ou sans intérêts choisis
+// (ce n'est pas la même chose que "✨ Tous", qui mélange les intérêts).
 function renderCats(){
-  let chips=[];
+  const chips=[{k:"random",label:"🎲 Aléatoire"}];
   if(interests.length){
     chips.push({k:"all",label:"✨ Tous"});
     interests.forEach(k=>{const c=CATEGORIES.find(x=>x.key===k);if(c)chips.push({k,label:c.label});});
-  }else{
-    chips.push({k:"all",label:"🎲 Aléatoire"});
   }
-  catsEl.innerHTML=chips.map(c=>`<button data-k="${c.k}" class="${c.k===cat?"active":""}">${c.label}</button>`).join("");
+  // Avant tout choix d'intérêts, "all" (défaut) tire déjà au hasard : la seule
+  // chip visible doit donc apparaître active, même si sa clé ("random") ne
+  // correspond pas littéralement à `cat` ("all").
+  const isActive=(k)=>k===cat||(k==="random"&&cat==="all"&&!interests.length);
+  catsEl.innerHTML=chips.map(c=>`<button data-k="${c.k}" class="${isActive(c.k)?"active":""}">${c.label}</button>`).join("");
   catsEl.querySelectorAll("button").forEach(b=>{b.onclick=()=>setCat(b.dataset.k);});
   // Le bouton est une icône seule : la nuance « modifier / choisir » passe par
   // l'infobulle et le nom accessible, jamais par le contenu (qui EST la roue).
