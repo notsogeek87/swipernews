@@ -76,19 +76,27 @@ image, lien vers l'article). L'ambiance change (accent cyan + badge) pour bien d
 les deux univers, et un nouvel appui sur **📰 Actus** revient aux flux RSS.
 
 Une **barre de centres d'intérêt** (chips défilables sous les onglets) permet de choisir
-ce qu'on veut apprendre : **Aléatoire** (défaut), Sciences, Histoire, Art & Culture,
-Artistes, Géographie, Nature, Espace, Technologie, Sport, Cinéma, Films, Musique,
-Jeux vidéo, Cuisine, Philosophie. Chaque
-catégorie utilise le moteur de recherche de Wikipédia (`generator=search`,
-`gsrsort=random`, `deepcategory:"…"`) pour tirer des articles au hasard dans la catégorie
-et ses sous-catégories. Le choix est mémorisé et chaque catégorie a son propre cache.
+ce qu'on veut apprendre : **Aléatoire** (défaut), Jeux vidéo, Films, Séries télévisées,
+Œuvres littéraires, Animaux, Sport, Musique, Histoire, Sciences, Technologie, Art,
+Géographie, Mythologie, Inventions, Personnes historiques et personnalités. Le choix est
+mémorisé et chaque catégorie a son propre cache.
 
 ### Source du mode Apprendre
 
-Le fil s'appuie sur **Wikipédia** (API `action`, `generator=search`/`random`, extrait
-d'intro + image), en français par défaut, pour toutes les catégories. Quand plusieurs
-catégories sont interrogées pour un même lot (mode « Tous »), les résultats sont
-dédoublonnés et mélangés (les cartes avec image d'abord).
+Le tirage et le contenu affichés viennent de deux sources différentes :
+
+- **Wikidata** choisit QUELS articles apparaissent : chaque catégorie est un identifiant
+  Wikidata (`Q…`) racine, et une requête SPARQL (`query.wikidata.org/sparql`) tire au sort
+  des titres dans son arbre instance-of/subclass-of (`wdt:P31/wdt:P279*`), via
+  `SERVICE bd:sample` (échantillonnage par réservoir — un `ORDER BY RAND()` matérialiserait
+  et trierait tout l'arbre, ingérable sur une classe comme « humain »). Seule la catégorie
+  **Aléatoire** y échappe : tirage direct sur Wikipédia (`generator=random`), sans arbre.
+- **Wikipédia** fournit le CONTENU affiché — extrait d'intro, image, lien — pour les titres
+  que Wikidata vient de tirer (`action=query`, titres explicites, pas de recherche). C'est ce
+  lien Wikipédia que « Découvrir » ouvre, quelle que soit la catégorie.
+
+Le tout en français par défaut. Quand plusieurs catégories sont interrogées pour un même lot
+(mode « Tous »), les résultats sont dédoublonnés et mélangés (les cartes avec image d'abord).
 
 ## Lancer en local
 
@@ -909,9 +917,10 @@ ouvrir la demande d'inclusion sur `gitlab.com/fdroid/fdroiddata`.
   non modifiable), `api/og.js` va lire la balise `og:image` de l'article, qui
   pointe vers la version pleine taille. Appelé uniquement si l'image du flux est
   réellement petite, résultat mémorisé côté client et mis en cache 24 h par le CDN.
-- **Mode Apprendre** : `api/learn.js` agrège **côté serveur** les catégories Wikipédia
-  demandées (cache CDN mutualisé entre utilisateurs). Le front l'appelle en priorité et
-  se rabat sur son agrégation client si l'endpoint n'est pas déployé (hébergement statique).
+- **Mode Apprendre** : `api/learn.js` agrège **côté serveur** les catégories demandées
+  (Wikidata pour les titres, Wikipédia pour le contenu — cache CDN mutualisé entre
+  utilisateurs). Le front l'appelle en priorité et se rabat sur son agrégation client si
+  l'endpoint n'est pas déployé (hébergement statique).
 - **Code partagé** : `src/lib.js` (fonctions pures : assainissement, parsing OPML/JSON,
   dates) et `src/learn-core.js` (catégories, URL et normaliseurs du mode Apprendre) sont
   chargés par `index.html` **et** par les fonctions serverless — une seule implémentation,
