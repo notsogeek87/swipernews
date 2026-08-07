@@ -245,8 +245,26 @@
   async function fetchCategoryItems(catKey, fetchJson) {
     const c = catByKey(catKey);
     if (!c.qid) return normalizeWiki(await fetchJson(wikiUrl()));
-    const titles = normalizeWikidataTitles(await fetchJson(wikidataUrl(catKey)));
-    if (!titles.length) return [];
+    const wdData = await fetchJson(wikidataUrl(catKey));
+    const titles = normalizeWikidataTitles(wdData);
+    if (!titles.length) {
+      // Diagnostic : sans ça, "Wikidata n'a rien trouvé pour ce P31" et
+      // "Wikidata a répondu une erreur qu'on avalait en silence" se
+      // ressemblaient à l'écran (liste vide) — indiscernables sans jeter un
+      // œil au JSON brut à la main. On lève ici plutôt que de renvoyer []
+      // pour que ce soit visible dans lastLearnDetail (voir index.html).
+      const pages =
+        wdData && wdData.query && Array.isArray(wdData.query.pages)
+          ? wdData.query.pages
+          : null;
+      const err = wdData && wdData.error;
+      const detail = err
+        ? `erreur wikidata : ${err.code || ""} ${err.info || JSON.stringify(err)}`.trim()
+        : pages
+          ? `${pages.length} item(s) trouvé(s), aucun avec sitelink ${WIKI_LANG}wiki`
+          : "réponse wikidata inattendue (pas de query.pages)";
+      throw new Error(`wikidata 0 titre — ${detail}`);
+    }
     return normalizeWiki(await fetchJson(wikipediaTitlesUrl(titles)));
   }
 

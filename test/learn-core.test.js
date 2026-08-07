@@ -153,13 +153,40 @@ test("fetchCategoryItems (catégorie Wikidata) enchaîne Wikidata puis Wikipédi
   assert.equal(out[0].title, "Tardigrade");
 });
 
-test("fetchCategoryItems renvoie une liste vide si Wikidata ne trouve aucun titre", async () => {
+test("fetchCategoryItems échoue explicitement si Wikidata ne trouve aucun item (pas une liste vide silencieuse)", async () => {
   const fetchJson = async (url) => {
     if (url.includes("www.wikidata.org")) return { query: { pages: [] } };
     throw new Error("ne devrait pas être appelé sans titre");
   };
-  const out = await core.fetchCategoryItems("sciences", fetchJson);
-  assert.deepEqual(out, []);
+  await assert.rejects(
+    core.fetchCategoryItems("sciences", fetchJson),
+    /0 item\(s\) trouvé/
+  );
+});
+
+test("fetchCategoryItems distingue des items trouvés sans sitelink exploitable", async () => {
+  const fetchJson = async (url) => {
+    if (url.includes("www.wikidata.org")) {
+      return {
+        query: { pages: [{ sitelinks: [{ site: "dewiki", title: "Ohne frwiki" }] }] },
+      };
+    }
+    throw new Error("ne devrait pas être appelé sans titre");
+  };
+  await assert.rejects(
+    core.fetchCategoryItems("sciences", fetchJson),
+    /1 item\(s\) trouvé\(s\), aucun avec sitelink frwiki/
+  );
+});
+
+test("fetchCategoryItems remonte l'erreur Wikidata plutôt que de l'avaler", async () => {
+  const fetchJson = async (url) => {
+    if (url.includes("www.wikidata.org")) {
+      return { error: { code: "badvalue", info: "paramètre invalide" } };
+    }
+    throw new Error("ne devrait pas être appelé sans titre");
+  };
+  await assert.rejects(core.fetchCategoryItems("sciences", fetchJson), /badvalue/);
 });
 
 test("randomBucket reste dans la plage cacheable", () => {
