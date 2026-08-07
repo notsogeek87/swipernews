@@ -418,6 +418,21 @@
   .visually-hidden{position:absolute!important;width:1px;height:1px;margin:-1px;padding:0;
     overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
 
+  /* Fil pensé pour le swipe vertical plein écran : illisible en paysage. On ne
+     bloque que sur écran tactile principal (hover:none + pointer:coarse), pas
+     au clavier/souris — sinon une fenêtre desktop redimensionnée en paysage
+     déclencherait le voile pour rien. */
+  .orientlock{display:none}
+  @media (orientation:landscape) and (hover:none) and (pointer:coarse){
+    .orientlock{display:flex;position:fixed;inset:0;z-index:9999;flex-direction:column;
+      align-items:center;justify-content:center;gap:16px;padding:32px;text-align:center;
+      background:var(--bg)}
+    .orientlock__ic{font-size:44px;animation:orientspin 1.8s ease-in-out infinite}
+    .orientlock p{font-size:16px;color:var(--ash);max-width:32ch;line-height:1.5}
+    .orientlock b{color:var(--ink)}
+    @keyframes orientspin{0%,100%{transform:rotate(0)}50%{transform:rotate(-90deg)}}
+  }
+
   /* Respect du réglage système « réduire les animations » (WCAG 2.3.3) */
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
@@ -428,6 +443,11 @@
 </style>
 </head>
 <body>
+
+<div class="orientlock" role="alert">
+  <span class="orientlock__ic" aria-hidden="true">📱</span>
+  <p><b>SwiperNews est fait pour le portrait.</b><br>Remets ton téléphone à la verticale pour swiper.</p>
+</div>
 
 <h1 class="visually-hidden">SwiperNews — apprendre et suivre l'actualité en swipe</h1>
 
@@ -543,8 +563,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=56"></script>
-<script src="src/learn-core.js?v=56"></script>
+<script src="src/lib.js?v=57"></script>
+<script src="src/learn-core.js?v=57"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -814,7 +834,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="56";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="57";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
