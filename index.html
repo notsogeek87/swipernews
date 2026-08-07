@@ -565,8 +565,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=58"></script>
-<script src="src/learn-core.js?v=58"></script>
+<script src="src/lib.js?v=59"></script>
+<script src="src/learn-core.js?v=59"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -836,7 +836,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="58";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="59";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1258,7 +1258,19 @@ async function loadFeeds(force){
       const arr=await fetchLearn(20);              // un lot multi-sources au démarrage ; le scroll infini complète
       if(!arr.length)throw new Error("empty");
       if(my!==loadSeq)return;                       // chargement obsolète → on abandonne
-      items=arr;render();hideStates();feedKeyShown=key;cacheSave(key);
+      if(sameFeed){
+        // Un fil déjà affiché : on ne le REMPLACE pas, sous peine de faire
+        // disparaître l'article en cours sous les yeux (le tirage aléatoire ne
+        // le contient presque jamais). On complète comme le ferait le scroll
+        // infini — voir loadMoreLearn, même logique de dédoublonnage.
+        const have=new Set(items.map(i=>i.title));
+        const fresh=arr.filter(a=>!have.has(a.title));
+        if(fresh.length){
+          items=items.concat(fresh);
+          if(items.length>CONFIG.MAX_ITEMS)items=items.slice(-CONFIG.MAX_ITEMS);
+        }
+      }else items=arr;
+      render();hideStates();feedKeyShown=key;cacheSave(key);
     }catch(e){
       if(my!==loadSeq||cached)return;               // si on a déjà le cache, on le garde
       warn("learn load",e);
