@@ -76,10 +76,17 @@ image, lien vers l'article). L'ambiance change (accent cyan + badge) pour bien d
 les deux univers, et un nouvel appui sur **📰 Actus** revient aux flux RSS.
 
 Une **barre de centres d'intérêt** (chips défilables sous les onglets) permet de choisir
-ce qu'on veut apprendre : **Aléatoire** (défaut), Jeux vidéo, Films, Séries télévisées,
-Musique, Romans, Batailles, Monuments historiques, Pays, Planètes, Exoplanètes, Inventions,
-Animaux, Plats, Art, Sport. Le choix
-est mémorisé et chaque catégorie a son propre cache.
+ce qu'on veut apprendre : Jeux vidéo, Films, Séries télévisées, Musique, Romans, Batailles,
+Monuments historiques, Pays, Planètes, Exoplanètes, Inventions, Animaux, Plats, Art, Sport.
+Le choix est mémorisé et chaque catégorie a son propre cache.
+
+En tête de la barre, une **puce d'ensemble** : « ✨ Tous » (mélange des centres d'intérêt
+choisis) ou « 🎲 Aléatoire » tant qu'aucun n'est coché. Une seule puce pour les deux — il y en
+avait deux au départ, une nuance réelle mais invisible à l'usage.
+
+Les volumes téléchargés suivent la taille du lot affiché : chaque catégorie interrogée ne
+fournit qu'une part des cartes, et on ne demande d'extraits que pour les articles réellement
+retenus (voir `DEFAULT_COUNT` et `TITLE_MARGIN` dans `src/learn-core.js`).
 
 ### Source du mode Apprendre
 

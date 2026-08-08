@@ -92,17 +92,26 @@
   /* ---------- Construction des URL ---------- */
 
   const WIKI_THUMB_PX = 1000; // suffisant pour un fond plein écran, même en DPR 3
-  // L'API Wikipédia n'accepte que 50 titres par requête `titles=`.
+
+  // Articles par lot quand l'appelant n'en demande pas un nombre précis
+  // (miroir de CONFIG.BATCH_SIZE dans index.html).
+  const DEFAULT_COUNT = 20;
+  // On demande un peu PLUS de titres que d'articles voulus : normalizeWiki
+  // écarte les extraits de moins de 120 caractères, fréquents sur les ébauches.
+  const TITLE_MARGIN = 1.5;
+  // Plafond de l'API Wikipédia pour `titles=` — un plafond, pas une cible :
+  // chaque requête ne demande que ce dont le lot a besoin.
   const MAX_TITLES = 50;
-  const CM_LIMIT = 500; // membres listés par catégorie (maximum de l'API)
-  // Une catégorie de tête (« Film », « Roman »…) contient surtout des
+  // Membres listés par catégorie. Il en faut nettement plus que de titres
+  // retenus, ce vivier étant ce dans quoi on tire au sort (`categorymembers`
+  // répond toujours dans le même ordre) — mais demander les 500 du maximum
+  // pour n'en garder qu'une trentaine était disproportionné.
+  const CM_LIMIT = 200;
+  // Une catégorie de tête (« Film », « Art »…) contient surtout des
   // SOUS-catégories et peu d'articles : il faut descendre. Chaque descente est
   // une requête de plus, d'où ce budget — au-delà, le chargement se ferait
   // sentir avant même la première carte.
   const CM_MAX_LOOKUPS = 4;
-  // En deçà, on continue de descendre (s'il reste du budget) plutôt que de
-  // servir un lot squelettique.
-  const CM_MIN_TITLES = 20;
 
   /** URL listant les membres d'une catégorie : ses articles ET ses
    *  sous-catégories (`cmtype=subcat|page`), pour pouvoir descendre. */
@@ -138,7 +147,7 @@
   /** URL Wikipédia : extrait d'intro + image + lien. Sans titres, c'est le
    *  tirage purement aléatoire de la catégorie « Aléatoire » ; avec, ce sont
    *  exactement les titres relevés dans la catégorie. */
-  function wikiUrl(titles) {
+  function wikiUrl(titles, count = DEFAULT_COUNT) {
     const params = new URLSearchParams({
       action: "query",
       format: "json",
@@ -152,16 +161,19 @@
       inprop: "url",
     });
     if (titles && titles.length) {
-      params.set("titles", titles.slice(0, MAX_TITLES).join("|"));
+      const list = titles.slice(0, MAX_TITLES);
+      params.set("titles", list.join("|"));
       params.set("redirects", "1");
-      params.set("exlimit", String(MAX_TITLES));
-      params.set("pilimit", String(MAX_TITLES));
+      // Calés sur le nombre réel de titres : un `exlimit` plus haut ferait
+      // calculer à Wikipédia des extraits qu'on ne demande pas.
+      params.set("exlimit", String(list.length));
+      params.set("pilimit", String(list.length));
     } else {
       params.set("generator", "random");
       params.set("grnnamespace", "0");
-      params.set("grnlimit", "20");
-      params.set("exlimit", "20");
-      params.set("pilimit", "20");
+      params.set("grnlimit", String(count));
+      params.set("exlimit", String(count));
+      params.set("pilimit", String(count));
     }
     return `https://${WIKI_LANG}.wikipedia.org/w/api.php?${params}`;
   }
@@ -196,12 +208,12 @@
    *  rend toujours les mêmes membres dans le même ordre, un tri aléatoire
    *  n'existe pas pour cette API. Sans ce tirage, chaque lot d'une même
    *  catégorie serait identique au précédent. */
-  async function collectTitles(category, fetchJson, notes) {
+  async function collectTitles(category, fetchJson, notes, want = DEFAULT_COUNT) {
     const queue = [category];
     const visited = new Set(queue);
     const titles = new Set();
     let lookups = 0;
-    while (queue.length && lookups < CM_MAX_LOOKUPS && titles.size < CM_MIN_TITLES) {
+    while (queue.length && lookups < CM_MAX_LOOKUPS && titles.size < want) {
       const current = queue.shift();
       lookups++;
       let data;
@@ -241,19 +253,21 @@
    *  correctifs opposés : catégorie introuvable (nom à corriger), catégorie
    *  trouvée mais sans article exploitable (descente à élargir), ou panne
    *  réseau. Elles remontent au panneau ?debug=1 (voir index.html). */
-  async function fetchCategoryItems(catKey, fetchJson) {
+  async function fetchCategoryItems(catKey, fetchJson, count = DEFAULT_COUNT) {
     const c = catByKey(catKey);
-    if (!c.category) return normalizeWiki(await fetchJson(wikiUrl()));
+    if (!c.category) return normalizeWiki(await fetchJson(wikiUrl(null, count)));
 
+    const want = Math.min(MAX_TITLES, Math.ceil(count * TITLE_MARGIN));
     const notes = [];
-    const titles = await collectTitles(c.category, fetchJson, notes);
+    const titles = await collectTitles(c.category, fetchJson, notes, want);
     const detail = notes.length ? ` — ${notes.join(" | ")}` : "";
     if (!titles.length) throw new Error(`aucun article sous « ${c.category} »${detail}`);
 
-    // Mélangé AVANT la troncature à MAX_TITLES : sans ça, une catégorie fournie
-    // rendrait toujours les mêmes articles, `categorymembers` répondant dans un
-    // ordre fixe.
-    const items = normalizeWiki(await fetchJson(wikiUrl(lib.shuffle(titles))));
+    // Mélangé AVANT la troncature : sans ça, une catégorie fournie rendrait
+    // toujours les mêmes articles, `categorymembers` répondant dans un ordre
+    // fixe. C'est aussi ce qui rend le vivier (CM_LIMIT) utile.
+    const retenus = lib.shuffle(titles.slice()).slice(0, want);
+    const items = normalizeWiki(await fetchJson(wikiUrl(retenus, count)));
     if (!items.length) {
       throw new Error(
         `${titles.length} titre(s) sous « ${c.category} », 0 exploitable${detail}`
@@ -276,10 +290,11 @@
   return {
     WIKI_LANG,
     WIKI_THUMB_PX,
+    DEFAULT_COUNT,
+    TITLE_MARGIN,
     MAX_TITLES,
     CM_LIMIT,
     CM_MAX_LOOKUPS,
-    CM_MIN_TITLES,
     CATEGORIES,
     catByKey,
     catLabel,

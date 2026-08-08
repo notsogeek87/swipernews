@@ -488,7 +488,7 @@
 
 <div class="state hidden" id="loading" role="status">
   <div class="spinner"></div>
-  <p>Chargement des actus…</p>
+  <p id="loadingMsg">Chargement des actus…</p>
 </div>
 
 <div class="state hidden" id="empty" role="status">
@@ -565,8 +565,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=73"></script>
-<script src="src/learn-core.js?v=73"></script>
+<script src="src/lib.js?v=74"></script>
+<script src="src/learn-core.js?v=74"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -708,8 +708,9 @@ function interestsChosen(){try{return localStorage.getItem(LS_INT)!==null;}catch
 let cat=(()=>{try{const v=localStorage.getItem(LS_CAT);
   // Même précaution que pour `interests` : un filtre mémorisé sous l'ancien jeu
   // de clés ne correspond plus à aucune catégorie et laisserait la barre sans
-  // chip active, sur un fil rabattu en douce sur l'aléatoire.
-  if(v&&(v==="all"||CATEGORIES.some(c=>c.key===v)))return v;
+  // puce active, sur un fil rabattu en douce sur l'aléatoire. "random" tombe
+  // dans le même cas depuis que sa puce a fusionné avec « Tous ».
+  if(v&&v!=="random"&&(v==="all"||CATEGORIES.some(c=>c.key===v)))return v;
   return "all";}catch(e){return "all";}})();
 /* Catégorie effective pour un lot : le filtre courant, ou un intérêt tiré au sort si "all". */
 function activeCatKey(){
@@ -849,7 +850,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="73";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="74";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1180,8 +1181,8 @@ async function learnFetchJson(url){
     catch(e2){throw new Error(`${direct} (direct) / ${(e2&&e2.message)||e2} (proxy)`);}
   }
 }
-async function srcWikipedia(catKey){
-  return LEARN.fetchCategoryItems(catKey,learnFetchJson);
+async function srcWikipedia(catKey,count){
+  return LEARN.fetchCategoryItems(catKey,learnFetchJson,count);
 }
 
 /* Catégories à interroger pour un lot : une seule si filtre précis ;
@@ -1205,7 +1206,11 @@ let lastLearnDetail=[];
 /* Agrégation côté client (repli si le backend /api/learn n'est pas disponible). */
 async function fetchLearnClient(keys,count){
   const tag=(p,catKey)=>p.then(list=>list.map(it=>({...it,cat:catKey}))); // marque la catégorie
-  const tasks=keys.map(catKey=>tag(srcWikipedia(catKey),catKey));
+  // Chaque catégorie ne fournit qu'une PART du lot : dedupAndRank tronque
+  // ensuite à `count`. Sans ce partage, trois catégories rapportaient chacune
+  // un lot entier, dont les deux tiers étaient jetés après téléchargement.
+  const part=Math.max(6,Math.ceil(count/keys.length));
+  const tasks=keys.map(catKey=>tag(srcWikipedia(catKey,part),catKey));
   const results=await Promise.allSettled(tasks);
   lastLearnDetail=results.map((r,i)=>{
     if(r.status==="rejected"){
@@ -2390,19 +2395,15 @@ applyModeUI();
 const catsEl=document.getElementById("cats");
 const editIntBtn=document.getElementById("editIntBtn");
 editIntBtn.onclick=openInterests;
-// "🎲 Aléatoire" reste TOUJOURS sélectionnable, avec ou sans intérêts choisis
-// (ce n'est pas la même chose que "✨ Tous", qui mélange les intérêts).
+// UNE SEULE puce d'ensemble, en tête : elle vaut « mélange de mes centres
+// d'intérêt » dès qu'il y en a, et « tirage au hasard » sinon (voir
+// activeCatKey, qui retombe sur la catégorie "random" quand la liste est
+// vide). Il y avait avant deux puces distinctes, « Tous » et « Aléatoire » —
+// une nuance réelle mais invisible à l'usage, donc source de confusion.
 function renderCats(){
-  const chips=[{k:"random",label:"🎲 Aléatoire"}];
-  if(interests.length){
-    chips.push({k:"all",label:"✨ Tous"});
-    interests.forEach(k=>{const c=CATEGORIES.find(x=>x.key===k);if(c)chips.push({k,label:c.label});});
-  }
-  // Avant tout choix d'intérêts, "all" (défaut) tire déjà au hasard : la seule
-  // chip visible doit donc apparaître active, même si sa clé ("random") ne
-  // correspond pas littéralement à `cat` ("all").
-  const isActive=(k)=>k===cat||(k==="random"&&cat==="all"&&!interests.length);
-  catsEl.innerHTML=chips.map(c=>`<button data-k="${c.k}" class="${isActive(c.k)?"active":""}">${c.label}</button>`).join("");
+  const chips=[{k:"all",label:interests.length?"✨ Tous":"🎲 Aléatoire"}];
+  interests.forEach(k=>{const c=CATEGORIES.find(x=>x.key===k);if(c)chips.push({k,label:c.label});});
+  catsEl.innerHTML=chips.map(c=>`<button data-k="${c.k}" class="${c.k===cat?"active":""}">${c.label}</button>`).join("");
   catsEl.querySelectorAll("button").forEach(b=>{b.onclick=()=>setCat(b.dataset.k);});
   // Le bouton est une icône seule : la nuance « modifier / choisir » passe par
   // l'infobulle et le nom accessible, jamais par le contenu (qui EST la roue).
@@ -2564,7 +2565,13 @@ function mergeFeeds(incoming){
 }
 
 /* ---------- Utils ---------- */
-function show(id){["loading","empty"].forEach(s=>document.getElementById(s).classList.toggle("hidden",s!==id));}
+function show(id){
+  // « les actus » n'a de sens qu'en mode Actus : en Apprendre ce sont des
+  // articles Wikipédia, pas des flux.
+  if(id==="loading")document.getElementById("loadingMsg").textContent=
+    mode==="learn"?"Chargement des articles…":"Chargement des actus…";
+  ["loading","empty"].forEach(s=>document.getElementById(s).classList.toggle("hidden",s!==id));
+}
 function hideStates(){document.getElementById("loading").classList.add("hidden");document.getElementById("empty").classList.add("hidden");}
 function showEmpty(reason){
   document.getElementById("loading").classList.add("hidden");

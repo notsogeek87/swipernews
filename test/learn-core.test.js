@@ -56,6 +56,7 @@ test("categoryMembersUrl demande articles ET sous-catégories, préfixe compris"
   // or une catégorie de tête contient surtout ça.
   assert.equal(params.get("cmtype"), "subcat|page");
   assert.equal(params.get("cmlimit"), String(core.CM_LIMIT));
+  assert.ok(core.CM_LIMIT < 500, "le vivier n'a pas à être au maximum de l'API");
 });
 
 test("normalizeCategoryMembers sépare articles et sous-catégories", () => {
@@ -106,7 +107,7 @@ test("collectTitles descend dans les sous-catégories quand la catégorie de tê
       },
     };
   };
-  const titles = await core.collectTitles("Film", fetchJson, []);
+  const titles = await core.collectTitles("Film", fetchJson, [], 20);
   assert.deepEqual(vus, ["Catégorie:Film", "Catégorie:Film français"]);
   assert.ok(titles.includes("Cinéma"), "les articles de la tête sont gardés");
   assert.ok(titles.length > 20, "complétés par ceux de la sous-catégorie");
@@ -125,7 +126,7 @@ test("collectTitles s'arrête dès qu'il a de quoi remplir un lot", async () => 
       },
     };
   };
-  await core.collectTitles("Pays", fetchJson, []);
+  await core.collectTitles("Pays", fetchJson, [], 20);
   assert.equal(appels, 1, "inutile de descendre quand la tête suffit");
 });
 
@@ -135,7 +136,7 @@ test("collectTitles borne le nombre de requêtes même sans jamais trouver d'art
     appels++;
     return { query: { categorymembers: [{ ns: 14, title: `Catégorie:Vide${appels}` }] } };
   };
-  const titles = await core.collectTitles("Film", fetchJson, []);
+  const titles = await core.collectTitles("Film", fetchJson, [], 20);
   assert.deepEqual(titles, []);
   assert.equal(appels, core.CM_MAX_LOOKUPS, "budget de requêtes respecté");
 });
@@ -148,7 +149,8 @@ test("collectTitles signale une catégorie inexistante plutôt que de l'avaler",
   const titles = await core.collectTitles(
     "Catégorie mal orthographiée",
     fetchJson,
-    notes
+    notes,
+    20
   );
   assert.deepEqual(titles, []);
   assert.match(notes.join(" "), /invalidcategory/);
@@ -169,10 +171,54 @@ test("wikiUrl avec titres interroge ces titres précis, sans recherche", () => {
   assert.equal(new URL(url).searchParams.get("titles"), "Effet tunnel|Tardigrade");
 });
 
-test("wikiUrl tronque à la limite de l'API Wikipédia (50 titres)", () => {
+test("wikiUrl tronque au plafond de l'API Wikipédia (50 titres)", () => {
   const many = Array.from({ length: 120 }, (_, i) => `T${i}`);
   const params = new URL(core.wikiUrl(many)).searchParams;
   assert.equal(params.get("titles").split("|").length, core.MAX_TITLES);
+});
+
+test("wikiUrl ne demande d'extraits que pour les titres réellement listés", () => {
+  // exlimit/pilimit calés sur le nombre de titres, pas sur le plafond : sinon
+  // Wikipédia calcule des extraits qu'on ne lui demande pas.
+  const params = new URL(core.wikiUrl(["A", "B", "C"])).searchParams;
+  assert.equal(params.get("exlimit"), "3");
+  assert.equal(params.get("pilimit"), "3");
+});
+
+test("wikiUrl (aléatoire) tire exactement le nombre d'articles demandé", () => {
+  const params = new URL(core.wikiUrl(null, 8)).searchParams;
+  assert.equal(params.get("grnlimit"), "8");
+  assert.equal(params.get("exlimit"), "8");
+});
+
+test("fetchCategoryItems ne télécharge pas plus que le lot demandé", async () => {
+  // Le reproche mesuré : 500 membres listés puis 50 extraits pour n'afficher
+  // que 20 cartes. Les volumes suivent maintenant le nombre voulu.
+  let titresDemandes = 0;
+  const fetchJson = async (url) => {
+    if (url.includes("categorymembers")) {
+      return {
+        query: {
+          categorymembers: Array.from({ length: 200 }, (_, i) => ({
+            ns: 0,
+            title: `A${i}`,
+          })),
+        },
+      };
+    }
+    titresDemandes = new URL(url).searchParams.get("titles").split("|").length;
+    return {
+      query: {
+        pages: Array.from({ length: 10 }, (_, i) => ({
+          title: `A${i}`,
+          extract: "x".repeat(130),
+        })),
+      },
+    };
+  };
+  await core.fetchCategoryItems("pays", fetchJson, 10);
+  assert.equal(titresDemandes, Math.ceil(10 * core.TITLE_MARGIN));
+  assert.ok(titresDemandes < core.MAX_TITLES, "on ne demande plus le plafond par défaut");
 });
 
 test("normalizeWiki préfère le thumbnail et écarte les extraits trop courts", () => {

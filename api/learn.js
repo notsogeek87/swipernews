@@ -67,8 +67,12 @@ module.exports = async function handler(req, res) {
   const catList = cats.length ? cats : ["random"];
 
   const tag = (p, catKey) => p.then((list) => list.map((it) => ({ ...it, cat: catKey })));
+  // Même partage que côté client (voir fetchLearnClient dans index.html) :
+  // chaque catégorie ne fournit qu'une part du lot, dedupAndRank tronquant
+  // ensuite à `count`.
+  const part = Math.max(6, Math.ceil(count / catList.length));
   const tasks = catList.map((catKey) =>
-    tag(core.fetchCategoryItems(catKey, fetchJson), catKey)
+    tag(core.fetchCategoryItems(catKey, fetchJson, part), catKey)
   );
 
   const results = await Promise.allSettled(tasks);
