@@ -565,8 +565,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=63"></script>
-<script src="src/learn-core.js?v=63"></script>
+<script src="src/lib.js?v=64"></script>
+<script src="src/learn-core.js?v=64"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -845,7 +845,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="63";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="64";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1245,7 +1245,7 @@ async function loadFeeds(force){
   const my=++loadSeq;feedLoadStarted=true;
   demobadge(false);syncing(false);
   const m=mode;                                   // capture : l'utilisateur peut changer de mode pendant le fetch
-  const key=m==="learn"?("learn_"+cat):"news";    // cache distinct par catégorie
+  const key=feedKey(m);                           // cache distinct par catégorie (et par intérêts en « Tous »)
   // « Même fil » = le contenu affiché appartient à la MÊME clé que celle qu'on
   // charge. Se contenter de « quelque chose est affiché » laissait le fil Actus
   // à l'écran pendant tout le chargement du mode Apprendre.
@@ -2244,7 +2244,15 @@ function applyModeUI(){
    Un fetch réel ne se fait plus qu'au 1er affichage, via ↻, ou sur un
    changement de catégorie. */
 const feedSnap={};
-function feedKey(m){return m==="learn"?("learn_"+cat):"news";}
+// « Tous » mélange les intérêts choisis : la clé doit donc varier avec EUX.
+// Sinon elle vaut "learn_all" quoi qu'on coche, loadFeeds conclut « même fil »
+// (sameFeed), et le nouveau lot est ajouté à la suite au lieu de remplacer —
+// changer d'intérêts semble alors sans effet. Le cache confondait aussi
+// « aucun intérêt » (tirage aléatoire) et « des intérêts » (leur mélange).
+function feedKey(m){
+  if(m!=="learn")return "news";
+  return "learn_"+cat+(cat==="all"?":"+interests.join(","):"");
+}
 function snapshotFeed(m){
   if(!feedEl.children.length)return;               // rien à mémoriser
   feedSnap[feedKey(m)]={
@@ -2319,13 +2327,13 @@ const catsEl=document.getElementById("cats");
 const editIntBtn=document.getElementById("editIntBtn");
 editIntBtn.onclick=openInterests;
 function renderCats(){
-  let chips=[];
-  if(interests.length){
-    chips.push({k:"all",label:"✨ Tous"});
-    interests.forEach(k=>{const c=CATEGORIES.find(x=>x.key===k);if(c)chips.push({k,label:c.label});});
-  }else{
-    chips.push({k:"all",label:"🎲 Aléatoire"});
-  }
+  // Une seule puce d'ensemble, et un seul NOM. Elle s'appelait « ✨ Tous »
+  // avec des intérêts et « 🎲 Aléatoire » sans : deux noms pour une même puce,
+  // qui donnaient l'impression de deux filtres distincts. Son sens ne change
+  // pas : « rien de précis » — le mélange des intérêts choisis, ou un tirage
+  // au hasard tant qu'aucun ne l'est (voir catKeysForBatch).
+  const chips=[{k:"all",label:"✨ Tous"}];
+  interests.forEach(k=>{const c=CATEGORIES.find(x=>x.key===k);if(c)chips.push({k,label:c.label});});
   catsEl.innerHTML=chips.map(c=>`<button data-k="${c.k}" class="${c.k===cat?"active":""}">${c.label}</button>`).join("");
   catsEl.querySelectorAll("button").forEach(b=>{b.onclick=()=>setCat(b.dataset.k);});
   // Le bouton est une icône seule : la nuance « modifier / choisir » passe par
