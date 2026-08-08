@@ -77,50 +77,39 @@ les deux univers, et un nouvel appui sur **📰 Actus** revient aux flux RSS.
 
 Une **barre de centres d'intérêt** (chips défilables sous les onglets) permet de choisir
 ce qu'on veut apprendre : **Aléatoire** (défaut), Jeux vidéo, Films, Séries télévisées,
-Œuvres littéraires, Animaux, Sport, Musique, Histoire, Sciences, Technologie, Art,
-Géographie, Mythologie, Inventions, Personnes historiques et personnalités. Le choix est
-mémorisé et chaque catégorie a son propre cache.
+Groupes musicaux, Romans, Personnalités historiques, Batailles, Pays, Monuments, Découvertes
+scientifiques, Objets célestes, Espèces animales, Inventions, Peintures, Gastronomie. Le choix
+est mémorisé et chaque catégorie a son propre cache.
 
 ### Source du mode Apprendre
 
-Le tirage et le contenu viennent de deux endroits : **Wikidata choisit QUELS articles
-apparaissent**, **Wikipédia fournit le contenu affiché** (extrait d'intro, image, lien — celui
-que « Découvrir » ouvre, quelle que soit la catégorie). Chaque catégorie est une liste
-d'identifiants Wikidata (`Q…`), le premier étant celui voulu.
+Tout vient de **Wikipédia**, en deux appels : `list=categorymembers` liste le contenu de la
+catégorie (`Catégorie:Film`, `Catégorie:Roman`…), puis un second appel va chercher extrait
+d'intro, image et lien des articles retenus — le lien qu'ouvre « Découvrir ». Seule la
+catégorie **Aléatoire** saute la première étape (`generator=random`).
 
-Obtenir « des articles français dont l'item Wikidata est de type X » s'est révélé nettement
-moins direct que prévu, et **aucun de ces appels n'est vérifiable depuis l'environnement de
-développement** (réseau sortant bloqué vers `wikidata.org` comme vers `wikipedia.org`). Cinq
-versions successives, chacune misant sur un seul mécanisme, ont donc été livrées puis
-invalidées une à une par un test réel. Plutôt que d'en parier une sixième, le code **essaie
-les sources dans l'ordre et garde la première qui rend des articles** :
+Deux points méritent l'explication :
 
-1. **SPARQL** (`query.wikidata.org`) — la seule qui applique la contrainte « a un article en
-   français » côté serveur, par une jointure : elle ne peut donc pas rendre des items
-   inexploitables. Volontairement dépouillée par rapport aux tentatives précédentes, dont on
-   connaît les défauts : `wdt:P31` direct (pas de chemin transitif `P279*`, trop lent) et un
-   décalage aléatoire (pas d'`ORDER BY RAND()`, qui trie tout avant de tronquer).
-2. **Recherche Wikidata** (`www.wikidata.org`, `haswbstatement:P31=…`, `gsrsort=random`) —
-   rapide, mais elle tire au sort AVANT de savoir lesquels ont un article français, d'où des
-   lots parfois vides sur les classes peu « wikipédisées ». À noter : ce mot-clé vient de
-   l'extension WikibaseCirrusSearch, active sur le dépôt Wikidata et **pas** sur les wikis
-   clients — l'envoyer à `fr.wikipedia.org` le fait traiter comme du texte brut.
-3. **Catégories Wikipédia** (`deepcategory:"…"`) — le mécanisme d'avant ce chantier, gardé en
-   filet. Il ratisse plus large et dérive parfois hors sujet (c'est ce qui a motivé le passage
-   à Wikidata), mais il a toujours rendu des articles : mieux vaut un fil imparfait qu'un mode
-   démo.
+- **On descend dans les sous-catégories.** Une catégorie de tête comme `Catégorie:Film`
+  contient surtout des sous-catégories et très peu d'articles. Le code descend donc tant qu'il
+  manque des articles, dans la limite d'un budget de requêtes (au-delà, le chargement se
+  ferait sentir avant la première carte).
+- **La descente est tirée au sort**, et c'est de là que vient la variété du fil :
+  `categorymembers` rend toujours les mêmes membres dans le même ordre, cette API n'ayant pas
+  de tri aléatoire. Sans ce tirage, chaque lot d'une même catégorie serait identique au
+  précédent.
 
-Seule la catégorie **Aléatoire** ignore tout ça : tirage direct sur Wikipédia
-(`generator=random`).
+**Wikidata a été essayé, puis abandonné.** Choisir les articles par leur type (`P31`)
+promettait des catégories exactes ; cinq mécanismes ont été livrés puis invalidés un à un par
+un test réel (deux variantes SPARQL, deux variantes de la recherche Wikidata, et le mot-clé
+`haswbstatement` envoyé à tort à Wikipédia — il n'existe que sur le dépôt Wikidata). Le fond
+du problème : `P31` ne remonte pas les sous-classes, et presque aucun article n'est
+« instance de » art, science ou technologie. Le détail de chaque tentative et de ce qu'elle a
+appris est consigné en tête de `src/learn-core.js`, pour qu'on n'y revienne pas en rond.
 
-Un dernier écueil, propre à Wikidata : `P31` ne remonte pas les sous-classes. Presque tous les
-articles animaliers sont `P31` « taxon » et non « animal », et quasiment rien n'est « instance
-de » art ou science — ce sont des sous-classes, pas des instances, d'où des catégories
-abstraites vides. Chaque catégorie liste donc aussi les types dont les articles sont réellement
-des instances (discipline, œuvre d'art, appareil…), OR-combinés.
-
-`?debug=1` affiche, catégorie par catégorie, ce que **chaque** source a répondu — panne réseau,
-erreur d'API, ou réponse vide — les trois appelant des correctifs opposés.
+`?debug=1` affiche, catégorie par catégorie, le nombre d'articles obtenus, et distingue une
+catégorie introuvable (nom à corriger) d'une catégorie trouvée mais sans article exploitable
+(descente à élargir).
 
 ## Lancer en local
 
@@ -942,9 +931,9 @@ ouvrir la demande d'inclusion sur `gitlab.com/fdroid/fdroiddata`.
   pointe vers la version pleine taille. Appelé uniquement si l'image du flux est
   réellement petite, résultat mémorisé côté client et mis en cache 24 h par le CDN.
 - **Mode Apprendre** : `api/learn.js` agrège **côté serveur** les catégories demandées
-  (Wikidata pour les titres, Wikipédia pour le contenu — cache CDN mutualisé entre
-  utilisateurs). Le front l'appelle en priorité et se rabat sur son agrégation client si
-  l'endpoint n'est pas déployé (hébergement statique).
+  (catégories Wikipédia — cache CDN mutualisé entre utilisateurs). Le front l'appelle en
+  priorité et se rabat sur son agrégation client si l'endpoint n'est pas déployé
+  (hébergement statique).
 - **Code partagé** : `src/lib.js` (fonctions pures : assainissement, parsing OPML/JSON,
   dates) et `src/learn-core.js` (catégories, URL et normaliseurs du mode Apprendre) sont
   chargés par `index.html` **et** par les fonctions serverless — une seule implémentation,

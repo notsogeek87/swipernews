@@ -565,8 +565,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=71"></script>
-<script src="src/learn-core.js?v=71"></script>
+<script src="src/lib.js?v=72"></script>
+<script src="src/learn-core.js?v=72"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -575,7 +575,7 @@
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
   const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds"],
-              SwiperLearn:["CATEGORIES","wikiUrl","sparqlUrl","wikidataUrl","SOURCES","normalizeWiki","fetchCategoryItems","randomBucket"]};
+              SwiperLearn:["CATEGORIES","wikiUrl","categoryMembersUrl","normalizeWiki","fetchCategoryItems","randomBucket"]};
   const missing=[];
   for(const ns in need){
     const mod=self[ns];
@@ -694,12 +694,23 @@ let mode=(()=>{try{return localStorage.getItem(LS_MODE)==="news"?"news":"learn";
    avec la fonction serverless (les deux listes avaient déjà divergé). */
 const CATEGORIES=LEARN.CATEGORIES;
 /* Intérêts choisis par l'utilisateur (sous-ensemble de clés CATEGORIES, hors "random"). */
-let interests=(()=>{try{const s=localStorage.getItem(LS_INT);return s?JSON.parse(s):[];}catch(e){return [];}})();
+let interests=(()=>{
+  try{const s=localStorage.getItem(LS_INT);const a=s?JSON.parse(s):[];
+    // Les centres d'intérêt ont changé de jeu de clés avec les catégories : on
+    // écarte celles qui n'existent plus, sinon « Tous » tirerait sur des
+    // catégories fantômes, silencieusement rabattues sur l'aléatoire.
+    return Array.isArray(a)?a.filter(k=>LEARN.CATEGORIES.some(c=>c.key===k)):[];
+  }catch(e){return [];}})();
 function interestsChosen(){try{return localStorage.getItem(LS_INT)!==null;}catch(e){return false;}}
 /* Filtre courant : "all" = mélange des intérêts choisis, "random" = tirage
    pur (chip toujours disponible, indépendant des intérêts), sinon une clé
    d'intérêt précise. */
-let cat=(()=>{try{const v=localStorage.getItem(LS_CAT);return v||"all";}catch(e){return "all";}})();
+let cat=(()=>{try{const v=localStorage.getItem(LS_CAT);
+  // Même précaution que pour `interests` : un filtre mémorisé sous l'ancien jeu
+  // de clés ne correspond plus à aucune catégorie et laisserait la barre sans
+  // chip active, sur un fil rabattu en douce sur l'aléatoire.
+  if(v&&(v==="all"||CATEGORIES.some(c=>c.key===v)))return v;
+  return "all";}catch(e){return "all";}})();
 /* Catégorie effective pour un lot : le filtre courant, ou un intérêt tiré au sort si "all". */
 function activeCatKey(){
   if(cat!=="all")return cat;
@@ -838,11 +849,11 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="71";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="72";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
-// news.lielu.eu pour les données) : Wikidata et Wikipédia s'appellent déjà en
-// direct dans un navigateur (CORS ouvert chez eux, voir srcWikipedia), et
+// news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
+// navigateur (CORS ouvert chez eux, voir srcWikipedia), et
 // seuls les flux RSS (pas de CORS chez eux) ont besoin d'un contournement —
 // géré par nativeGet ci-dessous, qui appelle explicitement le plugin
 // CapacitorHttp (réseau natif Android, aucun CORS) SEULEMENT pour ce cas. Sans
@@ -1149,18 +1160,17 @@ function findImage(node,raw){
 }
 // relTime : voir src/lib.js
 
-/* ---------- Mode Apprendre : titres Wikidata, contenu Wikipédia ----------
+/* ---------- Mode Apprendre : catégories Wikipédia ----------
    URL et normaliseurs viennent de src/learn-core.js : une seule implémentation,
    partagée avec /api/learn (elles avaient divergé). Ici on ne garde que la
    politique de récupération propre au navigateur (direct si CORS, sinon proxy),
-   injectée dans LEARN.fetchCategoryItems, qui enchaîne Wikidata (les titres de
-   la catégorie) puis Wikipédia (extrait/image/lien — le lien qu'ouvre
-   « Découvrir »). */
+   injectée dans LEARN.fetchCategoryItems, qui liste les membres de la catégorie
+   puis va chercher leur extrait/image/lien — le lien qu'ouvre « Découvrir ». */
 async function learnFetchJson(url){
   try{const res=await fetchWithTimeout(url,{cache:"no-store"},CONFIG.FETCH_TIMEOUT);
     if(!res.ok)throw new Error("http "+res.status);return await res.json();}
   catch(e){
-    warn("wikidata/wikipedia direct",e);
+    warn("wikipedia direct",e);
     // Repli par proxy : au-delà, "no-proxy" ne dit RIEN d'utile (voir
     // fetchText) — on garde donc la raison du tout premier essai (direct),
     // le plus révélateur (statut HTTP, ou timeout si AbortError), pour le
@@ -1202,8 +1212,7 @@ async function fetchLearnClient(keys,count){
       warn(`learn cat "${keys[i]}"`,r.reason);
       return `${keys[i]}: ÉCHEC — ${(r.reason&&r.reason.message)||r.reason}`;
     }
-    const srcs=[...new Set(r.value.map(it=>it.src).filter(Boolean))].join("+")||"?";
-    return `${keys[i]}: ${r.value.length} article(s) via ${srcs}`;
+    return `${keys[i]}: ${r.value.length} article(s)`;
   });
   const lists=results.filter(r=>r.status==="fulfilled").map(r=>r.value);
   return LEARN.dedupAndRank(lists,count);               // articles avec image d'abord, sources mélangées
@@ -1229,11 +1238,9 @@ async function fetchLearn(count=CONFIG.BATCH_SIZE){
         const data=await res.json();
         if(data&&Array.isArray(data.items)&&data.items.length){
           batch=data.items;
-          // Le backend agrège avec le MÊME noyau, donc ses articles portent
-          // aussi leur source : on la reporte, sinon le panneau ?debug=1
-          // afficherait le détail périmé du dernier repli client.
-          const srcs=[...new Set(batch.map(it=>it.src).filter(Boolean))].join("+")||"?";
-          lastLearnDetail=[`/api/learn: ${batch.length} article(s) via ${srcs}`];
+          // Sinon le panneau ?debug=1 afficherait le détail périmé du dernier
+          // repli client, alors que c'est le backend qui a servi ce lot.
+          lastLearnDetail=[`/api/learn: ${batch.length} article(s)`];
         }
       }
     }catch(e){warn("learn backend",e);/* repli client */}

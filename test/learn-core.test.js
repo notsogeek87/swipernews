@@ -6,160 +6,152 @@ const test = require("node:test");
 const assert = require("node:assert");
 const core = require("../src/learn-core.js");
 
-test("chaque catégorie a des identifiants Wikidata valides, sauf l'aléatoire", () => {
+test("chaque catégorie pointe une catégorie Wikipédia, sauf l'aléatoire", () => {
   const random = core.CATEGORIES.find((c) => c.key === "random");
-  assert.equal(random.qids, null);
+  assert.equal(random.category, null);
   for (const c of core.CATEGORIES.filter((c) => c.key !== "random")) {
-    assert.ok(Array.isArray(c.qids) && c.qids.length, `qids manquants pour ${c.key}`);
-    for (const q of c.qids) {
-      assert.ok(/^Q\d+$/.test(q), `qid invalide (${q}) pour ${c.key}`);
-    }
+    assert.ok(c.category, `catégorie Wikipédia manquante pour ${c.key}`);
+    assert.ok(
+      !/^Cat[ée]gorie:/.test(c.category),
+      `le préfixe « Catégorie: » est ajouté par categoryMembersUrl, pas ici (${c.key})`
+    );
     assert.ok(c.label, `label manquant pour ${c.key}`);
   }
 });
 
-test("les 15 catégories demandées sont là, avec leur qid principal en tête", () => {
-  // L'ordre des qids compte : le premier est celui explicitement demandé, les
-  // suivants ne sont là que pour rattraper les articles qui ne le portent pas.
+test("les 15 catégories demandées sont là, avec le bon titre Wikipédia", () => {
   const attendu = {
-    jeuxvideo: "Q7889",
-    films: "Q11424",
-    series: "Q5398426",
-    litterature: "Q7725634",
-    animaux: "Q729",
-    sport: "Q349",
-    musique: "Q638",
-    histoire: "Q309",
-    sciences: "Q336",
-    tech: "Q11019",
-    art: "Q735",
-    geo: "Q1071",
-    mythologie: "Q9134",
-    inventions: "Q450",
-    personnalites: "Q5",
+    jeuxvideo: "Jeu vidéo",
+    films: "Film",
+    series: "Série télévisée",
+    groupes: "Groupe musical",
+    romans: "Roman",
+    personnalites: "Personnalité historique",
+    batailles: "Bataille",
+    pays: "Pays",
+    monuments: "Monument",
+    decouvertes: "Découverte scientifique",
+    objetscelestes: "Objet céleste",
+    especes: "Espèce animale",
+    inventions: "Invention",
+    peintures: "Peinture",
+    gastronomie: "Gastronomie",
   };
-  for (const [key, qid] of Object.entries(attendu)) {
+  for (const [key, category] of Object.entries(attendu)) {
     const c = core.CATEGORIES.find((x) => x.key === key);
     assert.ok(c, `catégorie manquante : ${key}`);
-    assert.equal(c.qids[0], qid, `qid principal inattendu pour ${key}`);
+    assert.equal(c.category, category);
   }
   // random + les 15 demandées, rien de plus
   assert.equal(core.CATEGORIES.length, Object.keys(attendu).length + 1);
 });
 
-test("wikidataUrl interroge Wikidata (pas Wikipédia) et OR-combine les qids", () => {
-  // haswbstatement: n'existe que sur le dépôt Wikidata, pas sur les wikis
-  // clients — l'envoyer à fr.wikipedia.org avait tout cassé d'un coup.
-  const url = core.wikidataUrl("animaux");
-  assert.ok(url.startsWith("https://www.wikidata.org/w/api.php?"));
+test("categoryMembersUrl demande articles ET sous-catégories, préfixe compris", () => {
+  const url = core.categoryMembersUrl("Jeu vidéo");
+  assert.ok(url.startsWith("https://fr.wikipedia.org/w/api.php?"));
   const params = new URL(url).searchParams;
-  assert.equal(
-    params.get("gsrsearch"),
-    "haswbstatement:P31=Q729 OR haswbstatement:P31=Q16521"
-  );
-  assert.equal(params.get("gsrsort"), "random");
-  assert.equal(params.get("sitefilter"), "frwiki");
-  assert.equal(params.get("prop"), "sitelinks");
+  assert.equal(params.get("list"), "categorymembers");
+  assert.equal(params.get("cmtitle"), "Catégorie:Jeu vidéo");
+  // subcat en plus de page : sans les sous-catégories, impossible de descendre,
+  // or une catégorie de tête contient surtout ça.
+  assert.equal(params.get("cmtype"), "subcat|page");
+  assert.equal(params.get("cmlimit"), String(core.CM_LIMIT));
 });
 
-test("wikidataUrl échantillonne dans la limite documentée sûre", () => {
-  // 500 (le maximum théorique) n'avait rien donné de plus ; au-delà du plafond
-  // autorisé, MediaWiki avertit en silence plutôt que d'échouer franchement.
-  assert.ok(core.WIKIDATA_SAMPLE <= 50, "au-delà de la limite anonyme documentée");
-  const params = new URL(core.wikidataUrl("personnalites")).searchParams;
-  assert.equal(params.get("gsrlimit"), String(core.WIKIDATA_SAMPLE));
-});
-
-test("sparqlUrl contraint l'article français CÔTÉ SERVEUR, sans chemin transitif ni tri global", () => {
-  // Les deux points qui avaient tué les tentatives SPARQL précédentes :
-  // `wdt:P31/wdt:P279*` (trop lent) et `ORDER BY RAND()` (trie tout avant de
-  // tronquer). Ici : P31 direct, et un décalage aléatoire.
-  const url = core.sparqlUrl("sciences");
-  assert.ok(url.startsWith("https://query.wikidata.org/sparql?"));
-  const q = decodeURIComponent(url.split("query=")[1]);
-  assert.ok(q.includes("VALUES ?type { wd:Q336"), "doit lister les qids de la catégorie");
-  assert.ok(q.includes("wdt:P31 ?type"), "P31 direct");
-  assert.ok(!q.includes("P279"), "pas de chemin transitif");
-  assert.ok(!q.includes("ORDER BY"), "pas de tri global");
-  assert.ok(
-    q.includes("fr.wikipedia.org"),
-    "la contrainte article français est dans la requête"
-  );
-  assert.ok(/OFFSET \d+/.test(q));
-});
-
-test("normalizeSparqlTitles extrait et dédoublonne les titres", () => {
+test("normalizeCategoryMembers sépare articles et sous-catégories", () => {
   const data = {
-    results: {
-      bindings: [
-        { title: { value: "Effet tunnel" } },
-        { title: { value: "Tardigrade" } },
-        { title: { value: "Effet tunnel" } },
+    query: {
+      categorymembers: [
+        { ns: 0, title: "Tetris" },
+        { ns: 14, title: "Catégorie:Jeu de plateforme" },
+        { ns: 0, title: "Pong" },
+        { ns: 10, title: "Modèle:Palette" }, // ni l'un ni l'autre : ignoré
         {},
       ],
     },
   };
-  assert.deepEqual(core.normalizeSparqlTitles(data), ["Effet tunnel", "Tardigrade"]);
-  assert.deepEqual(core.normalizeSparqlTitles({}), []);
+  const out = core.normalizeCategoryMembers(data);
+  assert.deepEqual(out.pages, ["Tetris", "Pong"]);
+  // le préfixe est retiré : la sous-catégorie doit pouvoir être ré-interrogée
+  assert.deepEqual(out.subcats, ["Jeu de plateforme"]);
 });
 
-test("wikiCategoryUrl est le filet sans Wikidata (catégories Wikipédia)", () => {
-  const url = core.wikiCategoryUrl("sciences");
-  assert.ok(url.includes("fr.wikipedia.org/w/api.php"));
-  const params = new URL(url).searchParams;
-  assert.ok(params.get("gsrsearch").startsWith('deepcategory:"Sciences"'));
-  assert.equal(params.get("gsrsort"), "random");
+test("normalizeCategoryMembers tolère une réponse vide ou mal formée", () => {
+  assert.deepEqual(core.normalizeCategoryMembers({}), { pages: [], subcats: [] });
+  assert.deepEqual(core.normalizeCategoryMembers(null), { pages: [], subcats: [] });
 });
 
-test("le filet écarte les biographies, sauf pour la catégorie personnalités", () => {
-  // Dérive observée : un ACTEUR servi sous « Séries télévisées », l'arbre de
-  // catégories Wikipédia rangeant les personnes sous les œuvres où elles jouent.
-  const bio = ' -hastemplate:"Infobox Biographie2"';
-  assert.ok(
-    new URL(core.wikiCategoryUrl("series")).searchParams.get("gsrsearch").endsWith(bio)
-  );
-  assert.ok(
-    new URL(core.wikiCategoryUrl("films")).searchParams.get("gsrsearch").endsWith(bio)
-  );
-  // …sauf là où les biographies SONT le sujet voulu.
-  assert.equal(
-    new URL(core.wikiCategoryUrl("personnalites")).searchParams.get("gsrsearch"),
-    'deepcategory:"Personnalité"'
-  );
-});
-
-test("wikidataUrl renvoie null pour la catégorie aléatoire (pas de qids)", () => {
-  assert.equal(core.wikidataUrl("random"), null);
-});
-
-test("normalizeWikidataTitles extrait le sitelink frwiki et dédoublonne", () => {
-  const data = {
-    query: {
-      pages: [
-        {
-          sitelinks: [
-            { site: "frwiki", title: "Effet tunnel" },
-            { site: "dewiki", title: "Tunneleffekt" },
+test("collectTitles descend dans les sous-catégories quand la catégorie de tête est pauvre", async () => {
+  // Cas réel : « Film » ne contient presque que des sous-catégories.
+  const vus = [];
+  const fetchJson = async (url) => {
+    const titre = new URL(url).searchParams.get("cmtitle");
+    vus.push(titre);
+    if (titre === "Catégorie:Film") {
+      return {
+        query: {
+          categorymembers: [
+            { ns: 0, title: "Cinéma" },
+            { ns: 14, title: "Catégorie:Film français" },
           ],
         },
-        { sitelinks: [{ site: "frwiki", title: "Tardigrade" }] },
-        { sitelinks: [{ site: "frwiki", title: "Effet tunnel" }] }, // doublon
-        { sitelinks: [{ site: "dewiki", title: "Ohne frwiki" }] }, // pas d'article français : ignoré
-        {}, // aucun sitelink : ignoré
-      ],
-    },
+      };
+    }
+    return {
+      query: {
+        categorymembers: Array.from({ length: 25 }, (_, i) => ({
+          ns: 0,
+          title: `F${i}`,
+        })),
+      },
+    };
   };
-  assert.deepEqual(core.normalizeWikidataTitles(data), ["Effet tunnel", "Tardigrade"]);
+  const titles = await core.collectTitles("Film", fetchJson, []);
+  assert.deepEqual(vus, ["Catégorie:Film", "Catégorie:Film français"]);
+  assert.ok(titles.includes("Cinéma"), "les articles de la tête sont gardés");
+  assert.ok(titles.length > 20, "complétés par ceux de la sous-catégorie");
 });
 
-test("normalizeWikidataTitles accepte l'ancien format sitelinks indexé par site", () => {
-  const data = { query: { pages: [{ sitelinks: { frwiki: { title: "Tardigrade" } } }] } };
-  assert.deepEqual(core.normalizeWikidataTitles(data), ["Tardigrade"]);
+test("collectTitles s'arrête dès qu'il a de quoi remplir un lot", async () => {
+  let appels = 0;
+  const fetchJson = async () => {
+    appels++;
+    return {
+      query: {
+        categorymembers: [
+          ...Array.from({ length: 30 }, (_, i) => ({ ns: 0, title: `A${i}` })),
+          { ns: 14, title: "Catégorie:Sous" },
+        ],
+      },
+    };
+  };
+  await core.collectTitles("Pays", fetchJson, []);
+  assert.equal(appels, 1, "inutile de descendre quand la tête suffit");
 });
 
-test("normalizeWikidataTitles tolère une réponse vide ou mal formée", () => {
-  assert.deepEqual(core.normalizeWikidataTitles({}), []);
-  assert.deepEqual(core.normalizeWikidataTitles(null), []);
+test("collectTitles borne le nombre de requêtes même sans jamais trouver d'article", async () => {
+  let appels = 0;
+  const fetchJson = async () => {
+    appels++;
+    return { query: { categorymembers: [{ ns: 14, title: `Catégorie:Vide${appels}` }] } };
+  };
+  const titles = await core.collectTitles("Film", fetchJson, []);
+  assert.deepEqual(titles, []);
+  assert.equal(appels, core.CM_MAX_LOOKUPS, "budget de requêtes respecté");
+});
+
+test("collectTitles signale une catégorie inexistante plutôt que de l'avaler", async () => {
+  const notes = [];
+  const fetchJson = async () => ({
+    error: { code: "invalidcategory", info: "titre invalide" },
+  });
+  const titles = await core.collectTitles(
+    "Catégorie mal orthographiée",
+    fetchJson,
+    notes
+  );
+  assert.deepEqual(titles, []);
+  assert.match(notes.join(" "), /invalidcategory/);
 });
 
 test("wikiUrl sans titre demande un thumbnail borné et un tirage aléatoire", () => {
@@ -173,10 +165,8 @@ test("wikiUrl sans titre demande un thumbnail borné et un tirage aléatoire", (
 
 test("wikiUrl avec titres interroge ces titres précis, sans recherche", () => {
   const url = core.wikiUrl(["Effet tunnel", "Tardigrade"]);
-  assert.ok(url.includes("fr.wikipedia.org/w/api.php"));
   assert.ok(!url.includes("generator="));
-  const params = new URL(url).searchParams;
-  assert.equal(params.get("titles"), "Effet tunnel|Tardigrade");
+  assert.equal(new URL(url).searchParams.get("titles"), "Effet tunnel|Tardigrade");
 });
 
 test("wikiUrl tronque à la limite de l'API Wikipédia (50 titres)", () => {
@@ -212,7 +202,7 @@ test("normalizeWiki accepte encore l'ancien format indexé par pageid", () => {
   assert.equal(out[0].title, "T");
 });
 
-test("fetchCategoryItems (aléatoire) fait un seul aller Wikipédia", async () => {
+test("fetchCategoryItems (aléatoire) fait un seul aller, sans catégorie", async () => {
   const calls = [];
   const fetchJson = async (url) => {
     calls.push(url);
@@ -221,86 +211,57 @@ test("fetchCategoryItems (aléatoire) fait un seul aller Wikipédia", async () =
   const out = await core.fetchCategoryItems("random", fetchJson);
   assert.equal(calls.length, 1);
   assert.ok(calls[0].includes("generator=random"));
+  assert.ok(!calls[0].includes("categorymembers"));
   assert.equal(out.length, 1);
 });
 
-test("fetchCategoryItems s'arrête à la PREMIÈRE source qui rend des articles", async () => {
+test("fetchCategoryItems liste la catégorie puis va chercher le contenu", async () => {
   const calls = [];
   const fetchJson = async (url) => {
     calls.push(url);
-    if (url.startsWith("https://query.wikidata.org/")) {
-      return { results: { bindings: [{ title: { value: "Tardigrade" } }] } };
+    if (url.includes("categorymembers")) {
+      return {
+        query: {
+          categorymembers: Array.from({ length: 25 }, (_, i) => ({
+            ns: 0,
+            title: `Jeu ${i}`,
+          })),
+        },
+      };
     }
-    return { query: { pages: [{ title: "Tardigrade", extract: "z".repeat(130) }] } };
+    return { query: { pages: [{ title: "Tetris", extract: "z".repeat(130) }] } };
   };
-  const out = await core.fetchCategoryItems("sciences", fetchJson);
-  // SPARQL répond : ni la recherche Wikidata ni les catégories Wikipédia
-  // ne doivent être sollicitées.
+  const out = await core.fetchCategoryItems("jeuxvideo", fetchJson);
   assert.equal(calls.length, 2);
-  assert.ok(calls[0].startsWith("https://query.wikidata.org/"));
-  assert.ok(calls[1].startsWith("https://fr.wikipedia.org/"));
-  // startsWith et non includes : l'URL SPARQL contient elle-même
-  // "www.wikidata.org" dans ses PREFIX encodés.
-  assert.ok(!calls.some((u) => u.startsWith("https://www.wikidata.org/")));
-  assert.equal(out.length, 1);
-  assert.equal(out[0].title, "Tardigrade");
+  assert.equal(new URL(calls[0]).searchParams.get("cmtitle"), "Catégorie:Jeu vidéo");
+  assert.ok(new URL(calls[1]).searchParams.get("titles").includes("Jeu "));
+  assert.equal(out[0].title, "Tetris");
 });
 
-test("chaque article porte la source qui l'a produit", async () => {
-  // Sans ce marquage, une cascade qui réussit par le filet imprécis est
-  // indiscernable d'une cascade qui réussit par Wikidata : le panneau d'erreur
-  // s'efface dès qu'une source répond.
-  const parSparql = async (url) =>
-    url.startsWith("https://query.wikidata.org/")
-      ? { results: { bindings: [{ title: { value: "T" } }] } }
-      : { query: { pages: [{ title: "T", extract: "x".repeat(130) }] } };
-  const a = await core.fetchCategoryItems("sciences", parSparql);
-  assert.equal(a[0].src, "sparql");
+test("fetchCategoryItems nomme la catégorie fautive quand elle ne rend rien", async () => {
+  // Le message remonte au panneau ?debug=1 : « catégorie introuvable » et
+  // « catégorie trouvée mais sans article » appellent des correctifs opposés.
+  const vide = async () => ({ query: { categorymembers: [] } });
+  await assert.rejects(
+    core.fetchCategoryItems("peintures", vide),
+    /aucun article sous « Peinture »/
+  );
 
-  const parFilet = async (url) => {
-    if (url.startsWith("https://query.wikidata.org/")) throw new Error("ko");
-    if (url.startsWith("https://www.wikidata.org/")) return { query: { pages: [] } };
-    return { query: { pages: [{ title: "T", extract: "x".repeat(130) }] } };
-  };
-  const b = await core.fetchCategoryItems("sciences", parFilet);
-  assert.equal(b[0].src, "wpcat");
-});
-
-test("fetchCategoryItems bascule sur la source suivante quand une source échoue", async () => {
-  const tried = [];
-  const fetchJson = async (url) => {
-    if (url.startsWith("https://query.wikidata.org/")) {
-      tried.push("sparql");
-      throw new Error("timeout");
-    }
-    if (url.startsWith("https://www.wikidata.org/")) {
-      tried.push("wdsearch");
-      return { query: { pages: [] } }; // répond, mais rien d'exploitable
-    }
-    tried.push("wikipedia");
-    return { query: { pages: [{ title: "Repli", extract: "z".repeat(130) }] } };
-  };
-  const out = await core.fetchCategoryItems("sciences", fetchJson);
-  assert.deepEqual(tried, ["sparql", "wdsearch", "wikipedia"]);
-  assert.equal(out[0].title, "Repli"); // le filet catégories Wikipédia a servi
-});
-
-test("fetchCategoryItems rapporte CE QUE CHAQUE source a répondu quand tout échoue", async () => {
-  // C'est ce détail qui remonte au panneau ?debug=1 : sans lui, trois pannes
-  // de causes opposées se ressemblaient toutes à l'écran (« mode démo »).
-  const fetchJson = async (url) => {
-    if (url.startsWith("https://query.wikidata.org/")) throw new Error("http 429");
-    if (url.startsWith("https://www.wikidata.org/")) {
-      return { error: { code: "badvalue", info: "paramètre invalide" } };
-    }
-    return { query: { pages: [] } };
-  };
-  await assert.rejects(core.fetchCategoryItems("sciences", fetchJson), (e) => {
-    assert.match(e.message, /sparql: http 429/);
-    assert.match(e.message, /wdsearch: erreur badvalue/);
-    assert.match(e.message, /wpcat:/);
-    return true;
-  });
+  const sansExtrait = async (url) =>
+    url.includes("categorymembers")
+      ? {
+          query: {
+            categorymembers: Array.from({ length: 25 }, (_, i) => ({
+              ns: 0,
+              title: `P${i}`,
+            })),
+          },
+        }
+      : { query: { pages: [{ title: "P0", extract: "trop court" }] } };
+  await assert.rejects(
+    core.fetchCategoryItems("peintures", sansExtrait),
+    /0 exploitable/
+  );
 });
 
 test("randomBucket reste dans la plage cacheable", () => {

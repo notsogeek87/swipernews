@@ -1,5 +1,5 @@
 // Fonction serverless Vercel : agrège les catégories du mode Apprendre
-// (Wikidata pour les titres, Wikipédia pour l'extrait/l'image/le lien)
+// (catégories Wikipédia : membres de la catégorie, puis extrait/image/lien)
 // CÔTÉ SERVEUR.
 //
 // Intérêt : mutualiser le cache CDN entre tous les utilisateurs, masquer les
@@ -10,7 +10,7 @@
 // Les catégories, constructeurs d'URL et normaliseurs vivent dans
 // src/learn-core.js, partagés avec le navigateur (une seule implémentation).
 //
-// Hôtes appelés fixes et publics (Wikidata, Wikipédia) → pas d'exposition SSRF ici.
+// Hôte appelé fixe et public (Wikipédia) → pas d'exposition SSRF ici.
 "use strict";
 
 const core = require("../src/learn-core.js");
