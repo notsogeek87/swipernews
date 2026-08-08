@@ -83,39 +83,44 @@ mémorisé et chaque catégorie a son propre cache.
 
 ### Source du mode Apprendre
 
-Le tirage et le contenu viennent de deux sources :
+Le tirage et le contenu viennent de deux endroits : **Wikidata choisit QUELS articles
+apparaissent**, **Wikipédia fournit le contenu affiché** (extrait d'intro, image, lien — celui
+que « Découvrir » ouvre, quelle que soit la catégorie). Chaque catégorie est une liste
+d'identifiants Wikidata (`Q…`), le premier étant celui voulu.
 
-- **Wikidata** choisit QUELS articles apparaissent. Chaque catégorie est une liste
-  d'identifiants (`Q…`), et une recherche sur `www.wikidata.org/w/api.php`
-  (`generator=search`, `gsrsearch=haswbstatement:P31=…`, `gsrsort=random`) tire au sort des
-  items déclarant l'un d'eux comme nature (`P31`), en ne retenant que ceux ayant un article
-  français (`prop=sitelinks`, `sitefilter=frwiki`). Seule la catégorie **Aléatoire** échappe
-  à ce filtre : tirage direct sur Wikipédia (`generator=random`).
-- **Wikipédia** fournit le CONTENU affiché — extrait d'intro, image, lien — pour ces titres
-  précis (`action=query`, `titles=…`, pas de recherche). C'est ce lien que « Découvrir »
-  ouvre, quelle que soit la catégorie.
+Obtenir « des articles français dont l'item Wikidata est de type X » s'est révélé nettement
+moins direct que prévu, et **aucun de ces appels n'est vérifiable depuis l'environnement de
+développement** (réseau sortant bloqué vers `wikidata.org` comme vers `wikipedia.org`). Cinq
+versions successives, chacune misant sur un seul mécanisme, ont donc été livrées puis
+invalidées une à une par un test réel. Plutôt que d'en parier une sixième, le code **essaie
+les sources dans l'ordre et garde la première qui rend des articles** :
 
-Deux réglages non évidents, chacun issu d'une panne observée en production (l'historique
-complet est en tête de `src/learn-core.js`) :
+1. **SPARQL** (`query.wikidata.org`) — la seule qui applique la contrainte « a un article en
+   français » côté serveur, par une jointure : elle ne peut donc pas rendre des items
+   inexploitables. Volontairement dépouillée par rapport aux tentatives précédentes, dont on
+   connaît les défauts : `wdt:P31` direct (pas de chemin transitif `P279*`, trop lent) et un
+   décalage aléatoire (pas d'`ORDER BY RAND()`, qui trie tout avant de tronquer).
+2. **Recherche Wikidata** (`www.wikidata.org`, `haswbstatement:P31=…`, `gsrsort=random`) —
+   rapide, mais elle tire au sort AVANT de savoir lesquels ont un article français, d'où des
+   lots parfois vides sur les classes peu « wikipédisées ». À noter : ce mot-clé vient de
+   l'extension WikibaseCirrusSearch, active sur le dépôt Wikidata et **pas** sur les wikis
+   clients — l'envoyer à `fr.wikipedia.org` le fait traiter comme du texte brut.
+3. **Catégories Wikipédia** (`deepcategory:"…"`) — le mécanisme d'avant ce chantier, gardé en
+   filet. Il ratisse plus large et dérive parfois hors sujet (c'est ce qui a motivé le passage
+   à Wikidata), mais il a toujours rendu des articles : mieux vaut un fil imparfait qu'un mode
+   démo.
 
-- **L'échantillon Wikidata est large (500, le maximum).** On ne peut pas demander à la
-  recherche « seulement ceux qui ont un article français » : on échantillonne puis on filtre.
-  Or la proportion est très basse dans les grandes classes — Wikidata compte ~30 millions
-  d'humains (`Q5`) pour ~700 000 biographies sur fr.wikipedia, soit ~2 %. Avec l'ancienne
-  valeur de 40, la catégorie était vide environ 40 % du temps.
-- **Plusieurs qids par catégorie**, le premier étant celui voulu. `haswbstatement:P31=…` ne
-  retient que les items DIRECTEMENT typés, sans remonter les sous-classes. Presque tous les
-  articles animaliers sont `P31` « taxon » et non « animal » ; et quasiment rien n'est
-  « instance de » art ou science — ce sont des sous-classes, pas des instances, d'où des
-  catégories abstraites totalement vides. On liste donc aussi les types dont les articles
-  sont réellement des instances (discipline, œuvre d'art, appareil…).
+Seule la catégorie **Aléatoire** ignore tout ça : tirage direct sur Wikipédia
+(`generator=random`).
 
-`?debug=1` affiche le nombre d'articles obtenus par catégorie, et distingue « aucun item
-trouvé » (mauvais qids) de « des items, mais aucun avec article français » (échantillon trop
-petit) — les deux pannes appellent des correctifs opposés.
+Un dernier écueil, propre à Wikidata : `P31` ne remonte pas les sous-classes. Presque tous les
+articles animaliers sont `P31` « taxon » et non « animal », et quasiment rien n'est « instance
+de » art ou science — ce sont des sous-classes, pas des instances, d'où des catégories
+abstraites vides. Chaque catégorie liste donc aussi les types dont les articles sont réellement
+des instances (discipline, œuvre d'art, appareil…), OR-combinés.
 
-Le tout en français par défaut. Quand plusieurs catégories sont interrogées pour un même lot
-(mode « Tous »), les résultats sont dédoublonnés et mélangés (les cartes avec image d'abord).
+`?debug=1` affiche, catégorie par catégorie, ce que **chaque** source a répondu — panne réseau,
+erreur d'API, ou réponse vide — les trois appelant des correctifs opposés.
 
 ## Lancer en local
 

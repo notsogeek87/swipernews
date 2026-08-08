@@ -13,31 +13,35 @@
 // Wikipédia — deux appels enchaînés, voir fetchCategoryItems.
 //
 // ---------------------------------------------------------------------------
-// CE QUI A ÉTÉ ESSAYÉ, ET POURQUOI ON EST REVENU ICI
+// POURQUOI PLUSIEURS SOURCES ESSAYÉES EN CASCADE
 //
-// Rien de tout ceci n'est vérifiable depuis l'environnement de développement
-// (réseau sortant bloqué vers wikidata.org ET wikipedia.org) : chaque ligne
-// ci-dessous vient de tests sur l'app déployée, pas d'une supposition.
+// Rien de tout ceci n'est vérifiable depuis l'environnement de développement :
+// le réseau sortant y est bloqué vers wikidata.org ET wikipedia.org. Cinq
+// tentatives successives, chacune misant sur UN seul mécanisme, ont donc été
+// livrées puis invalidées par un test réel, une à la fois :
 //
-//  1. SPARQL + `SERVICE bd:sample` (query.wikidata.org) — échec total, toutes
-//     catégories, y compris via le proxy backend (donc pas un souci de CORS) :
-//     requête vraisemblablement malformée, syntaxe jamais vérifiable.
-//  2. SPARQL + `wdt:P31/wdt:P279*` + `ORDER BY RAND()` — syntaxiquement bon,
-//     mais >10 s et dépassements de délai : le chemin de propriété transitif
-//     combiné au tri complet avant LIMIT ne passe pas à l'échelle.
-//  3. Recherche Wikidata + sitelinks (CE FICHIER), mais avec un échantillon de
-//     40 items — Sport fonctionnait (rapide, contenu réel) ; Q5 renvoyait
-//     « 40 item(s) trouvé(s), aucun avec sitelink frwiki ». Le MÉCANISME est
-//     donc bon, c'est l'échantillon qui était trop petit (voir WIKIDATA_SAMPLE).
-//  4. Recherche `haswbstatement:` directement sur fr.wikipedia.org, en un seul
-//     appel — TOUTES les catégories cassées d'un coup, y compris Sport qui
-//     marchait juste avant. `haswbstatement:` est un mot-clé de l'extension
-//     WikibaseCirrusSearch, active sur le dépôt Wikidata, pas sur les wikis
-//     clients : Wikipédia l'a pris pour du texte brut et n'a rien trouvé.
+//  1. SPARQL + `SERVICE bd:sample` — échec total, toutes catégories, y compris
+//     via le proxy backend (donc pas un souci de CORS) : requête
+//     vraisemblablement malformée, syntaxe jamais vérifiable d'ici.
+//  2. SPARQL + `wdt:P31/wdt:P279*` + `ORDER BY RAND()` — syntaxe correcte,
+//     mais >10 s et dépassements de délai : le chemin transitif combiné au tri
+//     complet avant LIMIT ne passe pas à l'échelle.
+//  3. Recherche Wikidata + `prop=sitelinks`, échantillon de 40 — Sport rendait
+//     du contenu réel, mais Q5 renvoyait « 40 item(s) trouvé(s), aucun avec
+//     sitelink frwiki ».
+//  4. `haswbstatement:` envoyé à fr.wikipedia.org en un seul appel — TOUTES
+//     les catégories cassées d'un coup, Sport compris : c'est un mot-clé de
+//     WikibaseCirrusSearch, active sur le dépôt Wikidata et pas sur les wikis
+//     clients, donc pris pour du texte brut.
+//  5. Même chose qu'en 3 avec un échantillon de 500 et des qids élargis —
+//     toujours rien.
 //
-// D'où ce fichier : retour au mécanisme 3 (le seul dont on ait la preuve qu'il
-// rend du contenu réel), avec les deux défauts mesurés corrigés — voir
-// WIKIDATA_SAMPLE pour la taille d'échantillon, et CATEGORIES pour les qids.
+// Chaque itération ne testait qu'une hypothèse et coûtait un aller-retour
+// complet. D'où ce fichier : au lieu de parier, on ESSAIE LES SOURCES DANS
+// L'ORDRE et on garde la première qui rend des articles (voir SOURCES et
+// fetchCategoryItems). Ce qu'aucune n'a rendu est rapporté source par source
+// dans le panneau ?debug=1 — un seul test suffit désormais à savoir laquelle
+// marche et pourquoi les autres échouent, au lieu d'une hypothèse par test.
 // ---------------------------------------------------------------------------
 //
 // Chargé en <script src> classique dans index.html (l'app reste ouvrable en
@@ -83,33 +87,51 @@
   const CATEGORIES = [
     { key: "random", label: "🎲 Aléatoire", qids: null },
     // 1. Jeux vidéo — Q7889
-    { key: "jeuxvideo", label: "🎮 Jeux vidéo", qids: ["Q7889"] },
+    {
+      key: "jeuxvideo",
+      label: "🎮 Jeux vidéo",
+      qids: ["Q7889"],
+      deepcategory: "Jeu vidéo",
+    },
     // 2. Films — Q11424
-    { key: "films", label: "🎥 Films", qids: ["Q11424"] },
+    { key: "films", label: "🎥 Films", qids: ["Q11424"], deepcategory: "Film" },
     // 3. Séries télévisées — Q5398426 (+ mini-série)
-    { key: "series", label: "📺 Séries télévisées", qids: ["Q5398426", "Q1259759"] },
+    {
+      key: "series",
+      label: "📺 Séries télévisées",
+      qids: ["Q5398426", "Q1259759"],
+      deepcategory: "Série télévisée",
+    },
     // 4. Œuvres littéraires — Q7725634 (+ roman, pièce de théâtre, poème)
     {
       key: "litterature",
       label: "📚 Œuvres littéraires",
       qids: ["Q7725634", "Q8261", "Q25379", "Q5185279"],
+      deepcategory: "Œuvre littéraire",
     },
     // 5. Animaux — Q729 (+ taxon : la quasi-totalité des articles d'espèces ;
     //    contrepartie assumée, quelques plantes/champignons peuvent s'inviter)
-    { key: "animaux", label: "🐾 Animaux", qids: ["Q729", "Q16521"] },
+    {
+      key: "animaux",
+      label: "🐾 Animaux",
+      qids: ["Q729", "Q16521"],
+      deepcategory: "Animal",
+    },
     // 6. Sport — Q349 (+ discipline sportive)
-    { key: "sport", label: "⚽ Sport", qids: ["Q349", "Q31629"] },
+    { key: "sport", label: "⚽ Sport", qids: ["Q349", "Q31629"], deepcategory: "Sport" },
     // 7. Musique — Q638 (+ chanson, album, genre musical)
     {
       key: "musique",
       label: "🎵 Musique",
       qids: ["Q638", "Q7366", "Q482994", "Q188451"],
+      deepcategory: "Musique",
     },
     // 8. Histoire — Q309 (+ événement historique, guerre, bataille, traité)
     {
       key: "histoire",
       label: "📜 Histoire",
       qids: ["Q309", "Q13418847", "Q198", "Q178561", "Q131569"],
+      deepcategory: "Histoire",
     },
     // 9. Sciences — Q336 (+ discipline académique, branche de la science,
     //    théorie scientifique : « science » elle-même n'a presque aucune instance)
@@ -117,38 +139,49 @@
       key: "sciences",
       label: "🔬 Sciences",
       qids: ["Q336", "Q11862829", "Q2465832", "Q17737"],
+      deepcategory: "Sciences",
     },
     // 10. Technologie — Q11019 (+ appareil, outil, machine)
     {
       key: "tech",
       label: "💻 Technologie",
       qids: ["Q11019", "Q1183543", "Q39546", "Q11015"],
+      deepcategory: "Technologie",
     },
     // 11. Art — Q735 (+ œuvre d'art, peinture, sculpture, mouvement artistique)
     {
       key: "art",
       label: "🎨 Art",
       qids: ["Q735", "Q838948", "Q3305213", "Q860861", "Q968159"],
+      deepcategory: "Arts",
     },
     // 12. Géographie — Q1071 (+ ville, pays, montagne, cours d'eau)
     {
       key: "geo",
       label: "🌍 Géographie",
       qids: ["Q1071", "Q515", "Q6256", "Q8502", "Q4022"],
+      deepcategory: "Géographie",
     },
     // 13. Mythologie — Q9134 (+ divinité, créature légendaire, personnage mythologique)
     {
       key: "mythologie",
       label: "🔱 Mythologie",
       qids: ["Q9134", "Q178885", "Q2239243", "Q22988604"],
+      deepcategory: "Mythologie",
     },
     // 14. Inventions — Q450
-    { key: "inventions", label: "💡 Inventions", qids: ["Q450"] },
+    {
+      key: "inventions",
+      label: "💡 Inventions",
+      qids: ["Q450"],
+      deepcategory: "Invention",
+    },
     // 15. Personnes historiques et personnalités — Q5
     {
       key: "personnalites",
       label: "👤 Personnes historiques et personnalités",
       qids: ["Q5"],
+      deepcategory: "Personnalité",
     },
   ];
   const catByKey = (key) => CATEGORIES.find((c) => c.key === key) || CATEGORIES[0];
@@ -162,32 +195,65 @@
   const WIKI_THUMB_PX = 1000; // suffisant pour un fond plein écran, même en DPR 3
 
   /**
-   * Items Wikidata tirés au sort par requête. 500 = le maximum de l'API, et
-   * c'est nécessaire, pas du confort : on ne peut pas demander à la recherche
-   * « seulement ceux qui ont un article en français », donc on échantillonne
-   * puis on filtre. Or la proportion d'items ayant un article français est
-   * très basse dans les grandes classes — Wikidata compte ~30 millions
-   * d'humains (Q5) pour ~700 000 biographies sur fr.wikipedia, soit ~2 %.
-   *
-   * Avec 40 (la valeur d'avant), la probabilité de ne tomber sur AUCUN item
-   * exploitable était d'environ 40 % pour Q5 — exactement le « 40 item(s)
-   * trouvé(s), aucun avec sitelink frwiki » observé. Avec 500, elle tombe
-   * sous le millionième, et les classes denses (Sport, Films…) sont servies
-   * bien au-delà du nécessaire.
+   * Items Wikidata tirés au sort par requête de recherche. 50 est la limite
+   * documentée sûre pour un compte anonyme ; l'échantillon de 500 essayé
+   * ensuite n'a rien donné de mieux, et un plafond dépassé se traduit chez
+   * MediaWiki par un avertissement silencieux plutôt que par une erreur nette.
    */
-  const WIKIDATA_SAMPLE = 500;
+  const WIKIDATA_SAMPLE = 50;
   // L'API Wikipédia n'accepte que 50 titres par requête `titles=`.
   const MAX_TITLES = 50;
+  // Fenêtre dans laquelle on tire le décalage SPARQL. Assez large pour varier
+  // d'un lot à l'autre, assez étroite pour ne pas tomber au-delà du nombre de
+  // résultats des petites catégories (ce qui rendrait une liste vide).
+  const SPARQL_OFFSET_MAX = 800;
+  const SPARQL_ENDPOINT = "https://query.wikidata.org/sparql";
 
-  /** URL de recherche Wikidata : items tirés au sort déclarant l'un des qids
-   *  de la catégorie comme nature (`P31`), avec leur éventuel article
-   *  Wikipédia dans WIKI_LANG (`prop=sitelinks` + `sitefilter`).
+  /** SOURCE 1 — SPARQL (query.wikidata.org).
+   *
+   *  La seule qui applique la contrainte « a un article en français » CÔTÉ
+   *  SERVEUR, par une jointure : elle ne peut donc jamais rendre des items
+   *  inexploitables, contrairement à la recherche qui échantillonne d'abord et
+   *  filtre après coup. Volontairement dépouillée par rapport aux deux
+   *  tentatives SPARQL précédentes, dont on connaît les défauts (voir en-tête) :
+   *  `wdt:P31` direct sans chemin transitif, et un décalage aléatoire au lieu
+   *  d'un `ORDER BY RAND()` qui trie tout avant de tronquer. */
+  function sparqlUrl(catKey) {
+    const c = catByKey(catKey);
+    if (!c.qids || !c.qids.length) return null;
+    const wiki = `https://${WIKI_LANG}.wikipedia.org/`;
+    const offset = Math.floor(Math.random() * SPARQL_OFFSET_MAX);
+    const query = `PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX schema: <http://schema.org/>
+SELECT ?title WHERE {
+  VALUES ?type { ${c.qids.map((q) => `wd:${q}`).join(" ")} }
+  ?item wdt:P31 ?type .
+  ?article schema:about ?item ;
+           schema:isPartOf <${wiki}> ;
+           schema:name ?title .
+}
+LIMIT ${MAX_TITLES}
+OFFSET ${offset}`;
+    return `${SPARQL_ENDPOINT}?format=json&query=${encodeURIComponent(query)}`;
+  }
+
+  /** Titres (dédoublonnés) d'une réponse SPARQL JSON. */
+  function normalizeSparqlTitles(data) {
+    const bindings = (data && data.results && data.results.bindings) || [];
+    return Array.from(
+      new Set(bindings.map((b) => b.title && b.title.value).filter(Boolean))
+    );
+  }
+
+  /** SOURCE 2 — recherche Wikidata (www.wikidata.org).
    *
    *  Sur www.wikidata.org et NON sur fr.wikipedia.org : `haswbstatement:` est
    *  un mot-clé de WikibaseCirrusSearch, active sur le dépôt Wikidata et pas
-   *  sur les wikis clients (voir l'historique en tête de fichier, point 4).
-   *
-   *  Renvoie `null` pour « Aléatoire », qui n'a pas de qids (voir wikiUrl). */
+   *  sur les wikis clients (voir l'en-tête, point 4). Rapide, mais elle tire
+   *  au sort AVANT de savoir lesquels ont un article français, d'où des lots
+   *  parfois vides sur les classes peu wikipédisées — c'est pourquoi elle
+   *  passe après SPARQL. */
   function wikidataUrl(catKey) {
     const c = catByKey(catKey);
     if (!c.qids || !c.qids.length) return null;
@@ -227,9 +293,40 @@
     return Array.from(new Set(titles));
   }
 
+  /** SOURCE 3 — catégories Wikipédia (fr.wikipedia.org), dernier recours.
+   *
+   *  N'utilise pas Wikidata du tout : c'est le mécanisme d'avant ce chantier,
+   *  gardé en filet. Il ratisse plus large et dérive parfois hors sujet (c'est
+   *  précisément ce qui a motivé le passage à Wikidata), mais il a toujours
+   *  rendu des articles — mieux vaut un fil imparfait qu'un mode démo. */
+  function wikiCategoryUrl(catKey) {
+    const c = catByKey(catKey);
+    if (!c.deepcategory) return null;
+    const params = new URLSearchParams({
+      action: "query",
+      format: "json",
+      formatversion: "2",
+      origin: "*",
+      prop: "extracts|pageimages|info",
+      explaintext: "1",
+      exintro: "1",
+      exlimit: "20",
+      piprop: "thumbnail",
+      pithumbsize: String(WIKI_THUMB_PX),
+      pilimit: "20",
+      inprop: "url",
+      generator: "search",
+      gsrsearch: `deepcategory:"${c.deepcategory}"`,
+      gsrnamespace: "0",
+      gsrsort: "random",
+      gsrlimit: "20",
+    });
+    return `https://${WIKI_LANG}.wikipedia.org/w/api.php?${params}`;
+  }
+
   /** URL Wikipédia : extrait d'intro + image + lien. Sans titres, c'est le
    *  tirage purement aléatoire de la catégorie « Aléatoire » ; avec, ce sont
-   *  exactement les titres que Wikidata vient de rendre. */
+   *  exactement les titres qu'une des sources vient de rendre. */
   function wikiUrl(titles) {
     const params = new URLSearchParams({
       action: "query",
@@ -278,39 +375,75 @@
       .filter((i) => i.title && i.desc.length >= 120);
   }
 
+  /* ---------- Cascade de sources ---------- */
+
+  /** Les sources, dans l'ordre d'essai. `titles` en rend une liste, qu'on va
+   *  ensuite chercher sur Wikipédia ; `direct` en rend déjà des articles
+   *  complets, sans second appel. */
+  const SOURCES = [
+    { name: "sparql", url: sparqlUrl, titles: normalizeSparqlTitles },
+    { name: "wdsearch", url: wikidataUrl, titles: normalizeWikidataTitles },
+    { name: "wpcat", url: wikiCategoryUrl, direct: true },
+  ];
+
+  /** Résume ce qu'une source a répondu quand elle ne rend aucun titre. Les
+   *  causes possibles appellent des correctifs opposés — mauvais identifiants,
+   *  échantillon trop petit, erreur d'API — et se ressemblaient toutes à
+   *  l'écran (« mode démo ») tant qu'on ne les distinguait pas ici. */
+  function describeEmpty(data) {
+    const err = data && data.error;
+    if (err) return `erreur ${err.code || ""} ${err.info || JSON.stringify(err)}`.trim();
+    const warn = data && data.warnings;
+    if (warn) return `avertissement API : ${JSON.stringify(warn).slice(0, 160)}`;
+    const raw = data && data.query && data.query.pages;
+    if (Array.isArray(raw))
+      return `${raw.length} item(s), aucun avec article ${WIKI_LANG}`;
+    if (data && data.results) return "0 résultat";
+    return "réponse inattendue";
+  }
+
   /** Articles d'une catégorie, prêts pour dedupAndRank. `fetchJson` est fourni
    *  par l'appelant (navigateur : direct + repli proxy ; serveur : fetch avec
    *  délai) — c'est la SEULE différence entre les deux côtés, tout le reste
    *  (construction des URL, normalisation) est ici, en un seul exemplaire.
-   *  - « Aléatoire » : un aller simple vers le tirage aléatoire de Wikipédia.
-   *  - toute autre catégorie : Wikidata pour les titres, puis Wikipédia pour
-   *    l'extrait/l'image/le lien. C'est ce lien qu'ouvre « Découvrir ». */
+   *
+   *  « Aléatoire » part directement sur le tirage aléatoire de Wikipédia. Les
+   *  autres essaient SOURCES dans l'ordre et gardent la PREMIÈRE qui rend des
+   *  articles ; si aucune n'y arrive, l'erreur levée détaille ce que chacune a
+   *  répondu (voir lastLearnDetail, index.html, et le panneau ?debug=1). */
   async function fetchCategoryItems(catKey, fetchJson) {
-    const url = wikidataUrl(catKey);
-    if (!url) return normalizeWiki(await fetchJson(wikiUrl()));
+    const c = catByKey(catKey);
+    if (!c.qids || !c.qids.length) return normalizeWiki(await fetchJson(wikiUrl()));
 
-    const wdData = await fetchJson(url);
-    const titles = normalizeWikidataTitles(wdData);
-    if (!titles.length) {
-      // Sans ce détail, « Wikidata n'a rien trouvé pour ces P31 » (mauvais
-      // qids) et « des items existent mais aucun n'a d'article français »
-      // (échantillon trop petit) donnaient le même écran vide — or les deux
-      // appellent des correctifs opposés. Voir lastLearnDetail (index.html).
-      const pages =
-        wdData && wdData.query && Array.isArray(wdData.query.pages)
-          ? wdData.query.pages
-          : null;
-      const err = wdData && wdData.error;
-      const detail = err
-        ? `erreur wikidata : ${err.code || ""} ${err.info || JSON.stringify(err)}`.trim()
-        : pages
-          ? `${pages.length} item(s) trouvé(s), aucun avec sitelink ${WIKI_LANG}wiki`
-          : "réponse wikidata inattendue (pas de query.pages)";
-      throw new Error(`wikidata 0 titre — ${detail}`);
+    const notes = [];
+    for (const src of SOURCES) {
+      const url = src.url(catKey);
+      if (!url) continue;
+      try {
+        const data = await fetchJson(url);
+        if (src.direct) {
+          const items = normalizeWiki(data);
+          if (items.length) return items;
+          notes.push(`${src.name}: ${describeEmpty(data)}`);
+          continue;
+        }
+        const titles = src.titles(data);
+        if (!titles.length) {
+          notes.push(`${src.name}: ${describeEmpty(data)}`);
+          continue;
+        }
+        // Mélangé AVANT la troncature à MAX_TITLES : sans ça, une catégorie
+        // dense rendrait toujours les mêmes articles du même échantillon.
+        const items = normalizeWiki(
+          await fetchJson(wikiUrl(lib.shuffle(titles.slice())))
+        );
+        if (items.length) return items;
+        notes.push(`${src.name}: ${titles.length} titre(s), 0 article exploitable`);
+      } catch (e) {
+        notes.push(`${src.name}: ${(e && e.message) || e}`);
+      }
     }
-    // Mélangé AVANT la troncature à MAX_TITLES : sans ça, une catégorie dense
-    // rendrait toujours les 50 mêmes articles du même échantillon.
-    return normalizeWiki(await fetchJson(wikiUrl(lib.shuffle(titles.slice()))));
+    throw new Error(notes.join(" | ") || "aucune source disponible");
   }
 
   /**
@@ -333,8 +466,12 @@
     catByKey,
     catLabel,
     wikiUrl,
+    sparqlUrl,
+    normalizeSparqlTitles,
     wikidataUrl,
     normalizeWikidataTitles,
+    wikiCategoryUrl,
+    SOURCES,
     normalizeWiki,
     fetchCategoryItems,
     dedupAndRank: lib.dedupAndRank,

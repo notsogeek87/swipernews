@@ -62,12 +62,53 @@ test("wikidataUrl interroge Wikidata (pas Wikipédia) et OR-combine les qids", (
   assert.equal(params.get("prop"), "sitelinks");
 });
 
-test("wikidataUrl échantillonne assez large pour les classes peu wikipédisées", () => {
-  // 40 laissait ~40 % de chances de ne rien trouver pour Q5 (~2 % des humains
-  // de Wikidata ont un article français) : c'est le bug qui vidait la catégorie.
-  assert.ok(core.WIKIDATA_SAMPLE >= 500, "échantillon trop petit, voir WIKIDATA_SAMPLE");
+test("wikidataUrl échantillonne dans la limite documentée sûre", () => {
+  // 500 (le maximum théorique) n'avait rien donné de plus ; au-delà du plafond
+  // autorisé, MediaWiki avertit en silence plutôt que d'échouer franchement.
+  assert.ok(core.WIKIDATA_SAMPLE <= 50, "au-delà de la limite anonyme documentée");
   const params = new URL(core.wikidataUrl("personnalites")).searchParams;
   assert.equal(params.get("gsrlimit"), String(core.WIKIDATA_SAMPLE));
+});
+
+test("sparqlUrl contraint l'article français CÔTÉ SERVEUR, sans chemin transitif ni tri global", () => {
+  // Les deux points qui avaient tué les tentatives SPARQL précédentes :
+  // `wdt:P31/wdt:P279*` (trop lent) et `ORDER BY RAND()` (trie tout avant de
+  // tronquer). Ici : P31 direct, et un décalage aléatoire.
+  const url = core.sparqlUrl("sciences");
+  assert.ok(url.startsWith("https://query.wikidata.org/sparql?"));
+  const q = decodeURIComponent(url.split("query=")[1]);
+  assert.ok(q.includes("VALUES ?type { wd:Q336"), "doit lister les qids de la catégorie");
+  assert.ok(q.includes("wdt:P31 ?type"), "P31 direct");
+  assert.ok(!q.includes("P279"), "pas de chemin transitif");
+  assert.ok(!q.includes("ORDER BY"), "pas de tri global");
+  assert.ok(
+    q.includes("fr.wikipedia.org"),
+    "la contrainte article français est dans la requête"
+  );
+  assert.ok(/OFFSET \d+/.test(q));
+});
+
+test("normalizeSparqlTitles extrait et dédoublonne les titres", () => {
+  const data = {
+    results: {
+      bindings: [
+        { title: { value: "Effet tunnel" } },
+        { title: { value: "Tardigrade" } },
+        { title: { value: "Effet tunnel" } },
+        {},
+      ],
+    },
+  };
+  assert.deepEqual(core.normalizeSparqlTitles(data), ["Effet tunnel", "Tardigrade"]);
+  assert.deepEqual(core.normalizeSparqlTitles({}), []);
+});
+
+test("wikiCategoryUrl est le filet sans Wikidata (catégories Wikipédia)", () => {
+  const url = core.wikiCategoryUrl("sciences");
+  assert.ok(url.includes("fr.wikipedia.org/w/api.php"));
+  const params = new URL(url).searchParams;
+  assert.equal(params.get("gsrsearch"), 'deepcategory:"Sciences"');
+  assert.equal(params.get("gsrsort"), "random");
 });
 
 test("wikidataUrl renvoie null pour la catégorie aléatoire (pas de qids)", () => {
@@ -166,46 +207,63 @@ test("fetchCategoryItems (aléatoire) fait un seul aller Wikipédia", async () =
   assert.equal(out.length, 1);
 });
 
-test("fetchCategoryItems (catégorie) enchaîne Wikidata puis Wikipédia", async () => {
+test("fetchCategoryItems s'arrête à la PREMIÈRE source qui rend des articles", async () => {
   const calls = [];
   const fetchJson = async (url) => {
     calls.push(url);
-    if (url.includes("www.wikidata.org")) {
-      return {
-        query: { pages: [{ sitelinks: [{ site: "frwiki", title: "Tardigrade" }] }] },
-      };
+    if (url.startsWith("https://query.wikidata.org/")) {
+      return { results: { bindings: [{ title: { value: "Tardigrade" } }] } };
     }
     return { query: { pages: [{ title: "Tardigrade", extract: "z".repeat(130) }] } };
   };
   const out = await core.fetchCategoryItems("sciences", fetchJson);
+  // SPARQL répond : ni la recherche Wikidata ni les catégories Wikipédia
+  // ne doivent être sollicitées.
   assert.equal(calls.length, 2);
-  assert.ok(calls[0].includes("www.wikidata.org"));
-  assert.ok(calls[1].includes("fr.wikipedia.org"));
-  assert.equal(new URL(calls[1]).searchParams.get("titles"), "Tardigrade");
+  assert.ok(calls[0].startsWith("https://query.wikidata.org/"));
+  assert.ok(calls[1].startsWith("https://fr.wikipedia.org/"));
+  // startsWith et non includes : l'URL SPARQL contient elle-même
+  // "www.wikidata.org" dans ses PREFIX encodés.
+  assert.ok(!calls.some((u) => u.startsWith("https://www.wikidata.org/")));
   assert.equal(out.length, 1);
   assert.equal(out[0].title, "Tardigrade");
 });
 
-test("fetchCategoryItems distingue « aucun item » de « aucun article français »", async () => {
-  // Deux pannes opposées, deux correctifs opposés (mauvais qids vs échantillon
-  // trop petit) : elles ne doivent jamais se ressembler dans le diagnostic.
-  const vide = async () => ({ query: { pages: [] } });
-  await assert.rejects(core.fetchCategoryItems("sciences", vide), /0 item\(s\) trouvé/);
-
-  const sansFr = async () => ({
-    query: { pages: [{ sitelinks: [{ site: "dewiki", title: "Ohne frwiki" }] }] },
-  });
-  await assert.rejects(
-    core.fetchCategoryItems("sciences", sansFr),
-    /1 item\(s\) trouvé\(s\), aucun avec sitelink frwiki/
-  );
+test("fetchCategoryItems bascule sur la source suivante quand une source échoue", async () => {
+  const tried = [];
+  const fetchJson = async (url) => {
+    if (url.startsWith("https://query.wikidata.org/")) {
+      tried.push("sparql");
+      throw new Error("timeout");
+    }
+    if (url.startsWith("https://www.wikidata.org/")) {
+      tried.push("wdsearch");
+      return { query: { pages: [] } }; // répond, mais rien d'exploitable
+    }
+    tried.push("wikipedia");
+    return { query: { pages: [{ title: "Repli", extract: "z".repeat(130) }] } };
+  };
+  const out = await core.fetchCategoryItems("sciences", fetchJson);
+  assert.deepEqual(tried, ["sparql", "wdsearch", "wikipedia"]);
+  assert.equal(out[0].title, "Repli"); // le filet catégories Wikipédia a servi
 });
 
-test("fetchCategoryItems remonte l'erreur Wikidata plutôt que de l'avaler", async () => {
-  const fetchJson = async () => ({
-    error: { code: "badvalue", info: "paramètre invalide" },
+test("fetchCategoryItems rapporte CE QUE CHAQUE source a répondu quand tout échoue", async () => {
+  // C'est ce détail qui remonte au panneau ?debug=1 : sans lui, trois pannes
+  // de causes opposées se ressemblaient toutes à l'écran (« mode démo »).
+  const fetchJson = async (url) => {
+    if (url.startsWith("https://query.wikidata.org/")) throw new Error("http 429");
+    if (url.startsWith("https://www.wikidata.org/")) {
+      return { error: { code: "badvalue", info: "paramètre invalide" } };
+    }
+    return { query: { pages: [] } };
+  };
+  await assert.rejects(core.fetchCategoryItems("sciences", fetchJson), (e) => {
+    assert.match(e.message, /sparql: http 429/);
+    assert.match(e.message, /wdsearch: erreur badvalue/);
+    assert.match(e.message, /wpcat:/);
+    return true;
   });
-  await assert.rejects(core.fetchCategoryItems("sciences", fetchJson), /badvalue/);
 });
 
 test("randomBucket reste dans la plage cacheable", () => {
