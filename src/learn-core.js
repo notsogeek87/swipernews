@@ -37,7 +37,18 @@
     { key: "cinema", label: "🎬 Cinéma", q: 'deepcategory:"Cinéma"' },
     { key: "films", label: "🎥 Films", q: 'deepcategory:"Film"' },
     { key: "musique", label: "🎵 Musique", q: 'deepcategory:"Musique"' },
-    { key: "jeuxvideo", label: "🎮 Jeux vidéo", q: 'deepcategory:"Jeu vidéo"' },
+    // `insource:` cherche dans le WIKITEXTE de l'article, pas dans le texte rendu.
+    // Combiné à deepcategory (les mots-clés se cumulent en ET), il resserre la
+    // catégorie sur les articles qui SONT un jeu vidéo, au lieu de tout ce que
+    // l'arbre des catégories charrie — studios, consoles, personnalités. En
+    // contrepartie il ne retient que la tournure exacte : un article ouvrant sur
+    // « est un jeu de plateforme » ou « est une série de jeux vidéo » sort du
+    // lot. Essai limité à cette catégorie pour l'instant.
+    {
+      key: "jeuxvideo",
+      label: "🎮 Jeux vidéo",
+      q: 'deepcategory:"Jeu vidéo" insource:"est un jeu vidéo"',
+    },
     // Wikipédia n'est pas un livre de recettes (règle de fond du projet) : ce sont
     // des articles SUR les plats — origine, histoire, variantes — pas des marches
     // à suivre. Les vraies recettes sont sur Wikilivres, autre hôte, autre
