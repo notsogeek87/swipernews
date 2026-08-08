@@ -74,6 +74,11 @@
       q: 'deepcategory:"Cinéma" insource:"est un film"',
     },
     {
+      key: "series",
+      label: "📺 Séries télévisées",
+      q: 'deepcategory:"Série télévisée" insource:"est une série télévisée"',
+    },
+    {
       key: "musique",
       label: "🎵 Chansons",
       q: 'deepcategory:"Musique" insource:"est une chanson"',
