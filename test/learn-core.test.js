@@ -107,8 +107,25 @@ test("wikiCategoryUrl est le filet sans Wikidata (catégories Wikipédia)", () =
   const url = core.wikiCategoryUrl("sciences");
   assert.ok(url.includes("fr.wikipedia.org/w/api.php"));
   const params = new URL(url).searchParams;
-  assert.equal(params.get("gsrsearch"), 'deepcategory:"Sciences"');
+  assert.ok(params.get("gsrsearch").startsWith('deepcategory:"Sciences"'));
   assert.equal(params.get("gsrsort"), "random");
+});
+
+test("le filet écarte les biographies, sauf pour la catégorie personnalités", () => {
+  // Dérive observée : un ACTEUR servi sous « Séries télévisées », l'arbre de
+  // catégories Wikipédia rangeant les personnes sous les œuvres où elles jouent.
+  const bio = ' -hastemplate:"Infobox Biographie2"';
+  assert.ok(
+    new URL(core.wikiCategoryUrl("series")).searchParams.get("gsrsearch").endsWith(bio)
+  );
+  assert.ok(
+    new URL(core.wikiCategoryUrl("films")).searchParams.get("gsrsearch").endsWith(bio)
+  );
+  // …sauf là où les biographies SONT le sujet voulu.
+  assert.equal(
+    new URL(core.wikiCategoryUrl("personnalites")).searchParams.get("gsrsearch"),
+    'deepcategory:"Personnalité"'
+  );
 });
 
 test("wikidataUrl renvoie null pour la catégorie aléatoire (pas de qids)", () => {
@@ -227,6 +244,26 @@ test("fetchCategoryItems s'arrête à la PREMIÈRE source qui rend des articles"
   assert.ok(!calls.some((u) => u.startsWith("https://www.wikidata.org/")));
   assert.equal(out.length, 1);
   assert.equal(out[0].title, "Tardigrade");
+});
+
+test("chaque article porte la source qui l'a produit", async () => {
+  // Sans ce marquage, une cascade qui réussit par le filet imprécis est
+  // indiscernable d'une cascade qui réussit par Wikidata : le panneau d'erreur
+  // s'efface dès qu'une source répond.
+  const parSparql = async (url) =>
+    url.startsWith("https://query.wikidata.org/")
+      ? { results: { bindings: [{ title: { value: "T" } }] } }
+      : { query: { pages: [{ title: "T", extract: "x".repeat(130) }] } };
+  const a = await core.fetchCategoryItems("sciences", parSparql);
+  assert.equal(a[0].src, "sparql");
+
+  const parFilet = async (url) => {
+    if (url.startsWith("https://query.wikidata.org/")) throw new Error("ko");
+    if (url.startsWith("https://www.wikidata.org/")) return { query: { pages: [] } };
+    return { query: { pages: [{ title: "T", extract: "x".repeat(130) }] } };
+  };
+  const b = await core.fetchCategoryItems("sciences", parFilet);
+  assert.equal(b[0].src, "wpcat");
 });
 
 test("fetchCategoryItems bascule sur la source suivante quand une source échoue", async () => {

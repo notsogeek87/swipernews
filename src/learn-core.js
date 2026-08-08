@@ -316,7 +316,16 @@ OFFSET ${offset}`;
       pilimit: "20",
       inprop: "url",
       generator: "search",
-      gsrsearch: `deepcategory:"${c.deepcategory}"`,
+      // `-hastemplate:"Infobox Biographie2"` : l'arbre de catégories Wikipédia
+      // range les personnes sous les œuvres auxquelles elles ont participé —
+      // d'où un acteur servi sous « Séries télévisées ». Presque toutes les
+      // biographies de fr.wikipedia portent ce modèle, l'exclure retire donc
+      // l'essentiel de la dérive. Sans objet pour « personnalités », dont ce
+      // sont justement les articles voulus ; et inoffensif si le modèle change
+      // de nom, l'exclusion ne portant alors sur rien.
+      gsrsearch:
+        `deepcategory:"${c.deepcategory}"` +
+        (c.key === "personnalites" ? "" : ' -hastemplate:"Infobox Biographie2"'),
       gsrnamespace: "0",
       gsrsort: "random",
       gsrlimit: "20",
@@ -386,6 +395,13 @@ OFFSET ${offset}`;
     { name: "wpcat", url: wikiCategoryUrl, direct: true },
   ];
 
+  /** Marque les articles de la source qui les a produits. Sans ça, impossible
+   *  de savoir laquelle des trois a servi un lot : quand la cascade réussit,
+   *  le panneau d'erreur s'efface et on ne voit plus que le résultat. C'est
+   *  ainsi qu'un acteur est passé sous « Séries télévisées » sans qu'on sache
+   *  d'où il venait (le filet deepcategory, qui ratisse les sous-catégories). */
+  const stamp = (items, src) => items.map((it) => ({ ...it, src }));
+
   /** Résume ce qu'une source a répondu quand elle ne rend aucun titre. Les
    *  causes possibles appellent des correctifs opposés — mauvais identifiants,
    *  échantillon trop petit, erreur d'API — et se ressemblaient toutes à
@@ -422,7 +438,7 @@ OFFSET ${offset}`;
       try {
         const data = await fetchJson(url);
         if (src.direct) {
-          const items = normalizeWiki(data);
+          const items = stamp(normalizeWiki(data), src.name);
           if (items.length) return items;
           notes.push(`${src.name}: ${describeEmpty(data)}`);
           continue;
@@ -434,8 +450,9 @@ OFFSET ${offset}`;
         }
         // Mélangé AVANT la troncature à MAX_TITLES : sans ça, une catégorie
         // dense rendrait toujours les mêmes articles du même échantillon.
-        const items = normalizeWiki(
-          await fetchJson(wikiUrl(lib.shuffle(titles.slice())))
+        const items = stamp(
+          normalizeWiki(await fetchJson(wikiUrl(lib.shuffle(titles.slice())))),
+          src.name
         );
         if (items.length) return items;
         notes.push(`${src.name}: ${titles.length} titre(s), 0 article exploitable`);

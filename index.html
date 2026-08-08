@@ -565,8 +565,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=70"></script>
-<script src="src/learn-core.js?v=70"></script>
+<script src="src/lib.js?v=71"></script>
+<script src="src/learn-core.js?v=71"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -838,7 +838,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="70";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="71";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikidata et Wikipédia s'appellent déjà en
@@ -1202,7 +1202,8 @@ async function fetchLearnClient(keys,count){
       warn(`learn cat "${keys[i]}"`,r.reason);
       return `${keys[i]}: ÉCHEC — ${(r.reason&&r.reason.message)||r.reason}`;
     }
-    return `${keys[i]}: ${r.value.length} article(s)`;
+    const srcs=[...new Set(r.value.map(it=>it.src).filter(Boolean))].join("+")||"?";
+    return `${keys[i]}: ${r.value.length} article(s) via ${srcs}`;
   });
   const lists=results.filter(r=>r.status==="fulfilled").map(r=>r.value);
   return LEARN.dedupAndRank(lists,count);               // articles avec image d'abord, sources mélangées
@@ -1226,7 +1227,14 @@ async function fetchLearn(count=CONFIG.BATCH_SIZE){
       const res=await fetchWithTimeout("/api/learn?"+qs,{},CONFIG.FETCH_TIMEOUT);
       if(res.ok){
         const data=await res.json();
-        if(data&&Array.isArray(data.items)&&data.items.length)batch=data.items;
+        if(data&&Array.isArray(data.items)&&data.items.length){
+          batch=data.items;
+          // Le backend agrège avec le MÊME noyau, donc ses articles portent
+          // aussi leur source : on la reporte, sinon le panneau ?debug=1
+          // afficherait le détail périmé du dernier repli client.
+          const srcs=[...new Set(batch.map(it=>it.src).filter(Boolean))].join("+")||"?";
+          lastLearnDetail=[`/api/learn: ${batch.length} article(s) via ${srcs}`];
+        }
       }
     }catch(e){warn("learn backend",e);/* repli client */}
   }
@@ -1313,7 +1321,10 @@ async function loadFeeds(force){
           if(items.length>CONFIG.MAX_ITEMS)items=items.slice(-CONFIG.MAX_ITEMS);
         }
       }else items=arr;
-      dbgTop(null);                                  // succès : efface une éventuelle erreur affichée avant
+      // En debug on AFFICHE la source ayant servi au lieu d'effacer : c'est le
+      // seul moyen de voir qu'un lot vient du filet deepcategory (imprécis)
+      // plutôt que de Wikidata. Hors debug, dbgTop ne peint rien.
+      dbgTop(DEBUG?`v${APP_VERSION}  learn OK\n${lastLearnDetail.join("\n")}`:null);
       render();hideStates();feedKeyShown=key;cacheSave(key);
     }catch(e){
       if(my!==loadSeq||cached)return;               // si on a déjà le cache, on le garde
@@ -1821,7 +1832,7 @@ async function loadMoreLearn(){
   loadingMore=true;
   try{
     const more=await fetchLearn(20);
-    dbgTop(null);                                   // succès : efface une éventuelle erreur affichée avant
+    dbgTop(DEBUG?`v${APP_VERSION}  load more OK\n${lastLearnDetail.join("\n")}`:null);
     const have=new Set(items.map(i=>i.title));
     const fresh=more.filter(m=>!have.has(m.title));
     if(fresh.length){
