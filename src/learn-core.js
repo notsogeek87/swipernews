@@ -49,7 +49,7 @@
     { key: "geo", label: "🌍 Géographie", q: 'deepcategory:"Géographie"' },
     {
       key: "nature",
-      label: "🐾 Nature",
+      label: "🐾 Espèces",
       q: 'deepcategory:"Nature" insource:"est une espèce"',
     },
     { key: "espace", label: "🌌 Espace", q: 'deepcategory:"Astronomie"' },
@@ -60,22 +60,22 @@
     },
     {
       key: "sport",
-      label: "⚽ Sport",
+      label: "⚽ Disciplines sportives",
       q: 'deepcategory:"Sport" insource:"est une discipline sportive"',
     },
-    // Cinéma et Films partagent la même tournure : les deux catégories se
-    // recouvrent donc très largement, là où elles se distinguaient avant par
-    // l'arbre (métier, technique et histoire du cinéma d'un côté, œuvres de
-    // l'autre). Les garder toutes deux est un choix, pas un oubli.
+    // Fusion de « Cinéma » et « Films » : depuis qu'ils partagent la même
+    // tournure, ils rendaient le même contenu sous deux puces — l'arbre
+    // « Cinéma » englobant « Film », le second n'en était qu'un sous-ensemble.
+    // On garde donc le plus large. L'ancienne clé "cinema" est rebasculée sur
+    // celle-ci au chargement (voir CAT_RENAMED dans index.html).
     {
-      key: "cinema",
-      label: "🎬 Cinéma",
+      key: "films",
+      label: "🎬 Films",
       q: 'deepcategory:"Cinéma" insource:"est un film"',
     },
-    { key: "films", label: "🎥 Films", q: 'deepcategory:"Film" insource:"est un film"' },
     {
       key: "musique",
-      label: "🎵 Musique",
+      label: "🎵 Chansons",
       q: 'deepcategory:"Musique" insource:"est une chanson"',
     },
     {
@@ -90,7 +90,7 @@
     // "Spécialité culinaire" faisait autrement : exit les chefs et les ustensiles.
     {
       key: "cuisine",
-      label: "🍲 Cuisine",
+      label: "🍲 Plats",
       q: 'deepcategory:"Cuisine" insource:"est un plat"',
     },
     { key: "philo", label: "🧠 Philosophie", q: 'deepcategory:"Philosophie"' },

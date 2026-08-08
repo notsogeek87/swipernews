@@ -565,8 +565,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=62"></script>
-<script src="src/learn-core.js?v=62"></script>
+<script src="src/lib.js?v=63"></script>
+<script src="src/learn-core.js?v=63"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -693,11 +693,20 @@ let mode=(()=>{try{return localStorage.getItem(LS_MODE)==="news"?"news":"learn";
 /* Centres d'intérêt : définis une seule fois dans src/learn-core.js, partagés
    avec la fonction serverless (les deux listes avaient déjà divergé). */
 const CATEGORIES=LEARN.CATEGORIES;
+/* Clés de catégories fusionnées ou renommées. Sans ce report, un intérêt
+   mémorisé sous l'ancienne clé disparaît sans bruit de la barre (renderCats
+   ignore les clés inconnues), et un FILTRE courant devenu introuvable est pire
+   encore : plus aucune puce n'apparaît active et catByKey se rabat sur
+   "random", donc le fil sert de l'aléatoire sans que rien ne l'indique. */
+const CAT_RENAMED={cinema:"films"};
+const migrateCat=k=>CAT_RENAMED[k]||k;
 /* Intérêts choisis par l'utilisateur (sous-ensemble de clés CATEGORIES, hors "random"). */
-let interests=(()=>{try{const s=localStorage.getItem(LS_INT);return s?JSON.parse(s):[];}catch(e){return [];}})();
+let interests=(()=>{try{const s=localStorage.getItem(LS_INT);const a=s?JSON.parse(s):[];
+  // Set : qui avait coché Cinéma ET Films se retrouverait sinon avec la puce en double.
+  return Array.isArray(a)?[...new Set(a.map(migrateCat))]:[];}catch(e){return [];}})();
 function interestsChosen(){try{return localStorage.getItem(LS_INT)!==null;}catch(e){return false;}}
 /* Filtre courant : "all" = mélange des intérêts choisis, sinon une clé d'intérêt précise. */
-let cat=(()=>{try{const v=localStorage.getItem(LS_CAT);return (v&&v!=="random")?v:"all";}catch(e){return "all";}})();
+let cat=(()=>{try{const v=localStorage.getItem(LS_CAT);return (v&&v!=="random")?migrateCat(v):"all";}catch(e){return "all";}})();
 /* Catégorie effective pour un lot : le filtre courant, ou un intérêt tiré au sort si "all". */
 function activeCatKey(){
   if(cat!=="all")return cat;
@@ -836,7 +845,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="62";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="63";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
