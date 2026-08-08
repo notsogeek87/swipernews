@@ -20,30 +20,64 @@
 
   /**
    * Source unique de vérité des centres d'intérêt.
-   * q : requête de recherche Wikipédia (deepcategory = catégorie + sous-catégories).
-   *     null = tirage purement aléatoire.
+   *
+   * q : requête de recherche Wikipédia. `null` = tirage purement aléatoire.
+   *
+   *   - `deepcategory:"…"` parcourt la catégorie ET ses sous-catégories. Large,
+   *     mais l'arbre range sous un sujet bien plus que le sujet lui-même : sous
+   *     « Jeu vidéo » viennent aussi studios, consoles et personnalités.
+   *   - `insource:"…"` cherche dans le WIKITEXTE de l'article (pas dans le texte
+   *     rendu) et se cumule en ET avec le reste. Il ne garde donc que les
+   *     articles qui SONT la chose voulue.
+   *
+   * Contrepartie assumée là où insource est présent : la tournure doit être
+   * exacte. Un article ouvrant sur « est un jeu de plateforme » ou « est une
+   * série de jeux vidéo » sort du lot — catégorie plus juste, mais moins
+   * fournie. Les catégories sans insource sont celles où aucune tournure ne
+   * s'impose (Sciences, Histoire, Arts, Géographie, Astronomie, Philosophie).
    */
   const CATEGORIES = [
     { key: "random", label: "🎲 Aléatoire", q: null },
     { key: "sciences", label: "🔬 Sciences", q: 'deepcategory:"Sciences"' },
     { key: "histoire", label: "📜 Histoire", q: 'deepcategory:"Histoire"' },
     { key: "art", label: "🎨 Art & Culture", q: 'deepcategory:"Arts"' },
-    { key: "artistes", label: "🎭 Artistes", q: 'deepcategory:"Artiste"' },
+    {
+      key: "artistes",
+      label: "🎭 Artistes",
+      q: 'deepcategory:"Artiste" insource:"est un artiste"',
+    },
     { key: "geo", label: "🌍 Géographie", q: 'deepcategory:"Géographie"' },
-    { key: "nature", label: "🐾 Nature", q: 'deepcategory:"Nature"' },
+    {
+      key: "nature",
+      label: "🐾 Nature",
+      q: 'deepcategory:"Nature" insource:"est une espèce"',
+    },
     { key: "espace", label: "🌌 Espace", q: 'deepcategory:"Astronomie"' },
-    { key: "tech", label: "💻 Technologie", q: 'deepcategory:"Technologie"' },
-    { key: "sport", label: "⚽ Sport", q: 'deepcategory:"Sport"' },
-    { key: "cinema", label: "🎬 Cinéma", q: 'deepcategory:"Cinéma"' },
-    { key: "films", label: "🎥 Films", q: 'deepcategory:"Film"' },
-    { key: "musique", label: "🎵 Musique", q: 'deepcategory:"Musique"' },
-    // `insource:` cherche dans le WIKITEXTE de l'article, pas dans le texte rendu.
-    // Combiné à deepcategory (les mots-clés se cumulent en ET), il resserre la
-    // catégorie sur les articles qui SONT un jeu vidéo, au lieu de tout ce que
-    // l'arbre des catégories charrie — studios, consoles, personnalités. En
-    // contrepartie il ne retient que la tournure exacte : un article ouvrant sur
-    // « est un jeu de plateforme » ou « est une série de jeux vidéo » sort du
-    // lot. Essai limité à cette catégorie pour l'instant.
+    {
+      key: "tech",
+      label: "💻 Technologie",
+      q: 'deepcategory:"Technologie" insource:"est un protocole"',
+    },
+    {
+      key: "sport",
+      label: "⚽ Sport",
+      q: 'deepcategory:"Sport" insource:"est une discipline sportive"',
+    },
+    // Cinéma et Films partagent la même tournure : les deux catégories se
+    // recouvrent donc très largement, là où elles se distinguaient avant par
+    // l'arbre (métier, technique et histoire du cinéma d'un côté, œuvres de
+    // l'autre). Les garder toutes deux est un choix, pas un oubli.
+    {
+      key: "cinema",
+      label: "🎬 Cinéma",
+      q: 'deepcategory:"Cinéma" insource:"est un film"',
+    },
+    { key: "films", label: "🎥 Films", q: 'deepcategory:"Film" insource:"est un film"' },
+    {
+      key: "musique",
+      label: "🎵 Musique",
+      q: 'deepcategory:"Musique" insource:"est une chanson"',
+    },
     {
       key: "jeuxvideo",
       label: "🎮 Jeux vidéo",
@@ -52,9 +86,13 @@
     // Wikipédia n'est pas un livre de recettes (règle de fond du projet) : ce sont
     // des articles SUR les plats — origine, histoire, variantes — pas des marches
     // à suivre. Les vraies recettes sont sur Wikilivres, autre hôte, autre
-    // extraction. Si le fil dérive trop vers les chefs et les ustensiles, resserrer
-    // sur "Spécialité culinaire", sous-catégorie de celle-ci.
-    { key: "cuisine", label: "🍲 Cuisine", q: 'deepcategory:"Cuisine"' },
+    // extraction. `insource:"est un plat"` fait ici le tri que la sous-catégorie
+    // "Spécialité culinaire" faisait autrement : exit les chefs et les ustensiles.
+    {
+      key: "cuisine",
+      label: "🍲 Cuisine",
+      q: 'deepcategory:"Cuisine" insource:"est un plat"',
+    },
     { key: "philo", label: "🧠 Philosophie", q: 'deepcategory:"Philosophie"' },
   ];
   const catByKey = (key) => CATEGORIES.find((c) => c.key === key) || CATEGORIES[0];
