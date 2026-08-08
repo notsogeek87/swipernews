@@ -164,6 +164,11 @@
   .rail button svg{width:23px;height:23px;display:block}
 
   .progress{position:fixed;left:0;top:0;height:100dvh;width:3px;z-index:20;pointer-events:none}
+  /* Pas de jauge en mode Apprendre : le fil y est SANS FIN, donc une position
+     « x % du total » ne veut rien dire — elle recule à chaque lot chargé et
+     n'informe que du rechargement, qui ne regarde pas l'utilisateur. En Actus
+     le fil est fini, la jauge y garde tout son sens. */
+  body.learn .progress{display:none}
   /* Chargement en arrière-plan : fine barre indéterminée en haut. Volontairement
      NON bloquante — masquer un fil déjà lisible serait pire que le laisser voir. */
   .syncbar{position:fixed;left:0;top:0;height:2px;width:100%;z-index:21;pointer-events:none;
@@ -565,8 +570,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=65"></script>
-<script src="src/learn-core.js?v=65"></script>
+<script src="src/lib.js?v=66"></script>
+<script src="src/learn-core.js?v=66"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -845,7 +850,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="65";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="66";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2008,7 +2013,11 @@ feedEl.addEventListener("touchend",e=>{
   setMode(dx<0?"news":"learn");
   if(mode==="learn")setMode2Learn();
 },{passive:true});
-function updateProgress(){const max=feedEl.scrollHeight-feedEl.clientHeight;pbar.style.height=(max>0?feedEl.scrollTop/max*100:0)+"%";}
+function updateProgress(){
+  if(mode==="learn")return;              // jauge masquée : inutile de lire scrollHeight
+  const max=feedEl.scrollHeight-feedEl.clientHeight;   // (lecture qui force un reflow)
+  pbar.style.height=(max>0?feedEl.scrollTop/max*100:0)+"%";
+}
 /* Navigation clavier. Gardes indispensables : sans elles, une espace tapée dans
    le champ « ajouter un flux » faisait défiler le fil, et les flèches
    défilaient DERRIÈRE un panneau ouvert. C'est aussi le seul endroit où le
