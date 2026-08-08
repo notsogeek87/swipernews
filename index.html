@@ -565,8 +565,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=75"></script>
-<script src="src/learn-core.js?v=75"></script>
+<script src="src/lib.js?v=76"></script>
+<script src="src/learn-core.js?v=76"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -853,7 +853,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="75";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="76";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1200,9 +1200,8 @@ function catKeysForBatch(){
 // seul moyen de voir POURQUOI une catégorie a échoué. Une catégorie peut
 // échouer de deux façons bien distinctes, à ne pas confondre : REJETÉE (la
 // requête elle-même a échoué — réseau, timeout, statut HTTP) ou RÉSOLUE avec
-// zéro article (la requête a répondu, mais rien d'exploitable : Wikidata n'a
-// rien trouvé pour ce P31, ou aucun des titres trouvés n'avait un extrait
-// Wikipédia assez long). Promise.allSettled distingue déjà les deux ; sans ce
+// zéro article (la requête a répondu, mais rien d'exploitable : catégorie
+// vide, ou aucun des titres trouvés n'avait un extrait assez long). Promise.allSettled distingue déjà les deux ; sans ce
 // log, les deux cas se ressemblaient à l'écran ("mode démo") sans rien dire
 // de PLUS précis que "empty".
 let lastLearnDetail=[];
@@ -1336,17 +1335,17 @@ async function loadFeeds(force){
           if(items.length>CONFIG.MAX_ITEMS)items=items.slice(-CONFIG.MAX_ITEMS);
         }
       }else items=arr;
-      // En debug on AFFICHE la source ayant servi au lieu d'effacer : c'est le
-      // seul moyen de voir qu'un lot vient du filet deepcategory (imprécis)
-      // plutôt que de Wikidata. Hors debug, dbgTop ne peint rien.
+      // En debug on AFFICHE le détail du lot au lieu d'effacer : nombre
+      // d'articles par catégorie, pour repérer une catégorie qui s'épuise.
+      // Hors debug, dbgTop ne peint rien.
       dbgTop(DEBUG?`v${APP_VERSION}  learn OK\n${lastLearnDetail.join("\n")}`:null);
       render();hideStates();feedKeyShown=key;cacheSave(key);
     }catch(e){
       if(my!==loadSeq||cached)return;               // si on a déjà le cache, on le garde
       warn("learn load",e);
       // ?debug=1 : sans ça, le repli démo est muet — impossible de savoir si
-      // Wikidata/Wikipédia ont échoué (ÉCHEC) ou juste renvoyé 0 article pour
-      // cette catégorie (voir lastLearnDetail dans fetchLearnClient).
+      // Wikipédia a échoué (ÉCHEC) ou si la catégorie n'a rien donné (voir
+      // lastLearnDetail dans fetchLearnClient).
       // Panneau du HAUT (dbgTop), pas dbg() : celui du bas est réécrit par
       // dbgImage() dès que la 1ère carte démo s'affiche, avant d'être lu.
       const detail=lastLearnDetail.length?"\n"+lastLearnDetail.join("\n"):"";
