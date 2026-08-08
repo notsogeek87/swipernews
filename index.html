@@ -565,8 +565,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=74"></script>
-<script src="src/learn-core.js?v=74"></script>
+<script src="src/lib.js?v=75"></script>
+<script src="src/learn-core.js?v=75"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -633,6 +633,9 @@ const CONFIG = {
   RENDER_COALESCE_MS: 750,// puis fenêtre large : sans cela, 40 sources = 40
                          // reconstructions du fil en quelques secondes
   MAX_CARDS: 60,         // cartes gardées dans le DOM (borne le fil infini)
+  MORE_TRIES: 3,         // tirages tentés avant de relâcher le dédoublonnage
+                         // (voir loadMoreLearn : un lot 100 % déjà connu
+                         // n'allonge pas le fil, donc plus rien ne se charge)
   MAX_ITEMS: 300,        // items gardés en mémoire (dédoublonnage du scroll)
   CACHE_ITEMS: 40,       // articles Apprendre mis en cache localStorage par catégorie
   // Le cache Actus n'est plus un simple « peindre vite » : pendant AUTO_RELOAD_MS
@@ -850,7 +853,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="74";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="75";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1839,14 +1842,41 @@ function capDom(){
   // animation, en plein geste de l'utilisateur
   if(removedH)setScrollTopInstant(feedEl,feedEl.scrollTop-removedH);
 }
+/* Titres actuellement RENDUS. Le DOM est plafonné à MAX_CARDS : un article
+   sorti par le haut peut resservir sans que rien ne se voie, alors qu'il figure
+   encore dans `items` (plafonné, lui, à MAX_ITEMS). */
+function renderedTitles(){
+  const out=new Set();
+  for(const el of feedEl.children){const it=cardReg.get(+el.dataset.id);if(it)out.add(it.title);}
+  return out;
+}
 async function loadMoreLearn(){
   if(loadingMore||mode!=="learn")return;
   loadingMore=true;
   try{
-    const more=await fetchLearn(20);
-    dbgTop(DEBUG?`v${APP_VERSION}  load more OK\n${lastLearnDetail.join("\n")}`:null);
-    const have=new Set(items.map(i=>i.title));
-    const fresh=more.filter(m=>!have.has(m.title));
+    /* Le fil ne doit JAMAIS s'arrêter en silence. Or si le lot ne contient que
+       des articles déjà en mémoire, rien n'est ajouté : la hauteur du fil ne
+       bouge pas, le bas reste hors d'atteinte, aucun événement de scroll ne
+       repart — le « fil sans fin » se fige sans le moindre message. Cas
+       courant sur une petite catégorie, où les tirages finissent par se
+       recouper. D'où : on retire plusieurs fois, puis, en dernier recours, on
+       n'écarte plus que ce qui est RÉELLEMENT à l'écran. */
+    let more=[],fresh=[];
+    for(let i=0;i<CONFIG.MORE_TRIES&&!fresh.length;i++){
+      more=await fetchLearn(20);
+      const have=new Set(items.map(it=>it.title));   // `it` et non `i` : la boucle en a déjà un
+      fresh=more.filter(m=>!have.has(m.title));
+    }
+    if(!fresh.length&&more.length){
+      const shown=renderedTitles();
+      fresh=more.filter(m=>!shown.has(m.title));
+    }
+    // Vivier réellement épuisé (petite catégorie entièrement parcourue) : on
+    // resert plutôt que de figer. Même arbitrage que dropSeen, qui ré-autorise
+    // les plus anciens quand tout a été vu — un fil qui se répète reste un fil,
+    // un fil qui s'arrête sans rien dire ressemble à une panne.
+    if(!fresh.length&&more.length)fresh=more;
+    dbgTop(DEBUG?`v${APP_VERSION}  load more OK\n${lastLearnDetail.join("\n")}\n+${fresh.length} carte(s)`:null);
     if(fresh.length){
       items=items.concat(fresh);
       if(items.length>MAX_ITEMS)items=items.slice(-MAX_ITEMS);
