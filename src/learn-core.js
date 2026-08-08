@@ -65,27 +65,24 @@
     { key: "jeuxvideo", label: "🎮 Jeux vidéo", category: "Jeu vidéo" },
     { key: "films", label: "🎥 Films", category: "Film" },
     { key: "series", label: "📺 Séries télévisées", category: "Série télévisée" },
-    { key: "groupes", label: "🎸 Groupes musicaux", category: "Groupe musical" },
+    { key: "musique", label: "🎵 Musique", category: "Musique" },
     { key: "romans", label: "📚 Romans", category: "Roman" },
-    {
-      key: "personnalites",
-      label: "👤 Personnalités historiques",
-      category: "Personnalité historique",
-    },
     { key: "batailles", label: "⚔️ Batailles", category: "Bataille" },
-    { key: "pays", label: "🌍 Pays", category: "Pays" },
-    { key: "monuments", label: "🏛️ Monuments", category: "Monument" },
     {
-      key: "decouvertes",
-      label: "🔬 Découvertes scientifiques",
-      category: "Découverte scientifique",
+      key: "monuments",
+      label: "🏛️ Monuments historiques",
+      category: "Monument historique",
     },
-    { key: "objetscelestes", label: "🌌 Objets célestes", category: "Objet céleste" },
-    { key: "especes", label: "🐾 Espèces animales", category: "Espèce animale" },
+    { key: "pays", label: "🌍 Pays", category: "Pays" },
+    { key: "planetes", label: "🪐 Planètes", category: "Planète" },
+    { key: "exoplanetes", label: "🌌 Exoplanètes", category: "Exoplanète" },
     { key: "inventions", label: "💡 Inventions", category: "Invention" },
-    { key: "peintures", label: "🎨 Peintures", category: "Peinture" },
-    { key: "gastronomie", label: "🍲 Gastronomie", category: "Gastronomie" },
+    { key: "animaux", label: "🐾 Animaux", category: "Animal" },
+    { key: "plats", label: "🍲 Plats", category: "Plat" },
+    { key: "art", label: "🎨 Art", category: "Art" },
+    { key: "sport", label: "⚽ Sport", category: "Sport" },
   ];
+
   const catByKey = (key) => CATEGORIES.find((c) => c.key === key) || CATEGORIES[0];
   const catLabel = (key) => {
     const c = CATEGORIES.find((x) => x.key === key);

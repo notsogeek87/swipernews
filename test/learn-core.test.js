@@ -24,18 +24,18 @@ test("les 15 catégories demandées sont là, avec le bon titre Wikipédia", () 
     jeuxvideo: "Jeu vidéo",
     films: "Film",
     series: "Série télévisée",
-    groupes: "Groupe musical",
+    musique: "Musique",
     romans: "Roman",
-    personnalites: "Personnalité historique",
     batailles: "Bataille",
+    monuments: "Monument historique",
     pays: "Pays",
-    monuments: "Monument",
-    decouvertes: "Découverte scientifique",
-    objetscelestes: "Objet céleste",
-    especes: "Espèce animale",
+    planetes: "Planète",
+    exoplanetes: "Exoplanète",
     inventions: "Invention",
-    peintures: "Peinture",
-    gastronomie: "Gastronomie",
+    animaux: "Animal",
+    plats: "Plat",
+    art: "Art",
+    sport: "Sport",
   };
   for (const [key, category] of Object.entries(attendu)) {
     const c = core.CATEGORIES.find((x) => x.key === key);
@@ -243,8 +243,8 @@ test("fetchCategoryItems nomme la catégorie fautive quand elle ne rend rien", a
   // « catégorie trouvée mais sans article » appellent des correctifs opposés.
   const vide = async () => ({ query: { categorymembers: [] } });
   await assert.rejects(
-    core.fetchCategoryItems("peintures", vide),
-    /aucun article sous « Peinture »/
+    core.fetchCategoryItems("art", vide),
+    /aucun article sous « Art »/
   );
 
   const sansExtrait = async (url) =>
@@ -258,10 +258,7 @@ test("fetchCategoryItems nomme la catégorie fautive quand elle ne rend rien", a
           },
         }
       : { query: { pages: [{ title: "P0", extract: "trop court" }] } };
-  await assert.rejects(
-    core.fetchCategoryItems("peintures", sansExtrait),
-    /0 exploitable/
-  );
+  await assert.rejects(core.fetchCategoryItems("art", sansExtrait), /0 exploitable/);
 });
 
 test("randomBucket reste dans la plage cacheable", () => {

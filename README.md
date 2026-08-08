@@ -77,8 +77,8 @@ les deux univers, et un nouvel appui sur **📰 Actus** revient aux flux RSS.
 
 Une **barre de centres d'intérêt** (chips défilables sous les onglets) permet de choisir
 ce qu'on veut apprendre : **Aléatoire** (défaut), Jeux vidéo, Films, Séries télévisées,
-Groupes musicaux, Romans, Personnalités historiques, Batailles, Pays, Monuments, Découvertes
-scientifiques, Objets célestes, Espèces animales, Inventions, Peintures, Gastronomie. Le choix
+Musique, Romans, Batailles, Monuments historiques, Pays, Planètes, Exoplanètes, Inventions,
+Animaux, Plats, Art, Sport. Le choix
 est mémorisé et chaque catégorie a son propre cache.
 
 ### Source du mode Apprendre
