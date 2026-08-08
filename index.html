@@ -488,7 +488,7 @@
 
 <div class="state hidden" id="loading" role="status">
   <div class="spinner"></div>
-  <p>Chargement des actus…</p>
+  <p id="loadingMsg">Chargement des actus…</p>
 </div>
 
 <div class="state hidden" id="empty" role="status">
@@ -565,8 +565,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=59"></script>
-<script src="src/learn-core.js?v=59"></script>
+<script src="src/lib.js?v=60"></script>
+<script src="src/learn-core.js?v=60"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -836,7 +836,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="59";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="60";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2479,7 +2479,13 @@ function mergeFeeds(incoming){
 }
 
 /* ---------- Utils ---------- */
-function show(id){["loading","empty"].forEach(s=>document.getElementById(s).classList.toggle("hidden",s!==id));}
+function show(id){
+  // « les actus » n'a de sens qu'en mode Actus : en Apprendre, ce ne sont pas
+  // des flux mais des articles Wikipédia.
+  if(id==="loading")document.getElementById("loadingMsg").textContent=
+    mode==="learn"?"Chargement des articles…":"Chargement des actus…";
+  ["loading","empty"].forEach(s=>document.getElementById(s).classList.toggle("hidden",s!==id));
+}
 function hideStates(){document.getElementById("loading").classList.add("hidden");document.getElementById("empty").classList.add("hidden");}
 function showEmpty(reason){
   document.getElementById("loading").classList.add("hidden");
