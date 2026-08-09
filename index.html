@@ -106,6 +106,18 @@
      un filtre passe-bas, il conserve la luminance moyenne — un ciel à 200 reste
      à 200 après flou. Le contraste doit donc venir du texte, pas de l'image. */
   .card--img .card__title{text-shadow:0 0 3px rgba(0,0,0,.6),0 1px 6px rgba(0,0,0,.5)}
+  /* `display:block` n'est pas cosmétique : un lien en ligne épouse le TEXTE du
+     titre, donc un titre court garde une cible étroite, coincée à gauche —
+     mesuré à 255 px du bord droit, soit PIRE que la pastille qu'on cherchait à
+     éviter. En bloc, la cible occupe toute la largeur du titre et son bord
+     droit tombe à 22 px : le pouce droit l'atteint.
+     Le titre est un lien, mais ne doit pas RESSEMBLER à un lien : il reste
+     l'élément le plus lourd de la carte, sa couleur et sa graisse font déjà tout
+     le travail. Seul le retour au toucher signale qu'il est actionnable. Un
+     soulignement, lui, banaliserait le titre en le rapprochant du corps de texte. */
+  .card__title a{display:block;color:inherit;text-decoration:none;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;transition:opacity .12s}
+  .card__title a:active{opacity:.65}
   .card--img .card__desc{text-shadow:0 0 3px rgba(0,0,0,.55),0 1px 5px rgba(0,0,0,.4)}
   /* Source et date : halo plus soutenu. Ces lignes sont fines et se placent en
      HAUT du bloc — donc sur la zone la plus claire de l'image. Mesuré à 2,2:1
@@ -579,8 +591,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=67"></script>
-<script src="src/learn-core.js?v=67"></script>
+<script src="src/lib.js?v=68"></script>
+<script src="src/learn-core.js?v=68"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -859,7 +871,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="67";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="68";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1823,10 +1835,10 @@ function cardHTML(it,id){
     <div class="card__body">
       ${catB}
       <span class="card__source"><span class="dot"></span>${esc(it.source)}</span>
-      <h2 class="card__title">${esc(it.title)}</h2>
+      <h2 class="card__title">${link?`<a href="${escAttr(link)}" data-open target="_blank" rel="noopener">${esc(it.title)}</a>`:esc(it.title)}</h2>
       ${it.desc?`<p class="card__desc">${esc(it.desc)}</p>`:""}
       <div class="card__meta">${it.date?`<span>${relTime(it.date)}</span>`:""}</div>
-      ${link?`<a class="card__open" href="${escAttr(link)}" target="_blank" rel="noopener">${openIcon}<span>${openLabel}</span></a>`:`<span class="card__open" style="background:transparent;box-shadow:none;border:1px solid var(--redline);color:var(--ash)">Article de démo</span>`}
+      ${link?`<a class="card__open" data-open href="${escAttr(link)}" target="_blank" rel="noopener">${openIcon}<span>${openLabel}</span></a>`:`<span class="card__open" style="background:transparent;box-shadow:none;border:1px solid var(--redline);color:var(--ash)">Article de démo</span>`}
     </div>
   </article>`;
 }
@@ -1837,7 +1849,11 @@ feedEl.addEventListener("click",e=>{
   // Lien d'un article : dans l'app packagée, il s'ouvre dans le navigateur
   // intégré plutôt que dans Chrome (le lien reste un vrai <a> pour le web et
   // pour l'appui long « ouvrir dans un nouvel onglet / copier le lien »).
-  const openLink=e.target.closest("a.card__open");
+  // `a[data-open]` couvre les DEUX entrées : la pastille en bas de carte et le
+  // titre. Le titre est cliquable parce que la pastille, alignée à gauche comme
+  // le texte, est hors d'atteinte du pouce quand le téléphone est tenu de la
+  // main droite — alors que le titre, lui, barre toute la largeur.
+  const openLink=e.target.closest("a[data-open]");
   if(openLink&&openLink.href){
     const card=openLink.closest(".card"),t=card&&card.querySelector(".card__title");
     if(openArticle(openLink.href,t?t.textContent:""))e.preventDefault();
