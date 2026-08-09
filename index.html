@@ -203,6 +203,19 @@
   .brand__logo{display:flex;align-items:center}
   .brand__logo img{height:28px;width:28px;border-radius:var(--radius-sm);display:block;object-fit:cover}
   .brand__text{color:var(--flare)}
+  /* Signature au lancement : le nom s'écrit lettre à lettre, le curseur clignote
+     puis s'efface. Jouée UNE fois par ouverture de l'app — volontairement pas de
+     boucle : rien ne doit bouger en permanence dans le champ de vision de
+     quelqu'un qui lit (c'est la raison qui a fait retirer la jauge en Apprendre).
+     Les .ch restent des inline SIMPLES : un display:inline-block ferait épeler le
+     mot lettre par lettre par les lecteurs d'écran au lieu de le lire d'un bloc. */
+  .brand__text .ch{opacity:0;animation:brandType 1ms linear forwards;animation-delay:calc(var(--i)*68ms)}
+  @keyframes brandType{to{opacity:1}}
+  .brand__text .caret{display:inline-block;width:2px;height:1em;background:var(--flare);
+    vertical-align:-.12em;margin-left:2px;
+    animation:brandBlink .62s steps(1) infinite,brandCaret .25s 2.4s forwards}
+  @keyframes brandBlink{50%{opacity:0}}
+  @keyframes brandCaret{to{opacity:0;width:0;margin-left:0}}
   .top .actions{display:flex;gap:8px}
   .top .actions button{background:transparent;border:1.5px solid var(--redline);color:var(--ink);
     padding:9px 14px;border-radius:var(--radius-sm);font-family:var(--font-sans);font-weight:500;font-size:13px;
@@ -467,6 +480,11 @@
       transition-duration:.001ms!important;scroll-behavior:auto!important}
     .hint{animation:none}
     .peek{animation:none}
+    /* Le nom s'affiche d'emblée, sans curseur : la règle générale ci-dessus
+       n'annule pas les `animation-delay`, le curseur resterait sinon posé
+       quelques secondes après un texte pourtant déjà complet. */
+    .brand__text .ch{opacity:1!important;animation:none!important}
+    .brand__text .caret{display:none}
   }
 </style>
 </head>
@@ -591,8 +609,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=69"></script>
-<script src="src/learn-core.js?v=69"></script>
+<script src="src/lib.js?v=70"></script>
+<script src="src/learn-core.js?v=70"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -871,7 +889,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="69";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="70";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2566,6 +2584,20 @@ function demobadge(on){document.getElementById("demobadge").classList.toggle("hi
 function syncing(on){document.getElementById("syncbar").classList.toggle("on",!!on);}
 let toastT;function toast(m,ms){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");
   clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),ms||1800);}
+
+/* Le nom de l'app s'écrit à l'ouverture (mise en forme : .brand__text, CSS).
+   Le texte vit dans `data-text` ET dans le nœud : sans ce script — ou avec un
+   `?v=` en échec — le wordmark reste affiché tel quel, simplement sans effet. */
+(function brandTypewriter(){
+  const el=document.querySelector(".brand__text"),txt=el&&el.dataset.text;
+  if(!txt)return;
+  el.textContent="";
+  [...txt].forEach((c,i)=>{const s=document.createElement("span");
+    s.className="ch";s.style.setProperty("--i",i);s.textContent=c;el.appendChild(s);});
+  const caret=document.createElement("span");
+  caret.className="caret";caret.setAttribute("aria-hidden","true");   // décoratif
+  el.appendChild(caret);
+})();
 
 if(!firstRun)loadFeeds();
 </script>
