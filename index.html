@@ -249,10 +249,13 @@
   .modeswitch button.active{background:linear-gradient(135deg,var(--surface),var(--molten));color:var(--flare)}
   .modeswitch button .ic{font-size:15px}
 
-  /* Barre de catégories (mode Apprendre) : chips défilables horizontalement */
+  /* Barres de filtres : chips défilables horizontalement. Deux barres, une par
+     mode — #cats les centres d'intérêt (Apprendre), #srcs les sources (Actus).
+     Jamais visibles ensemble : chacune filtre un fil que l'autre mode n'a pas. */
   .cats{display:none;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px}
   .cats::-webkit-scrollbar{display:none}
-  body.learn .cats{display:flex}
+  body.learn #cats{display:flex}
+  body:not(.learn) #srcs{display:flex}
   .cats button{flex:0 0 auto;background:transparent;border:1px solid var(--redline);
     color:var(--ash);font-family:var(--font-sans);font-weight:500;font-size:13px;letter-spacing:-.01em;
     padding:7px 14px;border-radius:var(--radius-sm);
@@ -528,6 +531,7 @@
     <button id="tabNews" role="tab" aria-selected="false" aria-controls="feed"><span class="ic">📰</span> Actus</button>
   </div>
   <div class="cats" id="cats" role="group" aria-label="Centres d'intérêt"></div>
+  <div class="cats" id="srcs" role="group" aria-label="Sources"></div>
 </header>
 
 <div class="demobadge hidden" id="demobadge" role="status">Mode démo — hors-ligne</div>
@@ -623,8 +627,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=71"></script>
-<script src="src/learn-core.js?v=71"></script>
+<script src="src/lib.js?v=72"></script>
+<script src="src/learn-core.js?v=72"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -741,7 +745,23 @@ const LS_KEY="fluxswipe.feeds.v1";
 const LS_MODE="fluxswipe.mode.v1";
 const LS_CAT="fluxswipe.cat.v1";
 const LS_INT="fluxswipe.interests.v1";
+const LS_NSRC="fluxswipe.newssrc.v1";
 let feeds=load(),items=[];
+/* Filtre de source du mode Actus : "all", ou l'URL d'UNE source cochée. Le
+   pendant de `cat` pour Apprendre — même barre de puces, même mémorisation.
+   L'URL sert de clé plutôt que l'indice : supprimer une source du panneau
+   décalerait tous les indices suivants, et le filtre désignerait alors une
+   autre source sans que rien ne l'indique. Une URL disparue retombe sur
+   « Toutes » (voir sanitizeNewsSrc). */
+let newsSrc=(()=>{try{return localStorage.getItem(LS_NSRC)||"all";}catch(e){return "all";}})();
+function sanitizeNewsSrc(){
+  if(newsSrc==="all")return false;
+  if(feeds.some(f=>f.on&&f.url===newsSrc))return false;
+  newsSrc="all";                      // source décochée, supprimée, ou jamais vue
+  try{localStorage.setItem(LS_NSRC,newsSrc);}catch(e){}
+  return true;
+}
+sanitizeNewsSrc();
 /* Flux injoignables au dernier chargement : sert à les signaler dans le panneau
    Sources, car un toast disparaît avant qu'on ait pu agir. Volontairement non
    persisté — une source peut très bien remarcher au chargement suivant. */
@@ -773,7 +793,11 @@ function activeCatKey(){
 }
 
 function load(){try{const s=localStorage.getItem(LS_KEY);if(s)return JSON.parse(s);}catch(e){warn("load feeds",e);}return structuredClone(DEFAULT_FEEDS);}
-function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(feeds));}catch(e){warn("save feeds",e);}}
+function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(feeds));}catch(e){warn("save feeds",e);}
+  // Point de passage unique de TOUTE modification des sources (case cochée,
+  // ajout, suppression, import OPML) : la barre de filtres du mode Actus s'y
+  // remet à jour d'un seul endroit.
+  renderSrcs();}
 
 /* ---------- Helpers partagés ---------- */
 // Journalise sans casser le flux (remplace les catch silencieux, pour un debug possible)
@@ -903,7 +927,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="71";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="72";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1358,7 +1382,9 @@ async function loadFeeds(force){
 
   /* Seuil de fraîcheur : rien à aller chercher, on garde ce qui est à l'écran
      (cache tout juste peint, ou fil déjà affiché). Aucun appel aux sources. */
-  const age=Date.now()-lastNewsLoad;
+  // Fraîcheur de CE fil : chaque source filtrée a sa propre entrée de cache,
+  // datée. `lastNewsLoad` (global) ne vaut que pour ce qui est déjà à l'écran.
+  const age=Date.now()-(cached?cacheTime(key):lastNewsLoad);
   if(!force&&(cached||sameFeed)&&age<AUTO_RELOAD_MS){
     if(DEBUG)dbg(`v${APP_VERSION}  cache servi\n${items.length} articles, ${Math.round(age/60000)} min\n`+
                  `prochaine actualisation dans ${Math.round((AUTO_RELOAD_MS-age)/60000)} min`);
@@ -1366,7 +1392,10 @@ async function loadFeeds(force){
     return;
   }
 
-  const allActive=feeds.filter(f=>f.on);
+  // Une seule source quand la barre de filtres en désigne une : elle occupe
+  // alors tout le fil (perFeed vaut MAX_NEWS, plus haut), au lieu de la portion
+  // qu'elle a dans le mélange.
+  const allActive=feeds.filter(f=>f.on&&(newsSrc==="all"||f.url===newsSrc));
   if(!allActive.length){if(!cached&&!sameFeed){items=[];render();showEmpty("no-feeds");}return;}
 
   /* Beaucoup de sources (un OPML importé peut en compter des centaines) : on
@@ -2349,7 +2378,10 @@ const feedSnap={};
 // changer d'intérêts semble alors sans effet. Le cache confondait aussi
 // « aucun intérêt » (tirage aléatoire) et « des intérêts » (leur mélange).
 function feedKey(m){
-  if(m!=="learn")return "news";
+  // Actus : la clé porte la source filtrée, exactement comme Apprendre porte la
+  // catégorie. Cache, instantané de fil et test « même fil » suivent donc le
+  // filtre — sans quoi choisir une source servirait le fil mélangé du cache.
+  if(m!=="learn")return newsSrc==="all"?"news":"news:"+newsSrc;
   return "learn_"+cat+(cat==="all"?":"+interests.join(","):"");
 }
 function snapshotFeed(m){
@@ -2450,6 +2482,42 @@ function setCat(k){
   if(mode==="learn")loadFeeds();
 }
 
+/* ---------- Barre de filtres (mode Actus) ---------- */
+/* Le pendant de la barre des centres d'intérêt : filtrer le fil sur UNE source,
+   depuis la page principale, sans ouvrir le panneau Sources. Les puces sont les
+   sources COCHÉES — décocher reste le geste qui retire une source du fil, ce
+   filtre-là ne fait que se restreindre à l'une d'elles, sans rien changer aux
+   réglages.
+   getElementById à chaque rendu plutôt qu'une const : renderSrcs() est appelée
+   depuis save(), défini bien plus haut, qui s'exécuterait avant l'initialisation
+   d'une const déclarée ici. */
+function renderSrcs(){
+  const el=document.getElementById("srcs");
+  if(!el)return;
+  sanitizeNewsSrc();
+  const actifs=feeds.filter(f=>f.on);
+  // Avec une seule source, filtrer n'a aucun sens : la barre ne proposerait que
+  // « Toutes » et cette source, deux puces pour le même fil.
+  el.style.display=actifs.length>1?"":"none";
+  const chips=[{k:"all",label:"✨ Toutes"}].concat(actifs.map(f=>({k:f.url,label:f.name})));
+  el.innerHTML=chips.map(c=>
+    `<button data-k="${escAttr(c.k)}" class="${c.k===newsSrc?"active":""}">${esc(c.label)}</button>`).join("");
+  el.querySelectorAll("button").forEach(b=>{b.onclick=()=>setNewsSrc(b.dataset.k);});
+}
+function setNewsSrc(k){
+  if(k===newsSrc)return;
+  // Instantané AVANT le changement de clé, sinon le fil qu'on quitte serait
+  // rangé sous la clé de celui qu'on ouvre. Permet l'aller-retour immédiat
+  // entre deux sources, sans réseau — comme la bascule entre les deux modes.
+  if(mode==="news")snapshotFeed(mode);
+  newsSrc=k;
+  try{localStorage.setItem(LS_NSRC,newsSrc);}catch(e){}
+  renderSrcs();
+  const active=document.querySelector("#srcs button.active");
+  if(active)active.scrollIntoView({inline:"center",block:"nearest",behavior:"smooth"});
+  if(mode==="news"&&!restoreFeed("news"))loadFeeds();
+}
+
 /* ---------- Sélecteur de centres d'intérêt ---------- */
 const intSheet=document.getElementById("intSheet");
 let pendingInt=new Set();
@@ -2485,7 +2553,7 @@ function saveInterests(){
 }
 intSheet.onclick=e=>{if(e.target===intSheet)closeDialog(intSheet);};
 document.getElementById("saveInterestsBtn").onclick=saveInterests;
-renderCats();
+renderCats();renderSrcs();
 /* Premier lancement : on ouvre le choix des intérêts AVANT de charger quoi que
    ce soit. Charger un fil derrière la feuille était du réseau gaspillé, et
    surtout le contenu était remplacé sous les yeux de l'utilisateur dès qu'il
