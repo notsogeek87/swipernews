@@ -229,8 +229,17 @@
   .intgrid{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
   .intchip{background:transparent;border:1px solid var(--redline);color:var(--ash);
     font-family:var(--font-sans);font-weight:500;font-size:14px;letter-spacing:-.01em;padding:11px 16px;border-radius:var(--radius-sm);
-    cursor:pointer;transition:background .15s,color .15s}
-  .intchip.on{background:var(--surface);color:var(--flare)}
+    cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+  /* Coché = pavé corail PLEIN, libellé sombre. L'état cochait auparavant un
+     fond « surface » qui ne se distinguait du fond de page que de 1,12:1 —
+     invisible — la seule vraie différence étant la couleur du texte. Or une
+     nuance de teinte est le plus faible des signaux d'état, et le premier à
+     disparaître pour qui distingue mal les couleurs. Le remplissage porte ici
+     l'information par la LUMINANCE (écart × 43), donc perceptible même sans
+     percevoir le corail ; le libellé reste au-dessus de 4,5:1 (6,13:1).
+     La bordure garde la même épaisseur dans les deux états : sans quoi la
+     grille se réagencerait à chaque appui. */
+  .intchip.on{background:var(--flare);border-color:var(--flare);color:var(--bg);font-weight:700}
   /* « Warm Blush » : le lavis décoratif que la charte réserve aux zones de
      respiration — ici pour l'encart d'accueil, jamais sous forme de texte coloré. */
   .intro{background:rgba(252,172,156,.12);border:1px solid var(--redline);color:var(--ink);
@@ -570,8 +579,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=66"></script>
-<script src="src/learn-core.js?v=66"></script>
+<script src="src/lib.js?v=67"></script>
+<script src="src/learn-core.js?v=67"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -850,7 +859,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="66";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="67";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
