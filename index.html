@@ -591,8 +591,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=68"></script>
-<script src="src/learn-core.js?v=68"></script>
+<script src="src/lib.js?v=69"></script>
+<script src="src/learn-core.js?v=69"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -871,7 +871,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="68";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="69";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1293,11 +1293,21 @@ async function loadFeeds(force){
       const arr=await fetchLearn(20);              // un lot multi-sources au démarrage ; le scroll infini complète
       if(!arr.length)throw new Error("empty");
       if(my!==loadSeq)return;                       // chargement obsolète → on abandonne
-      if(sameFeed){
-        // Un fil déjà affiché : on ne le REMPLACE pas, sous peine de faire
-        // disparaître l'article en cours sous les yeux (le tirage aléatoire ne
-        // le contient presque jamais). On complète comme le ferait le scroll
-        // infini — voir loadMoreLearn, même logique de dédoublonnage.
+      // Quelque chose d'exploitable est DÉJÀ à l'écran : le fil courant, ou le
+      // cache tout juste peint. `sameFeed` seul ne suffisait pas — il est figé
+      // AVANT l'attente réseau, donc toujours faux au démarrage à froid, et le
+      // lot arrivé une seconde plus tard remplaçait le cache : la carte
+      // changeait toute seule sous les yeux, et la reprise de lecture (déjà
+      // désarmée par le rendu du cache) ne pouvait plus la rattraper.
+      // `force` (↻, réessai) reste une demande explicite de nouvelle fournée.
+      const keepShown=!force&&(sameFeed||!!cached);
+      if(keepShown){
+        // On ne REMPLACE pas, sous peine de faire disparaître l'article en
+        // cours sous les yeux (le tirage aléatoire ne le contient presque
+        // jamais). On complète comme le ferait le scroll infini — voir
+        // loadMoreLearn, même logique de dédoublonnage. L'article lu restant
+        // dans `items`, render() le retrouve via anchorLink() et conserve la
+        // position.
         const have=new Set(items.map(i=>i.title));
         const fresh=arr.filter(a=>!have.has(a.title));
         if(fresh.length){
