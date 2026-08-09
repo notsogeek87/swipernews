@@ -203,19 +203,33 @@
   .brand__logo{display:flex;align-items:center}
   .brand__logo img{height:28px;width:28px;border-radius:var(--radius-sm);display:block;object-fit:cover}
   .brand__text{color:var(--flare)}
-  /* Signature au lancement : le nom s'écrit lettre à lettre, le curseur clignote
-     puis s'efface. Jouée UNE fois par ouverture de l'app — volontairement pas de
-     boucle : rien ne doit bouger en permanence dans le champ de vision de
-     quelqu'un qui lit (c'est la raison qui a fait retirer la jauge en Apprendre).
-     Les .ch restent des inline SIMPLES : un display:inline-block ferait épeler le
-     mot lettre par lettre par les lecteurs d'écran au lieu de le lire d'un bloc. */
-  .brand__text .ch{opacity:0;animation:brandType 1ms linear forwards;animation-delay:calc(var(--i)*68ms)}
+  /* Signature de la barre : le nom s'écrit lettre à lettre, le curseur clignote
+     puis s'efface. Rejouée à chaque RETOUR de la barre (voir typeBrand/showTop),
+     jamais en boucle : rien ne doit bouger en permanence dans le champ de vision
+     de quelqu'un qui lit (c'est la raison qui a fait retirer la jauge en
+     Apprendre). La barre étant masquée pendant le swipe, l'effet ne peut pas
+     jouer en pleine lecture.
+     Le mot entier est TOUJOURS dans le DOM, les lettres à venir simplement en
+     opacity:0 : un lecteur d'écran lit « SwiperNews » même au milieu de la
+     frappe. Les .ch restent d'ailleurs des inline SIMPLES — un
+     display:inline-block ferait épeler le mot lettre par lettre. */
+  .brand__text .ch{position:relative;opacity:0;
+    animation:brandType 1ms linear forwards;animation-delay:calc(var(--i)*68ms)}
   @keyframes brandType{to{opacity:1}}
-  .brand__text .caret{display:inline-block;width:2px;height:1em;background:var(--flare);
-    vertical-align:-.12em;margin-left:2px;
-    animation:brandBlink .62s steps(1) infinite,brandCaret .25s 2.4s forwards}
-  @keyframes brandBlink{50%{opacity:0}}
-  @keyframes brandCaret{to{opacity:0;width:0;margin-left:0}}
+  /* Curseur de frappe : comme le mot occupe déjà toute sa largeur, un curseur
+     unique resterait garé à droite pendant que les lettres se remplissent — on
+     verrait une révélation, pas une frappe. Chacune porte donc le sien, allumé
+     le temps de son propre créneau : le curseur avance ainsi avec la lettre. */
+  .brand__text .ch::after{content:"";position:absolute;right:-2px;top:.08em;
+    width:2px;height:.92em;background:var(--flare);opacity:0;
+    animation:brandCarry 68ms linear;animation-delay:calc(var(--i)*68ms)}
+  @keyframes brandCarry{0%,99%{opacity:1}100%{opacity:0}}
+  /* Curseur final : prend le relais une fois le mot écrit (10 lettres × 68 ms),
+     clignote trois fois et s'éteint pour de bon. */
+  .brand__text .caret{display:inline-block;width:2px;height:.92em;background:var(--flare);
+    vertical-align:-.06em;margin-left:2px;opacity:0;
+    animation:brandBlink .62s linear 680ms 3 forwards}
+  @keyframes brandBlink{0%,49.9%{opacity:1}50%,100%{opacity:0}}
   .top .actions{display:flex;gap:8px}
   .top .actions button{background:transparent;border:1.5px solid var(--redline);color:var(--ink);
     padding:9px 14px;border-radius:var(--radius-sm);font-family:var(--font-sans);font-weight:500;font-size:13px;
@@ -484,7 +498,7 @@
        n'annule pas les `animation-delay`, le curseur resterait sinon posé
        quelques secondes après un texte pourtant déjà complet. */
     .brand__text .ch{opacity:1!important;animation:none!important}
-    .brand__text .caret{display:none}
+    .brand__text .ch::after,.brand__text .caret{display:none}
   }
 </style>
 </head>
@@ -609,8 +623,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=70"></script>
-<script src="src/learn-core.js?v=70"></script>
+<script src="src/lib.js?v=71"></script>
+<script src="src/learn-core.js?v=71"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -889,7 +903,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="70";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="71";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1988,8 +2002,31 @@ const LS_PEEK="fluxswipe.peek.v1";
 const peekEl=document.getElementById("peek");
 try{if(localStorage.getItem(LS_PEEK)!=="1")peekEl.classList.add("peek--new");}
 catch(e){peekEl.classList.add("peek--new");}
+/* Signature du wordmark : le nom se réécrit à CHAQUE retour de la barre, pas
+   seulement au lancement. Reconstruire les <span> relance les animations CSS —
+   un nœud neuf n'a rien joué —, ce qui évite le retrait/remise de classe et le
+   reflow forcé qu'il exige entre les deux.
+   Le texte vit AUSSI en clair dans le nœud (voir le HTML) : sans ce script, ou
+   avec un module en échec, le nom reste affiché, simplement sans effet. */
+const brandEl=document.querySelector(".brand__text");
+function typeBrand(){
+  const txt=brandEl&&brandEl.dataset.text;
+  if(!txt)return;
+  brandEl.textContent="";
+  [...txt].forEach((c,i)=>{const s=document.createElement("span");
+    s.className="ch";s.style.setProperty("--i",i);s.textContent=c;brandEl.appendChild(s);});
+  const caret=document.createElement("span");
+  caret.className="caret";caret.setAttribute("aria-hidden","true");   // décoratif
+  brandEl.appendChild(caret);
+}
+typeBrand();
 function showTop(){
+  // La frappe ne se rejoue que si la barre REVENAIT vraiment : le moindre appui
+  // sur le fil appelle showTop(), y compris barre déjà visible — sans ce test,
+  // le nom se réécrirait à chaque tap.
+  const revenait=topEl.classList.contains("top--away");
   topEl.classList.remove("top--away");document.body.classList.remove("top-away");
+  if(revenait)typeBrand();
   if(peekEl.classList.contains("peek--new")){
     peekEl.classList.remove("peek--new");
     try{localStorage.setItem(LS_PEEK,"1");}catch(e){warn("save peek",e);}
@@ -2584,20 +2621,6 @@ function demobadge(on){document.getElementById("demobadge").classList.toggle("hi
 function syncing(on){document.getElementById("syncbar").classList.toggle("on",!!on);}
 let toastT;function toast(m,ms){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");
   clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),ms||1800);}
-
-/* Le nom de l'app s'écrit à l'ouverture (mise en forme : .brand__text, CSS).
-   Le texte vit dans `data-text` ET dans le nœud : sans ce script — ou avec un
-   `?v=` en échec — le wordmark reste affiché tel quel, simplement sans effet. */
-(function brandTypewriter(){
-  const el=document.querySelector(".brand__text"),txt=el&&el.dataset.text;
-  if(!txt)return;
-  el.textContent="";
-  [...txt].forEach((c,i)=>{const s=document.createElement("span");
-    s.className="ch";s.style.setProperty("--i",i);s.textContent=c;el.appendChild(s);});
-  const caret=document.createElement("span");
-  caret.className="caret";caret.setAttribute("aria-hidden","true");   // décoratif
-  el.appendChild(caret);
-})();
 
 if(!firstRun)loadFeeds();
 </script>
