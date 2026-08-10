@@ -29,8 +29,10 @@ pour passer à la suivante. **Un seul fil**, où deux natures d'articles alterne
 > ont été fusionnés en un fil unique. Il n'y a plus de variable `mode`, plus
 > d'onglets, plus de jauge de progression (le fil n'a plus de fin) et plus de
 > carte de fin. Les réglages des deux anciens modes vivent dans **un seul
-> panneau** (⚙), et les deux barres de puces (sources / centres d'intérêt) sont
-> visibles ensemble. Les deux anciens modes restent atteignables comme les deux
+> panneau** (⚙), et les deux filtres (source / centre d'intérêt) tiennent dans
+> DEUX PASTILLES d'une seule rangée, qui ouvrent leur liste au toucher — les
+> barres de puces défilantes coûtaient une rangée de plus et cachaient tout ce
+> qui dépassait à droite. Les deux anciens modes restent atteignables comme les deux
 > EXTRÉMITÉS de la dose — et chaque extrémité coupe vraiment l'autre moitié,
 > réseau compris (`loadLearnPart` / `loadNewsPart` sortent aussitôt).
 
@@ -344,6 +346,13 @@ genre de script dérape.
   (cache, instantané), sinon une dose changée entre deux sessions servirait
   l'ancien mélange ; et `feedSnap` mémorise la dose, pour re-rendre quand
   l'instantané ne lui correspond plus.
+- `renderFilters()` / `openPicker()` — les deux pastilles de filtre et leur
+  feuille. `filterChips()` fabrique les puces une seule fois pour les deux, qui
+  ne peuvent donc pas diverger.
+- `scrollToCard()` / `scrollFix` — le filet de repositionnement s'exécute une
+  frame plus tard : sans son compteur de génération, celui d'un rendu dépassé
+  revient défaire la décision du rendu suivant (une repeinture progressive
+  ancrée sur l'article lu annulait le `forceTop` du rendu final).
 - `feedKey()` — identité du fil : les deux filtres (source d'actu, thème
   Wikipédia). Cache local, `feedSnap` et test « même fil » en dépendent.
 - `feedSnap` — état du fil mémorisé par filtre ; revenir à un filtre déjà vu ne

@@ -34,8 +34,9 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
 - **Fil unique** : les deux natures d'articles se succèdent à une cadence que
   vous réglez (voir *Dose d'apprentissage*). Une carte se reconnaît
   d'un coup d'œil — badge de thème et bouton « Découvrir » côté Wikipédia,
-  « Lire l'article » côté actus. Deux barres de puces, sous le titre, filtrent
-  chacune leur moitié : 📰 une source, 🎓 un centre d'intérêt
+  « Lire l'article » côté actus. Sous le titre, deux pastilles filtrent chacune
+  leur moitié — 📰 une source, 🎓 un centre d'intérêt — et affichent le filtre
+  en cours ; la liste complète s'ouvre au toucher
 - Reprise de lecture : l'app rouvre sur l'article quitté. Si l'article a disparu
   du flux entre-temps (un RSS ne garde
   que ses N derniers items), la reprise se rabat sur le repère temporel puis sur
@@ -79,6 +80,25 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
   corriger ou supprimer. Si toutes échouent, un message invite à réessayer ou à
   revoir ses sources (plus de faux contenu de démo)
 
+## La barre du haut
+
+Trois rangées — marque, sources, centres d'intérêt — mangeaient **19 % de la
+hauteur** de l'écran (152 px sur 780). Pire : les deux barres de puces
+défilaient horizontalement, si bien qu'avec cinq sources et six thèmes, **trois
+de chacun** seulement tenaient à l'écran — le filtre actif pouvait être hors
+champ, hors de portée du regard comme de la main.
+
+Les deux barres sont devenues **deux pastilles** sur une seule rangée
+(`📰 Toutes ▾` / `🎓 Tous ▾`, 108 px au total, 14 %). Chacune affiche le filtre
+en cours et s'allume quand il n'est plus « tout » ; un tap ouvre une feuille où
+la liste complète tient d'un coup, sans rien couper. Une pastille disparaît
+quand elle n'a pas de choix à offrir (une seule source cochée, aucun centre
+d'intérêt) ou quand la dose a retiré sa moitié du fil — les deux muettes, la
+rangée entière s'efface.
+
+Le compromis assumé : un tap de plus pour filtrer. C'est un geste rare (la
+plupart restent sur « Toutes »), et il devient en échange complet et lisible.
+
 ## Dose d'apprentissage
 
 La composition du fil tient à un seul réglage — un **curseur** à six crans, en
@@ -117,8 +137,7 @@ Entre les actus se glissent des articles **Wikipédia** tirés au hasard (titre,
 extrait, image, lien vers l'article). Ils se distinguent par un badge de thème,
 une typographie un peu plus dense et le verbe « Découvrir » sur leur bouton.
 
-Une **barre de centres d'intérêt** (chips défilables sous le titre) permet de choisir
-ce qu'on veut apprendre : **Aléatoire** (défaut), Sciences, Histoire, Art & Culture,
+La **pastille 🎓** de la barre du haut permet de choisir ce qu'on veut apprendre : **Aléatoire** (défaut), Sciences, Histoire, Art & Culture,
 Artistes, Géographie, Nature, Espace, Technologie, Sport, Cinéma, Films, Musique,
 Jeux vidéo, Cuisine, Philosophie. Chaque
 catégorie utilise le moteur de recherche de Wikipédia (`generator=search`,

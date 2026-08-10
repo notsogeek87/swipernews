@@ -249,27 +249,36 @@
     border-color:var(--flare);box-shadow:var(--shadow-ember)}
   .iconbtn--toggle:not(.on){border-color:rgba(149,28,4,.45);filter:grayscale(1);opacity:.65}
 
-  /* Barres de filtres : chips défilables horizontalement. Les DEUX sont
-     désormais visibles ensemble — #srcs restreint les actus à une source,
-     #cats les articles Wikipédia à un thème, et le fil unique mêle les deux.
-     Chacune se masque (en JS) quand elle n'aurait qu'une puce à proposer :
-     une barre « Toutes » seule ne filtre rien.
-     Le préfixe des puces d'ensemble (📰 / 🎓) dit laquelle fait quoi, sans
-     étiquette qui prendrait une ligne de plus. */
-  .cats{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px}
-  .cats::-webkit-scrollbar{display:none}
-  .cats button{flex:0 0 auto;background:transparent;border:1px solid var(--redline);
-    color:var(--ash);font-family:var(--font-sans);font-weight:500;font-size:13px;letter-spacing:-.01em;
-    padding:7px 14px;border-radius:var(--radius-sm);
-    cursor:pointer;white-space:nowrap;transition:background .2s,color .2s}
-  .cats button.active{background:var(--surface);color:var(--flare)}
+  /* Rangée de filtres : DEUX PASTILLES, une par filtre (📰 la source des actus,
+     🎓 le thème des articles Wikipédia).
+     Avant, c'étaient deux barres de puces défilantes, l'une sous l'autre : la
+     barre du haut mangeait 19 % de l'écran, et avec cinq sources et six thèmes
+     seules TROIS de chacun tenaient à l'écran — le filtre actif pouvait même
+     être hors champ, hors de portée du regard comme de la main.
+     La pastille, elle, affiche le filtre en cours ; la liste complète s'ouvre
+     au toucher, d'un coup et sans rien couper. Une rangée en moins.
+     Chacune disparaît quand elle n'a rien à proposer (une seule source cochée,
+     aucun centre d'intérêt) ou quand la dose a retiré sa moitié du fil. */
+  .filters{display:flex;gap:8px;min-width:0}
+  .filterbtn{flex:0 1 auto;min-width:0;display:inline-flex;align-items:center;gap:7px;
+    background:transparent;border:1px solid var(--redline);color:var(--ash);
+    font-family:var(--font-sans);font-weight:500;font-size:13px;letter-spacing:-.01em;
+    padding:8px 13px;border-radius:var(--radius-sm);cursor:pointer;
+    transition:background .2s,color .2s}
+  /* Un filtre est posé : même aplat « surface » que la puce active d'avant. Au
+     repos (« Toutes »/« Tous ») la pastille reste fantôme — l'état par défaut
+     ne doit pas se signaler comme un réglage en cours. */
+  .filterbtn.on{background:var(--surface);color:var(--flare)}
+  .filterbtn:hover{background:rgba(149,28,4,.15)}
+  .filterbtn:active{transform:scale(.97)}
   /* Le nom d'une source est le titre de son flux, que personne ne choisit :
      « Courrier international - Actualités France et Monde, vidéos, infographies »
-     est un titre réel, qui occupait à lui seul toute la largeur de la barre.
-     Coupé au filet plutôt que retaillé en JS : le texte complet reste dans le
-     DOM, donc dans le nom accessible — et la coupe suit la largeur réelle des
-     glyphes, ce qu'un nombre de caractères ne sait pas faire. */
-  #srcs button{max-width:44vw;overflow:hidden;text-overflow:ellipsis}
+     est un titre réel. Coupé au filet plutôt que retaillé en JS : le texte
+     complet reste dans le DOM, donc dans le nom accessible — et la coupe suit
+     la largeur réelle des glyphes, ce qu'un nombre de caractères ne sait pas
+     faire. min-width:0 est ce qui autorise le rétrécissement sous le contenu. */
+  .filterbtn__v{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .filterbtn__c{flex:0 0 auto;font-size:10px;opacity:.75}
 
   /* Curseur de dose (réglages). Un curseur, et pas six boutons segmentés :
      ce réglage est un CONTINUUM entre deux extrémités nommées, et le geste de
@@ -558,8 +567,12 @@
       <button id="openSheet" class="iconbtn" title="Sources, centres d'intérêt et réglages" aria-label="Réglages">⚙</button>
     </div>
   </div>
-  <div class="cats" id="srcs" role="group" aria-label="Sources d'actualité"></div>
-  <div class="cats" id="cats" role="group" aria-label="Centres d'intérêt"></div>
+  <!-- Deux pastilles, une par filtre : elles DISENT le filtre en cours, et
+       ouvrent la liste complète au toucher (voir renderFilters/openPicker). -->
+  <div class="filters" id="filters">
+    <button class="filterbtn" id="srcBtn" aria-haspopup="dialog"><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true">▾</span></button>
+    <button class="filterbtn" id="catBtn" aria-haspopup="dialog"><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true">▾</span></button>
+  </div>
 </header>
 
 <div class="demobadge hidden" id="demobadge" role="status">Wikipédia injoignable — articles de démo</div>
@@ -645,6 +658,18 @@
   </div>
 </div>
 
+<!-- Liste d'un filtre, ouverte depuis sa pastille. Une feuille plutôt qu'un
+     menu flottant : c'est la forme que le reste de l'app utilise déjà, et les
+     puces y tiennent toutes, sur plusieurs lignes s'il le faut. -->
+<div class="sheet" id="pickSheet" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
+  <div class="sheet__panel" tabindex="-1">
+    <div class="sheet__grip"></div>
+    <h2 id="pickTitle"></h2>
+    <p class="sub" id="pickSub"></p>
+    <div class="intgrid" id="pickGrid"></div>
+  </div>
+</div>
+
 <div class="installbar hidden" id="installBar">
   <div class="installbar__icon">◆</div>
   <div class="installbar__txt">
@@ -666,8 +691,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=76"></script>
-<script src="src/learn-core.js?v=76"></script>
+<script src="src/lib.js?v=77"></script>
+<script src="src/learn-core.js?v=77"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -890,9 +915,9 @@ let unreachable=new Set();
    avec la fonction serverless (les deux listes avaient déjà divergé). */
 const CATEGORIES=LEARN.CATEGORIES;
 /* Clés de catégories fusionnées ou renommées. Sans ce report, un intérêt
-   mémorisé sous l'ancienne clé disparaît sans bruit de la barre (renderCats
+   mémorisé sous l'ancienne clé disparaît sans bruit de la liste (filterChips
    ignore les clés inconnues), et un FILTRE courant devenu introuvable est pire
-   encore : plus aucune puce n'apparaît active et catByKey se rabat sur
+   encore : la pastille retombe sur « Tous » et catByKey se rabat sur
    "random", donc le fil sert de l'aléatoire sans que rien ne l'indique. */
 const CAT_RENAMED={cinema:"films"};
 const migrateCat=k=>CAT_RENAMED[k]||k;
@@ -921,7 +946,7 @@ function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(feeds));}catch(e)
   // Point de passage unique de TOUTE modification des sources (case cochée,
   // ajout, suppression, import OPML) : la barre de filtres des sources s'y
   // remet à jour d'un seul endroit.
-  renderSrcs();}
+  renderFilters();}
 
 /* ---------- Helpers partagés ---------- */
 // Journalise sans casser le flux (remplace les catch silencieux, pour un debug possible)
@@ -1051,7 +1076,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="76";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="77";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1713,13 +1738,24 @@ function resolveResume(pos){
    offsetTop ne suppose pas que toutes les cartes ont la même hauteur, et le
    lire force le recalcul du layout — indispensable juste après innerHTML,
    sinon scrollHeight vaut encore 0 et l'affectation de scrollTop est bornée. */
+/* Génération du filet de repositionnement. Le filet ci-dessous s'exécute une
+   frame PLUS TARD : sans ce compteur, celui d'un rendu déjà dépassé revenait
+   défaire la décision du rendu suivant. Cas réel : pendant un rafraîchissement,
+   une repeinture progressive s'ancre sur l'article lu et programme son filet,
+   puis le rendu final demande la tête du fil (forceTop) — et le filet en
+   retard ramenait aussitôt à l'ancien article. Le fil semblait alors ignorer
+   « remonter en tête », de façon intermittente : tout dépendait du nombre de
+   frames écoulées entre les deux rendus. */
+let scrollFix=0;
 function scrollToCard(i){
   const card=feedEl.children[i];
   if(!card)return 0;
   const top=card.offsetTop;
   setScrollTopInstant(feedEl,top);
   // Filet : si la valeur a été bornée (layout pas encore stabilisé), on réessaie.
+  const gen=scrollFix;
   requestAnimationFrame(()=>{
+    if(gen!==scrollFix)return;              // un rendu plus récent a décidé autrement
     const c=feedEl.children[i];
     if(c&&Math.abs(feedEl.scrollTop-c.offsetTop)>4)setScrollTopInstant(feedEl,c.offsetTop);
   });
@@ -1907,6 +1943,7 @@ function makeCardEl(it){
 /* altAnchor : lien de repli quand la carte lue vient d'être RETIRÉE du fil —
    seul cas où cela arrive, un changement de dose (voir applyMix). */
 function render(forceTop,altAnchor){
+  scrollFix++;                                  // périme le filet d'un rendu précédent
   const anchor=forceTop?null:anchorLink();      // avant mutation : où est l'utilisateur ?
 
   // Index des cartes déjà à l'écran, par lien d'article.
@@ -2457,7 +2494,7 @@ function survivingLink(m){
 }
 /* Ce que la dose change dans l'interface : le bouton 🎓, et les deux barres de
    puces — filtrer une moitié absente du fil n'aurait aucun sens. */
-function renderMixUI(){updateLearnToggle();renderCats();renderSrcs();}
+function renderMixUI(){updateLearnToggle();renderFilters();}
 function applyMix(){
   const m=mixLevel();
   const alt=survivingLink(m);
@@ -2487,61 +2524,90 @@ function updateLearnToggle(){
 }
 learnBtn.onclick=()=>setMixScore(mixLevel().learn?0:mixBack);
 
-/* ---------- Barre de filtres : thèmes Wikipédia ---------- */
-const catsEl=document.getElementById("cats");
-function renderCats(){
-  // Une seule puce d'ensemble, et un seul NOM. Elle s'appelait « ✨ Tous »
-  // avec des intérêts et « 🎲 Aléatoire » sans : deux noms pour une même puce,
-  // qui donnaient l'impression de deux filtres distincts. Son sens ne change
-  // pas : « rien de précis » — le mélange des intérêts choisis, ou un tirage
-  // au hasard tant qu'aucun ne l'est (voir catKeysForBatch).
-  const chips=[{k:"all",label:"🎓 Tous"}];
-  interests.forEach(k=>{const c=CATEGORIES.find(x=>x.key===k);if(c)chips.push({k,label:c.label});});
-  // Une seule puce à proposer : la barre ne filtre rien, elle ne fait que
-  // prendre une ligne. Même règle que pour les sources. Et rien à filtrer non
-  // plus quand la dose a retiré Wikipédia du fil — la barre qui disparaît est
-  // d'ailleurs le signal le plus clair que le bouton 🎓 a bien agi.
-  catsEl.style.display=(chips.length>1&&mixLevel().learn)?"":"none";
-  catsEl.innerHTML=chips.map(c=>`<button data-k="${c.k}" class="${c.k===cat?"active":""}">${c.label}</button>`).join("");
-  catsEl.querySelectorAll("button").forEach(b=>{b.onclick=()=>setCat(b.dataset.k);});
+/* ---------- Les deux filtres : une pastille chacun ----------
+   📰 restreint la moitié « actus » à UNE source, 🎓 la moitié Wikipédia à UN
+   thème — depuis la page principale, sans ouvrir les réglages. Les sources
+   proposées sont les sources COCHÉES : décocher reste le geste qui retire une
+   source du fil, ce filtre-là ne fait que se restreindre à l'une d'elles.
+   Les puces d'ensemble gardent un seul NOM. « Tous » s'appelait « ✨ Tous »
+   avec des intérêts et « 🎲 Aléatoire » sans : deux noms pour une même chose,
+   qui donnaient l'impression de deux filtres distincts. Son sens ne change
+   pas : « rien de précis » — le mélange des intérêts choisis, ou un tirage au
+   hasard tant qu'aucun ne l'est (voir catKeysForBatch). */
+const filtersEl=document.getElementById("filters");
+const srcBtn=document.getElementById("srcBtn"),catBtn=document.getElementById("catBtn");
+/* Les puces d'un filtre, la première étant toujours « tout ». Une seule
+   fabrique, pour la pastille comme pour la feuille : les deux ne peuvent pas
+   diverger. */
+function filterChips(kind){
+  if(kind==="src")return [{k:"all",label:"📰 Toutes"}]
+    .concat(feeds.filter(f=>f.on).map(f=>({k:f.url,label:f.name})));
+  return [{k:"all",label:"🎓 Tous"}]
+    .concat(interests.map(k=>CATEGORIES.find(c=>c.key===k)).filter(Boolean).map(c=>({k:c.key,label:c.label})));
 }
+function filterValue(kind){
+  const cur=kind==="src"?newsSrc:cat;
+  const c=filterChips(kind).find(x=>x.k===cur);
+  return c?c.label:(kind==="src"?"📰 Toutes":"🎓 Tous");
+}
+function renderFilters(){
+  sanitizeNewsSrc();
+  const m=mixLevel();
+  // Une pastille ne se montre que si elle a vraiment un choix à offrir (plus
+  // d'une source cochée, au moins un centre d'intérêt) ET si la moitié qu'elle
+  // filtre est dans le fil. Les deux muettes : la rangée entière disparaît —
+  // c'est d'ailleurs le signal le plus clair que le bouton 🎓 a bien agi.
+  const on={src:filterChips("src").length>1&&!!m.news,
+            cat:filterChips("cat").length>1&&!!m.learn};
+  [["src",srcBtn],["cat",catBtn]].forEach(([kind,btn])=>{
+    btn.classList.toggle("hidden",!on[kind]);
+    if(!on[kind])return;
+    const val=filterValue(kind);
+    // La pastille doit se comprendre SEULE, hors de sa liste : une source garde
+    // donc son 📰 même une fois choisie (un thème, lui, porte déjà son propre
+    // emoji). Le nom accessible, lui, reste sans emoji.
+    btn.querySelector(".filterbtn__v").textContent=
+      (kind==="src"&&!val.startsWith("📰"))?"📰 "+val:val;
+    btn.classList.toggle("on",(kind==="src"?newsSrc:cat)!=="all");
+    btn.setAttribute("aria-label",(kind==="src"?"Source des actus":"Thème des articles")+" : "+val);
+  });
+  filtersEl.classList.toggle("hidden",!on.src&&!on.cat);
+}
+/* Liste complète d'un filtre. Elle s'ouvre au toucher parce qu'une rangée
+   défilante cachait le reste : avec cinq sources, trois seulement tenaient à
+   l'écran — et le filtre actif pouvait être hors champ. */
+const pickSheet=document.getElementById("pickSheet");
+let pickKind="src";
+function openPicker(kind){
+  pickKind=kind;
+  const src=kind==="src",cur=src?newsSrc:cat;
+  document.getElementById("pickTitle").textContent=src?"Source des actus":"Thème des articles";
+  document.getElementById("pickSub").textContent=src
+    ? "Le fil ne gardera que cette source. Pour en ajouter ou en retirer, c'est dans les réglages."
+    : "Les articles Wikipédia seront tirés dans ce thème.";
+  document.getElementById("pickGrid").innerHTML=filterChips(kind).map(c=>
+    `<button class="intchip ${c.k===cur?"on":""}" data-k="${escAttr(c.k)}">${esc(c.label)}</button>`).join("");
+  openDialog(pickSheet);
+}
+document.getElementById("pickGrid").addEventListener("click",e=>{
+  const b=e.target.closest("[data-k]");
+  if(!b)return;
+  const k=b.dataset.k;
+  closeDialog(pickSheet);              // d'abord refermer : le fil se recompose derrière
+  if(pickKind==="src")setNewsSrc(k);else setCat(k);
+});
+pickSheet.onclick=e=>{if(e.target===pickSheet)closeDialog(pickSheet);};
+srcBtn.onclick=()=>openPicker("src");
+catBtn.onclick=()=>openPicker("cat");
 /* Les deux filtres se comportent pareil : instantané du fil qu'on quitte, puis
    restauration de celui qu'on ouvre s'il a déjà été vu — sinon chargement. */
-function switchFeed(){
-  const active=document.querySelector("#srcs button.active,#cats button.active");
-  if(active)active.scrollIntoView({inline:"center",block:"nearest",behavior:"smooth"});
-  if(!restoreFeed())loadFeeds();
-}
+function switchFeed(){if(!restoreFeed())loadFeeds();}
 function setCat(k){
   if(k===cat)return;
   snapshotFeed();                      // AVANT le changement de clé (voir setNewsSrc)
   cat=k;
   try{localStorage.setItem(LS_CAT,cat);}catch(e){}
-  renderCats();switchFeed();
-}
-
-/* ---------- Barre de filtres : sources d'actualité ---------- */
-/* Le pendant de la barre des thèmes : restreindre la moitié « actus » du fil à
-   UNE source, depuis la page principale, sans ouvrir les réglages. Les puces
-   sont les sources COCHÉES — décocher reste le geste qui retire une source du
-   fil, ce filtre-là ne fait que se restreindre à l'une d'elles, sans rien
-   changer aux réglages.
-   getElementById à chaque rendu plutôt qu'une const : renderSrcs() est appelée
-   depuis save(), défini bien plus haut, qui s'exécuterait avant l'initialisation
-   d'une const déclarée ici. */
-function renderSrcs(){
-  const el=document.getElementById("srcs");
-  if(!el)return;
-  sanitizeNewsSrc();
-  const actifs=feeds.filter(f=>f.on);
-  // Avec une seule source, filtrer n'a aucun sens : la barre ne proposerait que
-  // « Toutes » et cette source, deux puces pour le même fil. Idem quand la dose
-  // « Wikipédia seul » a retiré les actus.
-  el.style.display=(actifs.length>1&&mixLevel().news)?"":"none";
-  const chips=[{k:"all",label:"📰 Toutes"}].concat(actifs.map(f=>({k:f.url,label:f.name})));
-  el.innerHTML=chips.map(c=>
-    `<button data-k="${escAttr(c.k)}" class="${c.k===newsSrc?"active":""}">${esc(c.label)}</button>`).join("");
-  el.querySelectorAll("button").forEach(b=>{b.onclick=()=>setNewsSrc(b.dataset.k);});
+  renderFilters();switchFeed();
 }
 function setNewsSrc(k){
   if(k===newsSrc)return;
@@ -2551,7 +2617,7 @@ function setNewsSrc(k){
   snapshotFeed();
   newsSrc=k;
   try{localStorage.setItem(LS_NSRC,newsSrc);}catch(e){}
-  renderSrcs();switchFeed();
+  renderFilters();switchFeed();
 }
 
 /* ---------- Panneau unique : intérêts + sources + lecture ---------- */
@@ -2610,7 +2676,7 @@ function applySettings(){
   }
   const dose=pendingMix!==mixScore;
   if(dose)persistMix(pendingMix);
-  renderCats();
+  renderFilters();
   // Rien n'a changé : on referme, c'est tout. Recharger ramènerait en haut du
   // fil quelqu'un qui n'a fait qu'ouvrir le panneau pour regarder.
   // Une dose seule ne demande AUCUN réseau : les deux réserves sont déjà là,
