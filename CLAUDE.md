@@ -341,7 +341,7 @@ genre de script dérape.
   réconcilie par lien — donc glisser un article entre deux cartes n'en recrée
   aucune.
 - `MIX_LEVELS` / `mixScore` / `applyMix()` — la dose d'apprentissage (curseur des
-  réglages + bouton 🎓 de la barre). Elle ne déclenche AUCUN réseau : seule
+  réglages + bouton boussole de la barre). Elle ne déclenche AUCUN réseau : seule
   l'entrelacement change. `adoptItems()` remélange donc toujours ce qu'il reprend
   (cache, instantané), sinon une dose changée entre deux sessions servirait
   l'ancien mélange ; et `feedSnap` mémorise la dose, pour re-rendre quand
@@ -349,6 +349,10 @@ genre de script dérape.
 - `renderFilters()` / `openPicker()` — les deux pastilles de filtre et leur
   feuille. `filterChips()` fabrique les puces une seule fois pour les deux, qui
   ne peuvent donc pas diverger.
+- `ICON_*` / `setIcons()` — UNE famille de tracés pour toute l'app (2 px,
+  boîte de 24, `currentColor`), posée aussi dans la barre du haut. Ne pas y
+  remettre d'emoji ni de glyphe de police : ils ne s'alignent pas entre eux.
+  Les emoji restent là où ils sont une valeur (badge de thème, puces de listes).
 - `scrollToCard()` / `scrollFix` — le filet de repositionnement s'exécute une
   frame plus tard : sans son compteur de génération, celui d'un rendu dépassé
   revient défaire la décision du rendu suivant (une repeinture progressive

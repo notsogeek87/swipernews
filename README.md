@@ -35,8 +35,8 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
   vous réglez (voir *Dose d'apprentissage*). Une carte se reconnaît
   d'un coup d'œil — badge de thème et bouton « Découvrir » côté Wikipédia,
   « Lire l'article » côté actus. Sous le titre, deux pastilles filtrent chacune
-  leur moitié — 📰 une source, 🎓 un centre d'intérêt — et affichent le filtre
-  en cours ; la liste complète s'ouvre au toucher
+  leur moitié — un flux, un centre d'intérêt — et affichent le filtre en cours ;
+  la liste complète s'ouvre au toucher
 - Reprise de lecture : l'app rouvre sur l'article quitté. Si l'article a disparu
   du flux entre-temps (un RSS ne garde
   que ses N derniers items), la reprise se rabat sur le repère temporel puis sur
@@ -68,9 +68,9 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
   repart sur une fournée fraîche.
 - **Dose d'apprentissage** : un curseur, dans les réglages, décide de la
   proportion des deux — de *Actus seules* à *Wikipédia seul*, en passant par
-  *Équilibré* (défaut, un article toutes les trois actus). Le bouton **🎓** de la
-  barre du haut est le raccourci vers *Actus seules* et le retour, sans oublier
-  la dose choisie.
+  *Équilibré* (défaut, un article toutes les trois actus). Le bouton **boussole**
+  de la barre du haut est le raccourci vers *Actus seules* et le retour, sans
+  oublier la dose choisie.
 - **Un seul panneau de réglages** (⚙) : dose, centres d'intérêt, sources RSS et
   réglages du lecteur au même endroit, validés d'un seul bouton. Rouvert puis validé
   sans rien changer, il ne recharge rien — la position de lecture tient.
@@ -89,7 +89,7 @@ de chacun** seulement tenaient à l'écran — le filtre actif pouvait être hor
 champ, hors de portée du regard comme de la main.
 
 Les deux barres sont devenues **deux pastilles** sur une seule rangée
-(`📰 Toutes ▾` / `🎓 Tous ▾`, 108 px au total, 14 %). Chacune affiche le filtre
+(*Toutes ▾* / *Tous ▾*, 108 px au total, 14 %). Chacune affiche le filtre
 en cours et s'allume quand il n'est plus « tout » ; un tap ouvre une feuille où
 la liste complète tient d'un coup, sans rien couper. Une pastille disparaît
 quand elle n'a pas de choix à offrir (une seule source cochée, aucun centre
@@ -98,6 +98,28 @@ rangée entière s'efface.
 
 Le compromis assumé : un tap de plus pour filtrer. C'est un geste rare (la
 plupart restent sur « Toutes »), et il devient en échange complet et lisible.
+
+### Une seule famille d'icônes
+
+La barre mélangeait trois langages : des emoji en couleur (🎓, 📰), des glyphes
+de police (↻, ⚙, ▾) dont le dessin et la position dépendent du système, et le
+logo. À quatre ou cinq voisins, cela se voyait comme un empilement d'icônes
+disparates — et un emoji ne s'aligne pas comme un tracé : il suit la ligne de
+base du texte et porte sa propre marge, d'où des icônes qui « flottent » dans
+leur bouton.
+
+Tout est passé en **tracés** (2 px, extrémités rondes, boîte de 24, couleur
+héritée), tirés des mêmes constantes que les icônes des cartes : boussole
+(la moitié Wikipédia), flèche circulaire (rafraîchir), roue crantée (réglages),
+onde RSS (la source), étiquette (le thème), chevron. Même boîte pour toutes,
+donc même centre optique — mesuré à 0 px d'écart, ce qu'aucun glyphe de police
+ne garantit. Le seul élément coloré restant en haut est le logo, qui est une
+marque et non une icône.
+
+Les emoji restent là où ils sont une **valeur** et non une décoration : le badge
+de thème sur les cartes, et les puces des listes (chaque centre d'intérêt a le
+sien). Chaque liste garde d'ailleurs son langage — les sources sont des noms
+nus, les thèmes portent tous leur emoji.
 
 ## Dose d'apprentissage
 
@@ -123,10 +145,11 @@ Les deux extrémités remplacent les anciens onglets : *Actus seules* est l'anci
 mode Actus, *Wikipédia seul* l'ancien mode Apprendre. Chacune coupe vraiment
 l'autre moitié — pas seulement à l'affichage, mais aussi côté réseau.
 
-Le bouton **🎓** de la barre du haut est le raccourci quotidien : il éteint et
-rallume les articles Wikipédia sans ouvrir les réglages, en retenant la dose
-choisie. Éteint, la barre des centres d'intérêt disparaît (elle ne filtrerait
-plus rien) — c'est le signal le plus clair que le geste a porté. Changer de dose
+Le bouton **boussole** de la barre du haut est le raccourci quotidien : il
+éteint et rallume les articles Wikipédia sans ouvrir les réglages, en retenant
+la dose choisie. Allumé, il est plein et son tracé passe au corail ; éteint, il
+redevient fantôme et la pastille des centres d'intérêt disparaît (elle ne
+filtrerait plus rien) — c'est le signal le plus clair que le geste a porté. Changer de dose
 **ne recharge rien** : les deux réserves sont déjà en mémoire, seul leur
 entrelacement change, et l'utilisateur reste sur sa carte (ou sur la première
 qui lui survit, quand la dose écarte celle qu'il lisait).
@@ -137,7 +160,7 @@ Entre les actus se glissent des articles **Wikipédia** tirés au hasard (titre,
 extrait, image, lien vers l'article). Ils se distinguent par un badge de thème,
 une typographie un peu plus dense et le verbe « Découvrir » sur leur bouton.
 
-La **pastille 🎓** de la barre du haut permet de choisir ce qu'on veut apprendre : **Aléatoire** (défaut), Sciences, Histoire, Art & Culture,
+La **pastille « thème »** de la barre du haut permet de choisir ce qu'on veut apprendre : **Aléatoire** (défaut), Sciences, Histoire, Art & Culture,
 Artistes, Géographie, Nature, Espace, Technologie, Sport, Cinéma, Films, Musique,
 Jeux vidéo, Cuisine, Philosophie. Chaque
 catégorie utilise le moteur de recherche de Wikipédia (`generator=search`,

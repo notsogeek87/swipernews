@@ -237,17 +237,25 @@
     padding:9px 14px;border-radius:var(--radius-sm);font-family:var(--font-sans);font-weight:500;font-size:13px;
     letter-spacing:-.01em;cursor:pointer;transition:background .2s}
   .top .actions button:hover{background:rgba(149,28,4,.15)}
-  .iconbtn{width:38px;height:38px;padding:0!important;display:grid;place-items:center;font-size:17px}
-  /* Interrupteur 🎓 : allumé = Wikipédia dans le fil. L'état ALLUMÉ prend le
-     dégradé cocoa -> molten des boutons pleins (comme la puce active d'un
-     segmenté) ; l'état éteint recule d'un cran — liseré effacé et emoji
-     désaturé —, ce qui se lit sans distinguer les couleurs. Pas de bascule
-     animée : une pastille qui coulisse serait le seul objet mobile d'une barre
-     qui, elle, se veut immobile pendant la lecture. */
-  .top .actions .iconbtn--toggle{transition:background .2s,border-color .2s,filter .2s,opacity .2s}
-  .iconbtn--toggle.on{background:linear-gradient(135deg,var(--surface),var(--molten));
-    border-color:var(--flare);box-shadow:var(--shadow-ember)}
-  .iconbtn--toggle:not(.on){border-color:rgba(149,28,4,.45);filter:grayscale(1);opacity:.65}
+  .iconbtn{width:38px;height:38px;padding:0!important;display:grid;place-items:center}
+  /* Toutes les icônes de la barre à la même boîte : c'est ce qui les aligne
+     entre elles, ce qu'aucun glyphe de police ne garantit (chacun a sa propre
+     hauteur d'œil et sa propre position sur la ligne de base). */
+  .top .actions button svg{width:20px;height:20px;display:block}
+  /* Interrupteur « boussole » : allumé = Wikipédia dans le fil. L'état ALLUMÉ
+     prend le dégradé cocoa -> molten des boutons pleins (comme la puce active
+     d'un segmenté) et passe l'icône en corail ; l'état éteint recule d'un cran
+     — liseré effacé, icône en cendre. L'écart se lit donc par le REMPLISSAGE
+     et par la luminance, pas seulement par la teinte. Pas de bascule animée :
+     une pastille qui coulisse serait le seul objet mobile d'une barre qui, elle,
+     se veut immobile pendant la lecture. */
+  /* Sélecteurs préfixés par `.top .actions` : la règle générique des boutons de
+     la barre y impose déjà `color`, et sans cette précision l'icône restait en
+     linen dans les deux états — l'écart se serait joué sur le seul remplissage. */
+  .top .actions .iconbtn--toggle{transition:background .2s,border-color .2s,color .2s}
+  .top .actions .iconbtn--toggle.on{background:linear-gradient(135deg,var(--surface),var(--molten));
+    border-color:var(--flare);color:var(--flare);box-shadow:var(--shadow-ember)}
+  .top .actions .iconbtn--toggle:not(.on){border-color:rgba(149,28,4,.45);color:var(--ash)}
 
   /* Rangée de filtres : DEUX PASTILLES, une par filtre (📰 la source des actus,
      🎓 le thème des articles Wikipédia).
@@ -278,7 +286,12 @@
      la largeur réelle des glyphes, ce qu'un nombre de caractères ne sait pas
      faire. min-width:0 est ce qui autorise le rétrécissement sous le contenu. */
   .filterbtn__v{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .filterbtn__c{flex:0 0 auto;font-size:10px;opacity:.75}
+  /* Icône de tête (flux / étiquette) et chevron : deux tailles, une seule
+     famille de tracés — c'est elle qui dit de quel filtre il s'agit, à la place
+     des emoji de couleur qui juraient avec le reste de la barre. */
+  .filterbtn__i,.filterbtn__c{flex:0 0 auto;display:block}
+  .filterbtn__i svg{width:15px;height:15px;display:block}
+  .filterbtn__c svg{width:12px;height:12px;display:block;opacity:.7}
 
   /* Curseur de dose (réglages). Un curseur, et pas six boutons segmentés :
      ce réglage est un CONTINUUM entre deux extrémités nommées, et le geste de
@@ -559,19 +572,21 @@
 <header class="top">
   <div class="topline">
     <div class="brand"><span class="brand__logo"><img src="logo-192.png?v=42" alt="" width="28" height="28"></span><span class="brand__text" data-text="SwiperNews">SwiperNews</span></div>
+    <!-- Les icônes sont posées par setIcons() depuis les mêmes constantes que
+         les cartes : une seule famille de tracés dans toute l'app. -->
     <div class="actions">
-      <!-- Interrupteur 🎓 : le raccourci « actus seules ». Son libellé et son
-           état sont posés par updateLearnToggle(). -->
-      <button id="learnToggle" class="iconbtn iconbtn--toggle" aria-pressed="true">🎓</button>
-      <button id="reloadBtn" class="iconbtn" title="Rafraîchir les articles" aria-label="Rafraîchir">↻</button>
-      <button id="openSheet" class="iconbtn" title="Sources, centres d'intérêt et réglages" aria-label="Réglages">⚙</button>
+      <!-- Interrupteur « boussole » : le raccourci « actus seules ». Son
+           libellé et son état sont posés par updateLearnToggle(). -->
+      <button id="learnToggle" class="iconbtn iconbtn--toggle" aria-pressed="true"></button>
+      <button id="reloadBtn" class="iconbtn" title="Rafraîchir les articles" aria-label="Rafraîchir"></button>
+      <button id="openSheet" class="iconbtn" title="Sources, centres d'intérêt et réglages" aria-label="Réglages"></button>
     </div>
   </div>
   <!-- Deux pastilles, une par filtre : elles DISENT le filtre en cours, et
        ouvrent la liste complète au toucher (voir renderFilters/openPicker). -->
   <div class="filters" id="filters">
-    <button class="filterbtn" id="srcBtn" aria-haspopup="dialog"><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true">▾</span></button>
-    <button class="filterbtn" id="catBtn" aria-haspopup="dialog"><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true">▾</span></button>
+    <button class="filterbtn" id="srcBtn" aria-haspopup="dialog"><span class="filterbtn__i" aria-hidden="true"></span><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true"></span></button>
+    <button class="filterbtn" id="catBtn" aria-haspopup="dialog"><span class="filterbtn__i" aria-hidden="true"></span><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true"></span></button>
   </div>
 </header>
 
@@ -691,8 +706,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=77"></script>
-<script src="src/learn-core.js?v=77"></script>
+<script src="src/lib.js?v=78"></script>
+<script src="src/learn-core.js?v=78"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1076,7 +1091,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="77";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="78";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2025,9 +2040,26 @@ async function loadMore(){
 }
 // Libellé (emoji + nom) d'un centre d'intérêt à partir de sa clé
 const catLabel=LEARN.catLabel;
-// Icônes d'action : boussole (Découvrir, Wikipédia) / livre ouvert (Lire l'article, actus)
+/* ---------- Icônes ----------
+   UNE seule famille pour toute l'app : tracé de 2 px, extrémités rondes, boîte
+   de 24, couleur héritée (currentColor). La barre du haut mélangeait avant
+   trois langages — des emoji en couleur (🎓, 📰), des glyphes de police (↻, ⚙,
+   ▾) dont le dessin et la position dépendent du système, et le logo. À trois ou
+   quatre voisins, cela se voyait comme un empilement d'icônes disparates.
+   Un emoji ne s'aligne pas non plus comme un tracé : il suit la ligne de base
+   du texte et porte sa propre marge, d'où des icônes qui « flottent » dans leur
+   bouton. Ici chaque icône a la même boîte, donc le même centre optique.
+   Les emoji restent là où ils sont une VALEUR et non une décoration : badge de
+   thème sur les cartes, puces des listes (chaque centre d'intérêt a le sien). */
 const ICON_DISCOVER=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>`;
 const ICON_READ=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>`;
+// Flux RSS (la source d'une actu) et étiquette (le thème d'un article) : deux
+// dessins nettement différents, pour que les deux pastilles ne se confondent pas.
+const ICON_RSS=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1" fill="currentColor" stroke="none"></circle></svg>`;
+const ICON_TAG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>`;
+const ICON_RELOAD=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>`;
+const ICON_SETTINGS=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`;
+const ICON_CHEV=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
 function cardHTML(it,id){
   const img=safeImg(it.img,location.href);
   // data-bg (et non un style inline) : chargement paresseux + pas d'URL de flux
@@ -2536,19 +2568,45 @@ learnBtn.onclick=()=>setMixScore(mixLevel().learn?0:mixBack);
    hasard tant qu'aucun ne l'est (voir catKeysForBatch). */
 const filtersEl=document.getElementById("filters");
 const srcBtn=document.getElementById("srcBtn"),catBtn=document.getElementById("catBtn");
+/* Icônes de la barre du haut, posées une seule fois depuis les constantes
+   partagées avec les cartes. En HTML elles auraient été un deuxième exemplaire
+   des mêmes tracés, à corriger deux fois. */
+function setIcons(){
+  learnBtn.innerHTML=ICON_DISCOVER;
+  document.getElementById("reloadBtn").innerHTML=ICON_RELOAD;
+  document.getElementById("openSheet").innerHTML=ICON_SETTINGS;
+  srcBtn.querySelector(".filterbtn__i").innerHTML=ICON_RSS;
+  catBtn.querySelector(".filterbtn__i").innerHTML=ICON_TAG;
+  document.querySelectorAll(".filterbtn__c").forEach(el=>{el.innerHTML=ICON_CHEV;});
+}
+setIcons();
 /* Les puces d'un filtre, la première étant toujours « tout ». Une seule
    fabrique, pour la pastille comme pour la feuille : les deux ne peuvent pas
    diverger. */
+/* Chaque liste garde son propre langage : les sources sont des noms nus, les
+   thèmes portent tous leur emoji (il vient de CATEGORIES et sert aussi de badge
+   sur les cartes). D'où « Toutes » sans emoji d'un côté, « 🎓 Tous » de
+   l'autre — l'incohérence serait d'en mettre un seul au milieu de noms nus. */
 function filterChips(kind){
-  if(kind==="src")return [{k:"all",label:"📰 Toutes"}]
+  if(kind==="src")return [{k:"all",label:"Toutes"}]
     .concat(feeds.filter(f=>f.on).map(f=>({k:f.url,label:f.name})));
   return [{k:"all",label:"🎓 Tous"}]
     .concat(interests.map(k=>CATEGORIES.find(c=>c.key===k)).filter(Boolean).map(c=>({k:c.key,label:c.label})));
 }
+/* Ce que la pastille affiche : le NOM seul, sans emoji — c'est l'icône tracée à
+   sa gauche qui dit de quel filtre il s'agit. Découpe au premier espace plutôt
+   qu'à l'expression régulière : les libellés de centres d'intérêt sont tous
+   « emoji NOM », alors qu'un nom de flux est quelconque (« 20 Minutes »
+   commence par un chiffre, qu'aucun filtre d'emoji ne doit rogner). */
 function filterValue(kind){
-  const cur=kind==="src"?newsSrc:cat;
-  const c=filterChips(kind).find(x=>x.k===cur);
-  return c?c.label:(kind==="src"?"📰 Toutes":"🎓 Tous");
+  if(kind==="src"){
+    if(newsSrc==="all")return "Toutes";
+    const f=feeds.find(x=>x.url===newsSrc);
+    return f?f.name:hostOf(newsSrc);
+  }
+  if(cat==="all")return "Tous";
+  const c=CATEGORIES.find(x=>x.key===cat);
+  return c?c.label.slice(c.label.indexOf(" ")+1):"Tous";
 }
 function renderFilters(){
   sanitizeNewsSrc();
@@ -2563,11 +2621,7 @@ function renderFilters(){
     btn.classList.toggle("hidden",!on[kind]);
     if(!on[kind])return;
     const val=filterValue(kind);
-    // La pastille doit se comprendre SEULE, hors de sa liste : une source garde
-    // donc son 📰 même une fois choisie (un thème, lui, porte déjà son propre
-    // emoji). Le nom accessible, lui, reste sans emoji.
-    btn.querySelector(".filterbtn__v").textContent=
-      (kind==="src"&&!val.startsWith("📰"))?"📰 "+val:val;
+    btn.querySelector(".filterbtn__v").textContent=val;
     btn.classList.toggle("on",(kind==="src"?newsSrc:cat)!=="all");
     btn.setAttribute("aria-label",(kind==="src"?"Source des actus":"Thème des articles")+" : "+val);
   });
