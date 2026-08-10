@@ -1,14 +1,16 @@
 # SwiperNews — apprendre & suivre l'actu en swipe
 
 Une application (PWA + APK Android) qui fait lire des articles au **swipe
-vertical plein écran**, comme un fil de réseau social. Deux fils, entre lesquels
-on bascule au balayage horizontal :
+vertical plein écran**, comme un fil de réseau social. **Un seul fil**, où deux
+natures d'articles alternent — trois actus, un article Wikipédia, et ainsi de
+suite :
 
-- **📰 Actus** — les flux RSS que **vous** choisissez. Pas d'algorithme, pas de
-  recommandation, pas de compte : le fil est exactement la liste de sources
+- **📰 les actus** — les flux RSS que **vous** choisissez. Pas d'algorithme, pas
+  de recommandation, pas de compte : le fil est exactement la liste de sources
   cochées, importable et exportable en OPML.
-- **🎓 Apprendre** — des articles Wikipédia tirés au hasard, filtrables par
-  centres d'intérêt, en défilement infini.
+- **🎓 Wikipédia** — des articles tirés au hasard, filtrables par centres
+  d'intérêt. Ce sont eux qui rendent le fil infini : quand les actus sont
+  épuisées, ils prennent le relais.
 
 L'idée : reprendre le geste des réseaux sociaux **sans** ce qui va avec. Aucun
 compte, aucune télémétrie, aucun appel à un service que vous n'avez pas choisi.
@@ -29,14 +31,13 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
   et reste comme simple repère. Il ne capte **aucun** geste — l'appui le
   traverse jusqu'au fil. En faire une cible tactile aurait avalé les swipes
   verticaux commencés en haut de l'écran, pour ne rien gagner.
-- Bascule **Actus / Apprendre au balayage horizontal**, mais uniquement quand la
-  barre du haut est visible : pendant la lecture elle est masquée, et le geste
-  est alors ignoré pour éviter tout changement de mode accidentel. Balayer vers
-  la gauche amène l'onglet de droite, comme un carrousel. La bascule est
-  accompagnée d'un glissement court avec fondu, dans le sens du geste — et vaut
-  aussi pour un appui sur un onglet
-- Reprise de lecture : l'app rouvre sur l'article quitté, **pour chaque mode
-  indépendamment**. Si l'article a disparu du flux entre-temps (un RSS ne garde
+- **Fil unique** : les deux natures d'articles se succèdent à cadence fixe
+  (`MIX_EVERY`, trois actus pour un article Wikipédia). Une carte se reconnaît
+  d'un coup d'œil — badge de thème et bouton « Découvrir » côté Wikipédia,
+  « Lire l'article » côté actus. Deux barres de puces, sous le titre, filtrent
+  chacune leur moitié : 📰 une source, 🎓 un centre d'intérêt
+- Reprise de lecture : l'app rouvre sur l'article quitté. Si l'article a disparu
+  du flux entre-temps (un RSS ne garde
   que ses N derniers items), la reprise se rabat sur le repère temporel puis sur
   l'index, au lieu de retomber en tête du fil
 - Lisibilité sur photo : l'image n'est **jamais assombrie**, mais elle est floutée
@@ -61,21 +62,26 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
   **blocage des publicités et des traceurs** est disponible, désactivé par
   défaut. Voir [Navigateur intégré](#navigateur-intégré-app-android).
   Sur le web, le lien s'ouvre dans un nouvel onglet comme avant
-- **Mode Apprendre** 🎓 : un sélecteur à deux onglets en haut (**📰 Actus** / **🎓 Apprendre**, l'actif surligné) bascule le fil vers des articles Wikipédia aléatoires pour swiper en apprenant. Le fil est **sans fin** — de nouveaux articles se chargent automatiquement en approchant du bas — le bouton **↻** repart sur une nouvelle fournée, et le mode est mémorisé entre les sessions.
+- Fil **sans fin** : de nouveaux articles Wikipédia se chargent automatiquement en
+  approchant du bas, y compris une fois toutes les actus parcourues. Le bouton **↻**
+  repart sur une fournée fraîche.
+- **Un seul panneau de réglages** (⚙) : centres d'intérêt, sources RSS et réglages
+  du lecteur au même endroit, validés d'un seul bouton. Rouvert puis validé sans
+  rien changer, il ne recharge rien — la position de lecture tient.
 - Installable comme application (PWA) avec fonctionnement hors-ligne
-- En mode actus, si un flux est injoignable, le message le **nomme** (et le panneau
-  Sources marque la ligne d'un badge « injoignable »), pour savoir quelle source
+- Si un flux est injoignable, le message le **nomme** (et la liste des sources
+  marque la ligne d'un badge « injoignable »), pour savoir quelle source
   corriger ou supprimer. Si toutes échouent, un message invite à réessayer ou à
   revoir ses sources (plus de faux contenu de démo)
 
-## Mode Apprendre
+## La moitié Wikipédia du fil
 
-Un bouton **🎓 Apprendre** (barre du haut) fait passer l'app en mode découverte :
-le fil n'affiche alors que des articles **Wikipédia** tirés au hasard (titre, extrait,
-image, lien vers l'article). L'ambiance change (accent cyan + badge) pour bien distinguer
-les deux univers, et un nouvel appui sur **📰 Actus** revient aux flux RSS.
+Entre les actus se glissent des articles **Wikipédia** tirés au hasard (titre,
+extrait, image, lien vers l'article), un toutes les trois cartes. Ils se
+distinguent par un badge de thème, une typographie un peu plus dense et le verbe
+« Découvrir » sur leur bouton.
 
-Une **barre de centres d'intérêt** (chips défilables sous les onglets) permet de choisir
+Une **barre de centres d'intérêt** (chips défilables sous le titre) permet de choisir
 ce qu'on veut apprendre : **Aléatoire** (défaut), Sciences, Histoire, Art & Culture,
 Artistes, Géographie, Nature, Espace, Technologie, Sport, Cinéma, Films, Musique,
 Jeux vidéo, Cuisine, Philosophie. Chaque
@@ -83,7 +89,7 @@ catégorie utilise le moteur de recherche de Wikipédia (`generator=search`,
 `gsrsort=random`, `deepcategory:"…"`) pour tirer des articles au hasard dans la catégorie
 et ses sous-catégories. Le choix est mémorisé et chaque catégorie a son propre cache.
 
-### Source du mode Apprendre
+### D'où viennent ces articles
 
 Le fil s'appuie sur **Wikipédia** (API `action`, `generator=search`/`random`, extrait
 d'intro + image), en français par défaut, pour toutes les catégories. Quand plusieurs
@@ -155,27 +161,30 @@ ce ne sont pas des actualités récentes, et ils monopolisaient sinon la tête d
 
 - Les proxys de secours sont interrogés **en parallèle** (le premier qui répond gagne), au lieu d'un par un.
 - Les derniers articles sont **mis en cache** (localStorage) : au lancement suivant, ils s'affichent instantanément pendant que le fil se rafraîchit en arrière-plan (et le cache est conservé si le réseau échoue).
-- En mode Apprendre, un **seul lot** d'articles est chargé au démarrage ; le scroll infini complète le reste.
+- Un **seul lot** d'articles Wikipédia est chargé au démarrage ; le scroll infini complète le reste.
 - Les cartes hors écran sont **ignorées par le moteur de rendu** (`content-visibility`) et
   leurs images ne sont chargées qu'à l'approche de l'écran : un fil de 120 cartes plein
   écran ne garde plus 120 images en mémoire.
 - Le fil est **réconcilié par clé** (le lien de l'article) au lieu d'être réécrit : les
   cartes déjà affichées sont déplacées, jamais recréées. Sans cela, le rendu progressif
-  du mode Actus (un rendu par flux qui répond) détruisait et recréait l'image visible à
-  chaque réponse — elle clignotait.
-- Au tout premier lancement, rien n'est chargé derrière l'écran des centres d'intérêt :
-  le fil est chargé une seule fois, après le choix.
+  du fil (un rendu par flux qui répond, un par lot Wikipédia) détruisait et recréait
+  l'image visible à chaque réponse — elle clignotait. C'est aussi ce qui rend le
+  remélange gratuit : glisser un article Wikipédia entre deux actus ne recrée aucune carte.
+- Au tout premier lancement, rien n'est chargé derrière le panneau de réglages :
+  le fil est chargé une seule fois, après le choix des centres d'intérêt.
+- Les deux moitiés se chargent **en parallèle** et se rendent chacune de leur côté :
+  une source RSS lente ne retient pas les articles Wikipédia, et réciproquement.
 - `/api/learn` répond sur l'une de quelques variantes tirées au sort, donc **cacheables
   par le CDN** et mutualisées entre utilisateurs (un nonce par requête empêchait tout cache).
 
-### Quand le fil Actus se recharge-t-il ?
+### Quand les actus se rechargent-elles ?
 
 Une seule règle : **les sources ne sont interrogées qu'une fois toutes les
 30 minutes**, sauf demande explicite.
 
-- **Automatiquement** — à l'ouverture de l'app, au retour d'arrière-plan, à la
-  bascule vers Actus, ou toutes les 60 secondes pendant que l'app reste au
-  premier plan — le fil n'est rechargé que si le dernier lot **réellement
+- **Automatiquement** — à l'ouverture de l'app, au retour d'arrière-plan, ou
+  toutes les 60 secondes pendant que l'app reste au premier plan — les sources ne
+  sont réinterrogées que si le dernier lot **réellement
   récupéré** date de plus de **30 minutes**. En deçà, le cache local est servi
   tel quel, **sans le moindre appel réseau** : rouvrir l'app dix fois en dix
   minutes ne déclenche qu'un seul aller-retour vers les sources.
@@ -192,8 +201,8 @@ Une seule règle : **les sources ne sont interrogées qu'une fois toutes les
   déclencheurs ne se rattraperait jamais, même après des heures. La
   vérification elle-même ne coûte rien : `loadFeeds()` sans `force` ressort
   immédiatement si le seuil n'est pas atteint.
-- **Sur demande** — bouton **↻**, *Réessayer*, changement de sources, import
-  OPML, carte de fin de fil — le seuil est ignoré et les sources sont
+- **Sur demande** — bouton **↻**, *Réessayer*, changement de sources ou de
+  centres d'intérêt, import OPML — le seuil est ignoré et les sources sont
   interrogées immédiatement.
 
 La date du dernier chargement est stockée **avec le cache** (localStorage), pas
@@ -211,19 +220,22 @@ de rester sur l'article laissé la fois précédente.
 Seules les repeintures **progressives** pendant un chargement (un flux qui
 répond après l'autre) gardent l'ancrage sur l'article affiché — sans ça, la
 carte à l'écran changerait sous les yeux plusieurs fois par seconde.
-Le mode Apprendre est exclu de tout ceci — son fil est un tirage aléatoire sans
-fin, le recharger ferait perdre le lot en cours.
+La moitié Wikipédia est exclue de tout ceci — c'est un tirage aléatoire sans
+fin, la recharger ferait perdre le lot en cours (et donc la carte en train
+d'être lue, que le tirage suivant ne contient presque jamais). Elle n'est
+redemandée que sur une action explicite, ou quand il n'en reste rien.
 
-Le cache Actus conserve le fil **entier** (120 articles, comme à l'écran) et non
-un extrait : puisqu'il est servi pendant 30 minutes, le tronquer reviendrait à
-perdre les deux tiers des articles à chaque relancement. Le cache Apprendre, lui,
-reste à 40 articles par centre d'intérêt (le défilement infini le complète).
+Le cache conserve le fil mêlé **presque entier** (140 cartes) et non un extrait :
+puisqu'il est servi pendant 30 minutes, le tronquer reviendrait à perdre
+l'essentiel des articles à chaque relancement.
 
 Un rafraîchissement ne vide jamais un fil déjà affiché : si le réseau échoue, le
 contenu reste à l'écran avec un simple message.
 
 Si toutes les sources échouent au tout premier chargement, l'app **n'affiche plus de contenu de démo** : elle montre
-un message d'erreur avec les boutons *Réessayer* et *Ouvrir les sources*. Pour une fiabilité
+un message d'erreur avec les boutons *Réessayer* et *Ouvrir les réglages* — et encore,
+seulement si Wikipédia a échoué **aussi** : sans aucune source RSS joignable, la moitié
+Wikipédia suffit à faire un fil. Pour une fiabilité
 maximale (et pour ne dépendre d'aucun tiers), prévoir un petit backend qui récupère et
 parse le RSS côté serveur.
 
@@ -235,7 +247,7 @@ Le cœur de l'app reste sans build. Un petit outillage est fourni pour la qualit
 npm ci            # eslint + prettier (dev uniquement)
 npm run lint      # analyse statique de api/, src/ et des tests
 npm run format    # formatage (index.html volontairement exclu)
-npm test          # tests unitaires (assainissement, parsing, noyau Apprendre, anti-SSRF)
+npm test          # tests unitaires (assainissement, parsing, fil mêlé, Wikipédia, anti-SSRF)
 ```
 
 La CI GitHub Actions (`.github/workflows/ci.yml`) rejoue lint + format + tests sur chaque PR.
@@ -383,7 +395,7 @@ Une première tentative activait `plugins.CapacitorHttp` **globalement**
 y compris Wikipédia, qui n'en avait pourtant pas besoin — et s'est révélée
 nettement plus lente à l'usage. Mesuré sur l'émulateur Android local après
 être passé à un appel ciblé (`nativeGet` uniquement pour RSS) : ~3,2 s pour
-charger 4 flux RSS en parallèle — un lot Apprendre (Wikipédia seul, en CORS
+charger 4 flux RSS en parallèle — un lot Wikipédia (seul, en CORS
 direct) reste comparable à ce qu'on peut attendre sur le web.
 
 ```bash
@@ -427,7 +439,7 @@ même clé) est nécessaire après toute modification de `index.html` ou de
 
 ### Navigateur intégré (app Android)
 
-Dans l'APK, « Lire l'article » (Actus) et « Découvrir » (Apprendre) n'envoient
+Dans l'APK, « Lire l'article » (actu) et « Découvrir » (Wikipédia) n'envoient
 plus vers Chrome : l'article s'ouvre **dans l'app**, dans une activité maison
 (`android/app/src/main/java/eu/lielu/news/InAppBrowserActivity.java`). On ne
 quitte donc plus SwiperNews pour lire, et le retour ramène exactement à la carte
@@ -728,11 +740,10 @@ Bloqués / Affichés » (`fluxswipe.ads.v1`, **affichés** par défaut),
 n'apparaissent que quand le lecteur est actif — sans lui, la question ne se
 pose plus. Les trois préférences vivent côté web et sont
 transmises à chaque ouverture (`hideCmp`, `blockAds`) : le natif ne garde aucun
-état. Le réglage figure dans **les deux** panneaux — Sources et Centres
-d'intérêt — parce qu'ils ne sont jamais atteignables en même temps (⚙ Sources
-n'existe qu'en mode Actus, ✎ Modifier qu'en mode Apprendre) et que le choix vaut
-pour les deux fils : `renderReadPref()` remplit les deux points de montage
-`[data-readmount]` depuis un état unique. Il n'apparaît pas sur le web, où un
+état. Le réglage figure en bas du panneau unique, sous les sources :
+`renderReadPref()` remplit le point de montage `[data-readmount]` depuis un état
+unique (il y en avait un par panneau tant qu'il y en avait deux). Il n'apparaît
+pas sur le web, où un
 lien s'ouvre forcément dans un onglet, ni pendant l'accueil du premier
 lancement, où l'on ne demande qu'une chose à la fois. Le lecteur garde par
 ailleurs son bouton « ouvrir dans le navigateur » pour les cas ponctuels.
@@ -903,17 +914,18 @@ ouvrir la demande d'inclusion sur `gitlab.com/fdroid/fdroiddata`.
 
 ## Architecture
 
-- **Mode Actus** : `api/feed.js` (proxy RSS durci) ou, en repli, proxys CORS publics.
+- **Actus** : `api/feed.js` (proxy RSS durci) ou, en repli, proxys CORS publics.
 - **Images** : quand un flux ne publie qu'une vignette (Franceinfo sert des URL
   Thumbor **signées** en 432 px, où la taille fait partie de la signature — donc
   non modifiable), `api/og.js` va lire la balise `og:image` de l'article, qui
   pointe vers la version pleine taille. Appelé uniquement si l'image du flux est
   réellement petite, résultat mémorisé côté client et mis en cache 24 h par le CDN.
-- **Mode Apprendre** : `api/learn.js` agrège **côté serveur** les catégories Wikipédia
+- **Wikipédia** : `api/learn.js` agrège **côté serveur** les catégories
   demandées (cache CDN mutualisé entre utilisateurs). Le front l'appelle en priorité et
   se rabat sur son agrégation client si l'endpoint n'est pas déployé (hébergement statique).
 - **Code partagé** : `src/lib.js` (fonctions pures : assainissement, parsing OPML/JSON,
-  dates) et `src/learn-core.js` (catégories, URL et normaliseurs du mode Apprendre) sont
+  dates, entrelacement du fil) et `src/learn-core.js` (catégories, URL et
+  normaliseurs Wikipédia) sont
   chargés par `index.html` **et** par les fonctions serverless — une seule implémentation,
   couverte par `npm test`. Ce sont des `<script>` classiques, pas des modules ESM :
   `index.html` reste ouvrable en `file://`.

@@ -184,3 +184,43 @@ test("imageSizeFromUrl lit la taille demandée dans une URL Thumbor", () => {
   assert.equal(lib.imageSizeFromUrl("https://f.fr/pictures/abcdef/photo.jpg"), 0);
   assert.equal(lib.imageSizeFromUrl(""), 0);
 });
+
+test("interleave tient la cadence puis laisse la liste restante continuer seule", () => {
+  const n = ["n1", "n2", "n3", "n4", "n5", "n6", "n7"];
+  const w = ["w1", "w2"];
+  assert.deepEqual(lib.interleave(n, w, 3), [
+    "n1",
+    "n2",
+    "n3",
+    "w1",
+    "n4",
+    "n5",
+    "n6",
+    "w2",
+    "n7",
+  ]);
+  // Actus épuisées : les articles Wikipédia prennent le relais un à un, ce qui
+  // rend le fil infini même quand le RSS est à sec.
+  assert.deepEqual(lib.interleave(["n1"], ["w1", "w2", "w3"], 3), [
+    "n1",
+    "w1",
+    "w2",
+    "w3",
+  ]);
+  // Une seule des deux listes : elle sort telle quelle, sans trou.
+  assert.deepEqual(lib.interleave([], ["w1", "w2"], 3), ["w1", "w2"]);
+  assert.deepEqual(lib.interleave(["n1", "n2"], [], 3), ["n1", "n2"]);
+  assert.deepEqual(lib.interleave([], [], 3), []);
+});
+
+test("interleave est stable sur les préfixes (le fil déjà lu ne bouge pas)", () => {
+  // Propriété dont dépend le remélange à chaque arrivée de données : allonger
+  // les DEUX listes par la fin ne réordonne pas le début du résultat.
+  const n = ["n1", "n2", "n3", "n4", "n5", "n6"];
+  const w = ["w1", "w2"];
+  const avant = lib.interleave(n, w, 3);
+  const apres = lib.interleave(n.concat(["n7", "n8", "n9"]), w.concat(["w3"]), 3);
+  assert.deepEqual(apres.slice(0, avant.length), avant);
+  // Cadence dégénérée : jamais de boucle infinie, jamais de division par zéro.
+  assert.deepEqual(lib.interleave(["n1"], ["w1"], 0), ["n1", "w1"]);
+});

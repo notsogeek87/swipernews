@@ -55,7 +55,7 @@
 
   /* Pas de scroll-behavior:smooth ici : par spec CSSOM View, le setter scrollTop
      défile avec le comportement calculé de l'élément, donc TOUTES les
-     restaurations de position (reprise de session, capDom, bascule de mode)
+     restaurations de position (reprise de session, changement de filtre)
      seraient animées au lieu d'être instantanées — en conflit avec le
      scroll-snap et avec le geste en cours. Le défilement doux est demandé
      explicitement là où il est voulu (navigation clavier). */
@@ -141,7 +141,7 @@
      est ce qui autorise un élément flex à rétrécir sous son contenu — sans lui,
      text-overflow n'a jamais l'occasion de s'appliquer. */
   .card__source .txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  /* Badge de catégorie (mode Apprendre) : même « Eyebrow Tag », posé dans un
+  /* Badge de thème (carte Wikipédia) : même « Eyebrow Tag », posé dans un
      encadré (liseré signal-red, fond surface) pour rester lisible par-dessus
      une photo — un simple texte nu s'y perdrait. */
   .card__cat{display:flex;width:fit-content;align-items:center;gap:6px;
@@ -180,12 +180,10 @@
   .rail button:active{transform:scale(.88)}
   .rail button svg{width:23px;height:23px;display:block}
 
-  .progress{position:fixed;left:0;top:0;height:100dvh;width:3px;z-index:20;pointer-events:none}
-  /* Pas de jauge en mode Apprendre : le fil y est SANS FIN, donc une position
-     « x % du total » ne veut rien dire — elle recule à chaque lot chargé et
-     n'informe que du rechargement, qui ne regarde pas l'utilisateur. En Actus
-     le fil est fini, la jauge y garde tout son sens. */
-  body.learn .progress{display:none}
+  /* Plus de jauge de progression : le fil unique est SANS FIN (quand les actus
+     sont épuisées, Wikipédia prend le relais indéfiniment), donc une position
+     « x % du total » ne veut rien dire — elle reculerait à chaque lot chargé et
+     n'informerait que du rechargement, qui ne regarde pas l'utilisateur. */
   /* Chargement en arrière-plan : fine barre indéterminée en haut. Volontairement
      NON bloquante — masquer un fil déjà lisible serait pire que le laisser voir. */
   .syncbar{position:fixed;left:0;top:0;height:2px;width:100%;z-index:21;pointer-events:none;
@@ -197,7 +195,6 @@
     background:linear-gradient(90deg,transparent,var(--flare),transparent);
     animation:sync 1.1s linear infinite}
   @keyframes sync{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
-  .progress__bar{width:100%;background:var(--flare);transition:height .2s}
 
   .top{position:fixed;top:0;left:0;right:0;z-index:15;padding:calc(12px + env(safe-area-inset-top)) 16px 14px;
     display:flex;flex-direction:column;gap:11px;background:linear-gradient(rgba(25,5,1,.82),rgba(25,5,1,.5) 65%,transparent);
@@ -211,8 +208,8 @@
   /* Signature de la barre : le nom s'écrit lettre à lettre, le curseur clignote
      puis s'efface. Rejouée à chaque RETOUR de la barre (voir typeBrand/showTop),
      jamais en boucle : rien ne doit bouger en permanence dans le champ de vision
-     de quelqu'un qui lit (c'est la raison qui a fait retirer la jauge en
-     Apprendre). La barre étant masquée pendant le swipe, l'effet ne peut pas
+     de quelqu'un qui lit (c'est la raison qui a fait retirer la jauge de
+     progression). La barre étant masquée pendant le swipe, l'effet ne peut pas
      jouer en pleine lecture.
      Le mot entier est TOUJOURS dans le DOM, les lettres à venir simplement en
      opacity:0 : un lecteur d'écran lit « SwiperNews » même au milieu de la
@@ -242,25 +239,15 @@
   .top .actions button:hover{background:rgba(149,28,4,.15)}
   .iconbtn{width:38px;height:38px;padding:0!important;display:grid;place-items:center;font-size:17px}
 
-  /* Sélecteur de mode : deux onglets visibles, l'onglet actif dans le même
-     dégradé cocoa -> molten que les boutons pleins (pas de deuxième accent :
-     la charte n'a qu'une seule couleur chromatique, le corail, à l'inverse
-     du système précédent qui multipliait les teintes par mode). */
-  .modeswitch{align-self:center;display:inline-flex;gap:4px;padding:4px;border-radius:var(--radius-sm);
-    background:transparent;border:1px solid var(--redline)}
-  .modeswitch button{border:none;background:transparent;color:var(--ash);font-family:var(--font-sans);
-    font-weight:500;font-size:13.5px;letter-spacing:-.01em;padding:8px 18px;border-radius:var(--radius-sm);cursor:pointer;
-    display:flex;align-items:center;gap:7px;transition:background .2s,color .2s}
-  .modeswitch button.active{background:linear-gradient(135deg,var(--surface),var(--molten));color:var(--flare)}
-  .modeswitch button .ic{font-size:15px}
-
-  /* Barres de filtres : chips défilables horizontalement. Deux barres, une par
-     mode — #cats les centres d'intérêt (Apprendre), #srcs les sources (Actus).
-     Jamais visibles ensemble : chacune filtre un fil que l'autre mode n'a pas. */
-  .cats{display:none;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+  /* Barres de filtres : chips défilables horizontalement. Les DEUX sont
+     désormais visibles ensemble — #srcs restreint les actus à une source,
+     #cats les articles Wikipédia à un thème, et le fil unique mêle les deux.
+     Chacune se masque (en JS) quand elle n'aurait qu'une puce à proposer :
+     une barre « Toutes » seule ne filtre rien.
+     Le préfixe des puces d'ensemble (📰 / 🎓) dit laquelle fait quoi, sans
+     étiquette qui prendrait une ligne de plus. */
+  .cats{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px}
   .cats::-webkit-scrollbar{display:none}
-  body.learn #cats{display:flex}
-  body:not(.learn) #srcs{display:flex}
   .cats button{flex:0 0 auto;background:transparent;border:1px solid var(--redline);
     color:var(--ash);font-family:var(--font-sans);font-weight:500;font-size:13px;letter-spacing:-.01em;
     padding:7px 14px;border-radius:var(--radius-sm);
@@ -273,11 +260,6 @@
      DOM, donc dans le nom accessible — et la coupe suit la largeur réelle des
      glyphes, ce qu'un nombre de caractères ne sait pas faire. */
   #srcs button{max-width:44vw;overflow:hidden;text-overflow:ellipsis}
-
-  /* Bouton "centres d'intérêt" : en haut à droite, à la place de ⚙ Sources
-     (mode Actus) — les deux occupent le même emplacement, jamais visibles
-     ensemble, et portent la même roue crantée. Aucune teinte propre à ce
-     bouton : un seul accent dans tout le système. */
 
   /* Sélecteur de centres d'intérêt (grille de chips à cocher) */
   .intgrid{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
@@ -306,12 +288,13 @@
     text-transform:uppercase;font-size:12px}
   .demobadge.hidden{display:none}
 
-  /* Mode Apprendre : on privilégie le texte — titre plus compact, description
-     plus longue. Pas de changement de teinte : la charte n'a qu'un seul
-     accent chromatique, quel que soit le mode. */
-  body.learn .card__title{font-size:clamp(22px,5.6vw,32px);margin-bottom:10px}
-  body.learn .card__desc{-webkit-line-clamp:10;font-size:15px;line-height:1.55;max-width:60ch}
-  body.learn .card__body{padding-top:20px}
+  /* Carte Wikipédia : on privilégie le texte — titre plus compact, description
+     plus longue. Le traitement suit désormais la CARTE et non le mode : les
+     deux natures d'article se succèdent dans le même fil. Pas de changement de
+     teinte pour autant : la charte n'a qu'un seul accent chromatique. */
+  .card--learn .card__title{font-size:clamp(22px,5.6vw,32px);margin-bottom:10px}
+  .card--learn .card__desc{-webkit-line-clamp:10;font-size:15px;line-height:1.55;max-width:60ch}
+  .card--learn .card__body{padding-top:20px}
 
   .hint{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translateX(-50%);
     z-index:14;color:var(--ash);font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;
@@ -350,6 +333,13 @@
   .sheet__grip{width:44px;height:5px;border-radius:var(--radius-sm);background:var(--ash);opacity:.4;margin:0 auto 20px}
   .sheet h2{font-family:var(--font-sans);font-size:20px;font-weight:700;margin-bottom:4px;letter-spacing:-.02em}
   .sheet p.sub{color:var(--ash);font-size:14px;margin-bottom:18px}
+  /* Titre de section du panneau unique : les deux réglages (thèmes Wikipédia,
+     sources RSS) vivent maintenant dans la même feuille, il faut donc voir où
+     l'un finit et où l'autre commence. Même filet que les autres séparateurs du
+     panneau, jamais d'ombre ni de fond : la structure vient du liseré. */
+  .secttl{font-family:var(--font-sans);font-size:16px;font-weight:700;letter-spacing:-.02em;
+    margin-top:24px;padding-top:20px;border-top:1px solid rgba(149,28,4,.3)}
+  .secttl+p.sub{margin-top:4px}
   .feedrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(149,28,4,.3)}
   .feedrow input[type=checkbox]{width:20px;height:20px;accent-color:var(--flare)}
   .feedrow .name{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -380,8 +370,7 @@
 
   /* Réglage « Ouvrir les articles » (app packagée uniquement, voir renderReadPref).
      Segmenté plutôt qu'un interrupteur : les deux destinations sont nommées, on
-     n'a pas à deviner ce que « activé » veut dire. Même langage visuel que le
-     sélecteur de mode en haut de l'écran. */
+     n'a pas à deviner ce que « activé » veut dire. */
   /* En colonne, et non en ligne avec retour automatique : selon la longueur de
      la phrase, le sélecteur passait tantôt à droite, tantôt dessous, et deux
      réglages voisins ne s'alignaient plus. */
@@ -416,9 +405,6 @@
   .prefsub__acts{display:flex;flex-wrap:wrap;gap:8px}
   .prefsub__acts .iobtn{flex:0 1 auto;min-width:0;padding:9px 13px;font-size:12.5px}
 
-  /* Carte de fin du fil Actus (le RSS est fini : on marque clairement la fin) */
-  .endcard{justify-content:center}
-  .endcard .card__body{display:flex;flex-direction:column;align-items:center;text-align:center}
 
   .state{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;
     gap:16px;padding:40px;text-align:center;color:var(--ash)}
@@ -474,14 +460,6 @@
   .installbar__btn:active{transform:scale(.96)}
   .installbar__close{flex:0 0 auto;background:transparent;border:none;color:var(--ash);font-size:17px;cursor:pointer;padding:4px 6px}
 
-  /* Bascule entre modes : glissement court + fondu, dans le sens du geste.
-     Un glissement pleine largeur serait plus spectaculaire mais impliquerait de
-     dupliquer un fil de plus de 100 cartes ; ce mouvement court est celui des
-     onglets natifs, et il reste fluide sur mobile (transform + opacity seuls,
-     donc composés par le GPU, sans recalcul de mise en page). */
-  .feed--anim{transition:transform .19s cubic-bezier(.22,.61,.36,1),opacity .19s ease;
-    pointer-events:none}
-
   /* Titre de page pour les lecteurs d'écran (les cartes sont en h2) */
   .visually-hidden{position:absolute!important;width:1px;height:1px;margin:-1px;padding:0;
     overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
@@ -526,7 +504,6 @@
 
 <h1 class="visually-hidden">SwiperNews — apprendre et suivre l'actualité en swipe</h1>
 
-<div class="progress"><div class="progress__bar" id="pbar"></div></div>
 <div class="syncbar" id="syncbar" aria-hidden="true"></div>
 
 <header class="top">
@@ -534,21 +511,16 @@
     <div class="brand"><span class="brand__logo"><img src="logo-192.png?v=42" alt="" width="28" height="28"></span><span class="brand__text" data-text="SwiperNews">SwiperNews</span></div>
     <div class="actions">
       <button id="reloadBtn" class="iconbtn" title="Rafraîchir les articles" aria-label="Rafraîchir">↻</button>
-      <button id="openSheet" class="iconbtn" title="Gérer tes sources / réglages" aria-label="Sources et réglages">⚙</button>
-      <button id="editIntBtn" class="iconbtn catedit hidden" title="Choisir tes centres d'intérêt" aria-label="Centres d'intérêt">⚙</button>
+      <button id="openSheet" class="iconbtn" title="Sources, centres d'intérêt et réglages" aria-label="Réglages">⚙</button>
     </div>
   </div>
-  <div class="modeswitch" role="tablist" aria-label="Choix du mode">
-    <button id="tabLearn" class="active" role="tab" aria-selected="true" aria-controls="feed"><span class="ic">🎓</span> Apprendre</button>
-    <button id="tabNews" role="tab" aria-selected="false" aria-controls="feed"><span class="ic">📰</span> Actus</button>
-  </div>
+  <div class="cats" id="srcs" role="group" aria-label="Sources d'actualité"></div>
   <div class="cats" id="cats" role="group" aria-label="Centres d'intérêt"></div>
-  <div class="cats" id="srcs" role="group" aria-label="Sources"></div>
 </header>
 
-<div class="demobadge hidden" id="demobadge" role="status">Mode démo — hors-ligne</div>
+<div class="demobadge hidden" id="demobadge" role="status">Wikipédia injoignable — articles de démo</div>
 
-<div id="feed" role="tabpanel" aria-label="Fil d'articles"></div>
+<div id="feed" aria-label="Fil d'articles"></div>
 
 <!-- Rail unique, partagé par toutes les cartes (agit sur la carte visible) -->
 <div class="rail hidden" id="rail">
@@ -562,7 +534,7 @@
 
 <div class="state hidden" id="loading" role="status">
   <div class="spinner"></div>
-  <p id="loadingMsg">Chargement des actus…</p>
+  <p id="loadingMsg">Chargement de ton fil…</p>
 </div>
 
 <div class="state hidden" id="empty" role="status">
@@ -570,14 +542,26 @@
   <p id="emptyMsg"></p>
   <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:340px">
     <button class="iobtn" id="emptyRetry">↻ Réessayer</button>
-    <button class="iobtn" id="emptyOpen">Ouvrir les sources</button>
+    <button class="iobtn" id="emptyOpen">Ouvrir les réglages</button>
   </div>
 </div>
 
-<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Tes sources">
+<!-- Panneau UNIQUE : le fil est unique, ses réglages le sont aussi. Les deux
+     feuilles d'avant (Sources d'un côté, Centres d'intérêt de l'autre) étaient
+     le reflet des deux modes ; sans modes, elles n'avaient plus de raison
+     d'être séparées — et rien n'indiquait plus où trouver laquelle. -->
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Réglages de ton fil">
   <div class="sheet__panel" tabindex="-1">
     <div class="sheet__grip"></div>
-    <h2>Tes sources</h2>
+    <p class="intro hidden" id="introWelcome">✨ Le swipe qui rend plus malin. Un seul fil : tes actus, et entre elles des articles Wikipédia qui t'apprennent un truc que tu ne connaissais pas. Choisis ce qui allume ta curiosité 👇</p>
+    <h2>Ton fil</h2>
+    <p class="sub">Tes actus et des articles Wikipédia, en alternance dans un seul fil.</p>
+
+    <h3 class="secttl">🎓 Centres d'intérêt</h3>
+    <p class="sub">Les thèmes des articles Wikipédia glissés entre tes actus.</p>
+    <div class="intgrid" id="intGrid"></div>
+
+    <h3 class="secttl">📰 Sources d'actualité</h3>
     <p class="sub">Coche les flux à afficher, ajoute ceux que tu veux.</p>
     <div id="feedList"></div>
     <div class="addbox">
@@ -594,27 +578,13 @@
     </div>
     <input id="importFile" type="file" accept=".opml,.xml,.json,application/json,text/xml" style="display:none">
 
-    <!-- Réglage de lecture : présent dans les DEUX panneaux (celui-ci et les
-         centres d'intérêt), car ils ne sont jamais accessibles en même temps —
-         la roue ⚙ ouvre l'autre panneau en mode Apprendre. Un seul état, deux
-         points de montage remplis par renderReadPref(). Vide hors app packagée. -->
+    <!-- Réglages du lecteur, remplis par renderReadPref() (vide hors app
+         packagée). Un seul point de montage depuis la fusion des panneaux ;
+         masqué pendant l'accueil du 1er lancement, où l'on ne demande qu'une
+         chose à la fois. -->
     <div data-readmount></div>
 
-    <button class="applybtn" id="applyFeeds">Voir mon fil</button>
-  </div>
-</div>
-
-<div class="sheet" id="intSheet" role="dialog" aria-modal="true" aria-label="Tes centres d'intérêt">
-  <div class="sheet__panel" tabindex="-1">
-    <div class="sheet__grip"></div>
-    <p class="intro hidden" id="introWelcome">✨ Le swipe qui rend plus malin. Même geste que sur tes réseaux, sauf qu'ici chaque carte t'apprend un truc que tu ne connaissais pas. Choisis ce qui allume ta curiosité 👇</p>
-    <h2>Tes centres d'intérêt</h2>
-    <p class="sub">Choisis ce que tu veux apprendre. Tu pourras les modifier à tout moment.</p>
-    <div class="intgrid" id="intGrid"></div>
-    <!-- Voir le commentaire du même bloc dans le panneau Sources. Masqué pendant
-         l'accueil du 1er lancement : on ne demande qu'une chose à la fois. -->
-    <div data-readmount></div>
-    <button class="applybtn" id="saveInterestsBtn">Valider</button>
+    <button class="applybtn" id="applySettings">Voir mon fil</button>
   </div>
 </div>
 
@@ -639,8 +609,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=73"></script>
-<script src="src/learn-core.js?v=73"></script>
+<script src="src/lib.js?v=74"></script>
+<script src="src/learn-core.js?v=74"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -648,7 +618,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds"],
+  const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds","interleave"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket"]};
   const missing=[];
   for(const ns in need){
@@ -690,14 +660,19 @@
  * @property {string} link    URL de l'article (http/https)
  * @property {string} img     URL d'image (http/https/data:image) ou ""
  * @property {string} date    Date de publication brute ou ""
- * @property {string} [cat]   Clé de catégorie (mode Apprendre) pour le badge
+ * @property {string} [cat]   Clé de catégorie (article Wikipédia) pour le badge
+ * @property {"news"|"learn"} [kind] Nature de la carte dans le fil mêlé
  */
 
 /* ---------- Configuration centralisée (valeurs auparavant en dur un peu partout) ---------- */
 const CONFIG = {
   FETCH_TIMEOUT: 7000,   // délai d'expiration réseau (ms)
-  BATCH_SIZE: 20,        // articles par lot (mode Apprendre)
-  MAX_NEWS: 120,         // articles conservés en mode Actus
+  BATCH_SIZE: 20,        // articles Wikipédia par lot
+  // Cadence du fil unique : N actus, puis un article Wikipédia, et on
+  // recommence. Trois, parce qu'à un pour un le fil ne ressemble plus à un fil
+  // d'actualité, et qu'au-delà de quatre ou cinq l'article surprise se perd.
+  MIX_EVERY: 3,
+  MAX_NEWS: 120,         // articles d'actualité conservés dans le fil
   MIN_PER_FEED: 10,      // part MINIMALE garantie à chaque source ; la part
                          // réelle vaut MAX_NEWS / nombre de sources, donc aucune
                          // limite artificielle quand elles sont peu nombreuses
@@ -706,14 +681,17 @@ const CONFIG = {
   FIRST_PAINT_MS: 220,   // 1re repeinture : courte, pour afficher vite
   RENDER_COALESCE_MS: 750,// puis fenêtre large : sans cela, 40 sources = 40
                          // reconstructions du fil en quelques secondes
-  MAX_CARDS: 60,         // cartes gardées dans le DOM (borne le fil infini)
-  MAX_ITEMS: 300,        // items gardés en mémoire (dédoublonnage du scroll)
-  CACHE_ITEMS: 40,       // articles Apprendre mis en cache localStorage par catégorie
-  // Le cache Actus n'est plus un simple « peindre vite » : pendant AUTO_RELOAD_MS
-  // il EST le fil servi (voir loadFeeds). Le tronquer à 40 ferait perdre les deux
-  // tiers des articles à chaque relancement — on garde donc le fil entier.
-  CACHE_ITEMS_NEWS: 120, // = MAX_NEWS
-  SEEN_MAX: 2000,        // articles « déjà vus » mémorisés (mode Apprendre)
+  // Borne du fil infini. Le fil mêlé est rendu ENTIÈREMENT dans le DOM (il est
+  // recomposé à chaque arrivée de données, on ne peut donc pas y garder des
+  // cartes que le mélange ne contient plus) : cette borne est aussi celle du
+  // nombre de cartes. content-visibility rend les cartes hors écran quasi
+  // gratuites, mais 300 nœuds plein écran restent 300 nœuds.
+  MAX_ITEMS: 180,
+  // Le cache n'est pas un simple « peindre vite » : pendant AUTO_RELOAD_MS il
+  // EST le fil servi (voir loadFeeds). Le tronquer trop ferait perdre l'essentiel
+  // des articles à chaque relancement.
+  CACHE_ITEMS: 140,
+  SEEN_MAX: 2000,        // articles Wikipédia « déjà vus » mémorisés
   // https obligatoire : ce lien part dans CHAQUE partage. En http, redirection
   // au mieux, avertissement « site non sécurisé » ou blocage au pire.
   APP_URL: "https://news.lielu.eu",
@@ -722,10 +700,10 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,interleave,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
-/* ---------- Articles Wikipédia de démo (repli hors-ligne du mode Apprendre) ---------- */
+/* ---------- Articles Wikipédia de démo (repli hors-ligne) ---------- */
 const DEMO_LEARN = [
   {source:"Wikipédia", title:"Effet tunnel", desc:"En mécanique quantique, l'effet tunnel désigne la capacité d'une particule à franchir une barrière de potentiel qu'elle ne pourrait pas surmonter selon les lois de la physique classique. Ce comportement découle de la nature ondulatoire de la matière : la fonction d'onde de la particule ne s'annule pas brutalement à la barrière, mais décroît, laissant une probabilité non nulle de la retrouver de l'autre côté. Le phénomène est essentiel à la fusion nucléaire au cœur du Soleil, où il permet aux protons de se rapprocher malgré leur répulsion. Il est aussi exploité par le microscope à effet tunnel, capable d'imager des surfaces atome par atome, et par certains composants électroniques comme la diode tunnel.", date:"", img:"https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Effet_tunnel"},
   {source:"Wikipédia", title:"Bibliothèque d'Alexandrie", desc:"Fondée au IIIe siècle av. J.-C. sous la dynastie des Ptolémées, la bibliothèque d'Alexandrie fut l'une des plus grandes bibliothèques de l'Antiquité et un foyer majeur du savoir hellénistique. Elle rassemblait des centaines de milliers de rouleaux de papyrus et attirait savants, poètes et scientifiques de tout le bassin méditerranéen. On y aurait copié systématiquement les ouvrages des navires accostant au port. Son déclin, étalé sur plusieurs siècles, reste entouré de récits contradictoires, et elle demeure un symbole durable de la connaissance perdue.", date:"", img:"https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Biblioth%C3%A8que_d%27Alexandrie"},
@@ -754,13 +732,40 @@ const SUGGESTED_FEEDS = [
   {name:"L'Équipe · Sport", url:"https://www.lequipe.fr/rss/actu_rss.xml"},
 ];
 const LS_KEY="fluxswipe.feeds.v1";
-const LS_MODE="fluxswipe.mode.v1";
 const LS_CAT="fluxswipe.cat.v1";
 const LS_INT="fluxswipe.interests.v1";
 const LS_NSRC="fluxswipe.newssrc.v1";
-let feeds=load(),items=[];
-/* Filtre de source du mode Actus : "all", ou l'URL d'UNE source cochée. Le
-   pendant de `cat` pour Apprendre — même barre de puces, même mémorisation.
+/* ---------- Le fil unique ----------
+   Deux réserves, un seul fil. Les actus (RSS, finies, triées par date) et les
+   articles Wikipédia (tirage sans fin) sont collectés SÉPARÉMENT, puis
+   entrelacés à cadence fixe par interleave() : `items` n'est jamais construit à
+   la main, il est toujours le mélange des deux réserves.
+   C'est ce qui permet à chaque moitié de vivre sa vie — un flux qui répond, un
+   lot Wikipédia de plus — sans que l'autre ait à être rechargée, et sans
+   réordonner ce qui est déjà lu (voir la propriété de préfixe testée dans
+   test/lib.test.js). */
+let feeds=load(),newsItems=[],learnItems=[],items=[];
+const markKind=k=>it=>(it.kind===k?it:{...it,kind:k});
+/* Recompose le fil. Au-delà de MAX_ITEMS on jette la TÊTE (les plus anciennes
+   cartes, déjà lues : le fil ne grandit que par le bas), et on retire des deux
+   réserves ce qui vient d'en sortir, sinon le prochain mélange les ramènerait. */
+function remix(){
+  items=interleave(newsItems,learnItems,CONFIG.MIX_EVERY);
+  if(items.length<=CONFIG.MAX_ITEMS)return;
+  const partis=new Set(items.slice(0,items.length-CONFIG.MAX_ITEMS).map(seenKey));
+  items=items.slice(items.length-CONFIG.MAX_ITEMS);
+  newsItems=newsItems.filter(i=>!partis.has(seenKey(i)));
+  learnItems=learnItems.filter(i=>!partis.has(seenKey(i)));
+}
+/* Reprend un fil déjà mêlé (cache local, instantané de fil) : on le sépare en
+   ses deux réserves pour que la suite puisse continuer à le nourrir. */
+function adoptItems(list){
+  newsItems=list.filter(i=>i.kind!=="learn");
+  learnItems=list.filter(i=>i.kind==="learn");
+  items=list.slice();
+}
+/* Filtre des actus : "all", ou l'URL d'UNE source cochée. Le pendant de `cat`
+   pour les thèmes Wikipédia — même barre de puces, même mémorisation.
    L'URL sert de clé plutôt que l'indice : supprimer une source du panneau
    décalerait tous les indices suivants, et le filtre désignerait alors une
    autre source sans que rien ne l'indique. Une URL disparue retombe sur
@@ -778,7 +783,6 @@ sanitizeNewsSrc();
    Sources, car un toast disparaît avant qu'on ait pu agir. Volontairement non
    persisté — une source peut très bien remarcher au chargement suivant. */
 let unreachable=new Set();
-let mode=(()=>{try{return localStorage.getItem(LS_MODE)==="news"?"news":"learn";}catch(e){return "learn";}})();
 
 /* Centres d'intérêt : définis une seule fois dans src/learn-core.js, partagés
    avec la fonction serverless (les deux listes avaient déjà divergé). */
@@ -805,9 +809,15 @@ function activeCatKey(){
 }
 
 function load(){try{const s=localStorage.getItem(LS_KEY);if(s)return JSON.parse(s);}catch(e){warn("load feeds",e);}return structuredClone(DEFAULT_FEEDS);}
+/* Vrai dès qu'une source a bougé depuis le dernier chargement du fil. Sert à
+   ne recharger, à la validation du panneau, que s'il y a bien de quoi : ce
+   panneau est aussi celui des centres d'intérêt, on l'ouvre donc pour un oui ou
+   pour un non, et un rechargement inutile ramènerait en haut du fil. */
+let feedsDirty=false;
 function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(feeds));}catch(e){warn("save feeds",e);}
+  feedsDirty=true;
   // Point de passage unique de TOUTE modification des sources (case cochée,
-  // ajout, suppression, import OPML) : la barre de filtres du mode Actus s'y
+  // ajout, suppression, import OPML) : la barre de filtres des sources s'y
   // remet à jour d'un seul endroit.
   renderSrcs();}
 
@@ -823,7 +833,7 @@ async function fetchWithTimeout(url,opts={},ms=7000){
 }
 // safeLink / safeImg / stripHtml : voir src/lib.js (couverts par npm test).
 
-/* ---------- Mémoire « déjà vu » (mode Apprendre) ----------
+/* ---------- Mémoire « déjà vu » (articles Wikipédia) ----------
    Un article est marqué vu quand il passe réellement à l'écran. Les lots
    suivants excluent ce qui a déjà été vu ; si tout a été vu, on ré-autorise
    les plus anciens pour ne pas tarir le fil. Stockage borné. */
@@ -842,14 +852,14 @@ function addSeen(it){
 
 /* ---------- Reprise de position entre sessions ----------
    On mémorise l'article courant (par lien, pas par index car le tri peut bouger)
-   pour reprendre au même endroit à la réouverture de l'app. */
+   pour reprendre au même endroit à la réouverture de l'app.
+   Une seule entrée depuis le fil unique : POS_KEY. Les anciennes clés (news /
+   learn) restent dans le stockage sans être lues — elles ne désignent plus
+   rien, le fil qu'elles décrivaient n'existe plus. */
 const LS_POS="fluxswipe.pos.v1";
+const POS_KEY="mix";
 let posMap=(()=>{try{return JSON.parse(localStorage.getItem(LS_POS)||"{}");}catch(e){return {};}})();
-/* Reprise au démarrage : UN DRAPEAU PAR MODE.
-   Un drapeau unique était consommé par le premier fil rendu — en pratique
-   Apprendre, qui est le mode par défaut — si bien que la bascule vers Actus
-   arrivait toujours avec un drapeau déjà à false : Actus ne reprenait jamais. */
-const resumePending={news:true,learn:true};
+let resumePending=true;   // reprise au démarrage, désarmée dès qu'elle a servi
 function persistPos(){try{localStorage.setItem(LS_POS,JSON.stringify(posMap));}catch(e){warn("save pos",e);}}
 /* Mémorise l'article courant, ÉCRITURE IMMÉDIATE.
    Ne pas différer : quand l'app est tuée depuis l'écran des tâches récentes,
@@ -861,16 +871,16 @@ function rememberPos(){
   // infini, donc l'index DOM et celui de `items` ne coïncident plus après un cap.
   const it=currentItem();
   if(!it||!it.link)return;
-  const prev=posEntry(mode);              // tolère l'ancien format
+  const prev=posEntry();                  // tolère l'ancien format
   if(prev&&prev.link===it.link)return;
   // On mémorise aussi la DATE et l'INDEX : un flux d'actualité ne garde que ses
   // N derniers articles, donc au retour le lien exact a souvent disparu. Sans
   // repli, la reprise échouait silencieusement et l'utilisateur retombait en
   // haut — exactement comme si rien n'était mémorisé.
-  posMap[mode]={link:it.link,date:it.date||"",idx:currentIndex()};
+  posMap[POS_KEY]={link:it.link,date:it.date||"",idx:currentIndex()};
   persistPos();
-  if(DEBUG){const relu=(JSON.parse(localStorage.getItem(LS_POS)||"{}")[mode])||{};
-    dbg(`v${APP_VERSION}  mode=${mode}  idx=${currentIndex()}\n`+
+  if(DEBUG){const relu=(JSON.parse(localStorage.getItem(LS_POS)||"{}")[POS_KEY])||{};
+    dbg(`v${APP_VERSION}  idx=${currentIndex()}\n`+
         `ÉCRIT …${it.link.slice(-24)}\n`+
         `RELU  …${String(relu.link||relu||"(rien)").slice(-24)}`);}
 }
@@ -939,7 +949,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="73";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="74";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1083,7 +1093,7 @@ document.addEventListener("visibilitychange",()=>{
   // Retour au premier plan : on rafraîchit les actus si elles ont vieilli.
   // Le seuil (AUTO_RELOAD_MS) est appliqué par loadFeeds lui-même, pour que le
   // retour d'arrière-plan et le lancement de l'app suivent la MÊME règle.
-  if(mode!=="news"||!feedLoadStarted)return;
+  if(!feedLoadStarted)return;
   loadFeeds();
 });
 /* App natif uniquement (@capacitor/app) : signal de reprise plus fiable que
@@ -1095,7 +1105,7 @@ document.addEventListener("visibilitychange",()=>{
 if(isNativeApp){
   const CapApp=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
   if(CapApp&&CapApp.addListener)CapApp.addListener("resume",()=>{
-    if(mode!=="news"||!feedLoadStarted)return;
+    if(!feedLoadStarted)return;
     loadFeeds();
   });
 }
@@ -1112,7 +1122,7 @@ if(isNativeApp){
    atteint — l'appeler chaque minute ne déclenche un vrai appel aux sources
    qu'une fois toutes les AUTO_RELOAD_MS, comme prévu. */
 setInterval(()=>{
-  if(mode!=="news"||!feedLoadStarted)return;
+  if(!feedLoadStarted)return;
   if(document.visibilityState!=="visible")return;   // pas de réseau en arrière-plan
   loadFeeds();
 },60*1000);
@@ -1237,7 +1247,7 @@ function findImage(node,raw){
 }
 // relTime : voir src/lib.js
 
-/* ---------- Mode Apprendre : contenu Wikipédia ----------
+/* ---------- Moitié Wikipédia du fil : le contenu ----------
    URL et normaliseurs viennent de src/learn-core.js : une seule implémentation,
    partagée avec /api/learn (elles avaient divergé). Ici on ne garde que la
    politique de récupération propre au navigateur (direct si CORS, sinon proxy). */
@@ -1299,99 +1309,86 @@ async function fetchLearn(count=CONFIG.BATCH_SIZE){
    une variable en mémoire repartirait à zéro à chaque lancement, et chaque
    réouverture rappellerait toutes les sources. Voir AUTO_RELOAD_MS. */
 const LS_CACHE="fluxswipe.cache.v1";
-function cacheEntry(m){try{const e=(JSON.parse(localStorage.getItem(LS_CACHE)||"{}"))[m];
+function cacheEntry(key){try{const e=(JSON.parse(localStorage.getItem(LS_CACHE)||"{}"))[key];
   if(e&&Array.isArray(e.items)&&e.items.length>=3)return e;}catch(e){}return null;} // ignore un cache minuscule
-function cacheSave(m){try{if(!items||items.length<3)return; // on ne met pas en cache un lot trop maigre
+function cacheSave(key){try{if(!items||items.length<3)return; // on ne met pas en cache un lot trop maigre
   const all=JSON.parse(localStorage.getItem(LS_CACHE)||"{}");
-  const max=m==="news"?CONFIG.CACHE_ITEMS_NEWS:CONFIG.CACHE_ITEMS;
-  all[m]={t:Date.now(),items:items.slice(0,max)};localStorage.setItem(LS_CACHE,JSON.stringify(all));}catch(e){warn("cache save",e);}}
-function cacheLoad(m){const e=cacheEntry(m);return e?e.items:null;}
+  all[key]={t:Date.now(),items:items.slice(0,CONFIG.CACHE_ITEMS)};
+  localStorage.setItem(LS_CACHE,JSON.stringify(all));}catch(e){warn("cache save",e);}}
+function cacheLoad(key){const e=cacheEntry(key);return e?e.items:null;}
 // Date du dernier lot RÉELLEMENT récupéré pour ce fil, 0 si aucun cache utilisable.
-function cacheTime(m){const e=cacheEntry(m);return e?(e.t||0):0;}
+function cacheTime(key){const e=cacheEntry(key);return e?(e.t||0):0;}
 
 /* ---------- Chargement principal ---------- */
 // Compteur de génération : chaque appel invalide le précédent (annule proprement
-// un chargement obsolète après un changement rapide de mode/catégorie).
+// un chargement obsolète après un changement rapide de filtre).
 let loadSeq=0,feedLoadStarted=false;
-let feedKeyShown=null;   // clé du fil actuellement affiché (mode + catégorie)
-/* ---------- Fraîcheur du fil Actus : une seule règle ----------
-   Un rafraîchissement AUTOMATIQUE des actus n'interroge les sources que si le
-   dernier lot a plus de AUTO_RELOAD_MS. En deçà, le cache local est servi tel
-   quel, sans le moindre appel réseau. Trois chemins passaient auparavant à
-   côté et rappelaient tout :
-     - le lancement de l'app (cold start), parce que le compteur vivait en
-       mémoire et repartait à zéro ;
-     - le retour d'arrière-plan ;
-     - la bascule Apprendre → Actus quand le fil n'était plus en mémoire.
-   Les trois vont maintenant chercher la date DANS le cache (cacheTime), donc
-   rouvrir l'app dix fois en dix minutes ne déclenche qu'un seul aller-retour.
-
-   Seulement en Actus : en Apprendre le fil est un tirage aléatoire sans fin,
-   le recharger remplacerait le lot en cours et ferait perdre sa lecture.
-
-   Une action EXPLICITE (bouton ↻, réessai, changement de sources, import OPML)
-   passe `force` et ignore le seuil : l'utilisateur qui demande une mise à jour
-   doit l'obtenir. La position est préservée : render() se réancre sur
-   l'article affiché. */
-const AUTO_RELOAD_MS=30*60*1000;
-let lastNewsLoad=cacheTime("news");   // repris du cache : survit à la fermeture de l'app
+let feedKeyShown=null;   // clé du fil actuellement affiché (source + thème filtrés)
+let newsSettled=false;   // les actus ont fini leur tour (ou n'avaient rien à faire)
+/* Charge le fil : ses DEUX moitiés, en parallèle et sans que l'une attende
+   l'autre. Une source RSS lente ne doit pas retenir les articles Wikipédia, et
+   réciproquement ; chacune se rend de son côté, remix() recompose. */
 async function loadFeeds(force){
-  const my=++loadSeq;feedLoadStarted=true;
-  demobadge(false);syncing(false);
-  const m=mode;                                   // capture : l'utilisateur peut changer de mode pendant le fetch
-  const key=feedKey(m);                           // cache distinct par catégorie (et par intérêts en « Tous »)
+  const my=++loadSeq;feedLoadStarted=true;feedsDirty=false;
+  demobadge(false);syncing(false);newsSettled=false;
+  const key=feedKey();                            // cache distinct par source et par thème filtrés
   // « Même fil » = le contenu affiché appartient à la MÊME clé que celle qu'on
-  // charge. Se contenter de « quelque chose est affiché » laissait le fil Actus
-  // à l'écran pendant tout le chargement du mode Apprendre.
+  // charge (un filtre a pu changer entre-temps).
   const sameFeed=(feedKeyShown===key&&items.length>0);
   // Le cache local sert à peindre INSTANTANÉMENT. On ne l'applique pas à un
   // simple rafraîchissement du fil courant : il ne contient que CACHE_ITEMS
   // articles et tronquerait un fil plus complet, faisant disparaître la carte
   // en cours de lecture.
   const cached=sameFeed?null:cacheLoad(key);
-  if(cached){items=cached;render();hideStates();feedKeyShown=key;}
+  if(cached){adoptItems(cached);render();hideStates();feedKeyShown=key;}
   else if(!sameFeed){
     // On change de fil sans cache : vider explicitement. L'écran de chargement
-    // est transparent, il ne masquerait pas les cartes de l'autre mode.
-    items=[];render();show("loading");
+    // est transparent, il ne masquerait pas les cartes du fil précédent.
+    newsItems=[];learnItems=[];items=[];render();show("loading");
   }
+  loadLearnPart(my,key,force);
+  loadNewsPart(my,key,force,cached,sameFeed);
+}
 
-  if(m==="learn"){
-    try{
-      const arr=await fetchLearn(20);              // un lot multi-sources au démarrage ; le scroll infini complète
-      if(!arr.length)throw new Error("empty");
-      if(my!==loadSeq)return;                       // chargement obsolète → on abandonne
-      // Quelque chose d'exploitable est DÉJÀ à l'écran : le fil courant, ou le
-      // cache tout juste peint. `sameFeed` seul ne suffisait pas — il est figé
-      // AVANT l'attente réseau, donc toujours faux au démarrage à froid, et le
-      // lot arrivé une seconde plus tard remplaçait le cache : la carte
-      // changeait toute seule sous les yeux, et la reprise de lecture (déjà
-      // désarmée par le rendu du cache) ne pouvait plus la rattraper.
-      // `force` (↻, réessai) reste une demande explicite de nouvelle fournée.
-      const keepShown=!force&&(sameFeed||!!cached);
-      if(keepShown){
-        // On ne REMPLACE pas, sous peine de faire disparaître l'article en
-        // cours sous les yeux (le tirage aléatoire ne le contient presque
-        // jamais). On complète comme le ferait le scroll infini — voir
-        // loadMoreLearn, même logique de dédoublonnage. L'article lu restant
-        // dans `items`, render() le retrouve via anchorLink() et conserve la
-        // position.
-        const have=new Set(items.map(i=>i.title));
-        const fresh=arr.filter(a=>!have.has(a.title));
-        if(fresh.length){
-          items=items.concat(fresh);
-          if(items.length>CONFIG.MAX_ITEMS)items=items.slice(-CONFIG.MAX_ITEMS);
-        }
-      }else items=arr;
-      render();hideStates();feedKeyShown=key;cacheSave(key);
-    }catch(e){
-      if(my!==loadSeq||cached)return;               // si on a déjà le cache, on le garde
-      warn("learn load",e);
-      items=structuredClone(DEMO_LEARN);demobadge(true);render();hideStates();feedKeyShown=key;
-    }
-    return;
+/* ---------- Moitié Wikipédia ----------
+   Un seul lot au chargement ; le fil s'allonge ensuite tout seul au scroll
+   (loadMore). On ne redemande rien tant qu'il reste des articles en réserve :
+   les remplacer ferait disparaître, sous les yeux, la carte en cours de
+   lecture — le tirage aléatoire ne la contient presque jamais. */
+async function loadLearnPart(my,key,force){
+  if(!force&&learnItems.length)return;
+  try{
+    const arr=await fetchLearn(CONFIG.BATCH_SIZE);
+    if(my!==loadSeq)return;                        // chargement obsolète → on abandonne
+    if(!arr.length)throw new Error("empty");
+    learnItems=arr.map(markKind("learn"));
+    remix();render();hideStates();feedKeyShown=key;
+    if(newsSettled)cacheSave(key);                 // sinon les actus l'enregistreront
+  }catch(e){
+    if(my!==loadSeq)return;
+    warn("learn load",e);
+    // Repli hors-ligne : les articles de démo, mais seulement s'il n'y a rien
+    // d'autre à montrer — les actus, elles, ont pu répondre.
+    if(items.length)return;
+    learnItems=DEMO_LEARN.map(markKind("learn"));
+    remix();demobadge(true);render();hideStates();feedKeyShown=key;
   }
+}
 
+/* ---------- Moitié actualités ----------
+   Fraîcheur : une seule règle. Un rafraîchissement AUTOMATIQUE n'interroge les
+   sources que si le dernier lot a plus de AUTO_RELOAD_MS. En deçà, le cache
+   local est servi tel quel, sans le moindre appel réseau. La date vit DANS le
+   cache (cacheTime), pas en mémoire : rouvrir l'app dix fois en dix minutes ne
+   déclenche donc qu'un seul aller-retour.
+
+   Une action EXPLICITE (bouton ↻, réessai, changement de sources, import OPML)
+   passe `force` et ignore le seuil : l'utilisateur qui demande une mise à jour
+   doit l'obtenir. La position est préservée : render() se réancre sur
+   l'article affiché. */
+const AUTO_RELOAD_MS=30*60*1000;
+let lastNewsLoad=cacheTime(feedKey());   // repris du cache : survit à la fermeture de l'app
+async function loadNewsPart(my,key,force,cached,sameFeed){
   /* Seuil de fraîcheur : rien à aller chercher, on garde ce qui est à l'écran
      (cache tout juste peint, ou fil déjà affiché). Aucun appel aux sources. */
   // Fraîcheur de CE fil : chaque source filtrée a sa propre entrée de cache,
@@ -1400,15 +1397,24 @@ async function loadFeeds(force){
   if(!force&&(cached||sameFeed)&&age<AUTO_RELOAD_MS){
     if(DEBUG)dbg(`v${APP_VERSION}  cache servi\n${items.length} articles, ${Math.round(age/60000)} min\n`+
                  `prochaine actualisation dans ${Math.round((AUTO_RELOAD_MS-age)/60000)} min`);
-    resumePending[m]=false;   // aucun rendu ne suivra : inutile de guetter la reprise
+    newsSettled=true;
+    resumePending=false;      // aucun rendu ne suivra : inutile de guetter la reprise
     return;
   }
 
   // Une seule source quand la barre de filtres en désigne une : elle occupe
-  // alors tout le fil (perFeed vaut MAX_NEWS, plus haut), au lieu de la portion
-  // qu'elle a dans le mélange.
+  // alors toute la part des actus (perFeed vaut MAX_NEWS, plus bas), au lieu de
+  // la portion qu'elle a dans le mélange.
   const allActive=feeds.filter(f=>f.on&&(newsSrc==="all"||f.url===newsSrc));
-  if(!allActive.length){if(!cached&&!sameFeed){items=[];render();showEmpty("no-feeds");}return;}
+  if(!allActive.length){
+    // Aucune source cochée : ce n'est plus un fil vide, c'est un fil
+    // entièrement Wikipédia. L'état vide n'a de sens que si celui-ci est vide
+    // aussi (et il peut encore être en route : d'où le report à sa charge).
+    newsItems=[];remix();render();
+    newsSettled=true;resumePending=false;
+    if(items.length)cacheSave(key);
+    return;
+  }
 
   /* Beaucoup de sources (un OPML importé peut en compter des centaines) : on
      n'en interroge qu'un lot par chargement, en tournant d'un chargement à
@@ -1429,7 +1435,8 @@ async function loadFeeds(force){
     let all=[];
     collected.forEach(list=>{all=all.concat(list);});
     all.sort((a,b)=>itemTime(b)-itemTime(a));
-    items=all.slice(0,CONFIG.MAX_NEWS);
+    newsItems=all.slice(0,CONFIG.MAX_NEWS);
+    remix();                     // les actus ne sont qu'une moitié du fil
   }
 
   /* Repeinture GROUPÉE. Repeindre à chaque source qui répond donnait, avec 40
@@ -1479,7 +1486,7 @@ async function loadFeeds(force){
         if(res&&res.length){
           // Plafond par source : on garde ses articles les plus récents.
           const own=res.slice().sort((a,b)=>itemTime(b)-itemTime(a)).slice(0,perFeed);
-          collected.set(f.url,own);
+          collected.set(f.url,own.map(markKind("news")));
           scheduleRender();      // groupé : voir RENDER_COALESCE_MS
         }else failed.push(f);
       }).catch(()=>{if(my===loadSeq)failed.push(f);})
@@ -1492,13 +1499,15 @@ async function loadFeeds(force){
     }
   }
   function finish(){
-    syncing(false);
+    syncing(false);newsSettled=true;
     if(collected.size)flushRender();   // état final exact, sans attendre la fenêtre
     if(!collected.size){
       // On ne vide JAMAIS un fil déjà affiché parce qu'un rafraîchissement a
-      // échoué : mieux vaut du contenu un peu ancien qu'un écran d'erreur.
-      if(cached||sameFeed)toast("Réseau indisponible — le fil n'a pas été actualisé");
-      else{items=[];render();showEmpty("all-failed");}
+      // échoué : mieux vaut du contenu un peu ancien qu'un écran d'erreur. Et
+      // même sans actus du tout, la moitié Wikipédia suffit à faire un fil —
+      // l'écran d'erreur est réservé au cas où il ne reste vraiment rien.
+      if(cached||sameFeed||items.length)toast("Réseau indisponible — le fil n'a pas été actualisé");
+      else{newsItems=[];remix();render();showEmpty();}
     }else{
       lastNewsLoad=Date.now();
       cacheSave(key);
@@ -1513,7 +1522,7 @@ async function loadFeeds(force){
         toast(`Injoignable${noms.length>1?"s":""} : ${liste}`,4200);
       }
     }
-    resumePending[m]=false;   // chargement terminé : on n'essaie plus de reprendre
+    resumePending=false;   // chargement terminé : on n'essaie plus de reprendre
   }
   pump();
 }
@@ -1555,8 +1564,6 @@ let loadingMore=false;
 // tableau, ce qui permet de retirer d'anciennes cartes du DOM sans tout casser.
 const cardReg=new Map();
 let cardSeq=0;
-const {MAX_CARDS,MAX_ITEMS}=CONFIG;   // bornes du fil infini (DOM + mémoire)
-function renderCard(it){const id=cardSeq++;cardReg.set(id,it);return cardHTML(it,id);}
 /* Article actuellement à l'écran (sert au rail de partage et à l'ancrage). */
 function currentItem(){
   const card=currentCardEl();
@@ -1571,8 +1578,8 @@ function anchorLink(){
   return it&&it.link?it.link:"";
 }
 /* Position mémorisée, tolérante à l'ancien format (une simple chaîne). */
-function posEntry(m){
-  const v=posMap[m];
+function posEntry(){
+  const v=posMap[POS_KEY];
   if(!v)return null;
   return typeof v==="string"?{link:v,date:"",idx:-1}:v;
 }
@@ -1610,11 +1617,12 @@ function scrollToCard(i){
   });
   return top;
 }
-// Marque comme « vu » la carte actuellement à l'écran (mode Apprendre seulement)
+// Marque comme « vu » la carte actuellement à l'écran. Ne concerne que les
+// articles Wikipédia : c'est leur tirage aléatoire qui doit éviter les redites.
+// Une actu, elle, sort naturellement du fil quand elle vieillit.
 function markVisibleSeen(){
-  if(mode!=="learn")return;
   const it=currentItem();
-  if(it)addSeen(it);
+  if(it&&it.kind==="learn")addSeen(it);
 }
 
 /* ---------- Images de fond paresseuses ----------
@@ -1753,22 +1761,10 @@ function observeBackgrounds(scope){
     else{applyBg(el,el.dataset.bg);delete el.dataset.bg;}
   });
 }
-// Carte de fin (mode Actus) : les flux RSS sont finis, on marque clairement le bout
-function endCardHTML(){
-  return `<article class="card endcard">
-    <div class="card__noimg"></div>
-    <div class="card__body">
-      <h2 class="card__title" style="margin-bottom:12px">Tu es à jour ✨</h2>
-      <p class="card__desc" style="max-width:34ch;margin-bottom:22px">Tu as parcouru tous les articles récents de tes sources. Rafraîchis pour les nouveautés, ou ajoute des sources pour lire davantage.</p>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
-        <button class="iobtn" data-end="reload">↻ Rafraîchir</button>
-        <button class="iobtn" data-end="sources">＋ Ajouter des sources</button>
-      </div>
-    </div>
-  </article>`;
-}
+/* Plus de carte de fin : le fil ne finit plus. Quand les actus sont épuisées,
+   les articles Wikipédia prennent le relais et le défilement reste infini. */
 /* Reconstruit le fil en gardant l'utilisateur SUR SON ARTICLE.
-   Le mode Actus rend progressivement : chaque flux qui répond retrie la liste
+   Les actus arrivent progressivement : chaque flux qui répond retrie la liste
    par date. En restaurant une position en PIXELS, l'article sous les yeux
    changeait d'identité à chaque réponse. On réancre donc sur le lien de la
    carte visible — et, au démarrage seulement, sur l'article de la session
@@ -1784,12 +1780,15 @@ function makeCardEl(it){
 /* Reconstruit le fil en gardant l'utilisateur SUR SON ARTICLE, et en
    RÉUTILISANT les cartes déjà affichées.
    Réassigner innerHTML détruisait puis recréait toutes les cartes à chaque
-   rendu — et le mode Actus rend progressivement, un rendu par flux qui répond.
-   L'élément d'image de la carte visible était donc détruit et recréé plusieurs
-   fois de suite : c'est ce qui faisait clignoter l'image au lancement.
+   rendu — et le fil se peint progressivement, un rendu par flux qui répond et
+   un par lot Wikipédia. L'élément d'image de la carte visible était donc
+   détruit et recréé plusieurs fois de suite : c'est ce qui faisait clignoter
+   l'image au lancement.
    Ici on réconcilie par clé (le lien de l'article) : les cartes déjà présentes
-   sont déplacées, jamais recréées, donc leur image reste posée. */
-/* forceTop : un vrai rafraîchissement Actus (automatique ou ↻) vient de se
+   sont déplacées, jamais recréées, donc leur image reste posée. C'est aussi ce
+   qui rend le remélange gratuit — glisser un article Wikipédia entre deux actus
+   ne recrée aucune carte. */
+/* forceTop : un vrai rafraîchissement des actus (automatique ou ↻) vient de se
    terminer — on veut la 1ère carte, pas l'article en cours de lecture. Sans
    ça, l'utilisateur pouvait ne JAMAIS voir le haut du fil pendant des heures
    de lecture continue, alors que « les news sont à jour » est justement ce
@@ -1799,10 +1798,6 @@ function makeCardEl(it){
    chaque lot de sources qui répond. */
 function render(forceTop){
   const anchor=forceTop?null:anchorLink();      // avant mutation : où est l'utilisateur ?
-
-  // La carte de fin est régénérée à part (elle n'a pas d'article associé).
-  const oldEnd=feedEl.querySelector(".endcard");
-  if(oldEnd)oldEnd.remove();
 
   // Index des cartes déjà à l'écran, par lien d'article.
   const existing=new Map();
@@ -1830,77 +1825,59 @@ function render(forceTop){
     cursor.remove();
     cursor=next;
   }
-  if(mode==="news"&&items.length)feedEl.insertAdjacentHTML("beforeend",endCardHTML());
-
   let top=0;
   if(forceTop){
-    resumePending[mode]=false;                  // ordre explicite : pas de reprise à ignorer
+    resumePending=false;                        // ordre explicite : pas de reprise à ignorer
   }else if(anchor){
     const i=items.findIndex(it=>it.link===anchor);
     if(i>=0)top=scrollToCard(i);
-    resumePending[mode]=false;                  // l'utilisateur a pris la main
-  }else if(resumePending[mode]&&items.length){
-    // Reprise de session : le fil Actus se remplit progressivement, on réessaie
+    resumePending=false;                        // l'utilisateur a pris la main
+  }else if(resumePending&&items.length){
+    // Reprise de session : le fil se remplit progressivement, on réessaie
     // à chaque rendu tant que l'article n'est pas encore arrivé.
-    const link=posEntry(mode);
-    if(DEBUG)console.log("[resume]",mode,"items="+items.length,"cible="+(link&&link.link),
+    const link=posEntry();
+    if(DEBUG)console.log("[resume]","items="+items.length,"cible="+(link&&link.link),
       "i="+(link?resolveResume(link):"n/a"));
-    if(!link)resumePending[mode]=false;
+    if(!link)resumePending=false;
     else{const i=resolveResume(link);
-      if(i>0){top=scrollToCard(i);resumePending[mode]=false;}
-      else if(i===0)resumePending[mode]=false;} // i===-1 : pas encore là → on réessaiera
+      if(i>0){top=scrollToCard(i);resumePending=false;}
+      else if(i===0)resumePending=false;}       // i===-1 : pas encore là → on réessaiera
   }
-  // Aucune cible retenue (nouveau fil, changement de mode…) : on repart en haut.
+  // Aucune cible retenue (nouveau fil, changement de filtre…) : on repart en haut.
   // Conserver le scroll d'un fil précédent laisserait l'utilisateur au milieu
   // d'un contenu qui n'a rien à voir.
   if(!top)setScrollTopInstant(feedEl,0);
   observeBackgrounds();
-  if(DEBUG){const e=posEntry(mode),l=(e&&e.link)||"";const i=e?resolveResume(e):-1;
-    dbg(`v${APP_VERSION}  mode=${mode}  items=${items.length}\n`+
+  if(DEBUG){const e=posEntry(),l=(e&&e.link)||"";const i=e?resolveResume(e):-1;
+    dbg(`v${APP_VERSION}  items=${items.length} (${newsItems.length} actus / ${learnItems.length} wiki)\n`+
         `mémorisé=…${l.slice(-24)||"(rien)"}\n`+
-        `trouvé i=${i}  reprise=${resumePending[mode]}\n`+
+        `trouvé i=${i}  reprise=${resumePending}\n`+
         `top=${top}  scrollTop=${Math.round(feedEl.scrollTop)}  idx=${currentIndex()}`);}
   // Le hint ne doit pas resurgir en pleine lecture à chaque rendu progressif.
   document.getElementById("hint").classList.toggle("hidden",items.length===0||feedEl.scrollTop>50);
-  updateProgress();onCardChange();              // la 1ère carte affichée compte comme vue
+  onCardChange();                               // la 1ère carte affichée compte comme vue
 }
-/* Ajoute des cartes à la suite sans réinitialiser le scroll (mode Apprendre infini) */
-function appendCards(newItems){
-  feedEl.insertAdjacentHTML("beforeend",newItems.map(renderCard).join(""));
-  capDom();observeBackgrounds();updateProgress();
-}
-/* Retire les cartes les plus hautes au-delà de MAX_CARDS et ajuste le scroll
-   (chaque carte fait exactement la hauteur du viewport). */
-function capDom(){
-  let removedH=0;
-  while(feedEl.children.length>MAX_CARDS){
-    const first=feedEl.firstElementChild;
-    cardReg.delete(+first.dataset.id);
-    removedH+=first.offsetHeight;               // hauteur RÉELLE, pas supposée
-    first.remove();
-  }
-  // instantané : sans cela le CSS scroll-behavior transformerait ce recalage en
-  // animation, en plein geste de l'utilisateur
-  if(removedH)setScrollTopInstant(feedEl,feedEl.scrollTop-removedH);
-}
-async function loadMoreLearn(){
-  if(loadingMore||mode!=="learn")return;
+/* Allonge la réserve d'articles Wikipédia, donc le fil : c'est elle qui le rend
+   infini, y compris une fois les actus épuisées. Le mélange est recomposé puis
+   rendu — les cartes déjà affichées sont réutilisées telles quelles (render
+   réconcilie par lien), et remix() jette la tête du fil au-delà de MAX_ITEMS. */
+async function loadMore(){
+  if(loadingMore)return;
   loadingMore=true;
   try{
-    const more=await fetchLearn(20);
+    const more=await fetchLearn(CONFIG.BATCH_SIZE);
     const have=new Set(items.map(i=>i.title));
-    const fresh=more.filter(m=>!have.has(m.title));
+    const fresh=more.filter(m=>!have.has(m.title)).map(markKind("learn"));
     if(fresh.length){
-      items=items.concat(fresh);
-      if(items.length>MAX_ITEMS)items=items.slice(-MAX_ITEMS);
-      appendCards(fresh);
+      learnItems=learnItems.concat(fresh);
+      remix();render();
     }
   }catch(e){warn("load more",e);/* on réessaiera au prochain scroll */}
   finally{loadingMore=false;}
 }
-// Libellé (emoji + nom) d'une catégorie Apprendre à partir de sa clé
+// Libellé (emoji + nom) d'un centre d'intérêt à partir de sa clé
 const catLabel=LEARN.catLabel;
-// Icônes d'action : boussole (Découvrir, Apprendre) / livre ouvert (Lire l'article, Actus)
+// Icônes d'action : boussole (Découvrir, Wikipédia) / livre ouvert (Lire l'article, actus)
 const ICON_DISCOVER=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>`;
 const ICON_READ=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>`;
 function cardHTML(it,id){
@@ -1909,11 +1886,14 @@ function cardHTML(it,id){
   // interprétée comme du CSS. Voir observeBackgrounds().
   const bg=img?`<div class="card__bg" data-bg="${escAttr(img)}"></div>`:`<div class="card__noimg"></div>`;
   const link=safeLink(it.link,location.href);
-  const learnCard=mode==="learn";
+  // La nature de la carte suit l'ARTICLE, plus le mode : les deux se succèdent
+  // dans le même fil, et c'est ce qui les distingue d'un coup d'œil (typographie
+  // plus dense, badge de thème, verbe d'action différent).
+  const learnCard=it.kind==="learn";
   const openLabel=learnCard?"Découvrir":"Lire l'article";
   const openIcon=learnCard?ICON_DISCOVER:ICON_READ;
   const catB=it.cat&&catLabel(it.cat)?`<span class="card__cat">${esc(catLabel(it.cat))}</span>`:"";
-  return `<article class="card${img?" card--img":""}" data-id="${id}">
+  return `<article class="card${img?" card--img":""}${learnCard?" card--learn":""}" data-id="${id}">
     ${bg}
     <div class="card__body">
       ${catB}
@@ -1940,14 +1920,7 @@ feedEl.addEventListener("click",e=>{
   if(openLink&&openLink.href){
     const card=openLink.closest(".card"),t=card&&card.querySelector(".card__title");
     if(openArticle(openLink.href,t?t.textContent:""))e.preventDefault();
-    return;
   }
-  // Boutons de la carte de fin (mode Actus)
-  const end=e.target.closest("[data-end]");
-  if(end){e.stopPropagation();
-    if(end.dataset.end==="reload")loadFeeds(true);   // demande explicite : on ignore le seuil
-    else document.getElementById("openSheet").click();
-    return;}
 });
 /* Rail unique : il agit sur la carte visible (une seule instance pour toute
    l'app au lieu d'une par carte). Masqué sur la carte de fin. */
@@ -2027,7 +2000,6 @@ function openShareMenu(it){
   };
 }
 
-const pbar=document.getElementById("pbar");
 /* Masquage auto du haut pendant le swipe ; réapparaît au tap ou après une pause */
 const topEl=document.querySelector(".top");
 /* La barre du haut se masque au swipe et ne revient QUE sur un appui à
@@ -2082,15 +2054,14 @@ let scrollTick=false;
 function onScrollFrame(){
   scrollTick=false;
   const top=feedEl.scrollTop,h=viewH();
-  updateProgress();
   if(top>50)document.getElementById("hint").classList.add("hidden");
   if(Math.abs(top-lastScrollY)>4)hideTop();   // on swipe → on masque (jusqu'au prochain appui)
   lastScrollY=top;
   // L'utilisateur a franchi au moins une carte avant la reprise → on l'annule
-  if(resumePending[mode]&&top>h*0.5)resumePending[mode]=false;
+  if(resumePending&&top>h*0.5)resumePending=false;
   onCardChange();   // carte courante : marquage « vu », position, rail
-  // Mode Apprendre : charge un nouveau lot avant d'atteindre le bas → fil sans fin
-  if(mode==="learn"&&!loadingMore&&items.length&&top+h*3>=feedEl.scrollHeight)loadMoreLearn();
+  // Un lot de plus avant d'atteindre le bas → fil sans fin
+  if(!loadingMore&&items.length&&top+h*3>=feedEl.scrollHeight)loadMore();
 }
 feedEl.addEventListener("scroll",()=>{
   if(scrollTick)return;
@@ -2101,54 +2072,9 @@ if("onscrollend" in self)feedEl.addEventListener("scrollend",persistPos);
 // tap → réaffiche, et on empêche le re-masquage pendant que le snap se termine
 feedEl.addEventListener("click",()=>showTop());   // seul déclencheur du retour de la barre
 
-/* ---------- Bascule Apprendre <-> Actus au swipe horizontal ----------
-   Active UNIQUEMENT quand la barre du haut est visible. Pendant la lecture elle
-   est masquée, et c'est justement là qu'un geste un peu oblique risquerait de
-   changer de mode par erreur : le geste est donc purement et simplement ignoré.
-   La condition est évaluée au DÉBUT du geste (l'intention de l'utilisateur au
-   moment où il pose le doigt) et revérifiée à la fin, au cas où un défilement
-   aurait masqué la barre entre-temps.
-   Sens : les onglets sont [Apprendre][Actus] ; balayer vers la gauche amène
-   l'onglet de droite, comme un carrousel. */
-const SWIPE_MIN_X=60;    // déplacement horizontal minimal pour valider
-const SWIPE_MAX_Y=45;    // au-delà, le geste est vertical : on renonce
-const SWIPE_RATIO=2;     // franchement horizontal : |dx| > 2 x |dy|
-const SWIPE_MAX_MS=700;  // un balayage, pas un glissement lent
-let swipeStart=null;
-function swipeAllowed(){
-  return !topEl.classList.contains("top--away")
-    && !document.querySelector(".sheet.open,.sharemenu.open");
-}
-feedEl.addEventListener("touchstart",e=>{
-  swipeStart=null;
-  if(e.touches.length!==1||!swipeAllowed())return;
-  const t=e.touches[0];
-  swipeStart={x:t.clientX,y:t.clientY,at:Date.now()};
-},{passive:true});
-feedEl.addEventListener("touchmove",e=>{
-  if(!swipeStart||!e.touches.length)return;
-  // Dès que le doigt part verticalement, ce n'est plus un changement de mode :
-  // on abandonne sans attendre la fin du geste.
-  if(Math.abs(e.touches[0].clientY-swipeStart.y)>SWIPE_MAX_Y)swipeStart=null;
-},{passive:true});
-feedEl.addEventListener("touchcancel",()=>{swipeStart=null;},{passive:true});
-feedEl.addEventListener("touchend",e=>{
-  const s=swipeStart;swipeStart=null;
-  if(!s||!e.changedTouches||!e.changedTouches.length)return;
-  if(Date.now()-s.at>SWIPE_MAX_MS)return;
-  const t=e.changedTouches[0];
-  const dx=t.clientX-s.x,dy=t.clientY-s.y;
-  if(Math.abs(dx)<SWIPE_MIN_X)return;
-  if(Math.abs(dy)>SWIPE_MAX_Y||Math.abs(dx)<Math.abs(dy)*SWIPE_RATIO)return;
-  if(!swipeAllowed())return;                 // la barre s'est masquée en route
-  setMode(dx<0?"news":"learn");
-  if(mode==="learn")setMode2Learn();
-},{passive:true});
-function updateProgress(){
-  if(mode==="learn")return;              // jauge masquée : inutile de lire scrollHeight
-  const max=feedEl.scrollHeight-feedEl.clientHeight;   // (lecture qui force un reflow)
-  pbar.style.height=(max>0?feedEl.scrollTop/max*100:0)+"%";
-}
+/* Plus de balayage horizontal : il ne servait qu'à passer d'un mode à l'autre.
+   Avec un fil unique il n'y a plus rien à basculer — et un geste sans effet vaut
+   mieux qu'un geste qui déplacerait quelque chose au hasard. */
 /* Navigation clavier. Gardes indispensables : sans elles, une espace tapée dans
    le champ « ajouter un flux » faisait défiler le fil, et les flèches
    défilaient DERRIÈRE un panneau ouvert. C'est aussi le seul endroit où le
@@ -2162,7 +2088,7 @@ document.addEventListener("keydown",e=>{
   feedEl.scrollBy({top:e.key==="ArrowUp"?-h:h,behavior:"smooth"});
 });
 
-/* ---------- Sheet (panneau Sources) ---------- */
+/* ---------- Panneau de réglages (unique) ---------- */
 const sheet=document.getElementById("sheet");
 /* Gestion du focus des panneaux modaux.
    `aria-modal` ne piège PAS le focus par lui-même : sans `inert` sur le reste
@@ -2185,9 +2111,9 @@ function closeDialog(el){
   el.classList.remove("open");
   bgLayers().forEach(n=>{if(n)n.inert=false;});
   if(lastFocused){try{lastFocused.focus();}catch(_){}lastFocused=null;}
-  // Feuille des intérêts refermée sans valider au 1er lancement : le fil n'a
-  // encore rien chargé (on ne charge plus derrière la feuille), il faut le faire.
-  if(el===intSheet&&!feedLoadStarted)loadFeeds();
+  // Panneau refermé sans valider au 1er lancement : le fil n'a encore rien
+  // chargé (on ne charge plus derrière la feuille), il faut le faire.
+  if(!feedLoadStarted)loadFeeds();
 }
 // Boucle de tabulation à l'intérieur du panneau ouvert
 document.addEventListener("keydown",e=>{
@@ -2201,16 +2127,13 @@ document.addEventListener("keydown",e=>{
   if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
   else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
 });
-document.getElementById("openSheet").onclick=()=>{renderList();renderSuggest();renderReadPref();openDialog(sheet);};
+document.getElementById("openSheet").onclick=openSettings;
 document.getElementById("reloadBtn").onclick=()=>{toast("Actualisation…");loadFeeds(true);};
 
 /* ---------- Réglage « Ouvrir les articles » (app packagée) ----------
-   Deux points de montage (panneau Sources et panneau Centres d'intérêt) parce
-   qu'ils ne sont jamais atteignables en même temps : la roue ⚙ ouvre Sources en
-   mode Actus, Centres d'intérêt en mode Apprendre. Le réglage vaut pour les deux
-   fils, il doit donc se trouver des deux côtés — un seul état, une seule
-   fonction de rendu. Sur le web, les blocs restent vides : le choix n'existe
-   pas, un lien y part forcément dans un onglet. */
+   Un seul point de montage depuis la fusion des panneaux (querySelectorAll
+   reste : le montage peut être absent, jamais dupliqué). Sur le web, le bloc
+   reste vide : le choix n'existe pas, un lien y part forcément dans un onglet. */
 /* `extra` : classe supplémentaire sur la rangée de boutons (voir segbtns--sizes).
    `o.aria` : libellé parlé quand l'étiquette visible ne dit rien seule — quatre
    « A » de tailles différentes se voient mais ne s'entendent pas. */
@@ -2326,14 +2249,12 @@ renderReadPref();
 if(isNativeApp&&blState.url&&adsPref==="block"&&Date.now()-(blState.at||0)>BL_REFRESH){
   syncBlocklist(blState.url,true);
 }
-sheet.onclick=e=>{if(e.target===sheet)closeDialog(sheet);};
-// Boutons du panneau Sources (remplacent les anciens onclick inline → CSP possible)
+// Boutons du panneau (remplacent les anciens onclick inline → CSP possible)
 document.getElementById("addFeedBtn").onclick=addFeed;
 document.getElementById("exportOpml").onclick=()=>exportFeeds("opml");
 document.getElementById("exportJson").onclick=()=>exportFeeds("json");
 document.getElementById("importBtn").onclick=()=>document.getElementById("importFile").click();
 document.getElementById("importFile").onchange=importFromFile;
-document.getElementById("applyFeeds").onclick=applyAndClose;
 // État vide
 document.getElementById("emptyRetry").onclick=()=>loadFeeds(true);
 document.getElementById("emptyOpen").onclick=()=>document.getElementById("openSheet").click();
@@ -2364,142 +2285,82 @@ document.addEventListener("keydown",e=>{
   if(menu){menu.classList.remove("open");setTimeout(()=>menu.remove(),200);}
 });
 
-/* ---------- Sélecteur de mode (onglets Actus / Apprendre) ---------- */
-const tabNews=document.getElementById("tabNews"),tabLearn=document.getElementById("tabLearn");
-function applyModeUI(){
-  const on=mode==="learn";
-  document.body.classList.toggle("learn",on);
-  tabNews.classList.toggle("active",!on);
-  tabLearn.classList.toggle("active",on);
-  tabNews.setAttribute("aria-selected",String(!on));   // l'état actif doit être exposé, pas seulement peint
-  tabLearn.setAttribute("aria-selected",String(on));
-  // les sources RSS n'ont pas de sens en mode Apprendre → on masque le réglage,
-  // et inversement pour les centres d'intérêt : les deux boutons se partagent
-  // le même emplacement en haut à droite, jamais visibles ensemble.
-  document.getElementById("openSheet").classList.toggle("hidden",on);
-  document.getElementById("editIntBtn").classList.toggle("hidden",!on);
+/* ---------- Identité et mémorisation du fil ----------
+   La clé du fil porte les DEUX filtres : la source d'actualité retenue et le
+   thème Wikipédia retenu. Cache local, instantané et test « même fil » suivent
+   donc le filtrage — sans quoi changer de source servirait le fil mêlé
+   précédent, pris pour identique.
+   « Tous » mélange les intérêts choisis : la clé doit donc varier avec EUX,
+   sinon elle ne bouge pas quoi qu'on coche, loadFeeds conclut « même fil » et
+   changer d'intérêts semble sans effet. */
+function feedKey(){
+  return "mix|"+newsSrc+"|"+cat+(cat==="all"?":"+interests.join(","):"");
 }
-/* Mémorisation du fil par mode : à la bascule, on restaure l'état exact
-   (cartes affichées + position de scroll) au lieu de tout recharger.
-   Un fetch réel ne se fait plus qu'au 1er affichage, via ↻, ou sur un
-   changement de catégorie. */
+/* Instantané du fil, pour revenir d'un filtre à l'autre sans réseau : on
+   restaure l'état exact (cartes affichées + position de scroll) au lieu de tout
+   recharger. Un fetch réel ne se fait qu'au 1er affichage, via ↻, ou quand le
+   fil demandé n'a jamais été vu. */
 const feedSnap={};
-// « Tous » mélange les intérêts choisis : la clé doit donc varier avec EUX.
-// Sinon elle vaut "learn_all" quoi qu'on coche, loadFeeds conclut « même fil »
-// (sameFeed), et le nouveau lot est ajouté à la suite au lieu de remplacer —
-// changer d'intérêts semble alors sans effet. Le cache confondait aussi
-// « aucun intérêt » (tirage aléatoire) et « des intérêts » (leur mélange).
-function feedKey(m){
-  // Actus : la clé porte la source filtrée, exactement comme Apprendre porte la
-  // catégorie. Cache, instantané de fil et test « même fil » suivent donc le
-  // filtre — sans quoi choisir une source servirait le fil mélangé du cache.
-  if(m!=="learn")return newsSrc==="all"?"news":"news:"+newsSrc;
-  return "learn_"+cat+(cat==="all"?":"+interests.join(","):"");
-}
-function snapshotFeed(m){
+function snapshotFeed(){
   if(!feedEl.children.length)return;               // rien à mémoriser
-  feedSnap[feedKey(m)]={
+  feedSnap[feedKey()]={
     html:feedEl.innerHTML,scrollTop:feedEl.scrollTop,
     items:items.slice(),reg:new Map(cardReg),seq:cardSeq
   };
 }
-function restoreFeed(m){
-  const s=feedSnap[feedKey(m)];
+function restoreFeed(){
+  const s=feedSnap[feedKey()];
   if(!s||!s.html)return false;
   loadSeq++;                                        // invalide un éventuel chargement en cours
-  items=s.items.slice();
+  adoptItems(s.items);                              // sépare le fil mêlé en ses deux réserves
   feedEl.innerHTML=s.html;
   cardReg.clear();s.reg.forEach((v,k)=>cardReg.set(k,v));
   cardSeq=s.seq;
-  demobadge(false);hideStates();feedKeyShown=feedKey(m);
+  demobadge(false);hideStates();feedKeyShown=feedKey();
   document.getElementById("hint").classList.toggle("hidden",items.length===0);
-  updateProgress();
   setScrollTopInstant(feedEl,s.scrollTop);          // restaure la position exacte, sans animation
   observeBackgrounds();updateRail();
   onCardChange();                                   // recalage du suivi de carte
   return true;
 }
-/* Ordre des onglets, qui donne le SENS de la transition : aller vers un onglet
-   situé à droite fait glisser le contenu vers la gauche, comme un carrousel.
-   Vaut pour le balayage comme pour un appui sur un onglet. */
-const MODE_ORDER={learn:0,news:1};
-const FEED_ANIM_MS=190;
-let modeAnimating=false;
-function animateModeSwap(dir,swap){
-  if(modeAnimating||!dir){swap();return;}
-  modeAnimating=true;
-  const shift=42;
-  feedEl.classList.add("feed--anim");
-  feedEl.style.transform=`translateX(${-dir*shift}px)`;   // sortie
-  feedEl.style.opacity="0";
-  setTimeout(()=>{
-    swap();                                                // échange hors écran
-    feedEl.classList.remove("feed--anim");                 // repositionne sans animer
-    feedEl.style.transform=`translateX(${dir*shift}px)`;
-    void feedEl.offsetWidth;                               // force le reflow
-    feedEl.classList.add("feed--anim");
-    feedEl.style.transform="translateX(0)";                // entrée
-    feedEl.style.opacity="1";
-    setTimeout(()=>{
-      feedEl.classList.remove("feed--anim");
-      feedEl.style.transform="";feedEl.style.opacity="";
-      modeAnimating=false;
-    },FEED_ANIM_MS);
-  },FEED_ANIM_MS);
-}
-function setMode(m){
-  if(m===mode)return;
-  const dir=MODE_ORDER[m]>MODE_ORDER[mode]?1:-1;    // +1 : on va vers la droite
-  snapshotFeed(mode);                               // mémorise le fil qu'on quitte
-  mode=m;
-  try{localStorage.setItem(LS_MODE,mode);}catch(e){warn("save mode",e);}
-  applyModeUI();
-  animateModeSwap(dir,()=>{
-    if(!restoreFeed(m))loadFeeds();                 // restaure si possible, sinon (re)charge
-  });
-}
-function setMode2Learn(){                          // à l'entrée du mode Apprendre, on propose l'onboarding la 1ère fois
-  if(mode==="learn"&&!interestsChosen())openInterests();
-}
-tabNews.onclick=()=>setMode("news");
-tabLearn.onclick=()=>{setMode("learn");setMode2Learn();};
-applyModeUI();
 
-/* ---------- Barre de filtres (mode Apprendre) ---------- */
+/* ---------- Barre de filtres : thèmes Wikipédia ---------- */
 const catsEl=document.getElementById("cats");
-const editIntBtn=document.getElementById("editIntBtn");
-editIntBtn.onclick=openInterests;
 function renderCats(){
   // Une seule puce d'ensemble, et un seul NOM. Elle s'appelait « ✨ Tous »
   // avec des intérêts et « 🎲 Aléatoire » sans : deux noms pour une même puce,
   // qui donnaient l'impression de deux filtres distincts. Son sens ne change
   // pas : « rien de précis » — le mélange des intérêts choisis, ou un tirage
   // au hasard tant qu'aucun ne l'est (voir catKeysForBatch).
-  const chips=[{k:"all",label:"✨ Tous"}];
+  const chips=[{k:"all",label:"🎓 Tous"}];
   interests.forEach(k=>{const c=CATEGORIES.find(x=>x.key===k);if(c)chips.push({k,label:c.label});});
+  // Une seule puce à proposer : la barre ne filtre rien, elle ne fait que
+  // prendre une ligne. Même règle que pour les sources.
+  catsEl.style.display=chips.length>1?"":"none";
   catsEl.innerHTML=chips.map(c=>`<button data-k="${c.k}" class="${c.k===cat?"active":""}">${c.label}</button>`).join("");
   catsEl.querySelectorAll("button").forEach(b=>{b.onclick=()=>setCat(b.dataset.k);});
-  // Le bouton est une icône seule : la nuance « modifier / choisir » passe par
-  // l'infobulle et le nom accessible, jamais par le contenu (qui EST la roue).
-  const t=interests.length?"Modifier tes centres d'intérêt":"Choisir tes centres d'intérêt";
-  editIntBtn.title=t;editIntBtn.setAttribute("aria-label",t);
+}
+/* Les deux filtres se comportent pareil : instantané du fil qu'on quitte, puis
+   restauration de celui qu'on ouvre s'il a déjà été vu — sinon chargement. */
+function switchFeed(){
+  const active=document.querySelector("#srcs button.active,#cats button.active");
+  if(active)active.scrollIntoView({inline:"center",block:"nearest",behavior:"smooth"});
+  if(!restoreFeed())loadFeeds();
 }
 function setCat(k){
   if(k===cat)return;
+  snapshotFeed();                      // AVANT le changement de clé (voir setNewsSrc)
   cat=k;
   try{localStorage.setItem(LS_CAT,cat);}catch(e){}
-  renderCats();
-  const active=catsEl.querySelector("button.active");
-  if(active)active.scrollIntoView({inline:"center",block:"nearest",behavior:"smooth"});
-  if(mode==="learn")loadFeeds();
+  renderCats();switchFeed();
 }
 
-/* ---------- Barre de filtres (mode Actus) ---------- */
-/* Le pendant de la barre des centres d'intérêt : filtrer le fil sur UNE source,
-   depuis la page principale, sans ouvrir le panneau Sources. Les puces sont les
-   sources COCHÉES — décocher reste le geste qui retire une source du fil, ce
-   filtre-là ne fait que se restreindre à l'une d'elles, sans rien changer aux
-   réglages.
+/* ---------- Barre de filtres : sources d'actualité ---------- */
+/* Le pendant de la barre des thèmes : restreindre la moitié « actus » du fil à
+   UNE source, depuis la page principale, sans ouvrir les réglages. Les puces
+   sont les sources COCHÉES — décocher reste le geste qui retire une source du
+   fil, ce filtre-là ne fait que se restreindre à l'une d'elles, sans rien
+   changer aux réglages.
    getElementById à chaque rendu plutôt qu'une const : renderSrcs() est appelée
    depuis save(), défini bien plus haut, qui s'exécuterait avant l'initialisation
    d'une const déclarée ici. */
@@ -2511,7 +2372,7 @@ function renderSrcs(){
   // Avec une seule source, filtrer n'a aucun sens : la barre ne proposerait que
   // « Toutes » et cette source, deux puces pour le même fil.
   el.style.display=actifs.length>1?"":"none";
-  const chips=[{k:"all",label:"✨ Toutes"}].concat(actifs.map(f=>({k:f.url,label:f.name})));
+  const chips=[{k:"all",label:"📰 Toutes"}].concat(actifs.map(f=>({k:f.url,label:f.name})));
   el.innerHTML=chips.map(c=>
     `<button data-k="${escAttr(c.k)}" class="${c.k===newsSrc?"active":""}">${esc(c.label)}</button>`).join("");
   el.querySelectorAll("button").forEach(b=>{b.onclick=()=>setNewsSrc(b.dataset.k);});
@@ -2520,29 +2381,24 @@ function setNewsSrc(k){
   if(k===newsSrc)return;
   // Instantané AVANT le changement de clé, sinon le fil qu'on quitte serait
   // rangé sous la clé de celui qu'on ouvre. Permet l'aller-retour immédiat
-  // entre deux sources, sans réseau — comme la bascule entre les deux modes.
-  if(mode==="news")snapshotFeed(mode);
+  // entre deux sources, sans réseau.
+  snapshotFeed();
   newsSrc=k;
   try{localStorage.setItem(LS_NSRC,newsSrc);}catch(e){}
-  renderSrcs();
-  const active=document.querySelector("#srcs button.active");
-  if(active)active.scrollIntoView({inline:"center",block:"nearest",behavior:"smooth"});
-  if(mode==="news"&&!restoreFeed("news"))loadFeeds();
+  renderSrcs();switchFeed();
 }
 
-/* ---------- Sélecteur de centres d'intérêt ---------- */
-const intSheet=document.getElementById("intSheet");
+/* ---------- Panneau unique : intérêts + sources + lecture ---------- */
 let pendingInt=new Set();
-function openInterests(){
+function openSettings(){
   pendingInt=new Set(interests);
-  renderIntGrid();
-  const firstRun=!interestsChosen();
-  document.getElementById("introWelcome").classList.toggle("hidden",!firstRun); // intro visible seulement la 1ère fois
-  renderReadPref();
-  // Accueil du 1er lancement : on ne demande qu'une chose à la fois. Le réglage
-  // de lecture attendra la prochaine ouverture du panneau.
-  intSheet.querySelector("[data-readmount]").classList.toggle("hidden",firstRun);
-  openDialog(intSheet);
+  renderIntGrid();renderList();renderSuggest();renderReadPref();
+  const premier=!interestsChosen();
+  document.getElementById("introWelcome").classList.toggle("hidden",!premier); // intro visible seulement la 1ère fois
+  // Accueil du 1er lancement : on ne demande qu'une chose à la fois. Les
+  // réglages du lecteur attendront la prochaine ouverture du panneau.
+  sheet.querySelector("[data-readmount]").classList.toggle("hidden",premier);
+  openDialog(sheet);
 }
 function renderIntGrid(){
   const grid=document.getElementById("intGrid");
@@ -2554,25 +2410,38 @@ function renderIntGrid(){
     b.classList.toggle("on");
   });
 }
-function saveInterests(){
+/* Validation du panneau : les intérêts et les sources sont maintenant réglés
+   au même endroit, ils s'appliquent donc d'un seul geste. Les sources, elles,
+   sont déjà enregistrées au fil des clics (save()) — c'est le rechargement du
+   fil qui attend ce bouton, pour ne pas repartir en réseau à chaque case
+   cochée. */
+function applySettings(){
+  const avant=interests.join(",");
   interests=CATEGORIES.filter(c=>pendingInt.has(c.key)).map(c=>c.key); // garde l'ordre défini
   try{localStorage.setItem(LS_INT,JSON.stringify(interests));}catch(e){}
-  cat="all";try{localStorage.setItem(LS_CAT,cat);}catch(e){}
+  const bouge=feedsDirty||interests.join(",")!==avant;
+  if(interests.join(",")!==avant){
+    // Le thème filtré peut ne plus faire partie des intérêts : on repart du
+    // mélange, seule valeur toujours valable.
+    cat="all";try{localStorage.setItem(LS_CAT,cat);}catch(e){}
+  }
   renderCats();
-  if(mode==="learn")loadFeeds();          // AVANT la fermeture : closeDialog ne
-  closeDialog(intSheet);                  // relancera donc pas un 2e chargement
+  // Rien n'a changé : on referme, c'est tout. Recharger ramènerait en haut du
+  // fil quelqu'un qui n'a fait qu'ouvrir le panneau pour regarder.
+  if(bouge||!feedLoadStarted)loadFeeds(true);   // AVANT la fermeture : closeDialog
+  closeDialog(sheet);                           // ne relancera pas un 2e chargement
   try{window.dispatchEvent(new Event("interests-validated"));}catch(e){} // autorise la bannière d'install
 }
-intSheet.onclick=e=>{if(e.target===intSheet)closeDialog(intSheet);};
-document.getElementById("saveInterestsBtn").onclick=saveInterests;
+sheet.onclick=e=>{if(e.target===sheet)closeDialog(sheet);};
+document.getElementById("applySettings").onclick=applySettings;
 renderCats();renderSrcs();
-/* Premier lancement : on ouvre le choix des intérêts AVANT de charger quoi que
-   ce soit. Charger un fil derrière la feuille était du réseau gaspillé, et
-   surtout le contenu était remplacé sous les yeux de l'utilisateur dès qu'il
-   validait. Le chargement est déclenché par saveInterests(), ou à la fermeture
-   de la feuille si elle est refermée sans valider. */
-const firstRun=(mode==="learn"&&!interestsChosen());
-if(firstRun)openInterests();
+/* Premier lancement : on ouvre les réglages AVANT de charger quoi que ce soit.
+   Charger un fil derrière la feuille était du réseau gaspillé, et surtout le
+   contenu était remplacé sous les yeux de l'utilisateur dès qu'il validait. Le
+   chargement est déclenché par applySettings(), ou à la fermeture de la feuille
+   si elle est refermée sans valider. */
+const firstRun=!interestsChosen();
+if(firstRun)openSettings();
 function renderList(){document.getElementById("feedList").innerHTML=feeds.map((f,i)=>`
   <div class="feedrow"><input type="checkbox" ${f.on?"checked":""} data-toggle="${i}">
     <div><div class="name">${esc(f.name)}${unreachable.has(f.url)?'<span class="badge-ko">injoignable</span>':""}</div>
@@ -2595,8 +2464,6 @@ function addFeed(){const inp=document.getElementById("newUrl");const url=inp.val
   if(!/^https?:\/\//.test(url)){toast("URL invalide");return;}
   let name=url;try{name=new URL(url).hostname.replace("www.","");}catch(_){}
   feeds.push({name,url,on:true});save();inp.value="";renderList();renderSuggest();}
-// Les sources ont changé : le cache ne correspond plus à ce qui est coché.
-function applyAndClose(){closeDialog(sheet);loadFeeds(true);}
 
 /* ---------- Import / Export des sources ---------- */
 /* Rend true quand le fichier est parti, false sinon — l'appelant n'annonce
@@ -2671,28 +2538,23 @@ function mergeFeeds(incoming){
   incoming.forEach(f=>{if(!existing.has(f.url)){feeds.push(f);existing.add(f.url);added++;}});
   save();renderList();renderSuggest();
   toast(added? `${added} source${added>1?"s":""} importée${added>1?"s":""}` : "Sources déjà présentes");
-  if(added&&mode==="news")loadFeeds(true);   // rafraîchit le fil avec les sources importées
+  if(added)loadFeeds(true);   // rafraîchit le fil avec les sources importées
 }
 
 /* ---------- Utils ---------- */
 function show(id){
-  // « les actus » n'a de sens qu'en mode Actus : en Apprendre, ce ne sont pas
-  // des flux mais des articles Wikipédia.
-  if(id==="loading")document.getElementById("loadingMsg").textContent=
-    mode==="learn"?"Chargement des articles…":"Chargement des actus…";
   ["loading","empty"].forEach(s=>document.getElementById(s).classList.toggle("hidden",s!==id));
 }
 function hideStates(){document.getElementById("loading").classList.add("hidden");document.getElementById("empty").classList.add("hidden");}
-function showEmpty(reason){
+/* Écran d'erreur, désormais réservé au cas où il ne reste VRAIMENT rien : le fil
+   mêle deux origines, il faut que les deux aient échoué pour qu'il soit vide.
+   Un seul message, donc — « aucune source active » n'est plus une impasse,
+   Wikipédia fournit le fil à lui seul. */
+function showEmpty(){
   document.getElementById("loading").classList.add("hidden");
-  const title=document.getElementById("emptyTitle"),msg=document.getElementById("emptyMsg");
-  if(reason==="no-feeds"){
-    title.textContent="Aucune source active";
-    msg.textContent="Ajoute ou active des flux RSS, ou importe tes sources (OPML / JSON) depuis le panneau Sources.";
-  }else{
-    title.textContent="Flux injoignables";
-    msg.textContent="Impossible de récupérer tes flux pour le moment (proxy CORS indisponible ou flux hors-ligne). Réessaie, ou vérifie tes sources.";
-  }
+  document.getElementById("emptyTitle").textContent="Fil indisponible";
+  document.getElementById("emptyMsg").textContent=
+    "Ni tes flux ni Wikipédia n'ont répondu (hors-ligne, ou proxy indisponible). Réessaie, ou vérifie tes sources.";
   document.getElementById("empty").classList.remove("hidden");
 }
 function demobadge(on){document.getElementById("demobadge").classList.toggle("hidden",!on);}
@@ -2796,10 +2658,10 @@ if(!firstRun)loadFeeds();
   let barShown=false;
   function canShowBar(){
     if(standalone)return false;
-    // pas tant qu'un panneau (intérêts/sources) est ouvert, ni avant validation des intérêts
+    // pas tant que le panneau de réglages est ouvert, ni avant validation des intérêts
     if(typeof interestsChosen==="function"&&!interestsChosen())return false;
-    const s1=document.getElementById("intSheet"), s2=document.getElementById("sheet");
-    if((s1&&s1.classList.contains("open"))||(s2&&s2.classList.contains("open")))return false;
+    const panel=document.getElementById("sheet");
+    if(panel&&panel.classList.contains("open"))return false;
     const s=pwaState();
     if(s.installed||s.declined)return false;           // déjà installée, ou refus explicite
     if((s.dismissCount||0)>=2)return false;            // fermée 2 fois → il ne veut clairement pas

@@ -261,6 +261,27 @@
     return withImg.concat(noImg).slice(0, count);
   }
 
+  /** Entrelace deux listes à cadence fixe : `every` éléments de `a`, puis un de
+   *  `b`, et ainsi de suite. Dès que l'une est épuisée, l'autre continue seule —
+   *  le fil mêlé ne s'arrête donc que quand les deux sont vides.
+   *
+   *  Déterministe et sans état : les N premiers éléments du résultat ne
+   *  dépendent que des préfixes des deux entrées. C'est ce qui permet de
+   *  recalculer le mélange à CHAQUE arrivée de données (un flux qui répond, un
+   *  lot Wikipédia de plus) sans rebattre les cartes déjà lues. */
+  function interleave(a, b, every) {
+    const step = Math.max(1, every | 0);
+    const out = [];
+    let i = 0;
+    let j = 0;
+    while (i < a.length || j < b.length) {
+      for (let k = 0; k < step && i < a.length; k++) out.push(a[i++]);
+      if (j < b.length) out.push(b[j++]);
+      else if (i >= a.length) break;
+    }
+    return out;
+  }
+
   /** Extrait le contenu d'une balise <meta>, quel que soit l'ordre des attributs.
    *  Utilisé côté serveur (api/og.js) pour lire og:image sur la page d'un article,
    *  et côté app packagée (index.html) pour la même extraction faite en direct
@@ -358,6 +379,7 @@
     seenKey,
     dropSeen,
     dedupAndRank,
+    interleave,
     hostOf,
     parseJsonFeeds,
     parseOpmlFeeds,

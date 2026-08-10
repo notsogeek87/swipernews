@@ -13,19 +13,28 @@ documentation. S'y tenir.
 
 **SwiperNews** (`news.lielu.eu`) fait lire des articles au **swipe vertical
 plein écran**, comme un fil de réseau social — une carte par article, un geste
-pour passer à la suivante. Deux fils, entre lesquels on bascule au balayage
-horizontal :
+pour passer à la suivante. **Un seul fil**, où deux natures d'articles alternent
+à cadence fixe (`CONFIG.MIX_EVERY` : trois actus, un article Wikipédia) :
 
-- **📰 Actus** — les flux RSS que l'utilisateur choisit lui-même. Pas
+- **📰 les actus** — les flux RSS que l'utilisateur choisit lui-même. Pas
   d'algorithme, pas de recommandation, pas de compte : le fil est exactement la
-  liste de sources cochées, et elle s'importe/s'exporte en OPML.
-- **🎓 Apprendre** — des articles Wikipédia tirés au hasard, filtrables par
-  centres d'intérêt (sciences, histoire, espace…), en défilement infini.
+  liste de sources cochées, et elle s'importe/s'exporte en OPML. Fini par nature
+  (un RSS ne garde que ses N derniers items).
+- **🎓 Wikipédia** — des articles tirés au hasard, filtrables par centres
+  d'intérêt (sciences, histoire, espace…). Sans fin : c'est cette moitié qui
+  rend le fil infini, y compris une fois les actus épuisées.
+
+> Les deux **modes** (onglets Actus / Apprendre, bascule au balayage horizontal)
+> ont été fusionnés en un fil unique. Il n'y a plus de variable `mode`, plus
+> d'onglets, plus de jauge de progression (le fil n'a plus de fin) et plus de
+> carte de fin. Les réglages des deux anciens modes vivent dans **un seul
+> panneau** (⚙), et les deux barres de puces (sources / centres d'intérêt) sont
+> visibles ensemble.
 
 L'intention produit, qui explique beaucoup de décisions techniques : reprendre
 le geste des réseaux sociaux **sans** ce qui va avec. D'où l'absence de compte
-et de télémétrie, la reprise de lecture mémorisée par mode, le lecteur intégré
-sans barre d'URL, et le refus de tout appel à un tiers non choisi.
+et de télémétrie, la reprise de lecture, le lecteur intégré sans barre d'URL, et
+le refus de tout appel à un tiers non choisi.
 
 ## Ce qu'est ce dépôt
 
@@ -202,7 +211,7 @@ ne change côté web.
 ## Commandes
 
 ```bash
-npm test            # node --test — 35 tests, aucune dépendance à installer
+npm test            # node --test — 37 tests, aucune dépendance à installer
 npm run lint        # eslint api src test eslint.config.js  (PAS index.html)
 npm run format:check
 npm run cap:sync    # régénère www/ puis cap sync android
@@ -318,10 +327,17 @@ genre de script dérape.
 - `openArticle(url, title)` — point d'entrée unique du lecteur. Rend `false`
   quand le lien doit garder son comportement normal (`target="_blank"`).
 - `renderReadPref()` / `PREFS` / `setPref()` — les réglages du lecteur, rendus
-  dans **deux** points de montage `[data-readmount]` (panneau Sources *et*
-  panneau Centres d'intérêt) : ils ne sont jamais atteignables en même temps,
-  ⚙ Sources n'existant qu'en mode Actus et ✎ Modifier qu'en mode Apprendre.
-- `feedSnap` — état du fil mémorisé par mode ; une bascule ne recharge rien.
+  dans le point de montage `[data-readmount]` du panneau unique.
+- `newsItems` / `learnItems` / `remix()` — les DEUX réserves du fil et leur
+  entrelacement. `items` n'est jamais construit à la main : il est toujours
+  `interleave(newsItems, learnItems, MIX_EVERY)` (fonction pure de `src/lib.js`,
+  testée). Chaque moitié se charge et se rend de son côté (`loadLearnPart`,
+  `loadNewsPart`), `remix()` recompose, `render()` réconcilie par lien — donc
+  glisser un article entre deux cartes n'en recrée aucune.
+- `feedKey()` — identité du fil : les deux filtres (source d'actu, thème
+  Wikipédia). Cache local, `feedSnap` et test « même fil » en dépendent.
+- `feedSnap` — état du fil mémorisé par filtre ; revenir à un filtre déjà vu ne
+  recharge rien.
 
 ### Natif (`android/app/src/main/java/eu/lielu/news/`)
 
