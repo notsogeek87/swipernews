@@ -134,8 +134,13 @@
      pour le nom de source. Le point utilise le corail lui aussi (seul accent
      chromatique du système) plutôt qu'une deuxième teinte. */
   .card__source{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:12px;
-    letter-spacing:-.03em;text-transform:uppercase;color:var(--flare);margin-bottom:14px}
-  .card__source .dot{width:6px;height:6px;border-radius:50%;background:var(--flare)}
+    letter-spacing:-.03em;text-transform:uppercase;color:var(--flare);margin-bottom:14px;max-width:100%}
+  .card__source .dot{flex:0 0 auto;width:6px;height:6px;border-radius:50%;background:var(--flare)}
+  /* Une ligne, jamais deux : en capitales monospace, un titre de flux à
+     rallonge poussait le titre de l'article vers le bas de la carte. min-width:0
+     est ce qui autorise un élément flex à rétrécir sous son contenu — sans lui,
+     text-overflow n'a jamais l'occasion de s'appliquer. */
+  .card__source .txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   /* Badge de catégorie (mode Apprendre) : même « Eyebrow Tag », posé dans un
      encadré (liseré signal-red, fond surface) pour rester lisible par-dessus
      une photo — un simple texte nu s'y perdrait. */
@@ -261,6 +266,13 @@
     padding:7px 14px;border-radius:var(--radius-sm);
     cursor:pointer;white-space:nowrap;transition:background .2s,color .2s}
   .cats button.active{background:var(--surface);color:var(--flare)}
+  /* Le nom d'une source est le titre de son flux, que personne ne choisit :
+     « Courrier international - Actualités France et Monde, vidéos, infographies »
+     est un titre réel, qui occupait à lui seul toute la largeur de la barre.
+     Coupé au filet plutôt que retaillé en JS : le texte complet reste dans le
+     DOM, donc dans le nom accessible — et la coupe suit la largeur réelle des
+     glyphes, ce qu'un nombre de caractères ne sait pas faire. */
+  #srcs button{max-width:44vw;overflow:hidden;text-overflow:ellipsis}
 
   /* Bouton "centres d'intérêt" : en haut à droite, à la place de ⚙ Sources
      (mode Actus) — les deux occupent le même emplacement, jamais visibles
@@ -627,8 +639,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=72"></script>
-<script src="src/learn-core.js?v=72"></script>
+<script src="src/lib.js?v=73"></script>
+<script src="src/learn-core.js?v=73"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -927,7 +939,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="72";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="73";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1905,7 +1917,7 @@ function cardHTML(it,id){
     ${bg}
     <div class="card__body">
       ${catB}
-      <span class="card__source"><span class="dot"></span>${esc(it.source)}</span>
+      <span class="card__source"><span class="dot"></span><span class="txt">${esc(it.source)}</span></span>
       <h2 class="card__title">${link?`<a href="${escAttr(link)}" data-open target="_blank" rel="noopener">${esc(it.title)}</a>`:esc(it.title)}</h2>
       ${it.desc?`<p class="card__desc">${esc(it.desc)}</p>`:""}
       <div class="card__meta">${it.date?`<span>${relTime(it.date)}</span>`:""}</div>
