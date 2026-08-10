@@ -666,8 +666,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=75"></script>
-<script src="src/learn-core.js?v=75"></script>
+<script src="src/lib.js?v=76"></script>
+<script src="src/learn-core.js?v=76"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -808,19 +808,18 @@ const markKind=k=>it=>(it.kind===k?it:{...it,kind:k});
    Les deux extrémités valent d'être atteignables : « actus seules » remplace
    l'ancien onglet Actus (et n'appelle plus du tout Wikipédia), « Wikipédia
    seul » l'ancien onglet Apprendre (et n'interroge plus aucun flux). */
+/* Une phrase COURTE par cran : elle tient sur une ligne à la largeur d'un
+   téléphone, donc le bloc ne change pas de hauteur d'un cran à l'autre — sans
+   quoi tout ce qui suit le curseur sautait pendant qu'on le fait glisser.
+   Inutile d'y répéter « Wikipédia » : le titre de la section et les deux
+   extrémités du curseur le disent déjà. */
 const MIX_LEVELS=[
-  {news:1,learn:0,label:"Actus seules",
-   desc:"Rien que tes flux. Wikipédia n'est même pas interrogé."},
-  {news:6,learn:1,label:"Une pincée",
-   desc:"Un article Wikipédia toutes les six actus, juste de quoi être surpris."},
-  {news:3,learn:1,label:"Équilibré",
-   desc:"Un article Wikipédia toutes les trois actus."},
-  {news:1,learn:1,label:"Moitié-moitié",
-   desc:"Une actu, un article, une actu… autant apprendre que suivre."},
-  {news:1,learn:3,label:"Surtout apprendre",
-   desc:"Trois articles Wikipédia pour une actu."},
-  {news:0,learn:1,label:"Wikipédia seul",
-   desc:"Que des articles à découvrir. Tes flux ne sont plus chargés."},
+  {news:1,learn:0,label:"Actus seules",   desc:"Que tes flux, sans rien d'autre."},
+  {news:6,learn:1,label:"Une pincée",     desc:"Un article toutes les six actus."},
+  {news:3,learn:1,label:"Équilibré",      desc:"Un article toutes les trois actus."},
+  {news:1,learn:1,label:"Moitié-moitié",  desc:"Une actu, un article, une actu…"},
+  {news:1,learn:3,label:"Surtout apprendre",desc:"Trois articles pour une actu."},
+  {news:0,learn:1,label:"Wikipédia seul", desc:"Que des articles, sans tes flux."},
 ];
 const MIX_DEFAULT=2;                       // « Équilibré » : la cadence d'origine
 const LS_MIX="fluxswipe.mix.v1";
@@ -1052,7 +1051,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="75";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="76";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
