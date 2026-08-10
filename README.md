@@ -31,8 +31,8 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
   et reste comme simple repère. Il ne capte **aucun** geste — l'appui le
   traverse jusqu'au fil. En faire une cible tactile aurait avalé les swipes
   verticaux commencés en haut de l'écran, pour ne rien gagner.
-- **Fil unique** : les deux natures d'articles se succèdent à cadence fixe
-  (`MIX_EVERY`, trois actus pour un article Wikipédia). Une carte se reconnaît
+- **Fil unique** : les deux natures d'articles se succèdent à une cadence que
+  vous réglez (voir *Dose d'apprentissage*). Une carte se reconnaît
   d'un coup d'œil — badge de thème et bouton « Découvrir » côté Wikipédia,
   « Lire l'article » côté actus. Deux barres de puces, sous le titre, filtrent
   chacune leur moitié : 📰 une source, 🎓 un centre d'intérêt
@@ -65,21 +65,57 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
 - Fil **sans fin** : de nouveaux articles Wikipédia se chargent automatiquement en
   approchant du bas, y compris une fois toutes les actus parcourues. Le bouton **↻**
   repart sur une fournée fraîche.
-- **Un seul panneau de réglages** (⚙) : centres d'intérêt, sources RSS et réglages
-  du lecteur au même endroit, validés d'un seul bouton. Rouvert puis validé sans
-  rien changer, il ne recharge rien — la position de lecture tient.
+- **Dose d'apprentissage** : un curseur, dans les réglages, décide de la
+  proportion des deux — de *Actus seules* à *Wikipédia seul*, en passant par
+  *Équilibré* (défaut, un article toutes les trois actus). Le bouton **🎓** de la
+  barre du haut est le raccourci vers *Actus seules* et le retour, sans oublier
+  la dose choisie.
+- **Un seul panneau de réglages** (⚙) : dose, centres d'intérêt, sources RSS et
+  réglages du lecteur au même endroit, validés d'un seul bouton. Rouvert puis validé
+  sans rien changer, il ne recharge rien — la position de lecture tient.
 - Installable comme application (PWA) avec fonctionnement hors-ligne
 - Si un flux est injoignable, le message le **nomme** (et la liste des sources
   marque la ligne d'un badge « injoignable »), pour savoir quelle source
   corriger ou supprimer. Si toutes échouent, un message invite à réessayer ou à
   revoir ses sources (plus de faux contenu de démo)
 
+## Dose d'apprentissage
+
+La composition du fil tient à un seul réglage — un **curseur** à six crans, en
+tête du panneau ⚙, qui donne la proportion entre les deux natures d'articles :
+
+| Cran | Nom | Cadence |
+| --- | --- | --- |
+| 0 | Actus seules | que des actus — Wikipédia n'est **pas** interrogé |
+| 1 | Une pincée | 1 article Wikipédia toutes les 6 actus |
+| 2 | Équilibré *(défaut)* | 1 toutes les 3 actus |
+| 3 | Moitié-moitié | 1 pour 1 |
+| 4 | Surtout apprendre | 3 articles Wikipédia pour 1 actu |
+| 5 | Wikipédia seul | que des articles — **aucun** flux n'est chargé |
+
+Un curseur plutôt que six boutons : le réglage est un continuum entre deux
+extrémités nommées, et le geste de glisser le dit mieux qu'une rangée
+d'étiquettes. Sous le curseur, un **aperçu de la cadence** (une barre par carte,
+les articles Wikipédia en corail) montre le rythme obtenu — il est calculé avec
+la même fonction que le fil réel, pas dessiné à la main.
+
+Les deux extrémités remplacent les anciens onglets : *Actus seules* est l'ancien
+mode Actus, *Wikipédia seul* l'ancien mode Apprendre. Chacune coupe vraiment
+l'autre moitié — pas seulement à l'affichage, mais aussi côté réseau.
+
+Le bouton **🎓** de la barre du haut est le raccourci quotidien : il éteint et
+rallume les articles Wikipédia sans ouvrir les réglages, en retenant la dose
+choisie. Éteint, la barre des centres d'intérêt disparaît (elle ne filtrerait
+plus rien) — c'est le signal le plus clair que le geste a porté. Changer de dose
+**ne recharge rien** : les deux réserves sont déjà en mémoire, seul leur
+entrelacement change, et l'utilisateur reste sur sa carte (ou sur la première
+qui lui survit, quand la dose écarte celle qu'il lisait).
+
 ## La moitié Wikipédia du fil
 
 Entre les actus se glissent des articles **Wikipédia** tirés au hasard (titre,
-extrait, image, lien vers l'article), un toutes les trois cartes. Ils se
-distinguent par un badge de thème, une typographie un peu plus dense et le verbe
-« Découvrir » sur leur bouton.
+extrait, image, lien vers l'article). Ils se distinguent par un badge de thème,
+une typographie un peu plus dense et le verbe « Découvrir » sur leur bouton.
 
 Une **barre de centres d'intérêt** (chips défilables sous le titre) permet de choisir
 ce qu'on veut apprendre : **Aléatoire** (défaut), Sciences, Histoire, Art & Culture,

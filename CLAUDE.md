@@ -14,7 +14,8 @@ documentation. S'y tenir.
 **SwiperNews** (`news.lielu.eu`) fait lire des articles au **swipe vertical
 plein écran**, comme un fil de réseau social — une carte par article, un geste
 pour passer à la suivante. **Un seul fil**, où deux natures d'articles alternent
-à cadence fixe (`CONFIG.MIX_EVERY` : trois actus, un article Wikipédia) :
+à une cadence réglable (`MIX_LEVELS`, six crans de « Actus seules » à
+« Wikipédia seul », défaut : trois actus pour un article) :
 
 - **📰 les actus** — les flux RSS que l'utilisateur choisit lui-même. Pas
   d'algorithme, pas de recommandation, pas de compte : le fil est exactement la
@@ -29,7 +30,9 @@ pour passer à la suivante. **Un seul fil**, où deux natures d'articles alterne
 > d'onglets, plus de jauge de progression (le fil n'a plus de fin) et plus de
 > carte de fin. Les réglages des deux anciens modes vivent dans **un seul
 > panneau** (⚙), et les deux barres de puces (sources / centres d'intérêt) sont
-> visibles ensemble.
+> visibles ensemble. Les deux anciens modes restent atteignables comme les deux
+> EXTRÉMITÉS de la dose — et chaque extrémité coupe vraiment l'autre moitié,
+> réseau compris (`loadLearnPart` / `loadNewsPart` sortent aussitôt).
 
 L'intention produit, qui explique beaucoup de décisions techniques : reprendre
 le geste des réseaux sociaux **sans** ce qui va avec. D'où l'absence de compte
@@ -330,10 +333,17 @@ genre de script dérape.
   dans le point de montage `[data-readmount]` du panneau unique.
 - `newsItems` / `learnItems` / `remix()` — les DEUX réserves du fil et leur
   entrelacement. `items` n'est jamais construit à la main : il est toujours
-  `interleave(newsItems, learnItems, MIX_EVERY)` (fonction pure de `src/lib.js`,
-  testée). Chaque moitié se charge et se rend de son côté (`loadLearnPart`,
-  `loadNewsPart`), `remix()` recompose, `render()` réconcilie par lien — donc
-  glisser un article entre deux cartes n'en recrée aucune.
+  `mixLists(newsItems, learnItems, mixLevel())`, qui s'appuie sur `interleave`
+  (fonction pure de `src/lib.js`, testée). Chaque moitié se charge et se rend de
+  son côté (`loadLearnPart`, `loadNewsPart`), `remix()` recompose, `render()`
+  réconcilie par lien — donc glisser un article entre deux cartes n'en recrée
+  aucune.
+- `MIX_LEVELS` / `mixScore` / `applyMix()` — la dose d'apprentissage (curseur des
+  réglages + bouton 🎓 de la barre). Elle ne déclenche AUCUN réseau : seule
+  l'entrelacement change. `adoptItems()` remélange donc toujours ce qu'il reprend
+  (cache, instantané), sinon une dose changée entre deux sessions servirait
+  l'ancien mélange ; et `feedSnap` mémorise la dose, pour re-rendre quand
+  l'instantané ne lui correspond plus.
 - `feedKey()` — identité du fil : les deux filtres (source d'actu, thème
   Wikipédia). Cache local, `feedSnap` et test « même fil » en dépendent.
 - `feedSnap` — état du fil mémorisé par filtre ; revenir à un filtre déjà vu ne

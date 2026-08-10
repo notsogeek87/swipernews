@@ -238,6 +238,16 @@
     letter-spacing:-.01em;cursor:pointer;transition:background .2s}
   .top .actions button:hover{background:rgba(149,28,4,.15)}
   .iconbtn{width:38px;height:38px;padding:0!important;display:grid;place-items:center;font-size:17px}
+  /* Interrupteur 🎓 : allumé = Wikipédia dans le fil. L'état ALLUMÉ prend le
+     dégradé cocoa -> molten des boutons pleins (comme la puce active d'un
+     segmenté) ; l'état éteint recule d'un cran — liseré effacé et emoji
+     désaturé —, ce qui se lit sans distinguer les couleurs. Pas de bascule
+     animée : une pastille qui coulisse serait le seul objet mobile d'une barre
+     qui, elle, se veut immobile pendant la lecture. */
+  .top .actions .iconbtn--toggle{transition:background .2s,border-color .2s,filter .2s,opacity .2s}
+  .iconbtn--toggle.on{background:linear-gradient(135deg,var(--surface),var(--molten));
+    border-color:var(--flare);box-shadow:var(--shadow-ember)}
+  .iconbtn--toggle:not(.on){border-color:rgba(149,28,4,.45);filter:grayscale(1);opacity:.65}
 
   /* Barres de filtres : chips défilables horizontalement. Les DEUX sont
      désormais visibles ensemble — #srcs restreint les actus à une source,
@@ -260,6 +270,37 @@
      DOM, donc dans le nom accessible — et la coupe suit la largeur réelle des
      glyphes, ce qu'un nombre de caractères ne sait pas faire. */
   #srcs button{max-width:44vw;overflow:hidden;text-overflow:ellipsis}
+
+  /* Curseur de dose (réglages). Un curseur, et pas six boutons segmentés :
+     ce réglage est un CONTINUUM entre deux extrémités nommées, et le geste de
+     glisser dit cela mieux qu'une rangée d'étiquettes. La piste va du rouge
+     signal au corail — plus on va vers la droite, plus on apprend.
+     Poignée CARRÉE (coins techniques) : la pastille ronde du navigateur est la
+     seule forme que la charte exclut explicitement. */
+  .mix{display:flex;flex-direction:column;gap:2px}
+  .mixrange{-webkit-appearance:none;appearance:none;width:100%;height:26px;
+    background:transparent;cursor:pointer;margin:0}
+  .mixrange::-webkit-slider-runnable-track{height:4px;border-radius:var(--radius-sm);
+    background:linear-gradient(90deg,var(--redline),var(--flare))}
+  .mixrange::-moz-range-track{height:4px;border-radius:var(--radius-sm);
+    background:linear-gradient(90deg,var(--redline),var(--flare))}
+  .mixrange::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:22px;height:22px;margin-top:-9px;border-radius:var(--radius-sm);
+    background:linear-gradient(135deg,var(--surface),var(--molten));
+    border:1.5px solid var(--flare);box-shadow:var(--shadow-ember)}
+  .mixrange::-moz-range-thumb{width:22px;height:22px;border-radius:var(--radius-sm);
+    background:linear-gradient(135deg,var(--surface),var(--molten));
+    border:1.5px solid var(--flare);box-shadow:var(--shadow-ember);box-sizing:border-box}
+  .mixrange:focus-visible{outline:2px solid var(--flare);outline-offset:4px}
+  .mix__ends{display:flex;justify-content:space-between;color:var(--ash);font-size:12px;margin-bottom:8px}
+  .mix__name{font-weight:600;font-size:15px}
+  .mix__desc{color:var(--ash);font-size:12.5px;line-height:1.4}
+  /* Aperçu : la suite des cartes qu'on obtiendra, une barre par carte. Le
+     rythme se voit ainsi avant d'être subi — c'est ce qu'aucune phrase ne
+     rend. Deux teintes déjà au système, jamais une troisième. */
+  .mix__viz{display:flex;gap:3px;margin-top:11px}
+  .mix__viz span{flex:1 1 0;height:9px;border-radius:2px;background:var(--molten)}
+  .mix__viz span.w{background:var(--flare)}
 
   /* Sélecteur de centres d'intérêt (grille de chips à cocher) */
   .intgrid{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
@@ -510,6 +551,9 @@
   <div class="topline">
     <div class="brand"><span class="brand__logo"><img src="logo-192.png?v=42" alt="" width="28" height="28"></span><span class="brand__text" data-text="SwiperNews">SwiperNews</span></div>
     <div class="actions">
+      <!-- Interrupteur 🎓 : le raccourci « actus seules ». Son libellé et son
+           état sont posés par updateLearnToggle(). -->
+      <button id="learnToggle" class="iconbtn iconbtn--toggle" aria-pressed="true">🎓</button>
       <button id="reloadBtn" class="iconbtn" title="Rafraîchir les articles" aria-label="Rafraîchir">↻</button>
       <button id="openSheet" class="iconbtn" title="Sources, centres d'intérêt et réglages" aria-label="Réglages">⚙</button>
     </div>
@@ -556,6 +600,19 @@
     <p class="intro hidden" id="introWelcome">✨ Le swipe qui rend plus malin. Un seul fil : tes actus, et entre elles des articles Wikipédia qui t'apprennent un truc que tu ne connaissais pas. Choisis ce qui allume ta curiosité 👇</p>
     <h2>Ton fil</h2>
     <p class="sub">Tes actus et des articles Wikipédia, en alternance dans un seul fil.</p>
+
+    <h3 class="secttl">🎚️ Dose d'apprentissage</h3>
+    <p class="sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
+    <div class="mix">
+      <input class="mixrange" id="mixRange" type="range" min="0" max="5" step="1"
+             aria-label="Dose d'apprentissage" aria-describedby="mixDesc">
+      <div class="mix__ends" aria-hidden="true"><span>📰 Actus</span><span>Apprendre 🎓</span></div>
+      <b class="mix__name" id="mixName"></b>
+      <span class="mix__desc" id="mixDesc"></span>
+      <!-- Aperçu de la cadence : la suite des cartes que donnera cette dose.
+           Décoratif — la phrase au-dessus dit déjà la même chose en mots. -->
+      <div class="mix__viz" id="mixViz" aria-hidden="true"></div>
+    </div>
 
     <h3 class="secttl">🎓 Centres d'intérêt</h3>
     <p class="sub">Les thèmes des articles Wikipédia glissés entre tes actus.</p>
@@ -609,8 +666,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=74"></script>
-<script src="src/learn-core.js?v=74"></script>
+<script src="src/lib.js?v=75"></script>
+<script src="src/learn-core.js?v=75"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -668,10 +725,6 @@
 const CONFIG = {
   FETCH_TIMEOUT: 7000,   // délai d'expiration réseau (ms)
   BATCH_SIZE: 20,        // articles Wikipédia par lot
-  // Cadence du fil unique : N actus, puis un article Wikipédia, et on
-  // recommence. Trois, parce qu'à un pour un le fil ne ressemble plus à un fil
-  // d'actualité, et qu'au-delà de quatre ou cinq l'article surprise se perd.
-  MIX_EVERY: 3,
   MAX_NEWS: 120,         // articles d'actualité conservés dans le fil
   MIN_PER_FEED: 10,      // part MINIMALE garantie à chaque source ; la part
                          // réelle vaut MAX_NEWS / nombre de sources, donc aucune
@@ -746,11 +799,57 @@ const LS_NSRC="fluxswipe.newssrc.v1";
    test/lib.test.js). */
 let feeds=load(),newsItems=[],learnItems=[],items=[];
 const markKind=k=>it=>(it.kind===k?it:{...it,kind:k});
+
+/* ---------- Dose d'apprentissage ----------
+   Le curseur des réglages, et la seule chose qui décide de la composition du
+   fil. Chaque cran est une proportion `news:learn` par cycle — pas un
+   pourcentage, parce que c'est le RYTHME qui se voit à l'écran (« trois actus,
+   un article »), et qu'un pourcentage ne dirait pas où tombe la carte.
+   Les deux extrémités valent d'être atteignables : « actus seules » remplace
+   l'ancien onglet Actus (et n'appelle plus du tout Wikipédia), « Wikipédia
+   seul » l'ancien onglet Apprendre (et n'interroge plus aucun flux). */
+const MIX_LEVELS=[
+  {news:1,learn:0,label:"Actus seules",
+   desc:"Rien que tes flux. Wikipédia n'est même pas interrogé."},
+  {news:6,learn:1,label:"Une pincée",
+   desc:"Un article Wikipédia toutes les six actus, juste de quoi être surpris."},
+  {news:3,learn:1,label:"Équilibré",
+   desc:"Un article Wikipédia toutes les trois actus."},
+  {news:1,learn:1,label:"Moitié-moitié",
+   desc:"Une actu, un article, une actu… autant apprendre que suivre."},
+  {news:1,learn:3,label:"Surtout apprendre",
+   desc:"Trois articles Wikipédia pour une actu."},
+  {news:0,learn:1,label:"Wikipédia seul",
+   desc:"Que des articles à découvrir. Tes flux ne sont plus chargés."},
+];
+const MIX_DEFAULT=2;                       // « Équilibré » : la cadence d'origine
+const LS_MIX="fluxswipe.mix.v1";
+const LS_MIXBACK="fluxswipe.mixback.v1";   // dose à rétablir après un passage en « actus seules »
+const clampMix=n=>(Number.isInteger(n)&&n>=0&&n<MIX_LEVELS.length)?n:MIX_DEFAULT;
+let mixScore=(()=>{try{return clampMix(parseInt(localStorage.getItem(LS_MIX),10));}catch(e){return MIX_DEFAULT;}})();
+/* Dose rétablie par le bouton 🎓 quand on quitte « actus seules ». Jamais 0,
+   sinon le bouton ne pourrait plus rien rallumer. */
+let mixBack=(()=>{try{const n=clampMix(parseInt(localStorage.getItem(LS_MIXBACK),10));return n||MIX_DEFAULT;}catch(e){return MIX_DEFAULT;}})();
+const mixLevel=()=>MIX_LEVELS[mixScore];
+function persistMix(n){
+  mixScore=clampMix(n);
+  if(mixScore)mixBack=mixScore;
+  try{localStorage.setItem(LS_MIX,String(mixScore));localStorage.setItem(LS_MIXBACK,String(mixBack));}catch(e){warn("save mix",e);}
+}
+/* Entrelacement selon la dose : une seule règle, partagée par le fil et par son
+   aperçu dans les réglages. interleave() pose UN élément de sa 2e liste tous
+   les `every` de la 1re — pour une dose penchée vers Wikipédia, on lui passe
+   donc les deux listes dans l'autre sens. */
+function mixLists(news,learn,m){
+  if(!m.learn)return news.slice();
+  if(!m.news)return learn.slice();
+  return m.learn===1?interleave(news,learn,m.news):interleave(learn,news,m.learn);
+}
 /* Recompose le fil. Au-delà de MAX_ITEMS on jette la TÊTE (les plus anciennes
    cartes, déjà lues : le fil ne grandit que par le bas), et on retire des deux
    réserves ce qui vient d'en sortir, sinon le prochain mélange les ramènerait. */
 function remix(){
-  items=interleave(newsItems,learnItems,CONFIG.MIX_EVERY);
+  items=mixLists(newsItems,learnItems,mixLevel());
   if(items.length<=CONFIG.MAX_ITEMS)return;
   const partis=new Set(items.slice(0,items.length-CONFIG.MAX_ITEMS).map(seenKey));
   items=items.slice(items.length-CONFIG.MAX_ITEMS);
@@ -758,11 +857,15 @@ function remix(){
   learnItems=learnItems.filter(i=>!partis.has(seenKey(i)));
 }
 /* Reprend un fil déjà mêlé (cache local, instantané de fil) : on le sépare en
-   ses deux réserves pour que la suite puisse continuer à le nourrir. */
+   ses deux réserves pour que la suite puisse continuer à le nourrir, puis on le
+   REMÉLANGE. Le remélange n'est pas une précaution de style : la dose a pu
+   changer depuis que ce fil a été rangé (y compris entre deux sessions), et
+   servir l'ancien mélange tel quel remettrait dans le fil des cartes que la
+   dose courante écarte. */
 function adoptItems(list){
   newsItems=list.filter(i=>i.kind!=="learn");
   learnItems=list.filter(i=>i.kind==="learn");
-  items=list.slice();
+  remix();
 }
 /* Filtre des actus : "all", ou l'URL d'UNE source cochée. Le pendant de `cat`
    pour les thèmes Wikipédia — même barre de puces, même mémorisation.
@@ -949,7 +1052,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="74";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="75";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1356,6 +1459,7 @@ async function loadFeeds(force){
    les remplacer ferait disparaître, sous les yeux, la carte en cours de
    lecture — le tirage aléatoire ne la contient presque jamais. */
 async function loadLearnPart(my,key,force){
+  if(!mixLevel().learn)return;      // dose « actus seules » : Wikipédia n'est pas appelé
   if(!force&&learnItems.length)return;
   try{
     const arr=await fetchLearn(CONFIG.BATCH_SIZE);
@@ -1389,6 +1493,9 @@ async function loadLearnPart(my,key,force){
 const AUTO_RELOAD_MS=30*60*1000;
 let lastNewsLoad=cacheTime(feedKey());   // repris du cache : survit à la fermeture de l'app
 async function loadNewsPart(my,key,force,cached,sameFeed){
+  // Dose « Wikipédia seul » : aucun flux n'est interrogé. Le fil ne contient
+  // aucune actu, aller les chercher serait du réseau pour rien.
+  if(!mixLevel().news){newsSettled=true;return;}
   /* Seuil de fraîcheur : rien à aller chercher, on garde ce qui est à l'écran
      (cache tout juste peint, ou fil déjà affiché). Aucun appel aux sources. */
   // Fraîcheur de CE fil : chaque source filtrée a sa propre entrée de cache,
@@ -1409,10 +1516,12 @@ async function loadNewsPart(my,key,force,cached,sameFeed){
   if(!allActive.length){
     // Aucune source cochée : ce n'est plus un fil vide, c'est un fil
     // entièrement Wikipédia. L'état vide n'a de sens que si celui-ci est vide
-    // aussi (et il peut encore être en route : d'où le report à sa charge).
+    // aussi (et il peut encore être en route : d'où le report à sa charge) —
+    // sauf à la dose « actus seules », où plus rien ne peut arriver.
     newsItems=[];remix();render();
     newsSettled=true;resumePending=false;
     if(items.length)cacheSave(key);
+    else if(!mixLevel().learn)showEmpty("no-feeds");
     return;
   }
 
@@ -1796,7 +1905,9 @@ function makeCardEl(it){
    (voir flushRender ci-dessous) : les repeintures progressives pendant le
    chargement gardent l'ancrage, sinon la carte bougerait sous le doigt à
    chaque lot de sources qui répond. */
-function render(forceTop){
+/* altAnchor : lien de repli quand la carte lue vient d'être RETIRÉE du fil —
+   seul cas où cela arrive, un changement de dose (voir applyMix). */
+function render(forceTop,altAnchor){
   const anchor=forceTop?null:anchorLink();      // avant mutation : où est l'utilisateur ?
 
   // Index des cartes déjà à l'écran, par lien d'article.
@@ -1829,7 +1940,8 @@ function render(forceTop){
   if(forceTop){
     resumePending=false;                        // ordre explicite : pas de reprise à ignorer
   }else if(anchor){
-    const i=items.findIndex(it=>it.link===anchor);
+    let i=items.findIndex(it=>it.link===anchor);
+    if(i<0&&altAnchor)i=items.findIndex(it=>it.link===altAnchor);
     if(i>=0)top=scrollToCard(i);
     resumePending=false;                        // l'utilisateur a pris la main
   }else if(resumePending&&items.length){
@@ -2305,7 +2417,7 @@ function snapshotFeed(){
   if(!feedEl.children.length)return;               // rien à mémoriser
   feedSnap[feedKey()]={
     html:feedEl.innerHTML,scrollTop:feedEl.scrollTop,
-    items:items.slice(),reg:new Map(cardReg),seq:cardSeq
+    items:items.slice(),reg:new Map(cardReg),seq:cardSeq,mix:mixScore
   };
 }
 function restoreFeed(){
@@ -2319,10 +2431,62 @@ function restoreFeed(){
   demobadge(false);hideStates();feedKeyShown=feedKey();
   document.getElementById("hint").classList.toggle("hidden",items.length===0);
   setScrollTopInstant(feedEl,s.scrollTop);          // restaure la position exacte, sans animation
+  // La dose a changé depuis l'instantané : le HTML mémorisé ne correspond plus
+  // au fil recomposé. render() réconcilie par lien et garde la position — deux
+  // mélanges peuvent avoir la même LONGUEUR sans avoir le même ordre, d'où la
+  // comparaison de la dose plutôt que du nombre de cartes.
+  if(s.mix!==mixScore)render();
   observeBackgrounds();updateRail();
   onCardChange();                                   // recalage du suivi de carte
   return true;
 }
+
+/* ---------- Dose d'apprentissage : appliquer un changement ----------
+   Changer de dose ne recharge RIEN : les deux réserves sont déjà là, seul leur
+   entrelacement change. Le fil est donc recomposé et rendu sur place, en
+   gardant l'utilisateur où il en était. */
+/* La carte lue peut ne plus faire partie du fil (elle est d'une nature que la
+   nouvelle dose écarte) : on vise alors la première carte SUIVANTE qui y reste
+   — même endroit du fil, à une carte près. Sans ça, retirer Wikipédia depuis un
+   article Wikipédia renvoyait tout en haut. */
+function survivingLink(m){
+  for(let i=Math.max(0,currentIndex());i<items.length;i++){
+    const it=items[i];
+    if(it.kind==="learn"?m.learn:m.news)return it.link||"";
+  }
+  return "";
+}
+/* Ce que la dose change dans l'interface : le bouton 🎓, et les deux barres de
+   puces — filtrer une moitié absente du fil n'aurait aucun sens. */
+function renderMixUI(){updateLearnToggle();renderCats();renderSrcs();}
+function applyMix(){
+  const m=mixLevel();
+  const alt=survivingLink(m);
+  remix();render(false,alt);renderMixUI();
+  // Une moitié réclamée mais jamais chargée (dose montée depuis « actus
+  // seules », par exemple) : loadFeeds va la chercher, et ne touche pas à
+  // l'autre — elle est déjà à l'écran, donc fraîche à ses propres yeux.
+  if((m.learn&&!learnItems.length)||(m.news&&!newsItems.length))loadFeeds();
+}
+function setMixScore(n){
+  if(clampMix(n)===mixScore)return;
+  persistMix(n);applyMix();
+}
+/* Bouton 🎓 de la barre du haut : le raccourci vers « actus seules » et le
+   retour. Un interrupteur plutôt qu'une case à cocher — il agit tout de suite
+   sur le fil, et son état se lit d'un coup d'œil (allumé = Wikipédia dans le
+   fil). La dose précise, elle, reste dans les réglages : ce bouton ne fait que
+   l'éteindre et la rallumer, sans jamais l'oublier. */
+const learnBtn=document.getElementById("learnToggle");
+function updateLearnToggle(){
+  const on=!!mixLevel().learn;
+  learnBtn.classList.toggle("on",on);
+  learnBtn.setAttribute("aria-pressed",String(on));
+  const t=on?"Wikipédia dans le fil ("+mixLevel().label.toLowerCase()+") — appuie pour n'avoir que les actus"
+            :"Actus seules — appuie pour remettre les articles Wikipédia";
+  learnBtn.title=t;learnBtn.setAttribute("aria-label",t);
+}
+learnBtn.onclick=()=>setMixScore(mixLevel().learn?0:mixBack);
 
 /* ---------- Barre de filtres : thèmes Wikipédia ---------- */
 const catsEl=document.getElementById("cats");
@@ -2335,8 +2499,10 @@ function renderCats(){
   const chips=[{k:"all",label:"🎓 Tous"}];
   interests.forEach(k=>{const c=CATEGORIES.find(x=>x.key===k);if(c)chips.push({k,label:c.label});});
   // Une seule puce à proposer : la barre ne filtre rien, elle ne fait que
-  // prendre une ligne. Même règle que pour les sources.
-  catsEl.style.display=chips.length>1?"":"none";
+  // prendre une ligne. Même règle que pour les sources. Et rien à filtrer non
+  // plus quand la dose a retiré Wikipédia du fil — la barre qui disparaît est
+  // d'ailleurs le signal le plus clair que le bouton 🎓 a bien agi.
+  catsEl.style.display=(chips.length>1&&mixLevel().learn)?"":"none";
   catsEl.innerHTML=chips.map(c=>`<button data-k="${c.k}" class="${c.k===cat?"active":""}">${c.label}</button>`).join("");
   catsEl.querySelectorAll("button").forEach(b=>{b.onclick=()=>setCat(b.dataset.k);});
 }
@@ -2370,8 +2536,9 @@ function renderSrcs(){
   sanitizeNewsSrc();
   const actifs=feeds.filter(f=>f.on);
   // Avec une seule source, filtrer n'a aucun sens : la barre ne proposerait que
-  // « Toutes » et cette source, deux puces pour le même fil.
-  el.style.display=actifs.length>1?"":"none";
+  // « Toutes » et cette source, deux puces pour le même fil. Idem quand la dose
+  // « Wikipédia seul » a retiré les actus.
+  el.style.display=(actifs.length>1&&mixLevel().news)?"":"none";
   const chips=[{k:"all",label:"📰 Toutes"}].concat(actifs.map(f=>({k:f.url,label:f.name})));
   el.innerHTML=chips.map(c=>
     `<button data-k="${escAttr(c.k)}" class="${c.k===newsSrc?"active":""}">${esc(c.label)}</button>`).join("");
@@ -2389,10 +2556,27 @@ function setNewsSrc(k){
 }
 
 /* ---------- Panneau unique : intérêts + sources + lecture ---------- */
-let pendingInt=new Set();
+let pendingInt=new Set(),pendingMix=mixScore;
+/* Aperçu de la dose : les douze premières cartes du fil qu'elle donnerait,
+   calculées avec la MÊME fonction que le fil réel — une imitation dessinée à
+   la main finirait par mentir. */
+const mixPattern=m=>mixLists(Array(12).fill("n"),Array(12).fill("w"),m).slice(0,12);
+function renderMix(){
+  const m=MIX_LEVELS[pendingMix],range=document.getElementById("mixRange");
+  range.max=String(MIX_LEVELS.length-1);   // reste d'accord avec la table
+  range.value=String(pendingMix);
+  document.getElementById("mixName").textContent=m.label;
+  document.getElementById("mixDesc").textContent=m.desc;
+  document.getElementById("mixViz").innerHTML=
+    mixPattern(m).map(c=>`<span class="${c==="w"?"w":""}"></span>`).join("");
+}
+document.getElementById("mixRange").addEventListener("input",e=>{
+  pendingMix=clampMix(parseInt(e.target.value,10));
+  renderMix();          // le nom, la phrase et l'aperçu suivent le doigt
+});
 function openSettings(){
-  pendingInt=new Set(interests);
-  renderIntGrid();renderList();renderSuggest();renderReadPref();
+  pendingInt=new Set(interests);pendingMix=mixScore;
+  renderMix();renderIntGrid();renderList();renderSuggest();renderReadPref();
   const premier=!interestsChosen();
   document.getElementById("introWelcome").classList.toggle("hidden",!premier); // intro visible seulement la 1ère fois
   // Accueil du 1er lancement : on ne demande qu'une chose à la fois. Les
@@ -2425,16 +2609,22 @@ function applySettings(){
     // mélange, seule valeur toujours valable.
     cat="all";try{localStorage.setItem(LS_CAT,cat);}catch(e){}
   }
+  const dose=pendingMix!==mixScore;
+  if(dose)persistMix(pendingMix);
   renderCats();
   // Rien n'a changé : on referme, c'est tout. Recharger ramènerait en haut du
   // fil quelqu'un qui n'a fait qu'ouvrir le panneau pour regarder.
-  if(bouge||!feedLoadStarted)loadFeeds(true);   // AVANT la fermeture : closeDialog
+  // Une dose seule ne demande AUCUN réseau : les deux réserves sont déjà là,
+  // seul leur entrelacement change (applyMix ira chercher une moitié qui
+  // manque, si elle manque).
+  if(bouge||!feedLoadStarted){renderMixUI();loadFeeds(true);}
+  else if(dose)applyMix();
   closeDialog(sheet);                           // ne relancera pas un 2e chargement
   try{window.dispatchEvent(new Event("interests-validated"));}catch(e){} // autorise la bannière d'install
 }
 sheet.onclick=e=>{if(e.target===sheet)closeDialog(sheet);};
 document.getElementById("applySettings").onclick=applySettings;
-renderCats();renderSrcs();
+renderMixUI();
 /* Premier lancement : on ouvre les réglages AVANT de charger quoi que ce soit.
    Charger un fil derrière la feuille était du réseau gaspillé, et surtout le
    contenu était remplacé sous les yeux de l'utilisateur dès qu'il validait. Le
@@ -2550,11 +2740,18 @@ function hideStates(){document.getElementById("loading").classList.add("hidden")
    mêle deux origines, il faut que les deux aient échoué pour qu'il soit vide.
    Un seul message, donc — « aucune source active » n'est plus une impasse,
    Wikipédia fournit le fil à lui seul. */
-function showEmpty(){
+function showEmpty(reason){
   document.getElementById("loading").classList.add("hidden");
-  document.getElementById("emptyTitle").textContent="Fil indisponible";
-  document.getElementById("emptyMsg").textContent=
-    "Ni tes flux ni Wikipédia n'ont répondu (hors-ligne, ou proxy indisponible). Réessaie, ou vérifie tes sources.";
+  const t=document.getElementById("emptyTitle"),m=document.getElementById("emptyMsg");
+  if(reason==="no-feeds"){
+    // N'arrive qu'à la dose « actus seules » : partout ailleurs, Wikipédia
+    // fournit le fil à lui seul.
+    t.textContent="Aucune source active";
+    m.textContent="Coche ou ajoute un flux RSS, importe tes sources (OPML / JSON), ou remets des articles Wikipédia dans le fil avec le bouton 🎓.";
+  }else{
+    t.textContent="Fil indisponible";
+    m.textContent="Ni tes flux ni Wikipédia n'ont répondu (hors-ligne, ou proxy indisponible). Réessaie, ou vérifie tes sources.";
+  }
   document.getElementById("empty").classList.remove("hidden");
 }
 function demobadge(on){document.getElementById("demobadge").classList.toggle("hidden",!on);}
