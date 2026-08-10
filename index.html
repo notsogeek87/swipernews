@@ -734,9 +734,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=83"></script>
-<script src="src/learn-core.js?v=83"></script>
-<script src="src/i18n.js?v=83"></script>
+<script src="src/lib.js?v=84"></script>
+<script src="src/learn-core.js?v=84"></script>
+<script src="src/i18n.js?v=84"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1162,7 +1162,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="83";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="84";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1572,7 +1572,7 @@ async function loadFeeds(force){
    (loadMore). On ne redemande rien tant qu'il reste des articles en réserve :
    les remplacer ferait disparaître, sous les yeux, la carte en cours de
    lecture — le tirage aléatoire ne la contient presque jamais. */
-async function loadLearnPart(my,key,force){
+async function loadLearnPart(my,key,force,retry=true){
   if(!mixLevel().learn)return;      // dose « actus seules » : Wikipédia n'est pas appelé
   if(!force&&learnItems.length)return;
   try{
@@ -1596,6 +1596,17 @@ async function loadLearnPart(my,key,force){
   }catch(e){
     if(my!==loadSeq)return;
     warn("learn load",e);
+    // Même problème que côté actus (voir loadNewsPart) : un échec (réseau,
+    // proxy public flaky) peut être transitoire, et l'autre moitié déjà
+    // affichée (`items.length>0`, actus ou Wikipédia résiduel) empêchait
+    // jusqu'ici toute nouvelle tentative — la moitié Wikipédia restait vide
+    // pour de bon après un changement de langue OU de dose. On retente une
+    // fois avant d'abandonner ; une réserve déjà présente n'est, elle, jamais
+    // effacée pour un rafraîchissement qui échoue.
+    if(retry&&!learnItems.length){
+      setTimeout(()=>{if(my===loadSeq)loadLearnPart(my,key,true,false);},1500);
+      return;
+    }
     // Repli hors-ligne : les articles de démo, mais seulement s'il n'y a rien
     // d'autre à montrer — les actus, elles, ont pu répondre.
     if(items.length)return;
