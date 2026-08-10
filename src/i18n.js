@@ -52,6 +52,8 @@
       "state.retry": "↻ Réessayer",
       "state.openSettings": "Ouvrir les réglages",
 
+      "feed.loadingMore": "Chargement de nouveaux articles…",
+
       "empty.noFeeds.title": "Aucune source active",
       "empty.noFeeds.msg":
         "Coche ou ajoute un flux RSS, importe tes sources (OPML / JSON), ou remets des articles Wikipédia dans le fil avec le bouton 🎓.",
@@ -235,6 +237,8 @@
       "state.emptyDefault.title": "No articles",
       "state.retry": "↻ Retry",
       "state.openSettings": "Open settings",
+
+      "feed.loadingMore": "Loading new articles…",
 
       "empty.noFeeds.title": "No active source",
       "empty.noFeeds.msg":

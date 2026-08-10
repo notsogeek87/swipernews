@@ -73,6 +73,12 @@
   .card{height:100dvh;width:100%;scroll-snap-align:start;scroll-snap-stop:always;
     position:relative;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;
     content-visibility:auto;contain-intrinsic-size:auto 100dvh}
+  /* Carte de fin PROVISOIRE, ajoutée par renderLoadMoreCard() tant que loadMore()
+     est en vol : sans elle, swiper au-delà de la dernière carte réelle ne menait
+     nulle part (scroll-snap sans cible suivante) jusqu'à l'arrivée silencieuse du
+     lot suivant — rien n'indiquait que le fil continuait. */
+  .card--loadmore{justify-content:center;align-items:center;gap:16px;color:var(--ash);text-align:center;padding:40px}
+  .card--loadmore p{font-size:14px}
   /* pas de filter ici : saturate() crée une couche composite par carte, pour un
      rendu qu'on obtient en ajustant le dégradé au-dessus */
   .card__bg{position:absolute;inset:0;background-size:cover;background-position:center;transform:scale(1.08)}
@@ -728,9 +734,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=81"></script>
-<script src="src/learn-core.js?v=81"></script>
-<script src="src/i18n.js?v=81"></script>
+<script src="src/lib.js?v=82"></script>
+<script src="src/learn-core.js?v=82"></script>
+<script src="src/i18n.js?v=82"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1156,7 +1162,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="81";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="82";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1611,7 +1617,7 @@ async function loadLearnPart(my,key,force){
    l'article affiché. */
 const AUTO_RELOAD_MS=30*60*1000;
 let lastNewsLoad=cacheTime(feedKey());   // repris du cache : survit à la fermeture de l'app
-async function loadNewsPart(my,key,force,cached,sameFeed){
+async function loadNewsPart(my,key,force,cached,sameFeed,retry=true){
   // Dose « Wikipédia seul » : aucun flux n'est interrogé. Le fil ne contient
   // aucune actu, aller les chercher serait du réseau pour rien.
   if(!mixLevel().news){newsSettled=true;return;}
@@ -1727,6 +1733,18 @@ async function loadNewsPart(my,key,force,cached,sameFeed){
     }
   }
   function finish(){
+    // Fil neuf (changement de langue ou de filtre) sans la moindre actu
+    // affichée : `items.length` peut être non nul rien que par la moitié
+    // Wikipédia, ce qui déclencherait sinon un simple toast — facile à
+    // manquer, et qui ne revient jamais tout seul (voir le même problème
+    // corrigé côté Wikipédia dans loadLearnPart). On retente une fois avant
+    // d'abandonner pour de bon ; le chargement reste affiché pendant l'attente
+    // — une actu DÉJÀ présente, elle, n'est jamais effacée pour un
+    // rafraîchissement en arrière-plan qui échoue.
+    if(!collected.size&&retry&&!newsItems.length){
+      setTimeout(()=>{if(my===loadSeq)loadNewsPart(my,key,true,cached,sameFeed,false);},1500);
+      return;
+    }
     syncing(false);newsSettled=true;
     if(collected.size)flushRender();   // état final exact, sans attendre la fenêtre
     if(!collected.size){
@@ -2099,6 +2117,29 @@ function render(forceTop,altAnchor){
   // Le hint ne doit pas resurgir en pleine lecture à chaque rendu progressif.
   document.getElementById("hint").classList.toggle("hidden",items.length===0||feedEl.scrollTop>50);
   onCardChange();                               // la 1ère carte affichée compte comme vue
+  renderLoadMoreCard();          // toujours en dernier : elle doit rester la DERNIÈRE carte
+}
+/* Carte de fin provisoire : visible tant que loadMore() est en vol, pour que
+   swiper au-delà de la dernière carte réelle mène quelque part (un écran de
+   chargement) plutôt que nulle part. Gérée HORS de la réconciliation par lien
+   de render() — id fixe, ajoutée/retirée directement — puisqu'elle ne
+   correspond à aucun article de `items`. */
+function renderLoadMoreCard(){
+  const want=loadingMore&&items.length>0;
+  let el=document.getElementById("loadMoreCard");
+  if(want){
+    if(!el){
+      el=document.createElement("div");
+      el.id="loadMoreCard";
+      el.className="card card--loadmore";
+      el.setAttribute("role","status");        // annoncé au lecteur d'écran qui l'atteint
+      el.innerHTML=`<div class="spinner"></div><p></p>`;
+    }
+    el.querySelector("p").textContent=T("feed.loadingMore");
+    feedEl.appendChild(el);    // toujours en dernière position, même si déjà présente ailleurs
+  }else if(el){
+    el.remove();
+  }
 }
 /* Allonge la réserve d'articles Wikipédia, donc le fil : c'est elle qui le rend
    infini, y compris une fois les actus épuisées. Le mélange est recomposé puis
@@ -2107,6 +2148,7 @@ function render(forceTop,altAnchor){
 async function loadMore(){
   if(loadingMore)return;
   loadingMore=true;
+  renderLoadMoreCard();          // affiche l'attente tout de suite, sans attendre la réponse
   try{
     const more=await fetchLearn(CONFIG.BATCH_SIZE);
     const have=new Set(items.map(i=>i.title));
@@ -2116,7 +2158,7 @@ async function loadMore(){
       remix();render();
     }
   }catch(e){warn("load more",e);/* on réessaiera au prochain scroll */}
-  finally{loadingMore=false;}
+  finally{loadingMore=false;renderLoadMoreCard();}
 }
 /* ---------- Icônes ----------
    UNE seule famille pour toute l'app : tracé de 2 px, extrémités rondes, boîte
