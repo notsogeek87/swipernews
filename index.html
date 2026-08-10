@@ -734,9 +734,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=84"></script>
-<script src="src/learn-core.js?v=84"></script>
-<script src="src/i18n.js?v=84"></script>
+<script src="src/lib.js?v=85"></script>
+<script src="src/learn-core.js?v=85"></script>
+<script src="src/i18n.js?v=85"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1162,7 +1162,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="84";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="85";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1567,12 +1567,19 @@ async function loadFeeds(force){
   loadNewsPart(my,key,force,cached,sameFeed);
 }
 
+/* Délais des tentatives automatiques après un premier échec (news ET learn) :
+   croissants, pour couvrir un cold start de fonction serverless (Vercel) —
+   une fonction peu sollicitée (environnement staging/alpha) peut mettre
+   plusieurs secondes à démarrer ; une seule retentative à 1,5 s tombait
+   parfois dans la même fenêtre froide et échouait pour la même raison. */
+const RETRY_DELAYS_MS=[1500,3000,5000];
+
 /* ---------- Moitié Wikipédia ----------
    Un seul lot au chargement ; le fil s'allonge ensuite tout seul au scroll
    (loadMore). On ne redemande rien tant qu'il reste des articles en réserve :
    les remplacer ferait disparaître, sous les yeux, la carte en cours de
    lecture — le tirage aléatoire ne la contient presque jamais. */
-async function loadLearnPart(my,key,force,retry=true){
+async function loadLearnPart(my,key,force,attempt=0){
   if(!mixLevel().learn)return;      // dose « actus seules » : Wikipédia n'est pas appelé
   if(!force&&learnItems.length)return;
   try{
@@ -1597,19 +1604,23 @@ async function loadLearnPart(my,key,force,retry=true){
     if(my!==loadSeq)return;
     warn("learn load",e);
     // Même problème que côté actus (voir loadNewsPart) : un échec (réseau,
-    // proxy public flaky) peut être transitoire, et l'autre moitié déjà
-    // affichée (`items.length>0`, actus ou Wikipédia résiduel) empêchait
-    // jusqu'ici toute nouvelle tentative — la moitié Wikipédia restait vide
-    // pour de bon après un changement de langue OU de dose. On retente une
-    // fois avant d'abandonner ; une réserve déjà présente n'est, elle, jamais
-    // effacée pour un rafraîchissement qui échoue.
-    if(retry&&!learnItems.length){
-      setTimeout(()=>{if(my===loadSeq)loadLearnPart(my,key,true,false);},1500);
+    // proxy public flaky, cold start serverless) peut être transitoire, et
+    // l'autre moitié déjà affichée (`items.length>0`, actus ou Wikipédia
+    // résiduel) empêchait jusqu'ici toute nouvelle tentative — la moitié
+    // Wikipédia restait vide pour de bon après un changement de langue OU de
+    // dose. Plusieurs tentatives, délais croissants, avant d'abandonner ; une
+    // réserve déjà présente n'est, elle, jamais effacée pour un
+    // rafraîchissement qui échoue.
+    if(attempt<RETRY_DELAYS_MS.length&&!learnItems.length){
+      setTimeout(()=>{if(my===loadSeq)loadLearnPart(my,key,true,attempt+1);},RETRY_DELAYS_MS[attempt]);
       return;
     }
     // Repli hors-ligne : les articles de démo, mais seulement s'il n'y a rien
     // d'autre à montrer — les actus, elles, ont pu répondre.
-    if(items.length)return;
+    if(items.length){
+      toast(T("toast.network.stale"));   // même signal que côté actus : voir loadNewsPart
+      return;
+    }
     learnItems=DEMO_LEARN.map(markKind("learn"));
     remix();demobadge(true);render();hideStates();feedKeyShown=key;
   }
@@ -1628,7 +1639,7 @@ async function loadLearnPart(my,key,force,retry=true){
    l'article affiché. */
 const AUTO_RELOAD_MS=30*60*1000;
 let lastNewsLoad=cacheTime(feedKey());   // repris du cache : survit à la fermeture de l'app
-async function loadNewsPart(my,key,force,cached,sameFeed,retry=true){
+async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
   // Dose « Wikipédia seul » : aucun flux n'est interrogé. Le fil ne contient
   // aucune actu, aller les chercher serait du réseau pour rien.
   if(!mixLevel().news){newsSettled=true;return;}
@@ -1755,12 +1766,14 @@ async function loadNewsPart(my,key,force,cached,sameFeed,retry=true){
     // affichée : `items.length` peut être non nul rien que par la moitié
     // Wikipédia, ce qui déclencherait sinon un simple toast — facile à
     // manquer, et qui ne revient jamais tout seul (voir le même problème
-    // corrigé côté Wikipédia dans loadLearnPart). On retente une fois avant
-    // d'abandonner pour de bon ; le chargement reste affiché pendant l'attente
-    // — une actu DÉJÀ présente, elle, n'est jamais effacée pour un
-    // rafraîchissement en arrière-plan qui échoue.
-    if(!collected.size&&retry&&!newsItems.length){
-      setTimeout(()=>{if(my===loadSeq)loadNewsPart(my,key,true,cached,sameFeed,false);},1500);
+    // corrigé côté Wikipédia dans loadLearnPart). Plusieurs tentatives, délais
+    // croissants (voir RETRY_DELAYS_MS — un cold start de fonction serverless
+    // peut dépasser une seule retentative rapprochée), avant d'abandonner pour
+    // de bon ; le chargement reste affiché pendant l'attente — une actu DÉJÀ
+    // présente, elle, n'est jamais effacée pour un rafraîchissement en
+    // arrière-plan qui échoue.
+    if(!collected.size&&attempt<RETRY_DELAYS_MS.length&&!newsItems.length){
+      setTimeout(()=>{if(my===loadSeq)loadNewsPart(my,key,true,cached,sameFeed,attempt+1);},RETRY_DELAYS_MS[attempt]);
       return;
     }
     syncing(false);newsSettled=true;
