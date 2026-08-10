@@ -340,8 +340,10 @@ genre de script dérape.
   son côté (`loadLearnPart`, `loadNewsPart`), `remix()` recompose, `render()`
   réconcilie par lien — donc glisser un article entre deux cartes n'en recrée
   aucune.
-- `MIX_LEVELS` / `mixScore` / `applyMix()` — la dose d'apprentissage (curseur des
-  réglages + bouton boussole de la barre). Elle ne déclenche AUCUN réseau : seule
+- `MIX_LEVELS` / `mixScore` / `applyMix()` — la dose d'apprentissage. Le curseur
+  vit dans DEUX `[data-mixmount]` (feuille de la boussole, panneau de réglages),
+  un seul `renderMix()` les remplit ; il s'applique au `change`, jamais à
+  l'`input` (sinon le fil se reconstruirait à chaque pixel du glissement). Elle ne déclenche AUCUN réseau : seule
   l'entrelacement change. `adoptItems()` remélange donc toujours ce qu'il reprend
   (cache, instantané), sinon une dose changée entre deux sessions servirait
   l'ancien mélange ; et `feedSnap` mémorise la dose, pour re-rendre quand

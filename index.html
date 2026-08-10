@@ -201,6 +201,10 @@
     transition:transform .32s ease,opacity .32s ease}
   .top.top--away{transform:translateY(-115%);opacity:0;pointer-events:none}  /* masqué pendant le swipe */
   .topline{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  /* Rangée d'outils : filtres à gauche, boutons à droite, une seule ligne de
+     base. Les pastilles se rétrécissent (min-width:0 + ellipsis) plutôt que de
+     pousser les boutons hors de l'écran. */
+  .toprow{display:flex;align-items:center;gap:8px;min-width:0}
   .brand{font-weight:700;font-size:18px;letter-spacing:-.03em;display:flex;align-items:center;gap:8px}
   .brand__logo{display:flex;align-items:center}
   .brand__logo img{height:28px;width:28px;border-radius:var(--radius-sm);display:block;object-fit:cover}
@@ -232,7 +236,7 @@
     vertical-align:-.06em;margin-left:2px;opacity:0;
     animation:brandBlink .62s linear 680ms 3 forwards}
   @keyframes brandBlink{0%,49.9%{opacity:1}50%,100%{opacity:0}}
-  .top .actions{display:flex;gap:8px}
+  .top .actions{display:flex;gap:8px;flex:0 0 auto;margin-left:auto}
   .top .actions button{background:transparent;border:1.5px solid var(--redline);color:var(--ink);
     padding:9px 14px;border-radius:var(--radius-sm);font-family:var(--font-sans);font-weight:500;font-size:13px;
     letter-spacing:-.01em;cursor:pointer;transition:background .2s}
@@ -267,11 +271,13 @@
      au toucher, d'un coup et sans rien couper. Une rangée en moins.
      Chacune disparaît quand elle n'a rien à proposer (une seule source cochée,
      aucun centre d'intérêt) ou quand la dose a retiré sa moitié du fil. */
-  .filters{display:flex;gap:8px;min-width:0}
-  .filterbtn{flex:0 1 auto;min-width:0;display:inline-flex;align-items:center;gap:7px;
-    background:transparent;border:1px solid var(--redline);color:var(--ash);
+  .filters{display:flex;gap:8px;min-width:0;flex:0 1 auto}
+  /* Même hauteur que les boutons voisins (38 px) : la rangée se lit comme une
+     seule bande, pas comme deux familles d'objets de tailles différentes. */
+  .filterbtn{flex:0 1 auto;min-width:0;display:inline-flex;align-items:center;gap:6px;
+    min-height:38px;background:transparent;border:1px solid var(--redline);color:var(--ash);
     font-family:var(--font-sans);font-weight:500;font-size:13px;letter-spacing:-.01em;
-    padding:8px 13px;border-radius:var(--radius-sm);cursor:pointer;
+    padding:0 11px;border-radius:var(--radius-sm);cursor:pointer;
     transition:background .2s,color .2s}
   /* Un filtre est posé : même aplat « surface » que la puce active d'avant. Au
      repos (« Toutes »/« Tous ») la pastille reste fantôme — l'état par défaut
@@ -572,21 +578,27 @@
 <header class="top">
   <div class="topline">
     <div class="brand"><span class="brand__logo"><img src="logo-192.png?v=42" alt="" width="28" height="28"></span><span class="brand__text" data-text="SwiperNews">SwiperNews</span></div>
-    <!-- Les icônes sont posées par setIcons() depuis les mêmes constantes que
-         les cartes : une seule famille de tracés dans toute l'app. -->
+  </div>
+  <!-- UNE seule rangée d'outils : les deux pastilles de filtre à gauche, les
+       trois boutons à droite, tout sur la même ligne de base. Les pastilles
+       étaient auparavant sur une rangée à elles, calées à gauche pendant que
+       les boutons l'étaient à droite : deux alignements pour une même barre.
+       Les icônes sont posées par setIcons() depuis les mêmes constantes que
+       les cartes : une seule famille de tracés dans toute l'app. -->
+  <div class="toprow">
+    <!-- Deux pastilles, une par filtre : elles DISENT le filtre en cours, et
+         ouvrent la liste complète au toucher (voir renderFilters/openPicker). -->
+    <div class="filters" id="filters">
+      <button class="filterbtn" id="srcBtn" aria-haspopup="dialog"><span class="filterbtn__i" aria-hidden="true"></span><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true"></span></button>
+      <button class="filterbtn" id="catBtn" aria-haspopup="dialog"><span class="filterbtn__i" aria-hidden="true"></span><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true"></span></button>
+    </div>
     <div class="actions">
-      <!-- Interrupteur « boussole » : le raccourci « actus seules ». Son
-           libellé et son état sont posés par updateLearnToggle(). -->
-      <button id="learnToggle" class="iconbtn iconbtn--toggle" aria-pressed="true"></button>
+      <!-- Boussole : ouvre la dose d'apprentissage. Son état (plein/fantôme)
+           dit si Wikipédia est dans le fil ; voir updateDoseBtn(). -->
+      <button id="doseBtn" class="iconbtn iconbtn--toggle" aria-haspopup="dialog"></button>
       <button id="reloadBtn" class="iconbtn" title="Rafraîchir les articles" aria-label="Rafraîchir"></button>
       <button id="openSheet" class="iconbtn" title="Sources, centres d'intérêt et réglages" aria-label="Réglages"></button>
     </div>
-  </div>
-  <!-- Deux pastilles, une par filtre : elles DISENT le filtre en cours, et
-       ouvrent la liste complète au toucher (voir renderFilters/openPicker). -->
-  <div class="filters" id="filters">
-    <button class="filterbtn" id="srcBtn" aria-haspopup="dialog"><span class="filterbtn__i" aria-hidden="true"></span><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true"></span></button>
-    <button class="filterbtn" id="catBtn" aria-haspopup="dialog"><span class="filterbtn__i" aria-hidden="true"></span><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true"></span></button>
   </div>
 </header>
 
@@ -631,16 +643,9 @@
 
     <h3 class="secttl">🎚️ Dose d'apprentissage</h3>
     <p class="sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
-    <div class="mix">
-      <input class="mixrange" id="mixRange" type="range" min="0" max="5" step="1"
-             aria-label="Dose d'apprentissage" aria-describedby="mixDesc">
-      <div class="mix__ends" aria-hidden="true"><span>📰 Actus</span><span>Apprendre 🎓</span></div>
-      <b class="mix__name" id="mixName"></b>
-      <span class="mix__desc" id="mixDesc"></span>
-      <!-- Aperçu de la cadence : la suite des cartes que donnera cette dose.
-           Décoratif — la phrase au-dessus dit déjà la même chose en mots. -->
-      <div class="mix__viz" id="mixViz" aria-hidden="true"></div>
-    </div>
+    <!-- Même bloc que dans la feuille de la boussole, rempli par renderMix() :
+         un seul curseur, deux points de montage (comme les réglages du lecteur). -->
+    <div data-mixmount></div>
 
     <h3 class="secttl">🎓 Centres d'intérêt</h3>
     <p class="sub">Les thèmes des articles Wikipédia glissés entre tes actus.</p>
@@ -670,6 +675,17 @@
     <div data-readmount></div>
 
     <button class="applybtn" id="applySettings">Voir mon fil</button>
+  </div>
+</div>
+
+<!-- Dose d'apprentissage, ouverte depuis la boussole de la barre du haut. Le
+     même curseur qu'au bas des réglages : un seul état, deux points de montage. -->
+<div class="sheet" id="mixSheet" role="dialog" aria-modal="true" aria-labelledby="mixTitle">
+  <div class="sheet__panel" tabindex="-1">
+    <div class="sheet__grip"></div>
+    <h2 id="mixTitle">Dose d'apprentissage</h2>
+    <p class="sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
+    <div data-mixmount></div>
   </div>
 </div>
 
@@ -706,8 +722,8 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=78"></script>
-<script src="src/learn-core.js?v=78"></script>
+<script src="src/lib.js?v=79"></script>
+<script src="src/learn-core.js?v=79"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -863,17 +879,12 @@ const MIX_LEVELS=[
 ];
 const MIX_DEFAULT=2;                       // « Équilibré » : la cadence d'origine
 const LS_MIX="fluxswipe.mix.v1";
-const LS_MIXBACK="fluxswipe.mixback.v1";   // dose à rétablir après un passage en « actus seules »
 const clampMix=n=>(Number.isInteger(n)&&n>=0&&n<MIX_LEVELS.length)?n:MIX_DEFAULT;
 let mixScore=(()=>{try{return clampMix(parseInt(localStorage.getItem(LS_MIX),10));}catch(e){return MIX_DEFAULT;}})();
-/* Dose rétablie par le bouton 🎓 quand on quitte « actus seules ». Jamais 0,
-   sinon le bouton ne pourrait plus rien rallumer. */
-let mixBack=(()=>{try{const n=clampMix(parseInt(localStorage.getItem(LS_MIXBACK),10));return n||MIX_DEFAULT;}catch(e){return MIX_DEFAULT;}})();
 const mixLevel=()=>MIX_LEVELS[mixScore];
 function persistMix(n){
   mixScore=clampMix(n);
-  if(mixScore)mixBack=mixScore;
-  try{localStorage.setItem(LS_MIX,String(mixScore));localStorage.setItem(LS_MIXBACK,String(mixBack));}catch(e){warn("save mix",e);}
+  try{localStorage.setItem(LS_MIX,String(mixScore));}catch(e){warn("save mix",e);}
 }
 /* Entrelacement selon la dose : une seule règle, partagée par le fil et par son
    aperçu dans les réglages. interleave() pose UN élément de sa 2e liste tous
@@ -1091,7 +1102,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="78";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="79";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2526,7 +2537,7 @@ function survivingLink(m){
 }
 /* Ce que la dose change dans l'interface : le bouton 🎓, et les deux barres de
    puces — filtrer une moitié absente du fil n'aurait aucun sens. */
-function renderMixUI(){updateLearnToggle();renderFilters();}
+function renderMixUI(){updateDoseBtn();renderFilters();renderMix();}
 function applyMix(){
   const m=mixLevel();
   const alt=survivingLink(m);
@@ -2540,21 +2551,20 @@ function setMixScore(n){
   if(clampMix(n)===mixScore)return;
   persistMix(n);applyMix();
 }
-/* Bouton 🎓 de la barre du haut : le raccourci vers « actus seules » et le
-   retour. Un interrupteur plutôt qu'une case à cocher — il agit tout de suite
-   sur le fil, et son état se lit d'un coup d'œil (allumé = Wikipédia dans le
-   fil). La dose précise, elle, reste dans les réglages : ce bouton ne fait que
-   l'éteindre et la rallumer, sans jamais l'oublier. */
-const learnBtn=document.getElementById("learnToggle");
-function updateLearnToggle(){
+/* Boussole de la barre du haut : elle OUVRE la dose. C'était un interrupteur
+   tout ou rien, qui n'atteignait que les deux extrémités d'un réglage qui en
+   compte six — et il fallait passer par les réglages pour les quatre autres.
+   Le même geste donne maintenant toute l'échelle, « actus seules » compris
+   (le cran de gauche). Le bouton continue de DIRE l'état en cours : plein et
+   corail quand Wikipédia est dans le fil, fantôme quand il n'y est plus. */
+const doseBtn=document.getElementById("doseBtn");
+function updateDoseBtn(){
   const on=!!mixLevel().learn;
-  learnBtn.classList.toggle("on",on);
-  learnBtn.setAttribute("aria-pressed",String(on));
-  const t=on?"Wikipédia dans le fil ("+mixLevel().label.toLowerCase()+") — appuie pour n'avoir que les actus"
-            :"Actus seules — appuie pour remettre les articles Wikipédia";
-  learnBtn.title=t;learnBtn.setAttribute("aria-label",t);
+  doseBtn.classList.toggle("on",on);
+  const t="Dose d'apprentissage : "+mixLevel().label.toLowerCase();
+  doseBtn.title=t;doseBtn.setAttribute("aria-label",t);
 }
-learnBtn.onclick=()=>setMixScore(mixLevel().learn?0:mixBack);
+doseBtn.onclick=()=>{renderMix();openDialog(mixSheet);};
 
 /* ---------- Les deux filtres : une pastille chacun ----------
    📰 restreint la moitié « actus » à UNE source, 🎓 la moitié Wikipédia à UN
@@ -2572,7 +2582,7 @@ const srcBtn=document.getElementById("srcBtn"),catBtn=document.getElementById("c
    partagées avec les cartes. En HTML elles auraient été un deuxième exemplaire
    des mêmes tracés, à corriger deux fois. */
 function setIcons(){
-  learnBtn.innerHTML=ICON_DISCOVER;
+  doseBtn.innerHTML=ICON_DISCOVER;
   document.getElementById("reloadBtn").innerHTML=ICON_RELOAD;
   document.getElementById("openSheet").innerHTML=ICON_SETTINGS;
   srcBtn.querySelector(".filterbtn__i").innerHTML=ICON_RSS;
@@ -2613,8 +2623,8 @@ function renderFilters(){
   const m=mixLevel();
   // Une pastille ne se montre que si elle a vraiment un choix à offrir (plus
   // d'une source cochée, au moins un centre d'intérêt) ET si la moitié qu'elle
-  // filtre est dans le fil. Les deux muettes : la rangée entière disparaît —
-  // c'est d'ailleurs le signal le plus clair que le bouton 🎓 a bien agi.
+  // filtre est dans le fil : à « actus seules », la pastille des thèmes qui
+  // s'efface est le signal le plus clair que la dose a bien changé.
   const on={src:filterChips("src").length>1&&!!m.news,
             cat:filterChips("cat").length>1&&!!m.learn};
   [["src",srcBtn],["cat",catBtn]].forEach(([kind,btn])=>{
@@ -2675,26 +2685,53 @@ function setNewsSrc(k){
 }
 
 /* ---------- Panneau unique : intérêts + sources + lecture ---------- */
-let pendingInt=new Set(),pendingMix=mixScore;
+let pendingInt=new Set();
 /* Aperçu de la dose : les douze premières cartes du fil qu'elle donnerait,
    calculées avec la MÊME fonction que le fil réel — une imitation dessinée à
    la main finirait par mentir. */
 const mixPattern=m=>mixLists(Array(12).fill("n"),Array(12).fill("w"),m).slice(0,12);
-function renderMix(){
-  const m=MIX_LEVELS[pendingMix],range=document.getElementById("mixRange");
-  range.max=String(MIX_LEVELS.length-1);   // reste d'accord avec la table
-  range.value=String(pendingMix);
-  document.getElementById("mixName").textContent=m.label;
-  document.getElementById("mixDesc").textContent=m.desc;
-  document.getElementById("mixViz").innerHTML=
-    mixPattern(m).map(c=>`<span class="${c==="w"?"w":""}"></span>`).join("");
+/* Le curseur vit à DEUX endroits (la feuille de la boussole, le panneau de
+   réglages) : un seul balisage, monté dans chaque `[data-mixmount]`, et une
+   seule fonction de rendu — comme les réglages du lecteur. Des classes, pas des
+   id : ils seraient en double. */
+const MIX_HTML=`<div class="mix">
+  <input class="mixrange" type="range" min="0" step="1" aria-label="Dose d'apprentissage">
+  <div class="mix__ends" aria-hidden="true"><span>Actus</span><span>Apprendre</span></div>
+  <b class="mix__name"></b>
+  <span class="mix__desc"></span>
+  <div class="mix__viz" aria-hidden="true"></div>
+</div>`;
+/* `val` : dose PRÉVISUALISÉE pendant qu'on fait glisser le curseur ; sans
+   argument, c'est la dose en vigueur. */
+function renderMix(val){
+  const n=clampMix(val===undefined?mixScore:val),m=MIX_LEVELS[n];
+  document.querySelectorAll("[data-mixmount]").forEach(mount=>{
+    if(!mount.firstElementChild)mount.innerHTML=MIX_HTML;
+    const range=mount.querySelector(".mixrange");
+    range.max=String(MIX_LEVELS.length-1);   // reste d'accord avec la table
+    range.value=String(n);
+    mount.querySelector(".mix__name").textContent=m.label;
+    mount.querySelector(".mix__desc").textContent=m.desc;
+    mount.querySelector(".mix__viz").innerHTML=
+      mixPattern(m).map(c=>`<span class="${c==="w"?"w":""}"></span>`).join("");
+  });
 }
-document.getElementById("mixRange").addEventListener("input",e=>{
-  pendingMix=clampMix(parseInt(e.target.value,10));
-  renderMix();          // le nom, la phrase et l'aperçu suivent le doigt
+/* Délégation : les blocs sont (re)construits par renderMix, un écouteur posé
+   sur chacun serait à ré-attacher. Le nom, la phrase et l'aperçu suivent le
+   doigt (`input`) ; le fil, lui, n'est recomposé qu'au relâchement (`change`),
+   sinon on le reconstruirait à chaque pixel du glissement. */
+document.addEventListener("input",e=>{
+  if(e.target.classList.contains("mixrange"))renderMix(parseInt(e.target.value,10));
 });
+document.addEventListener("change",e=>{
+  if(!e.target.classList.contains("mixrange"))return;
+  setMixScore(parseInt(e.target.value,10));
+  renderMix();
+});
+const mixSheet=document.getElementById("mixSheet");
+mixSheet.onclick=e=>{if(e.target===mixSheet)closeDialog(mixSheet);};
 function openSettings(){
-  pendingInt=new Set(interests);pendingMix=mixScore;
+  pendingInt=new Set(interests);
   renderMix();renderIntGrid();renderList();renderSuggest();renderReadPref();
   const premier=!interestsChosen();
   document.getElementById("introWelcome").classList.toggle("hidden",!premier); // intro visible seulement la 1ère fois
@@ -2728,16 +2765,12 @@ function applySettings(){
     // mélange, seule valeur toujours valable.
     cat="all";try{localStorage.setItem(LS_CAT,cat);}catch(e){}
   }
-  const dose=pendingMix!==mixScore;
-  if(dose)persistMix(pendingMix);
   renderFilters();
   // Rien n'a changé : on referme, c'est tout. Recharger ramènerait en haut du
-  // fil quelqu'un qui n'a fait qu'ouvrir le panneau pour regarder.
-  // Une dose seule ne demande AUCUN réseau : les deux réserves sont déjà là,
-  // seul leur entrelacement change (applyMix ira chercher une moitié qui
-  // manque, si elle manque).
-  if(bouge||!feedLoadStarted){renderMixUI();loadFeeds(true);}
-  else if(dose)applyMix();
+  // fil quelqu'un qui n'a fait qu'ouvrir le panneau pour regarder. La dose,
+  // elle, s'est déjà appliquée toute seule au relâchement du curseur (aucun
+  // réseau : seul l'entrelacement change).
+  if(bouge||!feedLoadStarted)loadFeeds(true);
   closeDialog(sheet);                           // ne relancera pas un 2e chargement
   try{window.dispatchEvent(new Event("interests-validated"));}catch(e){} // autorise la bannière d'install
 }

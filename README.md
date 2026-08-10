@@ -69,8 +69,7 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
 - **Dose d'apprentissage** : un curseur, dans les réglages, décide de la
   proportion des deux — de *Actus seules* à *Wikipédia seul*, en passant par
   *Équilibré* (défaut, un article toutes les trois actus). Le bouton **boussole**
-  de la barre du haut est le raccourci vers *Actus seules* et le retour, sans
-  oublier la dose choisie.
+  de la barre du haut ouvre ce même curseur en un tap.
 - **Un seul panneau de réglages** (⚙) : dose, centres d'intérêt, sources RSS et
   réglages du lecteur au même endroit, validés d'un seul bouton. Rouvert puis validé
   sans rien changer, il ne recharge rien — la position de lecture tient.
@@ -88,10 +87,14 @@ défilaient horizontalement, si bien qu'avec cinq sources et six thèmes, **troi
 de chacun** seulement tenaient à l'écran — le filtre actif pouvait être hors
 champ, hors de portée du regard comme de la main.
 
-Les deux barres sont devenues **deux pastilles** sur une seule rangée
-(*Toutes ▾* / *Tous ▾*, 108 px au total, 14 %). Chacune affiche le filtre
-en cours et s'allume quand il n'est plus « tout » ; un tap ouvre une feuille où
-la liste complète tient d'un coup, sans rien couper. Une pastille disparaît
+Les deux barres sont devenues **deux pastilles** (*Toutes ▾* / *Tous ▾*), posées
+sur la **même rangée que les trois boutons** et à la même hauteur qu'eux : la
+barre tombe à 103 px (13 %), et surtout elle n'a plus qu'une seule ligne
+d'outils, là où les pastilles étaient calées à gauche pendant que les boutons
+l'étaient à droite, sur deux rangées. La marque garde la ligne du dessus.
+Chaque pastille affiche le filtre en cours et s'allume quand il n'est plus
+« tout » ; un tap ouvre une feuille où la liste complète tient d'un coup, sans
+rien couper. Une pastille disparaît
 quand elle n'a pas de choix à offrir (une seule source cochée, aucun centre
 d'intérêt) ou quand la dose a retiré sa moitié du fil — les deux muettes, la
 rangée entière s'efface.
@@ -139,17 +142,22 @@ Un curseur plutôt que six boutons : le réglage est un continuum entre deux
 extrémités nommées, et le geste de glisser le dit mieux qu'une rangée
 d'étiquettes. Sous le curseur, un **aperçu de la cadence** (une barre par carte,
 les articles Wikipédia en corail) montre le rythme obtenu — il est calculé avec
-la même fonction que le fil réel, pas dessiné à la main.
+la même fonction que le fil réel, pas dessiné à la main. L'aperçu suit le doigt
+pendant le glissement ; le fil, lui, n'est recomposé qu'au **relâchement**,
+sinon il serait reconstruit à chaque pixel.
 
 Les deux extrémités remplacent les anciens onglets : *Actus seules* est l'ancien
 mode Actus, *Wikipédia seul* l'ancien mode Apprendre. Chacune coupe vraiment
 l'autre moitié — pas seulement à l'affichage, mais aussi côté réseau.
 
-Le bouton **boussole** de la barre du haut est le raccourci quotidien : il
-éteint et rallume les articles Wikipédia sans ouvrir les réglages, en retenant
-la dose choisie. Allumé, il est plein et son tracé passe au corail ; éteint, il
-redevient fantôme et la pastille des centres d'intérêt disparaît (elle ne
-filtrerait plus rien) — c'est le signal le plus clair que le geste a porté. Changer de dose
+Le bouton **boussole** de la barre du haut ouvre ce curseur en un tap, sans
+passer par les réglages — c'était auparavant un interrupteur tout ou rien, qui
+n'atteignait que les deux extrémités d'une échelle qui en compte six. Le même
+curseur vit donc à deux endroits (`[data-mixmount]`, comme les réglages du
+lecteur) : un seul état, une seule fonction de rendu. Le bouton continue de
+**dire** l'état : plein, tracé corail, quand Wikipédia est dans le fil ;
+fantôme au cran *Actus seules*, où la pastille des centres d'intérêt disparaît
+aussi (elle ne filtrerait plus rien) — c'est le signal le plus clair que le geste a porté. Changer de dose
 **ne recharge rien** : les deux réserves sont déjà en mémoire, seul leur
 entrelacement change, et l'utilisateur reste sur sa carte (ou sur la première
 qui lui survit, quand la dose écarte celle qu'il lisait).
