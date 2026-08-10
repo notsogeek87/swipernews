@@ -568,10 +568,10 @@
 
 <div class="orientlock" role="alert">
   <span class="orientlock__ic" aria-hidden="true">📱</span>
-  <p><b>SwiperNews est fait pour le portrait.</b><br>Remets ton téléphone à la verticale pour swiper.</p>
+  <p><b data-i18n="orient.title">SwiperNews est fait pour le portrait.</b><br><span data-i18n="orient.body">Remets ton téléphone à la verticale pour swiper.</span></p>
 </div>
 
-<h1 class="visually-hidden">SwiperNews — apprendre et suivre l'actualité en swipe</h1>
+<h1 class="visually-hidden" data-i18n="app.h1">SwiperNews — apprendre et suivre l'actualité en swipe</h1>
 
 <div class="syncbar" id="syncbar" aria-hidden="true"></div>
 
@@ -596,37 +596,37 @@
       <!-- Boussole : ouvre la dose d'apprentissage. Son état (plein/fantôme)
            dit si Wikipédia est dans le fil ; voir updateDoseBtn(). -->
       <button id="doseBtn" class="iconbtn iconbtn--toggle" aria-haspopup="dialog"></button>
-      <button id="reloadBtn" class="iconbtn" title="Rafraîchir les articles" aria-label="Rafraîchir"></button>
-      <button id="openSheet" class="iconbtn" title="Sources, centres d'intérêt et réglages" aria-label="Réglages"></button>
+      <button id="reloadBtn" class="iconbtn" data-i18n-attr="title:top.reload.title,aria-label:top.reload.aria"></button>
+      <button id="openSheet" class="iconbtn" data-i18n-attr="title:top.settings.title,aria-label:top.settings.aria"></button>
     </div>
   </div>
 </header>
 
-<div class="demobadge hidden" id="demobadge" role="status">Wikipédia injoignable — articles de démo</div>
+<div class="demobadge hidden" id="demobadge" role="status" data-i18n="demobadge.text">Wikipédia injoignable — articles de démo</div>
 
-<div id="feed" aria-label="Fil d'articles"></div>
+<div id="feed" data-i18n-attr="aria-label:top.feed.aria"></div>
 
 <!-- Rail unique, partagé par toutes les cartes (agit sur la carte visible) -->
 <div class="rail hidden" id="rail">
-  <button id="shareBtn" aria-label="Partager cet article" title="Partager"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
+  <button id="shareBtn" data-i18n-attr="aria-label:rail.share.aria,title:rail.share.title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
 </div>
 
-<div class="hint" id="hint"><span class="arrow">⌃</span><span>Swipe</span></div>
+<div class="hint" id="hint"><span class="arrow">⌃</span><span data-i18n="hint.swipe">Swipe</span></div>
 <!-- Invitation à retrouver la barre du haut. Décoratif (aria-hidden) : le geste
      est « appuyer n'importe où », déjà accessible sans lui. -->
 <div class="peek" id="peek" aria-hidden="true">⌄</div>
 
 <div class="state hidden" id="loading" role="status">
   <div class="spinner"></div>
-  <p id="loadingMsg">Chargement de ton fil…</p>
+  <p id="loadingMsg" data-i18n="state.loading">Chargement de ton fil…</p>
 </div>
 
 <div class="state hidden" id="empty" role="status">
-  <h3 id="emptyTitle">Aucun article</h3>
+  <h3 id="emptyTitle" data-i18n="state.emptyDefault.title">Aucun article</h3>
   <p id="emptyMsg"></p>
   <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:340px">
-    <button class="iobtn" id="emptyRetry">↻ Réessayer</button>
-    <button class="iobtn" id="emptyOpen">Ouvrir les réglages</button>
+    <button class="iobtn" id="emptyRetry" data-i18n="state.retry">↻ Réessayer</button>
+    <button class="iobtn" id="emptyOpen" data-i18n="state.openSettings">Ouvrir les réglages</button>
   </div>
 </div>
 
@@ -634,37 +634,41 @@
      feuilles d'avant (Sources d'un côté, Centres d'intérêt de l'autre) étaient
      le reflet des deux modes ; sans modes, elles n'avaient plus de raison
      d'être séparées — et rien n'indiquait plus où trouver laquelle. -->
-<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Réglages de ton fil">
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" data-i18n-attr="aria-label:sheet.aria">
   <div class="sheet__panel" tabindex="-1">
     <div class="sheet__grip"></div>
-    <p class="intro hidden" id="introWelcome">✨ Le swipe qui rend plus malin. Un seul fil : tes actus, et entre elles des articles Wikipédia qui t'apprennent un truc que tu ne connaissais pas. Choisis ce qui allume ta curiosité 👇</p>
-    <h2>Ton fil</h2>
-    <p class="sub">Tes actus et des articles Wikipédia, en alternance dans un seul fil.</p>
+    <p class="intro hidden" id="introWelcome" data-i18n="sheet.intro">✨ Le swipe qui rend plus malin. Un seul fil : tes actus, et entre elles des articles Wikipédia qui t'apprennent un truc que tu ne connaissais pas. Choisis ce qui allume ta curiosité 👇</p>
+    <h2 data-i18n="sheet.title">Ton fil</h2>
+    <p class="sub" data-i18n="sheet.subtitle">Tes actus et des articles Wikipédia, en alternance dans un seul fil.</p>
 
-    <h3 class="secttl">🎚️ Dose d'apprentissage</h3>
-    <p class="sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
+    <!-- Langue de l'app (et de Wikipédia, voir renderLangPref) : un seul point
+         de montage, sur le même modèle que la dose et les réglages du lecteur. -->
+    <div data-langmount></div>
+
+    <h3 class="secttl" data-i18n="sheet.mix.title">🎚️ Dose d'apprentissage</h3>
+    <p class="sub" data-i18n="dose.sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
     <!-- Même bloc que dans la feuille de la boussole, rempli par renderMix() :
          un seul curseur, deux points de montage (comme les réglages du lecteur). -->
     <div data-mixmount></div>
 
-    <h3 class="secttl">🎓 Centres d'intérêt</h3>
-    <p class="sub">Les thèmes des articles Wikipédia glissés entre tes actus.</p>
+    <h3 class="secttl" data-i18n="sheet.interests.title">🎓 Centres d'intérêt</h3>
+    <p class="sub" data-i18n="sheet.interests.sub">Les thèmes des articles Wikipédia glissés entre tes actus.</p>
     <div class="intgrid" id="intGrid"></div>
 
-    <h3 class="secttl">📰 Sources d'actualité</h3>
-    <p class="sub">Coche les flux à afficher, ajoute ceux que tu veux.</p>
+    <h3 class="secttl" data-i18n="sheet.sources.title">📰 Sources d'actualité</h3>
+    <p class="sub" data-i18n="sheet.sources.sub">Coche les flux à afficher, ajoute ceux que tu veux.</p>
     <div id="feedList"></div>
     <div class="addbox">
-      <input id="newUrl" type="url" placeholder="https://exemple.com/rss" inputmode="url">
-      <button id="addFeedBtn">Ajouter</button>
+      <input id="newUrl" type="url" data-i18n-attr="placeholder:sheet.sources.placeholder" placeholder="https://exemple.com/rss" inputmode="url">
+      <button id="addFeedBtn" data-i18n="sheet.sources.add">Ajouter</button>
     </div>
 
     <div id="suggestBox"></div>
 
     <div class="iorow">
-      <button class="iobtn" id="exportOpml">↓ Exporter (OPML)</button>
-      <button class="iobtn" id="exportJson">↓ Exporter (JSON)</button>
-      <button class="iobtn" id="importBtn">↑ Importer un fichier</button>
+      <button class="iobtn" id="exportOpml" data-i18n="sheet.sources.exportOpml">↓ Exporter (OPML)</button>
+      <button class="iobtn" id="exportJson" data-i18n="sheet.sources.exportJson">↓ Exporter (JSON)</button>
+      <button class="iobtn" id="importBtn" data-i18n="sheet.sources.importFile">↑ Importer un fichier</button>
     </div>
     <input id="importFile" type="file" accept=".opml,.xml,.json,application/json,text/xml" style="display:none">
 
@@ -674,7 +678,7 @@
          chose à la fois. -->
     <div data-readmount></div>
 
-    <button class="applybtn" id="applySettings">Voir mon fil</button>
+    <button class="applybtn" id="applySettings" data-i18n="sheet.apply">Voir mon fil</button>
   </div>
 </div>
 
@@ -683,8 +687,8 @@
 <div class="sheet" id="mixSheet" role="dialog" aria-modal="true" aria-labelledby="mixTitle">
   <div class="sheet__panel" tabindex="-1">
     <div class="sheet__grip"></div>
-    <h2 id="mixTitle">Dose d'apprentissage</h2>
-    <p class="sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
+    <h2 id="mixTitle" data-i18n="dose.title">Dose d'apprentissage</h2>
+    <p class="sub" data-i18n="dose.sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
     <div data-mixmount></div>
   </div>
 </div>
@@ -704,11 +708,13 @@
 <div class="installbar hidden" id="installBar">
   <div class="installbar__icon">◆</div>
   <div class="installbar__txt">
-    <b>Installe SwiperNews</b>
+    <b data-i18n="installbar.title">Installe SwiperNews</b>
+    <!-- Rempli par maybeShowBar() avant chaque affichage (deux variantes,
+         prompt natif ou étapes iOS) : le contenu statique ne sert jamais. -->
     <span class="installbar__sub">Plein écran, hors-ligne, lancement en un tap.</span>
   </div>
   <button class="installbar__btn" id="installBarBtn">Installer</button>
-  <button class="installbar__close" id="installBarClose" aria-label="Fermer">✕</button>
+  <button class="installbar__close" id="installBarClose" data-i18n-attr="aria-label:installbar.close.aria">✕</button>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -722,8 +728,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=79"></script>
-<script src="src/learn-core.js?v=79"></script>
+<script src="src/lib.js?v=80"></script>
+<script src="src/learn-core.js?v=80"></script>
+<script src="src/i18n.js?v=80"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -732,7 +739,8 @@
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
   const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds","interleave"],
-              SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket"]};
+              SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket"],
+              SwiperI18n:["LANGS","t"]};
   const missing=[];
   for(const ns in need){
     const mod=self[ns];
@@ -812,6 +820,47 @@ const {stripHtml,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSiz
   seenKey,dropSeen,interleave,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
+/* ---------- Langue de l'interface ----------
+   Une seule couche pour deux choses : les textes de l'app (src/i18n.js,
+   T()) ET la langue interrogée sur Wikipédia (voir srcWikipedia et
+   fetchLearn plus bas) — l'utilisateur ne règle qu'une fois. Le français est
+   la langue COMPLÈTE (source de vérité, voir CLAUDE.md) ; les autres langues
+   sont des couches par-dessus, T() y retombe sur le français si une clé
+   manque plutôt que de laisser un vide. */
+const I18N=self.SwiperI18n;
+const LANGS=I18N.LANGS;
+const LS_LANG="fluxswipe.lang.v1";
+function browserLang(){
+  try{const nav=(navigator.language||"fr").slice(0,2).toLowerCase();return LANGS.includes(nav)?nav:"fr";}
+  catch(e){return "fr";}
+}
+let LANG=(()=>{try{const v=localStorage.getItem(LS_LANG);return LANGS.includes(v)?v:browserLang();}catch(e){return browserLang();}})();
+function T(key,vars){return I18N.t(LANG,key,vars);}
+/* Libellé (emoji + nom) d'un centre d'intérêt : le français lit CATEGORIES
+   directement (source de vérité, voir src/learn-core.js), les autres langues
+   passent par le dictionnaire ("cat.<clé>"), avec repli sur le français si la
+   traduction manque encore pour cette clé. */
+function catLabelT(key){
+  return LANG==="fr"?LEARN.catLabel(key):(T("cat."+key)||LEARN.catLabel(key));
+}
+/* Traduit le HTML STATIQUE (balisage déjà dans la page, pas régénéré par un
+   render*()) : `data-i18n="clé"` pose le texte, `data-i18n-attr="attr:clé,…"`
+   pose un ou plusieurs attributs. Le contenu généré en JS (toasts, panneaux
+   reconstruits) passe par T() directement à sa propre fabrication — il n'a
+   pas besoin de ce balisage. */
+function applyI18n(){
+  document.title=T("meta.title");
+  document.querySelectorAll("[data-i18n]").forEach(el=>{el.textContent=T(el.dataset.i18n);});
+  document.querySelectorAll("[data-i18n-attr]").forEach(el=>{
+    el.dataset.i18nAttr.split(",").forEach(pair=>{
+      const i=pair.indexOf(":"),attr=pair.slice(0,i),key=pair.slice(i+1);
+      el.setAttribute(attr,T(key));
+    });
+  });
+}
+document.documentElement.lang=LANG;
+applyI18n();
+
 /* ---------- Articles Wikipédia de démo (repli hors-ligne) ---------- */
 const DEMO_LEARN = [
   {source:"Wikipédia", title:"Effet tunnel", desc:"En mécanique quantique, l'effet tunnel désigne la capacité d'une particule à franchir une barrière de potentiel qu'elle ne pourrait pas surmonter selon les lois de la physique classique. Ce comportement découle de la nature ondulatoire de la matière : la fonction d'onde de la particule ne s'annule pas brutalement à la barrière, mais décroît, laissant une probabilité non nulle de la retrouver de l'autre côté. Le phénomène est essentiel à la fusion nucléaire au cœur du Soleil, où il permet aux protons de se rapprocher malgré leur répulsion. Il est aussi exploité par le microscope à effet tunnel, capable d'imager des surfaces atome par atome, et par certains composants électroniques comme la diode tunnel.", date:"", img:"https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=70", link:"https://fr.wikipedia.org/wiki/Effet_tunnel"},
@@ -870,13 +919,18 @@ const markKind=k=>it=>(it.kind===k?it:{...it,kind:k});
    Inutile d'y répéter « Wikipédia » : le titre de la section et les deux
    extrémités du curseur le disent déjà. */
 const MIX_LEVELS=[
-  {news:1,learn:0,label:"Actus seules",   desc:"Que tes flux, sans rien d'autre."},
-  {news:6,learn:1,label:"Une pincée",     desc:"Un article toutes les six actus."},
-  {news:3,learn:1,label:"Équilibré",      desc:"Un article toutes les trois actus."},
-  {news:1,learn:1,label:"Moitié-moitié",  desc:"Une actu, un article, une actu…"},
-  {news:1,learn:3,label:"Surtout apprendre",desc:"Trois articles pour une actu."},
-  {news:0,learn:1,label:"Wikipédia seul", desc:"Que des articles, sans tes flux."},
+  {news:1,learn:0},
+  {news:6,learn:1},
+  {news:3,learn:1},
+  {news:1,learn:1},
+  {news:1,learn:3},
+  {news:0,learn:1},
 ];
+/* Libellé/phrase d'un cran : dans src/i18n.js ("mix.level.<n>.label/desc"),
+   pas dans MIX_LEVELS — sinon le texte français y serait dupliqué avec le
+   dictionnaire, et les deux finiraient par diverger. */
+const mixLabel=n=>T("mix.level."+n+".label");
+const mixDesc=n=>T("mix.level."+n+".desc");
 const MIX_DEFAULT=2;                       // « Équilibré » : la cadence d'origine
 const LS_MIX="fluxswipe.mix.v1";
 const clampMix=n=>(Number.isInteger(n)&&n>=0&&n<MIX_LEVELS.length)?n:MIX_DEFAULT;
@@ -1102,7 +1156,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="79";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="80";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1172,13 +1226,15 @@ let adsPref=(()=>{try{return localStorage.getItem(LS_ADS)==="block"?"block":"all
    jamais dans le paquet, seulement dans le cache de l'appareil. */
 const LS_BL="fluxswipe.blocklist.v1";
 const BL_REFRESH=7*24*3600*1000;   // une mise à jour par semaine suffit
+/* `sub` porte la CLÉ i18n (bl.source.<clé>.sub), pas le texte : voir
+   blocklistHTML(), qui passe par T(). */
 const BL_SOURCES=[
   {name:"EasyList",
-   sub:"La référence d'uBlock Origin — ~52 000 domaines publicitaires",
+   sub:"bl.source.easylist.sub",
    credit:"EasyList (easylist.to), GPL-3 / CC BY-SA 3.0",
    url:"https://raw.githubusercontent.com/easylist/easylist/master/easylist/easylist_adservers.txt"},
   {name:"StevenBlack",
-   sub:"Fichier hosts unifié — ~106 000 entrées, pub et traceurs",
+   sub:"bl.source.stevenblack.sub",
    credit:"StevenBlack/hosts, MIT",
    url:"https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"},
 ];
@@ -1193,7 +1249,7 @@ function iabPlugin(){
 async function syncBlocklist(url,silent){
   const p=iabPlugin();
   if(!p||!p.syncBlocklist)return;
-  if(!silent)toast("Téléchargement de la liste…");
+  if(!silent)toast(T("toast.bl.downloading"));
   try{
     const r=await p.syncBlocklist({url});
     saveBl({url,at:Date.now(),count:(r&&r.count)||0});
@@ -1202,7 +1258,7 @@ async function syncBlocklist(url,silent){
     renderReadPref();
   }catch(e){
     // La liste précédente reste en service : un échec ne dégrade rien.
-    if(!silent)toast("Liste indisponible — "+((e&&e.message)||"réessaie plus tard"));
+    if(!silent)toast(T("toast.bl.unavailablePrefix")+((e&&e.message)||T("toast.bl.retryLater")));
   }
 }
 async function dropBlocklist(){
@@ -1211,7 +1267,7 @@ async function dropBlocklist(){
   blState={};
   try{localStorage.removeItem(LS_BL);}catch(e){}
   renderReadPref();
-  toast("Retour à la liste intégrée");
+  toast(T("toast.bl.reverted"));
 }
 
 /* Rend false quand le lien doit garder son comportement normal (target=_blank) :
@@ -1407,7 +1463,7 @@ function findImage(node,raw){
 
 /* --- Wikipédia (extrait d'intro + image, tri aléatoire par catégorie) --- */
 async function srcWikipedia(catKey){
-  const url=LEARN.wikiUrl(catKey);
+  const url=LEARN.wikiUrl(catKey,LANG);
   let data;
   try{const res=await fetchWithTimeout(url,{cache:"no-store"},CONFIG.FETCH_TIMEOUT);
     if(!res.ok)throw new Error("http");data=await res.json();}
@@ -1445,7 +1501,7 @@ async function fetchLearn(count=CONFIG.BATCH_SIZE){
       // variantes, donc cacheable par le CDN et mutualisée entre utilisateurs,
       // tout en restant variée à l'échelle d'une session. Avec un nonce, chaque
       // lot manquait le cache et payait l'aller-retour à Wikipédia.
-      const qs=new URLSearchParams({cats:keys.join(","),count:String(count),b:String(LEARN.randomBucket())});
+      const qs=new URLSearchParams({cats:keys.join(","),count:String(count),b:String(LEARN.randomBucket()),lang:LANG});
       const res=await fetchWithTimeout("/api/learn?"+qs,{},CONFIG.FETCH_TIMEOUT);
       if(res.ok){
         const data=await res.json();
@@ -1665,7 +1721,7 @@ async function loadNewsPart(my,key,force,cached,sameFeed){
       // échoué : mieux vaut du contenu un peu ancien qu'un écran d'erreur. Et
       // même sans actus du tout, la moitié Wikipédia suffit à faire un fil —
       // l'écran d'erreur est réservé au cas où il ne reste vraiment rien.
-      if(cached||sameFeed||items.length)toast("Réseau indisponible — le fil n'a pas été actualisé");
+      if(cached||sameFeed||items.length)toast(T("toast.network.stale"));
       else{newsItems=[];remix();render();showEmpty();}
     }else{
       lastNewsLoad=Date.now();
@@ -1678,7 +1734,7 @@ async function loadNewsPart(my,key,force,cached,sameFeed){
         const liste=noms.length>3
           ? noms.slice(0,3).join(", ")+" +"+(noms.length-3)
           : noms.join(", ");
-        toast(`Injoignable${noms.length>1?"s":""} : ${liste}`,4200);
+        toast(T(noms.length>1?"toast.feeds.unreachableMany":"toast.feeds.unreachableOne",{list:liste}),4200);
       }
     }
     resumePending=false;   // chargement terminé : on n'essaie plus de reprendre
@@ -2049,8 +2105,6 @@ async function loadMore(){
   }catch(e){warn("load more",e);/* on réessaiera au prochain scroll */}
   finally{loadingMore=false;}
 }
-// Libellé (emoji + nom) d'un centre d'intérêt à partir de sa clé
-const catLabel=LEARN.catLabel;
 /* ---------- Icônes ----------
    UNE seule famille pour toute l'app : tracé de 2 px, extrémités rondes, boîte
    de 24, couleur héritée (currentColor). La barre du haut mélangeait avant
@@ -2081,9 +2135,9 @@ function cardHTML(it,id){
   // dans le même fil, et c'est ce qui les distingue d'un coup d'œil (typographie
   // plus dense, badge de thème, verbe d'action différent).
   const learnCard=it.kind==="learn";
-  const openLabel=learnCard?"Découvrir":"Lire l'article";
+  const openLabel=learnCard?T("card.discover"):T("card.readArticle");
   const openIcon=learnCard?ICON_DISCOVER:ICON_READ;
-  const catB=it.cat&&catLabel(it.cat)?`<span class="card__cat">${esc(catLabel(it.cat))}</span>`:"";
+  const catB=it.cat&&catLabelT(it.cat)?`<span class="card__cat">${esc(catLabelT(it.cat))}</span>`:"";
   return `<article class="card${img?" card--img":""}${learnCard?" card--learn":""}" data-id="${id}">
     ${bg}
     <div class="card__body">
@@ -2092,7 +2146,7 @@ function cardHTML(it,id){
       <h2 class="card__title">${link?`<a href="${escAttr(link)}" data-open target="_blank" rel="noopener">${esc(it.title)}</a>`:esc(it.title)}</h2>
       ${it.desc?`<p class="card__desc">${esc(it.desc)}</p>`:""}
       <div class="card__meta">${it.date?`<span>${relTime(it.date)}</span>`:""}</div>
-      ${link?`<a class="card__open" data-open href="${escAttr(link)}" target="_blank" rel="noopener">${openIcon}<span>${openLabel}</span></a>`:`<span class="card__open" style="background:transparent;box-shadow:none;border:1px solid var(--redline);color:var(--ash)">Article de démo</span>`}
+      ${link?`<a class="card__open" data-open href="${escAttr(link)}" target="_blank" rel="noopener">${openIcon}<span>${openLabel}</span></a>`:`<span class="card__open" style="background:transparent;box-shadow:none;border:1px solid var(--redline);color:var(--ash)">${T("card.demo")}</span>`}
     </div>
   </article>`;
 }
@@ -2170,14 +2224,14 @@ function openShareMenu(it){
   back.className="sharemenu";
   back.setAttribute("role","dialog");
   back.setAttribute("aria-modal","true");
-  back.setAttribute("aria-label","Partager");
+  back.setAttribute("aria-label",T("share.title"));
   back.innerHTML=`<div class="sharemenu__panel">
     <div class="sheet__grip"></div>
-    <h2>Partager</h2>
+    <h2>${esc(T("share.title"))}</h2>
     <p class="sub">${esc(it.title)}</p>
     <div class="sharegrid">
       ${targets.map(x=>`<a class="sharedest" href="${escAttr(x.href)}" target="_blank" rel="noopener">${x.label}</a>`).join("")}
-      <button class="sharedest" id="copyLink">Copier</button>
+      <button class="sharedest" id="copyLink">${esc(T("share.copy"))}</button>
     </div>
   </div>`;
   document.body.appendChild(back);
@@ -2186,7 +2240,7 @@ function openShareMenu(it){
   back.onclick=e=>{if(e.target===back)close();};
   back.querySelectorAll("a.sharedest").forEach(a=>a.addEventListener("click",close));
   back.querySelector("#copyLink").onclick=async()=>{
-    try{await navigator.clipboard.writeText(full);toast("Copié");}catch(_){toast("Copie impossible");}
+    try{await navigator.clipboard.writeText(full);toast(T("toast.copied"));}catch(_){toast(T("toast.copyFailed"));}
     close();
   };
 }
@@ -2319,7 +2373,7 @@ document.addEventListener("keydown",e=>{
   else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
 });
 document.getElementById("openSheet").onclick=openSettings;
-document.getElementById("reloadBtn").onclick=()=>{toast("Actualisation…");loadFeeds(true);};
+document.getElementById("reloadBtn").onclick=()=>{toast(T("toast.refreshing"));loadFeeds(true);};
 
 /* ---------- Réglage « Ouvrir les articles » (app packagée) ----------
    Un seul point de montage depuis la fusion des panneaux (querySelectorAll
@@ -2345,65 +2399,61 @@ function blocklistHTML(){
   const src=BL_SOURCES.find(s=>s.url===blState.url);
   if(!blState.url){
     return `<div class="prefsub">
-      <span class="prefsub__state">Liste intégrée à l'app : 178 domaines. Une liste publique en bloque bien davantage, et se met à jour sans réinstaller l'app.</span>
+      <span class="prefsub__state">${esc(T("bl.builtin"))}</span>
       <div class="prefsub__acts">
-        ${BL_SOURCES.map(s=>`<button type="button" class="iobtn" data-blsrc="${escAttr(s.url)}" title="${escAttr(s.sub)}">↓ ${esc(s.name)}</button>`).join("")}
+        ${BL_SOURCES.map(s=>`<button type="button" class="iobtn" data-blsrc="${escAttr(s.url)}" title="${escAttr(T(s.sub))}">↓ ${esc(s.name)}</button>`).join("")}
       </div>
     </div>`;
   }
+  // relTime() reste en français quelle que soit LANG (voir src/i18n.js) :
+  // limitation connue, pas encore internationalisée.
   const when=blState.at?relTime(new Date(blState.at).toISOString()):"";
-  const n=(blState.count||0).toLocaleString("fr-FR");
+  const n=(blState.count||0).toLocaleString(LANG==="en"?"en-US":"fr-FR");
+  const name=esc(src?src.name:hostOf(blState.url));
+  const whenPart=when?T("bl.whenPart",{when:esc(when)}):"";
   return `<div class="prefsub">
-    <span class="prefsub__state">${esc(src?src.name:hostOf(blState.url))} — ${n} domaines${when?", mis à jour il y a "+esc(when):""}, plus les 178 intégrés.</span>
-    ${src?`<span class="prefsub__credit">Source : ${esc(src.credit)}</span>`:""}
+    <span class="prefsub__state">${T("bl.active",{name,n,whenPart})}</span>
+    ${src?`<span class="prefsub__credit">${esc(T("bl.credit",{credit:src.credit}))}</span>`:""}
     <div class="prefsub__acts">
-      <button type="button" class="iobtn" data-blsrc="${escAttr(blState.url)}">↻ Mettre à jour</button>
-      <button type="button" class="iobtn" data-bldrop>Retirer</button>
+      <button type="button" class="iobtn" data-blsrc="${escAttr(blState.url)}">${esc(T("bl.update"))}</button>
+      <button type="button" class="iobtn" data-bldrop>${esc(T("bl.remove"))}</button>
     </div>
   </div>`;
 }
 function renderReadPref(){
   const inApp=readPref!=="browser",hideCmp=cmpPref==="hide";
-  const desc={
-    app:"Lecteur intégré : la page du site, en plein écran et sans barre d'URL.",
-    read:"Mode lecture : rien que le titre, le texte et les images, comme une liseuse. Un bouton dans le lecteur permet de revenir à la page complète.",
-    browser:"Dans ton navigateur habituel (Chrome, Firefox…), comme un lien normal.",
-  };
-  let html=prefRow("read","Ouvrir les articles",desc[readPref],
-    [{v:"app",t:"Dans l'app"},{v:"read",t:"Lecture"},{v:"browser",t:"Navigateur"}],readPref);
+  let html=prefRow("read",T("read.label"),T("read.desc."+readPref),
+    [{v:"app",t:T("read.opt.app")},{v:"read",t:T("read.opt.read")},{v:"browser",t:T("read.opt.browser")}],readPref);
   /* Taille et fond ne sont proposés qu'en mode Lecture : en page complète, c'est
      la feuille de style du site qui décide, ces deux boutons n'auraient aucun
      effet visible et ne feraient qu'allonger le panneau. */
   if(readPref==="read"){
-    html+=prefRow("rsize","Taille du texte",
-      {s:"Compact : plus de mots par ligne, moins de défilement.",
-       m:"L'équilibre par défaut, pensé pour un téléphone tenu à bout de bras.",
-       l:"Confortable : lignes plus courtes, lecture plus posée.",
-       xl:"Très grand, pour lire sans lunettes ou de loin."}[rSizePref],
-      [{v:"s",t:"A",aria:"Compact"},{v:"m",t:"A",aria:"Normal"},
-       {v:"l",t:"A",aria:"Grand"},{v:"xl",t:"A",aria:"Très grand"}],rSizePref,"segbtns--sizes");
-    html+=prefRow("rtheme","Fond du lecteur",
-      {dark:"Sombre, comme le fil. Reposant le soir et sur écran OLED.",
-       sepia:"Sépia, comme du papier : moins de bleu, moins d'éblouissement en journée.",
-       light:"Clair, pour lire en plein soleil."}[rThemePref],
-      [{v:"dark",t:"Sombre"},{v:"sepia",t:"Sépia"},{v:"light",t:"Clair"}],rThemePref);
+    html+=prefRow("rsize",T("rsize.label"),T("rsize.desc."+rSizePref),
+      [{v:"s",t:"A",aria:T("rsize.aria.s")},{v:"m",t:"A",aria:T("rsize.aria.m")},
+       {v:"l",t:"A",aria:T("rsize.aria.l")},{v:"xl",t:"A",aria:T("rsize.aria.xl")}],rSizePref,"segbtns--sizes");
+    html+=prefRow("rtheme",T("rtheme.label"),T("rtheme.desc."+rThemePref),
+      [{v:"dark",t:T("rtheme.opt.dark")},{v:"sepia",t:T("rtheme.opt.sepia")},{v:"light",t:T("rtheme.opt.light")}],rThemePref);
   }
   // Sans lecteur intégré, la question des bandeaux ne se pose plus : c'est le
   // navigateur qui affiche la page, on n'a pas la main dessus.
   if(inApp){
-    html+=prefRow("cmp","Bandeaux cookies",
-      hideCmp?"Masqués à l'ouverture. Masqués, jamais acceptés : aucun consentement n'est donné en ton nom."
-             :"Affichés tels quels, comme dans un navigateur.",
-      [{v:"hide",t:"Masqués"},{v:"show",t:"Affichés"}],cmpPref);
-    html+=prefRow("ads","Publicités et traceurs",
-      adsPref==="block"?"Bloqués avant même d'être chargés : page plus légère, pistage en moins. Certains sites le détectent et refusent de s'afficher."
-                       :"Chargés normalement, comme dans un navigateur.",
-      [{v:"block",t:"Bloqués"},{v:"allow",t:"Affichés"}],adsPref);
+    html+=prefRow("cmp",T("cmp.label"),T("cmp.desc."+(hideCmp?"hide":"show")),
+      [{v:"hide",t:T("cmp.opt.hide")},{v:"show",t:T("cmp.opt.show")}],cmpPref);
+    html+=prefRow("ads",T("ads.label"),T("ads.desc."+adsPref),
+      [{v:"block",t:T("ads.opt.block")},{v:"allow",t:T("ads.opt.allow")}],adsPref);
     if(adsPref==="block")html+=blocklistHTML();
   }
   document.querySelectorAll("[data-readmount]").forEach(el=>{
     el.innerHTML=isNativeApp?html:"";
   });
+}
+/* Sélecteur de langue : contrairement à renderReadPref(), pas réservé à l'app
+   packagée — la traduction de l'interface et la langue de Wikipédia marchent
+   pareil sur le web. */
+function renderLangPref(){
+  const html=prefRow("lang",T("lang.label"),T("lang.desc"),
+    LANGS.map(l=>({v:l,t:T("lang.opt."+l)})),LANG);
+  document.querySelectorAll("[data-langmount]").forEach(el=>{el.innerHTML=html;});
 }
 const PREFS={
   read:{get:()=>readPref,set:v=>{readPref=v;},key:LS_READ,vals:READ_MODES},
@@ -2413,6 +2463,7 @@ const PREFS={
   rtheme:{get:()=>rThemePref,set:v=>{rThemePref=v;},key:LS_RTHEME,vals:READ_THEMES},
 };
 function setPref(name,v){
+  if(name==="lang"){setLang(v);return;}   // effets de bord propres : voir setLang
   const p=PREFS[name];
   if(!p)return;
   const next=p.vals.includes(v)?v:p.vals[0];   // valeur inconnue → on retombe sur le défaut
@@ -2424,6 +2475,19 @@ function setPref(name,v){
   // déjà ce qui a été retenu.
   renderReadPref();
 }
+/* Changer de langue retraduit toute l'interface ET change le Wikipédia
+   interrogé (voir feedKey) : contrairement aux autres réglages, ça ne
+   s'arrête pas à un ré-affichage du panneau — le fil est concerné. */
+function setLang(l){
+  if(!LANGS.includes(l)||l===LANG)return;
+  snapshotFeed();                      // AVANT le changement de clé (voir setCat/setNewsSrc)
+  LANG=l;
+  try{localStorage.setItem(LS_LANG,LANG);}catch(e){warn("save lang",e);}
+  document.documentElement.lang=LANG;
+  applyI18n();
+  renderLangPref();renderReadPref();renderIntGrid();renderList();renderSuggest();renderMixUI();
+  switchFeed();
+}
 // Délégation : les blocs sont réécrits à chaque rendu, un écouteur par bouton
 // serait à ré-attacher à chaque fois.
 document.addEventListener("click",e=>{
@@ -2433,6 +2497,7 @@ document.addEventListener("click",e=>{
   if(src){syncBlocklist(src.dataset.blsrc,false);return;}
   if(e.target.closest("[data-bldrop]"))dropBlocklist();
 });
+renderLangPref();
 renderReadPref();
 /* Rafraîchissement hebdomadaire, en silence : une liste de blocage vieille de
    plusieurs mois laisse passer les régies apparues depuis. Rien ne part si
@@ -2465,7 +2530,7 @@ document.getElementById("suggestBox").addEventListener("click",e=>{
   const url=b.dataset.suggest,name=b.dataset.name||hostOf(url);
   if(!feeds.some(f=>f.url===url)){feeds.push({name,url,on:true});save();}
   renderList();renderSuggest();
-  toast(`${name} ajouté`);
+  toast(T("toast.feedAdded",{name}));
 });
 // Fermeture au clavier (Échap) pour tous les panneaux ouverts
 document.addEventListener("keydown",e=>{
@@ -2485,7 +2550,10 @@ document.addEventListener("keydown",e=>{
    sinon elle ne bouge pas quoi qu'on coche, loadFeeds conclut « même fil » et
    changer d'intérêts semble sans effet. */
 function feedKey(){
-  return "mix|"+newsSrc+"|"+cat+(cat==="all"?":"+interests.join(","):"");
+  // LANG en tête : changer de langue change le Wikipédia interrogé (voir
+  // srcWikipedia/fetchLearn), donc le contenu — sans elle dans la clé, revenir
+  // à une langue déjà vue resservirait un instantané dans l'AUTRE langue.
+  return "mix|"+LANG+"|"+newsSrc+"|"+cat+(cat==="all"?":"+interests.join(","):"");
 }
 /* Instantané du fil, pour revenir d'un filtre à l'autre sans réseau : on
    restaure l'état exact (cartes affichées + position de scroll) au lieu de tout
@@ -2561,7 +2629,7 @@ const doseBtn=document.getElementById("doseBtn");
 function updateDoseBtn(){
   const on=!!mixLevel().learn;
   doseBtn.classList.toggle("on",on);
-  const t="Dose d'apprentissage : "+mixLevel().label.toLowerCase();
+  const t=T("dose.titlePrefix")+mixLabel(mixScore).toLowerCase();
   doseBtn.title=t;doseBtn.setAttribute("aria-label",t);
 }
 doseBtn.onclick=()=>{renderMix();openDialog(mixSheet);};
@@ -2598,10 +2666,10 @@ setIcons();
    sur les cartes). D'où « Toutes » sans emoji d'un côté, « 🎓 Tous » de
    l'autre — l'incohérence serait d'en mettre un seul au milieu de noms nus. */
 function filterChips(kind){
-  if(kind==="src")return [{k:"all",label:"Toutes"}]
+  if(kind==="src")return [{k:"all",label:T("filter.src.all")}]
     .concat(feeds.filter(f=>f.on).map(f=>({k:f.url,label:f.name})));
-  return [{k:"all",label:"🎓 Tous"}]
-    .concat(interests.map(k=>CATEGORIES.find(c=>c.key===k)).filter(Boolean).map(c=>({k:c.key,label:c.label})));
+  return [{k:"all",label:T("filter.cat.allChip")}]
+    .concat(interests.map(k=>CATEGORIES.find(c=>c.key===k)).filter(Boolean).map(c=>({k:c.key,label:catLabelT(c.key)})));
 }
 /* Ce que la pastille affiche : le NOM seul, sans emoji — c'est l'icône tracée à
    sa gauche qui dit de quel filtre il s'agit. Découpe au premier espace plutôt
@@ -2610,13 +2678,15 @@ function filterChips(kind){
    commence par un chiffre, qu'aucun filtre d'emoji ne doit rogner). */
 function filterValue(kind){
   if(kind==="src"){
-    if(newsSrc==="all")return "Toutes";
+    if(newsSrc==="all")return T("filter.src.all");
     const f=feeds.find(x=>x.url===newsSrc);
     return f?f.name:hostOf(newsSrc);
   }
-  if(cat==="all")return "Tous";
+  if(cat==="all")return T("filter.cat.allShort");
   const c=CATEGORIES.find(x=>x.key===cat);
-  return c?c.label.slice(c.label.indexOf(" ")+1):"Tous";
+  if(!c)return T("filter.cat.allShort");
+  const lbl=catLabelT(c.key);
+  return lbl.slice(lbl.indexOf(" ")+1);
 }
 function renderFilters(){
   sanitizeNewsSrc();
@@ -2633,7 +2703,7 @@ function renderFilters(){
     const val=filterValue(kind);
     btn.querySelector(".filterbtn__v").textContent=val;
     btn.classList.toggle("on",(kind==="src"?newsSrc:cat)!=="all");
-    btn.setAttribute("aria-label",(kind==="src"?"Source des actus":"Thème des articles")+" : "+val);
+    btn.setAttribute("aria-label",T(kind==="src"?"filter.src.label":"filter.cat.label")+" : "+val);
   });
   filtersEl.classList.toggle("hidden",!on.src&&!on.cat);
 }
@@ -2645,10 +2715,8 @@ let pickKind="src";
 function openPicker(kind){
   pickKind=kind;
   const src=kind==="src",cur=src?newsSrc:cat;
-  document.getElementById("pickTitle").textContent=src?"Source des actus":"Thème des articles";
-  document.getElementById("pickSub").textContent=src
-    ? "Le fil ne gardera que cette source. Pour en ajouter ou en retirer, c'est dans les réglages."
-    : "Les articles Wikipédia seront tirés dans ce thème.";
+  document.getElementById("pickTitle").textContent=T(src?"filter.src.label":"filter.cat.label");
+  document.getElementById("pickSub").textContent=T(src?"filter.src.sub":"filter.cat.sub");
   document.getElementById("pickGrid").innerHTML=filterChips(kind).map(c=>
     `<button class="intchip ${c.k===cur?"on":""}" data-k="${escAttr(c.k)}">${esc(c.label)}</button>`).join("");
   openDialog(pickSheet);
@@ -2710,8 +2778,13 @@ function renderMix(val){
     const range=mount.querySelector(".mixrange");
     range.max=String(MIX_LEVELS.length-1);   // reste d'accord avec la table
     range.value=String(n);
-    mount.querySelector(".mix__name").textContent=m.label;
-    mount.querySelector(".mix__desc").textContent=m.desc;
+    range.setAttribute("aria-label",T("dose.title"));
+    // Textes fixes du bloc : reposés à CHAQUE rendu (pas seulement à la 1re
+    // insertion) pour suivre un changement de langue en cours de session.
+    const ends=mount.querySelectorAll(".mix__ends span");
+    ends[0].textContent=T("mix.end.news");ends[1].textContent=T("mix.end.learn");
+    mount.querySelector(".mix__name").textContent=mixLabel(n);
+    mount.querySelector(".mix__desc").textContent=mixDesc(n);
     mount.querySelector(".mix__viz").innerHTML=
       mixPattern(m).map(c=>`<span class="${c==="w"?"w":""}"></span>`).join("");
   });
@@ -2732,7 +2805,7 @@ const mixSheet=document.getElementById("mixSheet");
 mixSheet.onclick=e=>{if(e.target===mixSheet)closeDialog(mixSheet);};
 function openSettings(){
   pendingInt=new Set(interests);
-  renderMix();renderIntGrid();renderList();renderSuggest();renderReadPref();
+  renderMix();renderIntGrid();renderList();renderSuggest();renderReadPref();renderLangPref();
   const premier=!interestsChosen();
   document.getElementById("introWelcome").classList.toggle("hidden",!premier); // intro visible seulement la 1ère fois
   // Accueil du 1er lancement : on ne demande qu'une chose à la fois. Les
@@ -2743,7 +2816,7 @@ function openSettings(){
 function renderIntGrid(){
   const grid=document.getElementById("intGrid");
   grid.innerHTML=CATEGORIES.filter(c=>c.key!=="random").map(c=>
-    `<button class="intchip ${pendingInt.has(c.key)?"on":""}" data-k="${c.key}">${c.label}</button>`).join("");
+    `<button class="intchip ${pendingInt.has(c.key)?"on":""}" data-k="${c.key}">${esc(catLabelT(c.key))}</button>`).join("");
   grid.querySelectorAll("button").forEach(b=>b.onclick=()=>{
     const k=b.dataset.k;
     if(pendingInt.has(k))pendingInt.delete(k);else pendingInt.add(k);
@@ -2786,16 +2859,16 @@ const firstRun=!interestsChosen();
 if(firstRun)openSettings();
 function renderList(){document.getElementById("feedList").innerHTML=feeds.map((f,i)=>`
   <div class="feedrow"><input type="checkbox" ${f.on?"checked":""} data-toggle="${i}">
-    <div><div class="name">${esc(f.name)}${unreachable.has(f.url)?'<span class="badge-ko">injoignable</span>':""}</div>
+    <div><div class="name">${esc(f.name)}${unreachable.has(f.url)?`<span class="badge-ko">${esc(T("sheet.sources.unreachable"))}</span>`:""}</div>
       <div class="url">${esc(f.url)}</div></div>
-    <button class="del" data-del="${i}" aria-label="Supprimer ${escAttr(f.name)}">✕</button></div>`).join("");}
+    <button class="del" data-del="${i}" aria-label="${escAttr(T("sheet.sources.deleteAria",{name:f.name}))}">✕</button></div>`).join("");}
 /* Suggestions : chips « + Source » pour celles pas encore présentes (plus de sources = plus d'articles) */
 function renderSuggest(){
   const box=document.getElementById("suggestBox");
   const have=new Set(feeds.map(f=>f.url));
   const avail=SUGGESTED_FEEDS.filter(s=>!have.has(s.url));
   if(!avail.length){box.innerHTML="";return;}
-  box.innerHTML=`<p class="sub" style="margin:16px 0 8px">Sources suggérées — un tap pour ajouter</p>`+
+  box.innerHTML=`<p class="sub" style="margin:16px 0 8px">${esc(T("sheet.sources.suggestTitle"))}</p>`+
     `<div class="intgrid">`+avail.map(s=>
       `<button class="intchip" data-suggest="${escAttr(s.url)}" data-name="${escAttr(s.name)}">+ ${esc(s.name)}</button>`
     ).join("")+`</div>`;
@@ -2803,7 +2876,7 @@ function renderSuggest(){
 function toggleFeed(i){feeds[i].on=!feeds[i].on;save();}
 function delFeed(i){feeds.splice(i,1);save();renderList();renderSuggest();}
 function addFeed(){const inp=document.getElementById("newUrl");const url=inp.value.trim();
-  if(!/^https?:\/\//.test(url)){toast("URL invalide");return;}
+  if(!/^https?:\/\//.test(url)){toast(T("toast.invalidUrl"));return;}
   let name=url;try{name=new URL(url).hostname.replace("www.","");}catch(_){}
   feeds.push({name,url,on:true});save();inp.value="";renderList();renderSuggest();}
 
@@ -2829,7 +2902,7 @@ async function download(filename,content,mime){
   return true;
 }
 async function exportFeeds(format){
-  if(!feeds.length){toast("Aucune source à exporter");return;}
+  if(!feeds.length){toast(T("toast.noFeedsExport"));return;}
   const stamp=new Date().toISOString().slice(0,10);
   let name,body,mime;
   if(format==="json"){
@@ -2851,11 +2924,11 @@ ${rows}
   try{
     await download(name,body,mime);
   }catch(e){
-    warn("export",e);toast("Export impossible");return;
+    warn("export",e);toast(T("toast.exportFailed"));return;
   }
   // Dans l'APK, la feuille de partage vient de s'ouvrir : elle dit déjà ce qui
   // se passe, et un toast se glisserait devant.
-  if(!isNativeApp)toast("Sources exportées");
+  if(!isNativeApp)toast(T("toast.feedsExported"));
 }
 function importFromFile(ev){
   const file=ev.target.files&&ev.target.files[0];
@@ -2866,9 +2939,9 @@ function importFromFile(ev){
       const text=String(reader.result||"");
       const parsed=text.trim().startsWith("{")||text.trim().startsWith("[")
         ? parseJsonFeeds(text) : parseOpmlFeeds(text);
-      if(!parsed.length){toast("Aucune source trouvée dans le fichier");return;}
+      if(!parsed.length){toast(T("toast.noFeedsInFile"));return;}
       mergeFeeds(parsed);
-    }catch(e){toast("Fichier illisible");}
+    }catch(e){toast(T("toast.unreadableFile"));}
     finally{ev.target.value="";}
   };
   reader.readAsText(file);
@@ -2879,7 +2952,7 @@ function mergeFeeds(incoming){
   let added=0;
   incoming.forEach(f=>{if(!existing.has(f.url)){feeds.push(f);existing.add(f.url);added++;}});
   save();renderList();renderSuggest();
-  toast(added? `${added} source${added>1?"s":""} importée${added>1?"s":""}` : "Sources déjà présentes");
+  toast(added? T(added>1?"toast.feedsImportedMany":"toast.feedsImportedOne",{n:added}) : T("toast.feedsAlreadyPresent"));
   if(added)loadFeeds(true);   // rafraîchit le fil avec les sources importées
 }
 
@@ -2898,11 +2971,11 @@ function showEmpty(reason){
   if(reason==="no-feeds"){
     // N'arrive qu'à la dose « actus seules » : partout ailleurs, Wikipédia
     // fournit le fil à lui seul.
-    t.textContent="Aucune source active";
-    m.textContent="Coche ou ajoute un flux RSS, importe tes sources (OPML / JSON), ou remets des articles Wikipédia dans le fil avec le bouton 🎓.";
+    t.textContent=T("empty.noFeeds.title");
+    m.textContent=T("empty.noFeeds.msg");
   }else{
-    t.textContent="Fil indisponible";
-    m.textContent="Ni tes flux ni Wikipédia n'ont répondu (hors-ligne, ou proxy indisponible). Réessaie, ou vérifie tes sources.";
+    t.textContent=T("empty.unavailable.title");
+    m.textContent=T("empty.unavailable.msg");
   }
   document.getElementById("empty").classList.remove("hidden");
 }
@@ -2945,7 +3018,7 @@ if(!firstRun)loadFeeds();
         sw.addEventListener("statechange",()=>{
           if(sw.state==="installed"&&navigator.serviceWorker.controller){
             swUpdateReady=true;
-            toast("Nouvelle version prête");
+            toast(T("toast.updateReady"));
           }
         });
       });
@@ -3025,8 +3098,8 @@ if(!firstRun)loadFeeds();
     const canPrompt=!!deferred, ios=isIos&&!standalone;
     if(!canPrompt&&!ios)return;                        // rien à proposer sur ce navigateur
     const sub=bar.querySelector(".installbar__sub"), b=document.getElementById("installBarBtn");
-    if(canPrompt){sub.textContent="Plein écran, hors-ligne, lancement en un tap.";b.textContent="Installer";}
-    else{sub.textContent="Appuie sur Partager, puis « Sur l'écran d'accueil ».";b.textContent="Compris";}
+    if(canPrompt){sub.textContent=T("installbar.sub");b.textContent=T("installbar.install");}
+    else{sub.textContent=T("installbar.iosSub");b.textContent=T("installbar.gotIt");}
     barShown=true;
     bar.classList.remove("hidden");requestAnimationFrame(()=>bar.classList.add("show"));
   }

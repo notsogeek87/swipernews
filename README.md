@@ -73,6 +73,12 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
 - **Un seul panneau de réglages** (⚙) : dose, centres d'intérêt, sources RSS et
   réglages du lecteur au même endroit, validés d'un seul bouton. Rouvert puis validé
   sans rien changer, il ne recharge rien — la position de lecture tient.
+- **Langue de l'interface** (français / anglais pour l'instant) : un réglage
+  qui traduit l'app ET change la langue de Wikipédia interrogée — les deux
+  n'en font qu'un, pour ne pas se retrouver avec des articles en anglais dans
+  une interface française. Ajouter une langue est incrémental : le français
+  reste la source complète, les autres langues n'ont besoin que des clés
+  qu'elles traduisent (voir `src/i18n.js`).
 - Installable comme application (PWA) avec fonctionnement hors-ligne
 - Si un flux est injoignable, le message le **nomme** (et la liste des sources
   marque la ligne d'un badge « injoignable »), pour savoir quelle source
@@ -1034,6 +1040,10 @@ ouvrir la demande d'inclusion sur `gitlab.com/fdroid/fdroiddata`.
 - Les icônes PNG restent en couleurs vraies (`logo-512.png` pèse ~38 Ko). La
   quantification par palette qui allégeait l'ancien logo fait border le dégradé
   du nouveau : le gain de poids ne vaut pas la dégradation visible.
+- Le contenu des articles (RSS, Wikipédia) n'est pas traduit : seule
+  l'interface l'est. Les dates relatives (« il y a 3 jours ») restent aussi en
+  français quelle que soit la langue choisie — `relTime()` n'est pas encore
+  internationalisée (voir `src/i18n.js`).
 
 ## Licence
 

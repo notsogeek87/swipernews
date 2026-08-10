@@ -216,7 +216,7 @@ ne change côté web.
 ## Commandes
 
 ```bash
-npm test            # node --test — 37 tests, aucune dépendance à installer
+npm test            # node --test — 49 tests, aucune dépendance à installer
 npm run lint        # eslint api src test eslint.config.js  (PAS index.html)
 npm run format:check
 npm run cap:sync    # régénère www/ puis cap sync android
@@ -359,10 +359,25 @@ genre de script dérape.
   frame plus tard : sans son compteur de génération, celui d'un rendu dépassé
   revient défaire la décision du rendu suivant (une repeinture progressive
   ancrée sur l'article lu annulait le `forceTop` du rendu final).
-- `feedKey()` — identité du fil : les deux filtres (source d'actu, thème
+- `feedKey()` — identité du fil : LANG, les deux filtres (source d'actu, thème
   Wikipédia). Cache local, `feedSnap` et test « même fil » en dépendent.
 - `feedSnap` — état du fil mémorisé par filtre ; revenir à un filtre déjà vu ne
   recharge rien.
+- `LANG` / `T()` / `src/i18n.js` — la couche de traduction de l'interface.
+  Le français (`STRINGS.fr`) est la langue COMPLÈTE, source de vérité ; les
+  autres langues (aujourd'hui `en`) sont des couches par-dessus, `T()` y
+  retombe sur le français si une clé manque — ajouter une langue est donc
+  incrémental. Un seul réglage pilote deux choses : les textes de l'app ET la
+  langue interrogée sur Wikipédia (`LEARN.wikiUrl(catKey, LANG)`, `qByLang`
+  dans `src/learn-core.js`) — changer de langue change donc aussi `feedKey()`
+  et relance un chargement. `applyI18n()` traduit le HTML statique via
+  `data-i18n`/`data-i18n-attr` ; le contenu généré (toasts, panneaux
+  reconstruits) appelle `T()` directement. `catLabelT()` fait le pont avec les
+  centres d'intérêt : le français lit `CATEGORIES.label` (`src/learn-core.js`)
+  directement, les autres langues passent par `T("cat.<clé>")`.
+  **Non traduits, par choix documenté dans `src/i18n.js`** : le contenu des
+  articles (RSS, Wikipédia — aucun appel de traduction n'est fait) et
+  `relTime()` (dates relatives toujours en français, à reprendre séparément).
 
 ### Natif (`android/app/src/main/java/eu/lielu/news/`)
 

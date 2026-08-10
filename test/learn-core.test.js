@@ -30,6 +30,28 @@ test("wikiUrl bascule en tirage aléatoire pour la catégorie random", () => {
   assert.ok(!url.includes("gsrsearch"));
 });
 
+test("wikiUrl interroge le Wikipédia de la langue demandée", () => {
+  const url = core.wikiUrl("sciences", "en");
+  assert.ok(url.startsWith("https://en.wikipedia.org/"));
+  assert.ok(decodeURIComponent(url).includes('deepcategory:"Science"'));
+});
+
+test("wikiUrl retombe sur le français pour une langue non reconnue", () => {
+  const url = core.wikiUrl("sciences", "de");
+  assert.ok(url.startsWith("https://fr.wikipedia.org/"));
+});
+
+test("wikiUrl sans langue reste le français par défaut (compat)", () => {
+  const url = core.wikiUrl("sciences");
+  assert.ok(url.startsWith("https://fr.wikipedia.org/"));
+});
+
+test("chaque catégorie autre qu'aléatoire a une traduction anglaise de sa requête", () => {
+  for (const c of core.CATEGORIES.filter((c) => c.key !== "random")) {
+    assert.ok(c.qByLang && c.qByLang.en, `qByLang.en manquant pour ${c.key}`);
+  }
+});
+
 test("normalizeWiki préfère le thumbnail et écarte les extraits trop courts", () => {
   const out = core.normalizeWiki({
     query: {

@@ -64,10 +64,13 @@ module.exports = async function handler(req, res) {
   const cats = parseList(q.cats, ["random"]).filter((c) => known.has(c));
   const count = Math.min(Math.max(parseInt(q.count, 10) || 20, 1), 40);
   const catList = cats.length ? cats : ["random"];
+  // Langue de l'interface (voir src/i18n.js côté client) : ?lang= choisit le
+  // Wikipédia interrogé. Repli sur le français géré par wikiUrl lui-même.
+  const lang = core.LANGS.includes(q.lang) ? q.lang : core.WIKI_LANG;
 
   const tag = (p, catKey) => p.then((list) => list.map((it) => ({ ...it, cat: catKey })));
   const tasks = catList.map((catKey) =>
-    tag(fetchJson(core.wikiUrl(catKey)).then(core.normalizeWiki), catKey)
+    tag(fetchJson(core.wikiUrl(catKey, lang)).then(core.normalizeWiki), catKey)
   );
 
   const results = await Promise.allSettled(tasks);
