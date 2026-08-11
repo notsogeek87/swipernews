@@ -201,6 +201,16 @@ test("isPaywalledHtml lit le signal isAccessibleForFree (JSON-LD schema.org)", (
   assert.ok(!lib.isPaywalledHtml(null));
 });
 
+test("isPaywalledHtml lit aussi le texte visible « Réservé aux abonnés »", () => {
+  // Second signal, indépendant du JSON-LD : cas réel rencontré, un site dont
+  // le balisage structuré ne déclare pas isAccessibleForFree partout.
+  assert.ok(
+    lib.isPaywalledHtml('<div class="paywall">Article réservé aux abonnés</div>')
+  );
+  assert.ok(lib.isPaywalledHtml("<p>Contenu RÉSERVÉ AUX ABONNÉS Le Monde</p>"));
+  assert.ok(!lib.isPaywalledHtml("<p>Article accessible à tous, sans restriction.</p>"));
+});
+
 test("parseJsonFeeds lit les deux formes d'export et ignore les entrées sans url", () => {
   const asArray = lib.parseJsonFeeds(
     '[{"name":"X","url":"https://x/f"},{"name":"sans url"}]'

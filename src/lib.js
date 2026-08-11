@@ -427,18 +427,34 @@
     return PAYWALL_CANDIDATE_DOMAINS.some((d) => host === d || host.endsWith("." + d));
   }
 
-  /** Vrai si LA PAGE elle-même déclare l'article payant, via le signal
+  /** Deuxième signal, texte visible plutôt que balisage structuré : la
+   *  quasi-totalité des sites de presse français à paywall affichent
+   *  explicitement « Réservé aux abonnés » sur la page — complète
+   *  isAccessibleForFree pour les sites qui ne le déclarent pas (ou dont le
+   *  balisage diffère selon la rubrique, cas réel rencontré : Le Monde/Idées).
+   *  Risque assumé, non mesurable sans voir les pages concernées : la même
+   *  formule peut apparaître dans un encart promotionnel générique en bas
+   *  d'un article GRATUIT (« découvrez les avantages réservés aux abonnés »),
+   *  ce qui donnerait un faux positif indiscernable par simple recherche de
+   *  texte. Accepté sciemment : mieux vaut ce risque ponctuel que rater un
+   *  paywall réel faute de balisage fiable. */
+  const PAYWALL_TEXT_PATTERN = /r[ée]serv[ée]s?\s+aux\s+abonn[ée]s/i;
+  /** Vrai si LA PAGE elle-même déclare l'article payant : soit via le signal
    *  standard utilisé par Google Actualités pour ses propres indicateurs
-   *  « abonnés » : `isAccessibleForFree: false` dans un bloc JSON-LD
-   *  schema.org (NewsArticle). Recherche texte plutôt que JSON.parse strict :
-   *  les blocs JSON-LD réels contiennent parfois des caractères ou une syntaxe
-   *  qui feraient échouer un vrai parseur, alors que ce signal précis se
-   *  reconnaît sans ambiguïté par simple motif. Absence de signal → considéré
-   *  gratuit (un faux négatif silencieux est préférable à un badge affiché à
-   *  tort sur un article réellement libre). */
+   *  « abonnés » (`isAccessibleForFree: false` dans un bloc JSON-LD
+   *  schema.org NewsArticle), soit via PAYWALL_TEXT_PATTERN ci-dessus.
+   *  Recherche texte plutôt que JSON.parse strict pour le premier : les blocs
+   *  JSON-LD réels contiennent parfois des caractères ou une syntaxe qui
+   *  feraient échouer un vrai parseur, alors que ce signal précis se
+   *  reconnaît sans ambiguïté par simple motif. Absence de tout signal →
+   *  considéré gratuit (un faux négatif silencieux est préférable à un badge
+   *  affiché à tort sur un article réellement libre). */
   function isPaywalledHtml(html) {
     if (!html) return false;
-    return /"isAccessibleForFree"\s*:\s*"?false"?/i.test(String(html));
+    const s = String(html);
+    return (
+      /"isAccessibleForFree"\s*:\s*"?false"?/i.test(s) || PAYWALL_TEXT_PATTERN.test(s)
+    );
   }
 
   /** Sources depuis un export JSON (tableau, ou objet {feeds:[...]}) . */
