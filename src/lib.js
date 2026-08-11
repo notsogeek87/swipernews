@@ -337,12 +337,17 @@
     return SPONSORED_PATTERNS.some((re) => re.test(text));
   }
 
-  /** Sites dont le contenu est, dans l'immense majorité des cas, réservé aux
-   *  abonnés — pas les sites à paywall « compteur » (quelques articles
-   *  gratuits par mois), trop souvent lisibles pour justifier le badge.
+  /** Sites où au moins UNE PARTIE du contenu est réservée aux abonnés — quasi
+   *  aucun site de presse n'est payant à 100 %, même ceux au paywall le plus
+   *  strict publient des dépêches ou de l'actu chaude en accès libre. Cette
+   *  liste ne sert donc PAS de verdict (voir isPaywalledHtml pour ça) : juste
+   *  à décider quels domaines valent la peine d'une vérification article par
+   *  article, pour ne pas l'interroger sur des sites qui ne sont jamais
+   *  payants. Un faux « candidat » ne coûte qu'une vérification de plus, pas
+   *  un mauvais badge — la liste peut donc rester large.
    *  Liste au mérite, non exhaustive, à compléter au fil de l'eau. */
-  const PAYWALL_DOMAINS = [
-    // Presse française
+  const PAYWALL_CANDIDATE_DOMAINS = [
+    // Presse française (nationale, régionale, magazines)
     "lemonde.fr",
     "lefigaro.fr",
     "lesechos.fr",
@@ -356,6 +361,25 @@
     "alternatives-economiques.fr",
     "usinenouvelle.com",
     "latribune.fr",
+    "lequipe.fr",
+    "midilibre.fr",
+    "ouest-france.fr",
+    "sudouest.fr",
+    "leparisien.fr",
+    "lepoint.fr",
+    "lexpress.fr",
+    "nouvelobs.com",
+    "laprovence.com",
+    "ladepeche.fr",
+    "republicain-lorrain.fr",
+    "nicematin.com",
+    "dna.fr",
+    "leprogres.fr",
+    "parismatch.com",
+    "capital.fr",
+    "marianne.net",
+    "letemps.ch",
+    "lesoir.be",
     // Presse internationale
     "nytimes.com",
     "wsj.com",
@@ -376,11 +400,26 @@
     "seekingalpha.com",
     "barrons.com",
   ];
-  /** Vrai si le lien pointe vers un domaine réputé (quasi) systématiquement
-   *  payant — sous-domaines compris (abonnes.lemonde.fr, etc.). */
-  function isPaywalledDomain(url) {
+  /** Vrai si le lien pointe vers un domaine où une vérification par article a
+   *  du sens (voir le commentaire de PAYWALL_CANDIDATE_DOMAINS) — sous-domaines
+   *  compris (abonnes.lemonde.fr, etc.). */
+  function isPaywallCandidateDomain(url) {
     const host = hostOf(url).toLowerCase();
-    return PAYWALL_DOMAINS.some((d) => host === d || host.endsWith("." + d));
+    return PAYWALL_CANDIDATE_DOMAINS.some((d) => host === d || host.endsWith("." + d));
+  }
+
+  /** Vrai si LA PAGE elle-même déclare l'article payant, via le signal
+   *  standard utilisé par Google Actualités pour ses propres indicateurs
+   *  « abonnés » : `isAccessibleForFree: false` dans un bloc JSON-LD
+   *  schema.org (NewsArticle). Recherche texte plutôt que JSON.parse strict :
+   *  les blocs JSON-LD réels contiennent parfois des caractères ou une syntaxe
+   *  qui feraient échouer un vrai parseur, alors que ce signal précis se
+   *  reconnaît sans ambiguïté par simple motif. Absence de signal → considéré
+   *  gratuit (un faux négatif silencieux est préférable à un badge affiché à
+   *  tort sur un article réellement libre). */
+  function isPaywalledHtml(html) {
+    if (!html) return false;
+    return /"isAccessibleForFree"\s*:\s*"?false"?/i.test(String(html));
   }
 
   /** Sources depuis un export JSON (tableau, ou objet {feeds:[...]}) . */
@@ -448,7 +487,8 @@
     dedupAndRank,
     interleave,
     isSponsoredItem,
-    isPaywalledDomain,
+    isPaywallCandidateDomain,
+    isPaywalledHtml,
     hostOf,
     parseJsonFeeds,
     parseOpmlFeeds,

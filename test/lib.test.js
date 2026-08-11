@@ -136,14 +136,43 @@ test("isSponsoredItem ne filtre pas du contenu éditorial qui parle juste de spo
   assert.ok(!lib.isSponsoredItem({}));
 });
 
-test("isPaywalledDomain détecte les domaines connus, sous-domaines compris", () => {
-  assert.ok(lib.isPaywalledDomain("https://www.lemonde.fr/politique/article/x.html"));
-  assert.ok(lib.isPaywalledDomain("https://abonnes.lemonde.fr/article/x.html"));
-  assert.ok(lib.isPaywalledDomain("https://www.nytimes.com/2026/08/11/world/y.html"));
-  assert.ok(!lib.isPaywalledDomain("https://www.france24.com/fr/article"));
-  assert.ok(!lib.isPaywalledDomain(""));
+test("isPaywallCandidateDomain repère les domaines à vérifier, sous-domaines compris", () => {
+  assert.ok(
+    lib.isPaywallCandidateDomain("https://www.lemonde.fr/politique/article/x.html")
+  );
+  assert.ok(lib.isPaywallCandidateDomain("https://abonnes.lemonde.fr/article/x.html"));
+  assert.ok(
+    lib.isPaywallCandidateDomain("https://www.nytimes.com/2026/08/11/world/y.html")
+  );
+  // Sites à contenu MIXTE (certains articles gratuits, d'autres non) : candidats
+  // à une vérification par article, pas un verdict en soi.
+  assert.ok(lib.isPaywallCandidateDomain("https://www.lequipe.fr/Football/Article/x"));
+  assert.ok(
+    lib.isPaywallCandidateDomain("https://www.midilibre.fr/2026/08/11/article,1234.php")
+  );
+  assert.ok(!lib.isPaywallCandidateDomain("https://www.france24.com/fr/article"));
+  assert.ok(!lib.isPaywallCandidateDomain(""));
   // ne doit pas confondre un domaine qui CONTIENT la chaîne avec le domaine lui-même
-  assert.ok(!lib.isPaywalledDomain("https://notlemonde.fr/x"));
+  assert.ok(!lib.isPaywallCandidateDomain("https://notlemonde.fr/x"));
+});
+
+test("isPaywalledHtml lit le signal isAccessibleForFree (JSON-LD schema.org)", () => {
+  const paidBool = `<script type="application/ld+json">
+    {"@type":"NewsArticle","isAccessibleForFree":false}
+  </script>`;
+  const paidString = `<script type="application/ld+json">
+    {"@type":"NewsArticle","isPartOf":{"isAccessibleForFree":"False"}}
+  </script>`;
+  const free = `<script type="application/ld+json">
+    {"@type":"NewsArticle","isAccessibleForFree":true}
+  </script>`;
+  assert.ok(lib.isPaywalledHtml(paidBool));
+  assert.ok(lib.isPaywalledHtml(paidString));
+  assert.ok(!lib.isPaywalledHtml(free));
+  // Absence totale de signal : un article normal, sans marqueur du tout.
+  assert.ok(!lib.isPaywalledHtml("<html><body>Un article ordinaire.</body></html>"));
+  assert.ok(!lib.isPaywalledHtml(""));
+  assert.ok(!lib.isPaywalledHtml(null));
 });
 
 test("parseJsonFeeds lit les deux formes d'export et ignore les entrées sans url", () => {

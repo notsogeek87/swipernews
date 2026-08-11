@@ -747,9 +747,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=94"></script>
-<script src="src/learn-core.js?v=94"></script>
-<script src="src/i18n.js?v=94"></script>
+<script src="src/lib.js?v=95"></script>
+<script src="src/learn-core.js?v=95"></script>
+<script src="src/i18n.js?v=95"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -757,7 +757,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds","interleave","isSponsoredItem","isPaywalledDomain"],
+  const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds","interleave","isSponsoredItem","isPaywallCandidateDomain","isPaywalledHtml"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -836,7 +836,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,interleave,isSponsoredItem,isPaywalledDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,interleave,isSponsoredItem,isPaywallCandidateDomain,isPaywalledHtml,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1192,7 +1192,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="94";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="95";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2048,18 +2048,24 @@ function markVisibleSeen(){
    plein écran (écran mobile courant : ~1100-1300 px physiques). */
 const MIN_GOOD_W=800;
 
-/* ---------- og:image : rattraper les flux qui ne publient qu'une vignette ----------
-   Certains éditeurs servent des URL d'images SIGNÉES (Thumbor) où la taille
-   fait partie de la signature : impossible d'en réclamer une plus grande en
-   modifiant l'URL. La page de l'article, elle, référence la version large via
-   <meta og:image> — une URL déjà signée. /api/og va la chercher côté serveur.
+/* ---------- Métadonnées d'article : og:image et indicateur payant ----------
+   DEUX besoins distincts qui lisent la MÊME page d'article, donc UN seul
+   point d'accès et UN seul cache par lien — sinon un article à la fois trop
+   petit ET candidat payant (voir isPaywallCandidateDomain) déclencherait deux
+   requêtes vers l'éditeur pour la même page.
+   - image : certains éditeurs servent des URL SIGNÉES (Thumbor) où la taille
+     fait partie de la signature, impossible d'en réclamer une plus grande en
+     modifiant l'URL. La page de l'article référence la version large via
+     <meta og:image>. /api/og va la chercher côté serveur.
+   - paywalled : voir isPaywalledHtml (src/lib.js) — lu sur la même page,
+     jamais interrogé seul.
    Résultats mémorisés (session + localStorage) pour n'interroger qu'une fois
    par article, y compris les échecs. */
-const LS_OG="fluxswipe.og.v1";
+const LS_OG="fluxswipe.artmeta.v1";
 let ogCache=(()=>{try{return JSON.parse(localStorage.getItem(LS_OG)||"{}");}catch(e){return {};}})();
 let ogSaveT;
-function ogRemember(link,img){
-  ogCache[link]=img||"";
+function ogRemember(link,meta){
+  ogCache[link]=meta;
   clearTimeout(ogSaveT);
   ogSaveT=setTimeout(()=>{
     try{
@@ -2073,25 +2079,28 @@ function ogRemember(link,img){
 // Franceinfo, notamment, ne publie dans son flux qu'une vignette Thumbor
 // signée à 432 px, alors que la page de l'article référence en <meta og:image>
 // la version pleine taille). Direct via nativeGet (aucun CORS), extraction
-// avec la même fonction metaContent que le backend (src/lib.js, partagée).
-async function nativeOgImage(link){
+// avec les mêmes metaContent/isPaywalledHtml que le backend (src/lib.js, partagées).
+async function nativeArticleMeta(link){
   const html=await nativeGet(link,6000);
+  const paywalled=isPaywalledHtml(html);
+  let image="";
   const raw=metaContent(html,["og:image:secure_url","og:image:url","og:image","twitter:image","twitter:image:src"]);
-  if(!raw)throw new Error("aucune og:image");
-  const abs=new URL(decodeEntities(raw),link);
-  if(abs.protocol!=="http:"&&abs.protocol!=="https:")throw new Error("schéma d'image non autorisé");
-  return abs.href;
+  if(raw){
+    const abs=new URL(decodeEntities(raw),link);
+    if(abs.protocol==="http:"||abs.protocol==="https:")image=abs.href;
+  }
+  return {image,paywalled};
 }
 const ogPending=new Map();
-function ogImageFor(link){
-  if(!link)return Promise.resolve("");
+function articleMetaFor(link){
+  if(!link)return Promise.resolve({image:"",paywalled:false});
   if(Object.prototype.hasOwnProperty.call(ogCache,link))return Promise.resolve(ogCache[link]);
   if(ogPending.has(link))return ogPending.get(link);
-  const p=(isNativeApp?nativeOgImage(link):fetchWithTimeout("/api/og?url="+encodeURIComponent(link),{},CONFIG.FETCH_TIMEOUT)
+  const p=(isNativeApp?nativeArticleMeta(link):fetchWithTimeout("/api/og?url="+encodeURIComponent(link),{},CONFIG.FETCH_TIMEOUT)
       .then(r=>r.ok?r.json():null)
-      .then(d=>d&&d.image))
-    .then(img=>{img=safeImg(img,location.href)||"";ogRemember(link,img);return img;})
-    .catch(e=>{warn("og",e);ogRemember(link,"");return "";})
+      .then(d=>({image:safeImg(d&&d.image,location.href)||"",paywalled:!!(d&&d.paywalled)})))
+    .then(meta=>{ogRemember(link,meta);return meta;})
+    .catch(e=>{warn("og",e);const meta={image:"",paywalled:false};ogRemember(link,meta);return meta;})
     .finally(()=>ogPending.delete(link));
   ogPending.set(link,p);
   return p;
@@ -2144,8 +2153,8 @@ function applyBg(el,src){
       const known=hintW||await probeWidth(src);
       if(known>=MIN_GOOD_W||!link)return;
       // 3) image de partage de l'article, souvent la version pleine taille
-      const og=await ogImageFor(link);
-      if(og)await trySwap(og,"og:image",known);
+      const meta=await articleMetaFor(link);
+      if(meta.image)await trySwap(meta.image,"og:image",known);
     }catch(e){warn("applyBg",e);}
   })();
 }
@@ -2162,6 +2171,39 @@ function observeBackgrounds(scope){
   (scope||feedEl).querySelectorAll(".card__bg[data-bg]").forEach(el=>{
     if(bgObserver)bgObserver.observe(el);
     else{applyBg(el,el.dataset.bg);delete el.dataset.bg;}
+  });
+}
+/* Vérifie et affiche, si besoin, la pastille payante — une fois la carte
+   proche de l'écran (même marge que bgObserver), jamais avant : c'est ce qui
+   limite le coût aux articles réellement vus, pas tout le fil chargé. */
+async function checkPaywall(el){
+  delete el.dataset.pw;
+  const it=cardReg.get(+el.dataset.id);
+  if(!it||!it.link)return;
+  try{
+    const meta=await articleMetaFor(it.link);
+    if(!meta.paywalled)return;
+    const actions=el.querySelector(".card__actions");
+    if(!actions||actions.querySelector(".card__paywall"))return;
+    const span=document.createElement("span");
+    span.className="card__paywall";
+    const label=T("card.paywall.title");
+    span.title=label;span.setAttribute("aria-label",label);
+    span.innerHTML=ICON_PAYWALL;
+    actions.appendChild(span);
+  }catch(e){warn("checkPaywall",e);}
+}
+const pwObserver=("IntersectionObserver" in self)?new IntersectionObserver((entries,obs)=>{
+  entries.forEach(en=>{
+    if(!en.isIntersecting)return;
+    obs.unobserve(en.target);
+    checkPaywall(en.target);
+  });
+},{root:feedEl,rootMargin:"150% 0px"}):null;
+function observePaywall(scope){
+  (scope||feedEl).querySelectorAll(".card[data-pw]").forEach(el=>{
+    if(pwObserver)pwObserver.observe(el);
+    else checkPaywall(el);
   });
 }
 /* Plus de carte de fin : le fil ne finit plus. Quand les actus sont épuisées,
@@ -2254,7 +2296,7 @@ function render(forceTop,altAnchor){
   // Conserver le scroll d'un fil précédent laisserait l'utilisateur au milieu
   // d'un contenu qui n'a rien à voir.
   if(!top)setScrollTopInstant(feedEl,0);
-  observeBackgrounds();
+  observeBackgrounds();observePaywall();
   if(DEBUG){const e=posEntry(),l=(e&&e.link)||"";const i=e?resolveResume(e):-1;
     dbg(`v${APP_VERSION}  items=${items.length} (${newsItems.length} actus / ${learnItems.length} wiki)\n`+
         `mémorisé=…${l.slice(-24)||"(rien)"}\n`+
@@ -2326,7 +2368,7 @@ const ICON_TAG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strok
 const ICON_RELOAD=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>`;
 const ICON_SETTINGS=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`;
 const ICON_CHEV=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
-// Signale un article probablement payant (voir isPaywalledDomain, src/lib.js).
+// Signale un article payant, une fois confirmé par checkPaywall() (voir plus bas).
 const ICON_PAYWALL=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>`;
 function cardHTML(it,id){
   const img=safeImg(it.img,location.href);
@@ -2341,11 +2383,13 @@ function cardHTML(it,id){
   const openLabel=learnCard?T("card.discover"):T("card.readArticle");
   const openIcon=learnCard?ICON_DISCOVER:ICON_READ;
   const catB=it.cat&&catLabelT(it.cat)?`<span class="card__cat">${esc(catLabelT(it.cat))}</span>`:"";
-  // Best effort : voir isPaywalledDomain (src/lib.js) — liste de domaines connus,
-  // pas une lecture de la page. Sans objet pour Wikipédia, jamais payant.
-  const paywall=!learnCard&&link&&isPaywalledDomain(link)
-    ?`<span class="card__paywall" title="${escAttr(T("card.paywall.title"))}" aria-label="${escAttr(T("card.paywall.title"))}">${ICON_PAYWALL}</span>`:"";
-  return `<article class="card${img?" card--img":""}${learnCard?" card--learn":""}" data-id="${id}">
+  // Payant : jamais tranché ici. isPaywallCandidateDomain ne dit que si la
+  // vérification (asynchrone, une vraie lecture de la page — voir
+  // isPaywalledHtml/checkPaywall) vaut la peine ; data-pw ne marque donc
+  // qu'une CANDIDATURE, que checkPaywall confirmera ou non une fois la carte
+  // à l'écran. Sans objet pour Wikipédia, jamais payant.
+  const pwCandidate=!learnCard&&link&&isPaywallCandidateDomain(link);
+  return `<article class="card${img?" card--img":""}${learnCard?" card--learn":""}" data-id="${id}"${pwCandidate?" data-pw":""}>
     ${bg}
     <div class="card__body">
       ${catB}
@@ -2355,7 +2399,6 @@ function cardHTML(it,id){
       <div class="card__meta">${it.date?`<span>${relTime(it.date)}</span>`:""}</div>
       <div class="card__actions">
         ${link?`<a class="card__open" data-open href="${escAttr(link)}" target="_blank" rel="noopener">${openIcon}<span>${openLabel}</span></a>`:`<span class="card__open" style="background:transparent;box-shadow:none;border:1px solid var(--redline);color:var(--ash)">${T("card.demo")}</span>`}
-        ${paywall}
       </div>
     </div>
   </article>`;
@@ -2814,7 +2857,7 @@ function restoreFeed(){
   // mélanges peuvent avoir la même LONGUEUR sans avoir le même ordre, d'où la
   // comparaison de la dose plutôt que du nombre de cartes.
   if(s.mix!==mixScore)render();
-  observeBackgrounds();updateRail();
+  observeBackgrounds();observePaywall();updateRail();
   onCardChange();                                   // recalage du suivi de carte
   return true;
 }

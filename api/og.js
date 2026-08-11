@@ -1,24 +1,32 @@
-// Fonction serverless Vercel : extrait l'image de partage (og:image) d'un
-// article, côté serveur.
+// Fonction serverless Vercel : extrait, côté serveur, l'image de partage
+// (og:image) et l'indicateur d'accès payant d'un article — les DEUX depuis la
+// même lecture de <head>, pour ne jamais payer deux requêtes vers l'éditeur
+// pour une seule page.
 //
-// Pourquoi : certains éditeurs ne publient dans leur flux RSS qu'une vignette
-// très réduite. Franceinfo, par exemple, sert des URL Thumbor SIGNÉES du type
+// Image — pourquoi : certains éditeurs ne publient dans leur flux RSS qu'une
+// vignette très réduite. Franceinfo, par exemple, sert des URL Thumbor
+// SIGNÉES du type
 //   /pictures/<signature>/0x0:1024x576/432x243/filters:quality(50)/…
 // La signature couvre la taille demandée : impossible de réclamer un plus grand
 // format en modifiant l'URL, le serveur rejette. Le recadrage annoncé
 // (0x0:1024x576) montre pourtant qu'une source bien plus grande existe.
-//
 // La page de l'article, elle, référence cette source via <meta og:image> — une
 // URL déjà signée, en grand format. On va donc la chercher là.
 //
-// Coût maîtrisé : le front n'appelle ce point d'accès que pour les articles dont
-// l'image de flux est réellement petite, la réponse est minuscule (une URL) et
-// mise en cache longuement par le CDN, donc mutualisée entre tous les
-// utilisateurs.
+// Payant — pourquoi : voir isPaywalledHtml (src/lib.js). Appelé uniquement
+// pour les domaines d'une liste de candidats (voir isPaywallCandidateDomain,
+// index.html) — pas systématiquement, un article gratuit sur un domaine hors
+// liste ne déclenche jamais cet appel.
+//
+// Coût maîtrisé : le front n'appelle ce point d'accès QUE pour les articles
+// dont l'image de flux est réellement petite OU dont le domaine fait partie
+// des candidats payants (voir index.html) — jamais pour tout le fil. La
+// réponse est minuscule et mise en cache longuement par le CDN, donc
+// mutualisée entre tous les utilisateurs.
 "use strict";
 
 const { assertSafeUrl } = require("./feed.js");
-const { metaContent } = require("../src/lib.js");
+const { metaContent, isPaywalledHtml } = require("../src/lib.js");
 
 const FETCH_TIMEOUT_MS = 6000;
 // Les balises Open Graph vivent dans le <head> : inutile de lire l'article
@@ -102,6 +110,12 @@ async function handler(req, res) {
     if (!upstream.ok || !/html/i.test(type)) throw new Error("pas une page HTML");
 
     const html = await readHead(upstream);
+    // Payant : calculé quel que soit le sort de l'image ci-dessous — les deux
+    // signaux viennent de la même lecture de <head>, aucune requête de plus.
+    const paywalled = isPaywalledHtml(html);
+
+    let image = "";
+    let width = 0;
     const raw = metaContent(html, [
       "og:image:secure_url",
       "og:image:url",
@@ -109,24 +123,26 @@ async function handler(req, res) {
       "twitter:image",
       "twitter:image:src",
     ]);
-    if (!raw) throw new Error("aucune og:image");
-
-    // Résolution en absolu, et refus de tout ce qui n'est pas http(s).
-    const abs = new URL(decodeEntities(raw), upstream.url || url);
-    if (abs.protocol !== "http:" && abs.protocol !== "https:") {
-      throw new Error("schéma d'image non autorisé");
+    if (raw) {
+      // Résolution en absolu, et refus de tout ce qui n'est pas http(s).
+      const abs = new URL(decodeEntities(raw), upstream.url || url);
+      if (abs.protocol === "http:" || abs.protocol === "https:") {
+        image = abs.href;
+        width = parseInt(metaContent(html, ["og:image:width"]) || "0", 10) || 0;
+      }
     }
 
-    const width = parseInt(metaContent(html, ["og:image:width"]) || "0", 10) || 0;
-    // L'image d'un article ne change pratiquement jamais : cache CDN long,
-    // mutualisé entre tous les utilisateurs.
+    // Ni l'image ni l'indicateur payant ne changent en pratique une fois
+    // l'article publié : cache CDN long, mutualisé entre tous les utilisateurs.
     res.setHeader("Cache-Control", "s-maxage=86400, stale-while-revalidate=604800");
-    res.status(200).json({ image: abs.href, width });
+    res.status(200).json({ image, width, paywalled });
   } catch (e) {
-    // Pas d'og:image : réponse explicite et cacheable, pour ne pas réinterroger
-    // la même page à chaque affichage.
+    // Page injoignable ou pas HTML : réponse explicite et cacheable, pour ne
+    // pas réinterroger la même page à chaque affichage.
     res.setHeader("Cache-Control", "s-maxage=3600");
-    res.status(200).json({ image: "", error: (e && e.message) || "indisponible" });
+    res
+      .status(200)
+      .json({ image: "", paywalled: false, error: (e && e.message) || "indisponible" });
   } finally {
     clearTimeout(t);
   }
