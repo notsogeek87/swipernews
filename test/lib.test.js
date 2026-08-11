@@ -99,6 +99,43 @@ test("dropSeen écarte le déjà-vu mais ne tarit jamais le fil", () => {
   assert.equal(lib.dropSeen(list, allSeen).length, 2);
 });
 
+test("isSponsoredItem détecte les libellés éditoriaux standard", () => {
+  assert.ok(lib.isSponsoredItem({ title: "[Sponsorisé] Une offre incroyable" }));
+  assert.ok(lib.isSponsoredItem({ title: "Sponsorisé : ce produit change tout" }));
+  assert.ok(
+    lib.isSponsoredItem({ title: "X", desc: "Contenu sponsorisé par la marque Y." })
+  );
+  assert.ok(lib.isSponsoredItem({ title: "Un publi-reportage pour découvrir Z" }));
+  assert.ok(lib.isSponsoredItem({ title: "Publireportage : la nouvelle gamme" }));
+  assert.ok(lib.isSponsoredItem({ title: "This is Sponsored Content" }));
+  assert.ok(lib.isSponsoredItem({ title: "An advertorial about widgets" }));
+});
+
+test("isSponsoredItem ne filtre pas du contenu éditorial qui parle juste de sponsoring", () => {
+  // Un article DE FOND sur le sponsoring sportif, pas un article sponsorisé.
+  assert.ok(
+    !lib.isSponsoredItem({
+      title: "Le sponsoring sportif en question",
+      desc: "Enquête sur les contrats entre marques et clubs.",
+    })
+  );
+  // « partenaire » seul, sans marqueur explicite : trop générique pour un vrai
+  // article de partenariat éditorial (ex: co-organisation d'un événement).
+  assert.ok(
+    !lib.isSponsoredItem({
+      title: "Notre partenaire local ouvre une nouvelle salle",
+    })
+  );
+  // « communiqué de presse » n'est pas forcément un contenu sponsorisé.
+  assert.ok(
+    !lib.isSponsoredItem({
+      title: "Communiqué de presse : résultats du 2e trimestre",
+    })
+  );
+  assert.ok(!lib.isSponsoredItem({ title: "Titre normal", desc: "Rien à signaler." }));
+  assert.ok(!lib.isSponsoredItem({}));
+});
+
 test("parseJsonFeeds lit les deux formes d'export et ignore les entrées sans url", () => {
   const asArray = lib.parseJsonFeeds(
     '[{"name":"X","url":"https://x/f"},{"name":"sans url"}]'

@@ -316,6 +316,27 @@
     }
   }
 
+  /** Libellés éditoriaux standard du contenu sponsorisé (fr + en), pas de mot
+   *  générique comme « partenaire » ou « communiqué de presse » : trop de
+   *  faux positifs sur du contenu éditorial légitime. */
+  const SPONSORED_PATTERNS = [
+    /\bcontenu\s+sponsoris[ée]/i,
+    /\barticle\s+sponsoris[ée]/i,
+    /\bsponsoris[ée]e?s?\s*[\]:\-–]/i, // « [Sponsorisé] », « Sponsorisé : »
+    /^\s*\[?\s*sponsoris[ée]/i,
+    /\bpubli[-\s]?repor?tage/i,
+    /\bpubli[-\s]?communiqu[ée]/i,
+    /\badvertorial\b/i,
+    /\bsponsored\s+(content|post|article)\b/i,
+    /\bpaid\s+content\b/i,
+    /\bpromoted\s+content\b/i,
+  ];
+  /** Vrai si le titre/résumé d'un item porte un marqueur de contenu sponsorisé. */
+  function isSponsoredItem(item) {
+    const text = `${(item && item.title) || ""} ${(item && item.desc) || ""}`;
+    return SPONSORED_PATTERNS.some((re) => re.test(text));
+  }
+
   /** Sources depuis un export JSON (tableau, ou objet {feeds:[...]}) . */
   function parseJsonFeeds(text) {
     const data = JSON.parse(text);
@@ -380,6 +401,7 @@
     dropSeen,
     dedupAndRank,
     interleave,
+    isSponsoredItem,
     hostOf,
     parseJsonFeeds,
     parseOpmlFeeds,

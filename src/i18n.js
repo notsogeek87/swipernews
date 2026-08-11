@@ -93,6 +93,7 @@
 
       "sheet.sources.title": "📰 Sources d'actualité",
       "sheet.sources.sub": "Coche les flux à afficher, ajoute ceux que tu veux.",
+      "sheet.sources.filterSponsored": "Filtrer les articles sponsorisés",
       "sheet.sources.placeholder": "https://exemple.com/rss",
       "sheet.sources.add": "Ajouter",
       "sheet.sources.exportOpml": "↓ Exporter (OPML)",
@@ -279,6 +280,7 @@
 
       "sheet.sources.title": "📰 News sources",
       "sheet.sources.sub": "Check the feeds to show, add whichever you like.",
+      "sheet.sources.filterSponsored": "Filter out sponsored articles",
       "sheet.sources.placeholder": "https://example.com/rss",
       "sheet.sources.add": "Add",
       "sheet.sources.exportOpml": "↓ Export (OPML)",
