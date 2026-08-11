@@ -47,7 +47,25 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
   fond clair (ciel, neige)
 - Titre, résumé, image, source et date tirés directement des flux RSS. Quand un
   article propose plusieurs tailles d'image, la **plus grande** est retenue (les
-  flux listent la vignette en premier ; la prendre donnait des fonds flous)
+  flux listent la vignette en premier ; la prendre donnait des fonds flous).
+  Si le flux n'en publie aucune (fréquent chez les sites WordPress nus), l'app
+  tente de son côté une image de partage (`og:image`) une fois la carte proche
+  de l'écran
+- **Filtre sponsorisé et bons plans** (activé par défaut, réglage dans le
+  panneau Sources) : écarte du fil les articles marqués comme contenu
+  sponsorisé (titre, résumé ou catégorie RSS) et les articles de la rubrique
+  « bons plans » (détectés au chemin de l'URL, `/bons-plans/` — répandu chez
+  les sites tech français — plutôt qu'à des mots-clés, souvent absents d'un
+  titre de bon plan purement descriptif). Voir `isPromotionalItem` (`src/lib.js`)
+- **Indicateur d'article payant** : une pastille `$` discrète, à côté du
+  bouton « Lire l'article », signale un article réservé aux abonnés — vérifié
+  **par article**, pas par domaine (la quasi-totalité des sites de presse ont
+  aussi du contenu gratuit). Le signal vient de la page elle-même
+  (`isAccessibleForFree` en JSON-LD, ou à défaut le texte « Réservé aux
+  abonnés »), lue uniquement pour les articles d'une liste de domaines
+  candidats, une fois la carte proche de l'écran — jamais pour tout le fil.
+  Voir `isPaywallCandidateDomain`/`isPaywalledHtml` (`src/lib.js`) et
+  `articleMetaFor` (`index.html`)
 - Gestion des sources : ajout, suppression, activation/désactivation
 - Import / export des sources aux formats **OPML** (standard) et **JSON** — importe tes sources et lis-les directement
 - Partage d'un article (feuille de partage du système — celle de l'appareil, avec ses applications — ou, à défaut, menu WhatsApp / Telegram / mail / X / copie du lien),
@@ -280,17 +298,22 @@ Une seule règle : **les sources ne sont interrogées qu'une fois toutes les
   récupéré** date de plus de **30 minutes**. En deçà, le cache local est servi
   tel quel, **sans le moindre appel réseau** : rouvrir l'app dix fois en dix
   minutes ne déclenche qu'un seul aller-retour vers les sources.
-  Dans l'app native, un signal supplémentaire s'ajoute : l'événement `resume`
-  de `@capacitor/app`, adossé directement à `onResume()` de l'Activity Android
-  — plus fiable que `visibilitychange` dans cette WebView. Les deux se
-  chevauchent volontairement (le doublon éventuel est ignoré par `loadFeeds`
-  via son compteur de génération), plutôt que de choisir l'un ou l'autre.
-  La vérification périodique est un filet de sécurité en dernier recours : sur
-  Android, une app mise en arrière-plan est presque toujours **suspendue**, pas
-  tuée — pas de rechargement à froid, et ni `visibilitychange` ni `resume` ne
-  sont formellement garantis au retour (le code le documente déjà pour la
-  sauvegarde de position). Sans ce filet, une actualisation qui rate ses deux
-  déclencheurs ne se rattraperait jamais, même après des heures. La
+  Dans l'app native, DEUX signaux supplémentaires s'ajoutent, redondants à
+  dessein plutôt qu'un choix entre eux (le doublon éventuel est ignoré par
+  `loadFeeds` via son compteur de génération) :
+  - l'événement `resume` de `@capacitor/app` (`index.html`), plus fiable que
+    `visibilitychange` dans cette WebView, mais qui reste relayé par le pont
+    JS du plugin ;
+  - `onResume()` de l'Activity elle-même (`MainActivity.java`), qui évalue
+    directement `loadFeeds()` dans la WebView — un cran plus bas que le
+    plugin, donc encore plus fiable, puisqu'il ne dépend d'aucun relais JS
+    pour être livré.
+  La vérification périodique reste un filet de sécurité en dernier recours :
+  sur Android, une app mise en arrière-plan est presque toujours
+  **suspendue**, pas tuée — pas de rechargement à froid, et aucun des trois
+  signaux n'est formellement garanti au retour (le code le documente déjà pour
+  la sauvegarde de position). Sans ce filet, une actualisation qui rate ses
+  trois déclencheurs ne se rattraperait jamais, même après des heures. La
   vérification elle-même ne coûte rien : `loadFeeds()` sans `force` ressort
   immédiatement si le seuil n'est pas atteint.
 - **Sur demande** — bouton **↻**, *Réessayer*, changement de sources ou de
@@ -564,11 +587,21 @@ place dans l'article. Deux détails rendent la chose fluide :
   page — un changement de hauteur de vue relancerait la mise en page du site à
   chaque geste. D'où le `FrameLayout` : la barre flotte au-dessus de la WebView,
   qui ne bouge jamais ;
-- les marges viennent de `getInsetsIgnoringVisibility` et non de `getInsets` :
-  escamoter la barre d'état changerait sinon les marges, donc la zone de rendu,
-  donc… la mise en page du site, à nouveau. La WebView reçoit une marge haute
-  égale à la hauteur de la barre, avec `clipToPadding=false` pour que le texte
-  passe *sous* la barre en défilant au lieu d'être coupé.
+- les marges latérales/basses viennent de `getInsetsIgnoringVisibility` et non
+  de `getInsets` : escamoter la barre d'état changerait sinon ces marges, donc
+  la zone de rendu, donc… la mise en page du site, à nouveau. En haut, la
+  WebView reçoit une vraie **marge de vue** (`topMargin`, pas un padding) égale
+  à la hauteur de la barre. La nuance compte : un padding aurait laissé
+  l'en-tête du site partiellement caché sous la barre dès qu'il est en
+  `position:fixed`/`sticky` — la norme pour la presse — puisqu'un padding ne
+  déplace jamais un élément fixe (modèle de boîte CSS, pas une bizarrerie de
+  WebView), alors qu'il continue d'être dessiné dans la zone que la barre
+  recouvre. Une marge, elle, réduit les bornes RÉELLES de la WebView : rien ne
+  peut plus jamais y être dessiné, fixe ou non. Contrepartie assumée : quand la
+  barre s'efface au scroll, la bande qu'elle occupait reste vide un instant au
+  lieu de laisser le site en profiter — les deux ne sont pas conciliables sans
+  redimensionner la WebView pendant l'animation, ce que le paragraphe
+  précédent interdit justement.
 
 Détails d'implémentation qui comptent :
 
@@ -1007,11 +1040,21 @@ ouvrir la demande d'inclusion sur `gitlab.com/fdroid/fdroiddata`.
 ## Architecture
 
 - **Actus** : `api/feed.js` (proxy RSS durci) ou, en repli, proxys CORS publics.
-- **Images** : quand un flux ne publie qu'une vignette (Franceinfo sert des URL
-  Thumbor **signées** en 432 px, où la taille fait partie de la signature — donc
-  non modifiable), `api/og.js` va lire la balise `og:image` de l'article, qui
-  pointe vers la version pleine taille. Appelé uniquement si l'image du flux est
-  réellement petite, résultat mémorisé côté client et mis en cache 24 h par le CDN.
+- **Images et statut payant** : `api/og.js` lit la page d'un article pour DEUX
+  signaux distincts, extraits d'une même requête — jamais deux appels pour une
+  seule page. Image : quand un flux ne publie qu'une vignette (Franceinfo sert
+  des URL Thumbor **signées** en 432 px, où la taille fait partie de la
+  signature — donc non modifiable) ou n'en publie **aucune**, `api/og.js` va
+  lire la balise `og:image` de l'article, qui pointe vers la version pleine
+  taille ou comble l'absence. Statut payant : le signal `isAccessibleForFree`
+  (JSON-LD schema.org, celui qu'utilise Google Actualités) est cherché dans la
+  même page — lu plus profondément que la simple balise `og:image` (paramètre
+  `paywall=1`) quand le domaine appartient à une liste de candidats
+  (`isPaywallCandidateDomain`, `src/lib.js`), parce que ce signal vit souvent
+  après le `<head>` sur les sites en rendu serveur (Next.js et consorts), là
+  où `og:image` seul n'a jamais besoin d'aller chercher aussi loin. Résultat
+  mémorisé côté client (un seul cache pour les deux signaux) et mis en cache
+  24 h par le CDN.
 - **Wikipédia** : `api/learn.js` agrège **côté serveur** les catégories
   demandées (cache CDN mutualisé entre utilisateurs). Le front l'appelle en priorité et
   se rabat sur son agrégation client si l'endpoint n'est pas déployé (hébergement statique).

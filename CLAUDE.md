@@ -351,6 +351,22 @@ genre de script dérape.
 - `renderFilters()` / `openPicker()` — les deux pastilles de filtre et leur
   feuille. `filterChips()` fabrique les puces une seule fois pour les deux, qui
   ne peuvent donc pas diverger.
+- `filterSponsored` / `isPromotionalItem()` (`src/lib.js`) — filtre sponsorisé
+  ET bons plans, un seul réglage (case dans le panneau Sources, activée par
+  défaut). Appliqué dans `fetchFeedRobust()`, donc identique web/natif sans
+  aucun appel réseau. Détection par texte (titre/résumé/catégorie RSS) pour le
+  sponsorisé ; par chemin d'URL (`/bons-plans/`) pour les bons plans — un titre
+  de bon plan est en général purement descriptif (prix, produit), sans jamais
+  dire « bon plan ».
+- `articleMetaFor()` / `checkPaywall()` / `checkMissingImage()` — deux filets
+  asynchrones, tous deux gated par `IntersectionObserver` (jamais pour tout le
+  fil) et partageant le MÊME cache par lien (`ogCache`), pour ne jamais
+  interroger deux fois la page d'un même article. `checkPaywall` (candidats
+  seulement, voir `isPaywallCandidateDomain`) pose la pastille `$` si
+  `isPaywalledHtml` confirme sur la vraie page (pas le domaine, qui ne sert
+  que de préfiltre). `checkMissingImage` comble une image totalement absente du
+  flux (contrairement à `applyBg`, qui ne s'occupe que d'une image trop
+  petite).
 - `ICON_*` / `setIcons()` — UNE famille de tracés pour toute l'app (2 px,
   boîte de 24, `currentColor`), posée aussi dans la barre du haut. Ne pas y
   remettre d'emoji ni de glyphe de police : ils ne s'alignent pas entre eux.
@@ -383,9 +399,9 @@ genre de script dérape.
 
 | Fichier | Rôle |
 | --- | --- |
-| `MainActivity` | `registerPlugin(InAppBrowserPlugin)` **avant** `super.onCreate` |
+| `MainActivity` | `registerPlugin(InAppBrowserPlugin)` **avant** `super.onCreate` ; `onResume()` évalue directement `loadFeeds()` dans la WebView — signal de reprise le plus fiable, sans passer par le pont `@capacitor/app` |
 | `InAppBrowserPlugin` | Pont JS→natif : `open`, `share`, `saveFile`, `syncBlocklist`, `clearBlocklist` |
-| `InAppBrowserActivity` | Le lecteur : barre escamotable, insets, injections |
+| `InAppBrowserActivity` | Le lecteur : barre escamotable, insets, injections. `applyWebPadding()` pose une **marge de vue** (`topMargin`), jamais un padding, sur `reader_web` — un padding ne pousse jamais un élément `position:fixed`/`sticky` (l'en-tête de la plupart des sites de presse), qui resterait donc caché sous la barre |
 | `ReaderWebView` | Sous-classe minimale, seulement pour exposer `onScrollChanged` |
 | `BlocklistStore` | Liste de blocage : parsing, téléchargement, cache, fusion |
 
@@ -437,6 +453,19 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   zone de rendu, donc la mise en page du site — à chaque geste.
 - **Ne jamais redimensionner la WebView pour animer la barre** : elle coulisse
   en `translationY` au-dessus, dans un `FrameLayout`.
+- **Un `padding` ne déplace jamais un élément `position:fixed`/`sticky`**
+  (modèle de boîte CSS, vrai pour tout moteur de rendu, pas une bizarrerie
+  WebView). Une barre flottante posée par-dessus une WebView continue donc de
+  recouvrir l'en-tête `position:fixed` d'un site, quel que soit le padding
+  réservé — seule une vraie **marge de vue** (`topMargin`) réduit les bornes
+  RÉELLES de la WebView, empêchant tout rendu (fixe ou non) sous la barre.
+  Contrepartie : la marge ne peut pas suivre l'animation de la barre (voir le
+  point précédent), donc la zone qu'elle occupe reste vide quand la barre
+  s'efface, plutôt que de laisser le site en profiter.
+- **`\b` juste après une lettre accentuée échoue TOUJOURS en JS**, y compris
+  en fin de chaîne : sans indicateur Unicode, `\w` ne couvre que
+  `[A-Za-z0-9_]`, donc `é`/`è`/… ne comptent jamais comme un caractère de mot
+  pour `\b`. `/sponsoris[ée]\b/i` ne matche donc jamais « Sponsorisé » seul.
 - **Parsing d'une liste de blocage** : `lemonde.fr##.banniere` est une règle
   *cosmétique*, pas une ligne hosts avec commentaire. La couper au `#` donne
   `lemonde.fr` et fait **bloquer le site**. Un `#` n'est un commentaire que
