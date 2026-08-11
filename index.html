@@ -734,9 +734,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=85"></script>
-<script src="src/learn-core.js?v=85"></script>
-<script src="src/i18n.js?v=85"></script>
+<script src="src/lib.js?v=86"></script>
+<script src="src/learn-core.js?v=86"></script>
+<script src="src/i18n.js?v=86"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1162,7 +1162,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="85";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="86";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1618,7 +1618,11 @@ async function loadLearnPart(my,key,force,attempt=0){
     // Repli hors-ligne : les articles de démo, mais seulement s'il n'y a rien
     // d'autre à montrer — les actus, elles, ont pu répondre.
     if(items.length){
-      toast(T("toast.network.stale"));   // même signal que côté actus : voir loadNewsPart
+      // La raison de l'échec est ajoutée en clair : sans elle, ce toast et
+      // celui des actus (voir loadNewsPart) se ressemblent trop pour dire
+      // lequel a vraiment échoué, ni pourquoi — un détail lisible à l'écran
+      // vaut mieux que d'avoir à rouvrir les DevTools pour le savoir.
+      toast(T("toast.network.stale")+` (Wikipédia : ${(e&&e.message)||"?"})`,4200);
       return;
     }
     learnItems=DEMO_LEARN.map(markKind("learn"));
@@ -1783,7 +1787,15 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
       // échoué : mieux vaut du contenu un peu ancien qu'un écran d'erreur. Et
       // même sans actus du tout, la moitié Wikipédia suffit à faire un fil —
       // l'écran d'erreur est réservé au cas où il ne reste vraiment rien.
-      if(cached||sameFeed||items.length)toast(T("toast.network.stale"));
+      // Les sources parties en échec sont nommées : voir le même choix pour
+      // le toast « Injoignable » plus bas, et la note sur le toast Wikipédia
+      // symétrique (voir loadLearnPart) — un détail lisible à l'écran vaut
+      // mieux qu'avoir à rouvrir les DevTools pour savoir ce qui a raté.
+      if(cached||sameFeed||items.length){
+        const noms=failed.map(f=>f.name);
+        const liste=noms.length>3?noms.slice(0,3).join(", ")+" +"+(noms.length-3):noms.join(", ");
+        toast(T("toast.network.stale")+(liste?` (${liste})`:""),4200);
+      }
       else{newsItems=[];remix();render();showEmpty();}
     }else{
       lastNewsLoad=Date.now();
