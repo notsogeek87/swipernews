@@ -276,28 +276,52 @@ public class InAppBrowserActivity extends AppCompatActivity {
     }
 
     /**
-     * Marges de la WebView : les barres système sur les côtés et en bas,
-     * JAMAIS de marge haute réservée ici.
+     * Marges de la WebView : barres système sur les côtés et en bas (padding,
+     * comme avant), et — point clé — une vraie MARGE DE VUE en haut, jamais un
+     * padding, pour la hauteur de la barre.
      *
-     * <p>En mode lecture, la marge haute est celle de la page elle-même
-     * (--sn-top, voir pushReaderTop/readerApplied) — poser aussi une marge
-     * ici la doublerait, exactement comme avant.
+     * <p>{@code reader_barwrap} flotte par-dessus {@code reader_web} : ce sont
+     * deux vues distinctes d'un même FrameLayout (voir activity_reader.xml),
+     * la barre au-dessus en z-order. Un padding sur la WebView ne fait que
+     * décaler où COMMENCE le rendu de la page à l'intérieur d'une zone qui,
+     * elle, s'étend quand même sous la barre — un en-tête de site en
+     * {@code position:fixed}/{@code sticky} (la norme pour la presse) ignore
+     * ce padding (modèle de boîte CSS, pas une bizarrerie de WebView) et se
+     * retrouve dessiné exactement là, donc recouvert par notre barre opaque.
+     * Un essai précédent avait retiré le padding : ça ne changeait rien, la
+     * barre restant une vue à part qui recouvre cette zone quoi qu'il arrive
+     * DANS la WebView.
      *
-     * <p>En mode page complète, réserver {@code barHeight} en haut poussait
-     * bien le flux normal de la page, mais PAS son en-tête quand celui-ci est
-     * en {@code position:fixed}/{@code sticky} — ce qu'utilise la plupart des
-     * sites de presse pour le leur. Ce n'est pas une bizarrerie de WebView :
-     * un padding sur un ancêtre ne déplace jamais un élément fixe, quel que
-     * soit le moteur de rendu, c'est le modèle de boîte CSS. L'en-tête du
-     * site restait donc partiellement caché sous notre propre barre. Notre
-     * barre flotte désormais par-dessus le site, comme la barre d'adresse de
-     * n'importe quel navigateur mobile, et s'efface au premier geste vers le
-     * bas (voir onWebScroll) pour dégager l'en-tête — au prix d'un très bref
-     * recouvrement au tout premier affichage, avant le premier scroll.
+     * <p>Une marge, elle, réduit les bornes RÉELLES de la WebView : rien —
+     * fixe ou non — ne peut plus jamais y être dessiné, parce que cette zone
+     * est physiquement hors de sa surface. Posée une seule fois quand
+     * {@code barHeight} est mesuré ou change (mêmes déclencheurs qu'avant),
+     * jamais depuis {@code hideBar()}/{@code showBar()} : la marge ne bouge
+     * donc PAS pendant l'animation de la barre, qui continue de glisser en
+     * {@code translationY} par-dessus une WebView de taille fixe — aucun
+     * risque de relancer la mise en page du site à chaque geste. Contrepartie
+     * assumée : quand la barre s'efface au scroll, la bande qu'elle occupait
+     * reste vide (fond {@code reader_bg}) le temps qu'elle est cachée, plutôt
+     * que de laisser la page en profiter — les deux ne sont pas conciliables
+     * sans redimensionner la WebView pendant l'animation, ce que le projet
+     * interdit explicitement.
+     *
+     * <p>En mode lecture, la marge haute reste celle de la page elle-même
+     * (--sn-top, voir pushReaderTop/readerApplied) — en poser une ici aussi
+     * la doublerait, inchangé par rapport à avant.
      */
     private void applyWebPadding() {
         if (web == null) return;
         web.setPadding(insetLeft, 0, insetRight, insetBottom);
+        ViewGroup.LayoutParams lp = web.getLayoutParams();
+        if (lp instanceof ViewGroup.MarginLayoutParams) {
+            ViewGroup.MarginLayoutParams mlp = (ViewGroup.MarginLayoutParams) lp;
+            int top = readerApplied ? 0 : barHeight;
+            if (mlp.topMargin != top) {
+                mlp.topMargin = top;
+                web.setLayoutParams(mlp);
+            }
+        }
     }
 
     /** Hauteur de la barre en pixels CSS, la seule unité que comprend la page. */

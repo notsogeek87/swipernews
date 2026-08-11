@@ -7,9 +7,13 @@
      colonne) : c'est ce qui lui permet de glisser hors de l'écran pendant la
      lecture sans redimensionner la page — un changement de hauteur de vue
      relancerait la mise en page du site à chaque geste. La WebView reçoit en
-     compensation une marge haute de la hauteur de la barre (posée dans le code)
-     avec clipToPadding=false, pour que le texte commence sous la barre et passe
-     dessous en défilant. -->
+     compensation une vraie MARGE haute de la hauteur de la barre (posée dans
+     le code, voir applyWebPadding) — une marge, pas un padding : elle réduit
+     les bornes réelles de la WebView, pour qu'un en-tête de site en
+     position:fixed/sticky (la norme pour la presse) ne puisse jamais être
+     dessiné sous la barre et s'y retrouver recouvert. clipToPadding=false
+     reste posé pour les côtés/le bas (barres système), où seul un padding
+     est en jeu. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/reader_root"
     android:layout_width="match_parent"
