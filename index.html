@@ -737,9 +737,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=92"></script>
-<script src="src/learn-core.js?v=92"></script>
-<script src="src/i18n.js?v=92"></script>
+<script src="src/lib.js?v=93"></script>
+<script src="src/learn-core.js?v=93"></script>
+<script src="src/i18n.js?v=93"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1182,7 +1182,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="92";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="93";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1774,6 +1774,11 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
     whenFeedIdle(()=>{
       if(my!==loadSeq)return;                       // périmé pendant l'attente du contact
       rebuild(top);render(top);hideStates();feedKeyShown=key;
+      // `top` seul (rendu final) : cacheSave() lit `items`, que rebuild()
+      // vient tout juste de recalculer ci-dessus — l'appeler depuis finish()
+      // AVANT que ce bloc ne s'exécute (un doigt posé sur le fil le reporte)
+      // enregistrerait encore l'ancien `items` sous la nouvelle clé.
+      if(top&&collected.size)cacheSave(key);
     });
   }
   /* Fenêtre progressive : courte pour le tout premier rendu (le contenu doit
@@ -1855,7 +1860,8 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
       else{newsItems=[];remix();render();showEmpty();}
     }else{
       lastNewsLoad=Date.now();
-      cacheSave(key);
+      // cacheSave(key) se fait désormais dans paint()/whenFeedIdle ci-dessus,
+      // une fois `items` réellement à jour (voir son commentaire).
       unreachable=new Set(failed.map(f=>f.url));   // pour marquer le panneau Sources
       if(failed.length){
         // Nommer les flux : « 2 flux injoignables » n'indique pas lesquels
@@ -1915,20 +1921,24 @@ const feedEl=document.getElementById("feed");
    attend un effet immédiat. */
 // Pointer Events plutôt que touch* : couvre aussi bien le doigt (natif) que
 // la souris (web, tests), avec un seul jeu d'écouteurs.
-let feedTouching=false,pendingFeedUpdate=null;
+let feedTouching=false,pendingFeedUpdates=[];
 feedEl.addEventListener("pointerdown",()=>{feedTouching=true;});
 function releaseFeedTouch(){
   feedTouching=false;
-  if(pendingFeedUpdate){const fn=pendingFeedUpdate;pendingFeedUpdate=null;fn();}
+  if(pendingFeedUpdates.length){const fns=pendingFeedUpdates;pendingFeedUpdates=[];fns.forEach(fn=>fn());}
 }
 feedEl.addEventListener("pointerup",releaseFeedTouch);
 feedEl.addEventListener("pointercancel",releaseFeedTouch);
 /* À utiliser pour tout réentrelacement déclenché EN ARRIÈRE-PLAN : reporte
-   l'exécution si un doigt est actuellement posé sur le fil. Un seul en
-   attente à la fois — comme scheduleRender, la dernière mise à jour rend les
-   précédentes obsolètes. */
+   l'exécution si un doigt est actuellement posé sur le fil. Une FILE, pas un
+   simple dernier-remplace-le-précédent : loadLearnPart et loadNewsPart
+   tournent en parallèle et peuvent chacun avoir un appel en attente en même
+   temps — un seul créneau perdait silencieusement celui de l'autre (son
+   rebuild()/cacheSave() n'avait alors jamais lieu). Rejouer les deux à la
+   relâche est sans risque : chaque fonction relit l'état partagé courant
+   (collected, newsItems…) et se protège elle-même via `my!==loadSeq`. */
 function whenFeedIdle(fn){
-  if(feedTouching){pendingFeedUpdate=fn;return;}
+  if(feedTouching){pendingFeedUpdates.push(fn);return;}
   fn();
 }
 let loadingMore=false;
