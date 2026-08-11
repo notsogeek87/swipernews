@@ -160,7 +160,8 @@
   .card__meta{margin-top:16px;display:flex;align-items:center;gap:14px;color:var(--ash);font-size:13px}
   /* Bouton primaire plein : dégradé cocoa -> molten et halo intérieur « braise »
      (seule ombre de tout le système), conformes à la charte au pixel près. */
-  .card__open{margin-top:20px;display:inline-flex;align-items:center;gap:10px;
+  .card__actions{margin-top:20px;display:flex;align-items:stretch;gap:10px}
+  .card__open{display:inline-flex;align-items:center;gap:10px;
     background:linear-gradient(135deg,var(--surface),var(--molten));color:var(--ink);border:none;
     font-family:var(--font-sans);font-weight:500;font-size:15px;letter-spacing:-.01em;
     padding:14px 22px;border-radius:var(--radius-sm);text-decoration:none;cursor:pointer;
@@ -168,6 +169,15 @@
   .card__open:hover{filter:brightness(1.15)}
   .card__open svg{width:18px;height:18px;flex:0 0 auto}
   .card__open:active{transform:translateY(1px) scale(.98)}
+  /* Pastille « payant » : même Eyebrow Tag que .card__cat (surface + liseré +
+     flare), pas le style plein du bouton primaire — c'est une INFO à côté du
+     bouton, pas une seconde action. Élément à part dans .card__actions, jamais
+     dans .card__open : un lecteur presse forcément l'un des deux, autant
+     qu'ils restent distincts au toucher. */
+  .card__paywall{display:inline-flex;align-items:center;justify-content:center;
+    width:48px;flex:0 0 auto;background:var(--surface);border:1px solid var(--redline);
+    color:var(--flare);border-radius:var(--radius-sm)}
+  .card__paywall svg{width:18px;height:18px}
 
   /* Rail UNIQUE en position:fixed, hors des cartes. Auparavant chaque carte
      portait son propre rail avec backdrop-filter:blur(12px) — l'un des effets
@@ -737,9 +747,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=93"></script>
-<script src="src/learn-core.js?v=93"></script>
-<script src="src/i18n.js?v=93"></script>
+<script src="src/lib.js?v=94"></script>
+<script src="src/learn-core.js?v=94"></script>
+<script src="src/i18n.js?v=94"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -747,7 +757,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds","interleave","isSponsoredItem"],
+  const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds","interleave","isSponsoredItem","isPaywalledDomain"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -826,7 +836,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,interleave,isSponsoredItem,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,interleave,isSponsoredItem,isPaywalledDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1182,7 +1192,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="93";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="94";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2316,6 +2326,8 @@ const ICON_TAG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strok
 const ICON_RELOAD=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>`;
 const ICON_SETTINGS=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`;
 const ICON_CHEV=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+// Signale un article probablement payant (voir isPaywalledDomain, src/lib.js).
+const ICON_PAYWALL=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>`;
 function cardHTML(it,id){
   const img=safeImg(it.img,location.href);
   // data-bg (et non un style inline) : chargement paresseux + pas d'URL de flux
@@ -2329,6 +2341,10 @@ function cardHTML(it,id){
   const openLabel=learnCard?T("card.discover"):T("card.readArticle");
   const openIcon=learnCard?ICON_DISCOVER:ICON_READ;
   const catB=it.cat&&catLabelT(it.cat)?`<span class="card__cat">${esc(catLabelT(it.cat))}</span>`:"";
+  // Best effort : voir isPaywalledDomain (src/lib.js) — liste de domaines connus,
+  // pas une lecture de la page. Sans objet pour Wikipédia, jamais payant.
+  const paywall=!learnCard&&link&&isPaywalledDomain(link)
+    ?`<span class="card__paywall" title="${escAttr(T("card.paywall.title"))}" aria-label="${escAttr(T("card.paywall.title"))}">${ICON_PAYWALL}</span>`:"";
   return `<article class="card${img?" card--img":""}${learnCard?" card--learn":""}" data-id="${id}">
     ${bg}
     <div class="card__body">
@@ -2337,7 +2353,10 @@ function cardHTML(it,id){
       <h2 class="card__title">${link?`<a href="${escAttr(link)}" data-open target="_blank" rel="noopener">${esc(it.title)}</a>`:esc(it.title)}</h2>
       ${it.desc?`<p class="card__desc">${esc(it.desc)}</p>`:""}
       <div class="card__meta">${it.date?`<span>${relTime(it.date)}</span>`:""}</div>
-      ${link?`<a class="card__open" data-open href="${escAttr(link)}" target="_blank" rel="noopener">${openIcon}<span>${openLabel}</span></a>`:`<span class="card__open" style="background:transparent;box-shadow:none;border:1px solid var(--redline);color:var(--ash)">${T("card.demo")}</span>`}
+      <div class="card__actions">
+        ${link?`<a class="card__open" data-open href="${escAttr(link)}" target="_blank" rel="noopener">${openIcon}<span>${openLabel}</span></a>`:`<span class="card__open" style="background:transparent;box-shadow:none;border:1px solid var(--redline);color:var(--ash)">${T("card.demo")}</span>`}
+        ${paywall}
+      </div>
     </div>
   </article>`;
 }

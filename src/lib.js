@@ -337,6 +337,52 @@
     return SPONSORED_PATTERNS.some((re) => re.test(text));
   }
 
+  /** Sites dont le contenu est, dans l'immense majorité des cas, réservé aux
+   *  abonnés — pas les sites à paywall « compteur » (quelques articles
+   *  gratuits par mois), trop souvent lisibles pour justifier le badge.
+   *  Liste au mérite, non exhaustive, à compléter au fil de l'eau. */
+  const PAYWALL_DOMAINS = [
+    // Presse française
+    "lemonde.fr",
+    "lefigaro.fr",
+    "lesechos.fr",
+    "liberation.fr",
+    "mediapart.fr",
+    "la-croix.com",
+    "lopinion.fr",
+    "challenges.fr",
+    "courrierinternational.com",
+    "telerama.fr",
+    "alternatives-economiques.fr",
+    "usinenouvelle.com",
+    "latribune.fr",
+    // Presse internationale
+    "nytimes.com",
+    "wsj.com",
+    "ft.com",
+    "economist.com",
+    "washingtonpost.com",
+    "theathletic.com",
+    "newyorker.com",
+    "bloomberg.com",
+    "theinformation.com",
+    "thetimes.co.uk",
+    "telegraph.co.uk",
+    "latimes.com",
+    "bostonglobe.com",
+    "foreignpolicy.com",
+    "hbr.org",
+    "technologyreview.com",
+    "seekingalpha.com",
+    "barrons.com",
+  ];
+  /** Vrai si le lien pointe vers un domaine réputé (quasi) systématiquement
+   *  payant — sous-domaines compris (abonnes.lemonde.fr, etc.). */
+  function isPaywalledDomain(url) {
+    const host = hostOf(url).toLowerCase();
+    return PAYWALL_DOMAINS.some((d) => host === d || host.endsWith("." + d));
+  }
+
   /** Sources depuis un export JSON (tableau, ou objet {feeds:[...]}) . */
   function parseJsonFeeds(text) {
     const data = JSON.parse(text);
@@ -402,6 +448,7 @@
     dedupAndRank,
     interleave,
     isSponsoredItem,
+    isPaywalledDomain,
     hostOf,
     parseJsonFeeds,
     parseOpmlFeeds,

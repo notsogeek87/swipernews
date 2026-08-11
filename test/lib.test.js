@@ -136,6 +136,16 @@ test("isSponsoredItem ne filtre pas du contenu éditorial qui parle juste de spo
   assert.ok(!lib.isSponsoredItem({}));
 });
 
+test("isPaywalledDomain détecte les domaines connus, sous-domaines compris", () => {
+  assert.ok(lib.isPaywalledDomain("https://www.lemonde.fr/politique/article/x.html"));
+  assert.ok(lib.isPaywalledDomain("https://abonnes.lemonde.fr/article/x.html"));
+  assert.ok(lib.isPaywalledDomain("https://www.nytimes.com/2026/08/11/world/y.html"));
+  assert.ok(!lib.isPaywalledDomain("https://www.france24.com/fr/article"));
+  assert.ok(!lib.isPaywalledDomain(""));
+  // ne doit pas confondre un domaine qui CONTIENT la chaîne avec le domaine lui-même
+  assert.ok(!lib.isPaywalledDomain("https://notlemonde.fr/x"));
+});
+
 test("parseJsonFeeds lit les deux formes d'export et ignore les entrées sans url", () => {
   const asArray = lib.parseJsonFeeds(
     '[{"name":"X","url":"https://x/f"},{"name":"sans url"}]'

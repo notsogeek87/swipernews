@@ -212,6 +212,7 @@
       "card.discover": "Découvrir",
       "card.readArticle": "Lire l'article",
       "card.demo": "Article de démo",
+      "card.paywall.title": "Accès payant probable",
     },
     en: {
       "meta.title": "SwiperNews — learn & news in a swipe",
@@ -397,6 +398,7 @@
       "card.discover": "Discover",
       "card.readArticle": "Read article",
       "card.demo": "Demo article",
+      "card.paywall.title": "Likely paywalled",
 
       // Libellés des centres d'intérêt (clés définies dans src/learn-core.js) :
       // absents du français, qui lit directement CATEGORIES.label (voir
