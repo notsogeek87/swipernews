@@ -425,7 +425,22 @@ public class InAppBrowserActivity extends AppCompatActivity {
         readerBtn.setSelected(readerOn);
     }
 
+    /**
+     * Nombre de tentatives supplémentaires si la première ne trouve rien : une
+     * page construite côté client (React/Next.js et consorts) peut avoir fini
+     * de CHARGER (onPageFinished) sans avoir fini de RENDRE son article — le
+     * script s'exécute alors sur un DOM encore squelette. Une seule retentative
+     * suffit à couvrir ce cas sans faire attendre indéfiniment un article
+     * réellement trop court.
+     */
+    private static final int READ_RETRY_MAX = 1;
+    private static final long READ_RETRY_DELAY_MS = 700;
+
     private void injectReadScript() {
+        injectReadScript(0);
+    }
+
+    private void injectReadScript(int attempt) {
         if (!readerOn || web == null) { revealContent(); return; }
         if (readScript == null) readScript = readRaw(R.raw.reader_read);
         if (readScript == null) { revealContent(); return; }
@@ -437,11 +452,22 @@ public class InAppBrowserActivity extends AppCompatActivity {
             + "\",top:" + barCssHeight() + "};\n";
         web.evaluateJavascript(prelude + readScript, value -> web.evaluateJavascript(
             "document.documentElement.dataset.snRead || ''", state -> {
-                // Quel que soit le verdict, la page redevient visible ici : c'est
-                // le seul endroit qui sait que la transformation est terminée.
-                revealContent();
                 // evaluateJavascript rend du JSON : la chaîne arrive entre guillemets.
                 String s = state == null ? "" : state.replace("\"", "");
+                if (s.isEmpty() && attempt < READ_RETRY_MAX) {
+                    // Rien trouvé : le script lui-même n'a rien touché (voir son
+                    // garde-fou en tête, `dataset.snRead` déjà présent → sortie
+                    // immédiate), donc le réinjecter tel quel est sans risque.
+                    // Le voile reste en place pendant l'attente.
+                    web.postDelayed(() -> {
+                        if (web != null) injectReadScript(attempt + 1);
+                    }, READ_RETRY_DELAY_MS);
+                    return;
+                }
+                // Quel que soit le verdict final, la page redevient visible ici :
+                // c'est le seul endroit qui sait que la transformation est
+                // (vraiment) terminée, tentatives comprises.
+                revealContent();
                 // La page simplifiée porte sa propre marge haute : la WebView
                 // lâche la sienne, sinon les deux s'ajoutent.
                 readerApplied = "1".equals(s);

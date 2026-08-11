@@ -189,6 +189,17 @@
       if (run >= 2 && brs[k].parentNode) brs[k].parentNode.removeChild(brs[k]);
     }
 
+    /* Garde-fou final : le score du départ (étape « seuil ») porte sur le bloc
+       AVANT élagage — les étapes 1-6 ci-dessus peuvent l'avoir vidé (encarts
+       comptés comme du texte au score, puis retirés comme UNLIKELY/LABELS/
+       liens denses). Sans ce filet, un article qui franchit tout juste le
+       seuil initial pouvait finir en page de lecture QUASIMENT VIDE : ce n'est
+       pas un échec d'extraction (le message « pas assez de texte » ne
+       s'affiche que si `best` est resté introuvable), donc rien ne le
+       signale — juste un fond coloré sans rien dessus. On revérifie ici, sur
+       ce qui a RÉELLEMENT survécu, avant d'engager le remplacement. */
+    if (len(art) < 200 && !art.querySelector("img")) return;
+
     function meta(sel) {
       var m = document.querySelector(sel);
       return (m && m.getAttribute("content")) || "";
