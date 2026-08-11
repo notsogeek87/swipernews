@@ -1,7 +1,9 @@
 // Fonction serverless Vercel : extrait, côté serveur, l'image de partage
-// (og:image) et l'indicateur d'accès payant d'un article — les DEUX depuis la
-// même lecture de <head>, pour ne jamais payer deux requêtes vers l'éditeur
-// pour une seule page.
+// (og:image) et l'indicateur d'accès payant d'un article — les DEUX depuis LA
+// MÊME lecture, pour ne jamais payer deux requêtes vers l'éditeur pour une
+// seule page. La profondeur de lecture diffère selon ce qui est demandé (voir
+// `deep`, paramètre `paywall=1`) : og:image seul reste tête-seule (rapide),
+// le paywall a besoin de lire plus loin (voir MAX_BYTES_DEEP ci-dessous).
 //
 // Image — pourquoi : certains éditeurs ne publient dans leur flux RSS qu'une
 // vignette très réduite. Franceinfo, par exemple, sert des URL Thumbor
@@ -32,18 +34,27 @@ const FETCH_TIMEOUT_MS = 6000;
 // Les balises Open Graph vivent dans le <head> : inutile de lire l'article
 // entier, on s'arrête bien avant.
 const MAX_BYTES = 256 * 1024;
+// L'indicateur payant (isAccessibleForFree), lui, vit dans un bloc JSON-LD qui
+// n'est PAS garanti dans le <head> — beaucoup de sites en rendu serveur
+// (Next.js et consorts) l'injectent juste avant </body>, une fois tout
+// l'article déjà rendu. S'arrêter à </head> comme pour og:image manquerait
+// donc systématiquement le signal sur ces sites. Lecture plus large, mais
+// seulement quand elle sert (voir `deep` plus bas) — pas pour chaque appel.
+const MAX_BYTES_DEEP = 768 * 1024;
 
-// Lit au plus MAX_BYTES, et s'arrête dès la fin du <head>.
-async function readHead(upstream) {
+// Lit jusqu'à `cap` octets. `stopAtHead` s'arrête dès la fin du <head> (assez
+// pour og:image, jamais assez pour un JSON-LD en fin de page) ; sans lui, lit
+// jusqu'au cap quel que soit l'endroit où </head> apparaît.
+async function readHead(upstream, cap, stopAtHead) {
   const reader = upstream.body && upstream.body.getReader && upstream.body.getReader();
-  if (!reader) return (await upstream.text()).slice(0, MAX_BYTES);
+  if (!reader) return (await upstream.text()).slice(0, cap);
   const dec = new TextDecoder("utf-8");
   let html = "";
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     html += dec.decode(value, { stream: true });
-    if (html.length >= MAX_BYTES || /<\/head>/i.test(html)) {
+    if (html.length >= cap || (stopAtHead && /<\/head>/i.test(html))) {
       try {
         await reader.cancel();
       } catch {
@@ -87,6 +98,10 @@ async function handler(req, res) {
     res.status(400).json({ error: "Paramètre 'url' manquant" });
     return;
   }
+  // Posé par index.html uniquement pour les domaines candidats au paywall
+  // (voir isPaywallCandidateDomain) : un simple appel de secours pour
+  // og:image reste en lecture courte, tête seule.
+  const deep = req.query && req.query.paywall === "1";
   // Même garde anti-SSRF que le proxy de flux : pas de réseau interne.
   try {
     await assertSafeUrl(url);
@@ -109,9 +124,9 @@ async function handler(req, res) {
     const type = upstream.headers.get("content-type") || "";
     if (!upstream.ok || !/html/i.test(type)) throw new Error("pas une page HTML");
 
-    const html = await readHead(upstream);
+    const html = await readHead(upstream, deep ? MAX_BYTES_DEEP : MAX_BYTES, !deep);
     // Payant : calculé quel que soit le sort de l'image ci-dessous — les deux
-    // signaux viennent de la même lecture de <head>, aucune requête de plus.
+    // signaux viennent de la même lecture, aucune requête de plus.
     const paywalled = isPaywalledHtml(html);
 
     let image = "";

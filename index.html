@@ -744,9 +744,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=97"></script>
-<script src="src/learn-core.js?v=97"></script>
-<script src="src/i18n.js?v=97"></script>
+<script src="src/lib.js?v=98"></script>
+<script src="src/learn-core.js?v=98"></script>
+<script src="src/i18n.js?v=98"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1189,7 +1189,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="97";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="98";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2096,7 +2096,13 @@ function articleMetaFor(link){
   if(!link)return Promise.resolve({image:"",paywalled:false});
   if(Object.prototype.hasOwnProperty.call(ogCache,link))return Promise.resolve(ogCache[link]);
   if(ogPending.has(link))return ogPending.get(link);
-  const p=(isNativeApp?nativeArticleMeta(link):fetchWithTimeout("/api/og?url="+encodeURIComponent(link),{},CONFIG.FETCH_TIMEOUT)
+  // paywall=1 : demande à /api/og de lire plus loin que le <head> (voir
+  // MAX_BYTES_DEEP côté api/og.js — le signal isAccessibleForFree vit souvent
+  // en fin de page sur les sites en rendu serveur). Seulement pour les
+  // domaines candidats : inutile d'alourdir chaque appel de secours og:image.
+  const deep=isPaywallCandidateDomain(link);
+  const api="/api/og?url="+encodeURIComponent(link)+(deep?"&paywall=1":"");
+  const p=(isNativeApp?nativeArticleMeta(link):fetchWithTimeout(api,{},CONFIG.FETCH_TIMEOUT)
       .then(r=>r.ok?r.json():null)
       .then(d=>({image:safeImg(d&&d.image,location.href)||"",paywalled:!!(d&&d.paywalled)})))
     .then(meta=>{ogRemember(link,meta);return meta;})
