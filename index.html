@@ -734,9 +734,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=86"></script>
-<script src="src/learn-core.js?v=86"></script>
-<script src="src/i18n.js?v=86"></script>
+<script src="src/lib.js?v=87"></script>
+<script src="src/learn-core.js?v=87"></script>
+<script src="src/i18n.js?v=87"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1162,7 +1162,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="86";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="87";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2393,6 +2393,20 @@ function hideTop(){topEl.classList.add("top--away");document.body.classList.add(
    géométrie (dont scrollHeight, coûteux sur un fil de cartes plein écran) puis
    écrit des styles. En le faisant à chaque événement, on alternait lectures et
    écritures pendant le geste — layout thrashing garanti. */
+/* Cartes Wikipédia encore à venir depuis la position actuelle : sert à
+   réapprovisionner la réserve AVANT qu'elle ne s'épuise, pas seulement près
+   du bas du fil entier. Sans ça, une dose penchée vers Wikipédia avec une
+   réserve d'actus bien plus grande (un seul lot Wikipédia contre jusqu'à
+   MAX_NEWS actus) interlace ce lot puis DÉVERSE tout le reste des actus d'un
+   coup dès qu'il est épuisé (interleave, src/lib.js, ne remélange pas quand
+   une des deux listes est vide) : le seuil « près du bas de TOUT le fil »
+   ne se déclenchait qu'après ce déversement, bien après que l'utilisateur
+   ait déjà traversé plusieurs écrans d'actus sans le moindre article. */
+function learnCardsAhead(){
+  let n=0;
+  for(let i=Math.max(0,currentIndex());i<items.length;i++)if(items[i].kind==="learn")n++;
+  return n;
+}
 let scrollTick=false;
 function onScrollFrame(){
   scrollTick=false;
@@ -2403,8 +2417,12 @@ function onScrollFrame(){
   // L'utilisateur a franchi au moins une carte avant la reprise → on l'annule
   if(resumePending&&top>h*0.5)resumePending=false;
   onCardChange();   // carte courante : marquage « vu », position, rail
-  // Un lot de plus avant d'atteindre le bas → fil sans fin
-  if(!loadingMore&&items.length&&top+h*3>=feedEl.scrollHeight)loadMore();
+  // Un lot de plus avant d'atteindre le bas → fil sans fin. Ou, dès que la
+  // réserve Wikipédia s'annonce maigre alors que la dose en réclame : voir
+  // learnCardsAhead ci-dessus.
+  const nearEnd=top+h*3>=feedEl.scrollHeight;
+  const lowOnLearn=!!mixLevel().learn&&learnCardsAhead()<5;
+  if(!loadingMore&&items.length&&(nearEnd||lowOnLearn))loadMore();
 }
 feedEl.addEventListener("scroll",()=>{
   if(scrollTick)return;
