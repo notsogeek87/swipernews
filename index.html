@@ -734,9 +734,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=88"></script>
-<script src="src/learn-core.js?v=88"></script>
-<script src="src/i18n.js?v=88"></script>
+<script src="src/lib.js?v=89"></script>
+<script src="src/learn-core.js?v=89"></script>
+<script src="src/i18n.js?v=89"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -958,8 +958,25 @@ function mixLists(news,learn,m){
 /* Recompose le fil. Au-delà de MAX_ITEMS on jette la TÊTE (les plus anciennes
    cartes, déjà lues : le fil ne grandit que par le bas), et on retire des deux
    réserves ce qui vient d'en sortir, sinon le prochain mélange les ramènerait. */
-function remix(){
-  items=mixLists(newsItems,learnItems,mixLevel());
+/* `geleAvant` : quand vrai, la carte affichée ET son aperçu (celle juste
+   après, visible en bas d'écran en scroll-snap) ne sont JAMAIS reprises dans
+   le nouvel entrelacement — un changement de dose s'applique toujours à
+   l'instant (voir applyMix), mais sans jamais changer ce qui est sous le
+   doigt : seul ce qui vient APRÈS ce petit prolongement se remélange selon la
+   nouvelle dose. Même règle pour un lot Wikipédia qui arrive en arrière-plan
+   (loadMore, loadLearnPart, rebuild des actus) : sans elle, la carte vers
+   laquelle on est en train de swiper pouvait changer d'identité pendant le
+   geste.
+   Seuls les appelants qui PROLONGENT le fil déjà affiché passent `true`.
+   `adoptItems()` (changement de filtre/langue, restauration d'un instantané —
+   une IDENTITÉ DE FIL DIFFÉRENTE) doit garder le défaut `false` : figer des
+   cartes de l'ANCIEN fil les ferait apparaître au début du nouveau. */
+function remix(geleAvant){
+  const fige=geleAvant?items.slice(0,Math.min(Math.max(0,currentIndex())+2,items.length)):[];
+  const pris=new Set(fige.map(seenKey));
+  const resteNews=newsItems.filter(i=>!pris.has(seenKey(i)));
+  const resteLearn=learnItems.filter(i=>!pris.has(seenKey(i)));
+  items=fige.concat(mixLists(resteNews,resteLearn,mixLevel()));
   if(items.length<=CONFIG.MAX_ITEMS)return;
   const partis=new Set(items.slice(0,items.length-CONFIG.MAX_ITEMS).map(seenKey));
   items=items.slice(items.length-CONFIG.MAX_ITEMS);
@@ -1162,7 +1179,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="88";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="89";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1602,7 +1619,7 @@ async function loadLearnPart(my,key,force,attempt=0){
     }
     if(!arr.length)throw new Error("empty");
     learnItems=arr.map(markKind("learn"));
-    remix();render();hideStates();feedKeyShown=key;
+    remix(true);render();hideStates();feedKeyShown=key;
     if(newsSettled)cacheSave(key);                 // sinon les actus l'enregistreront
     syncing(false);
   }catch(e){
@@ -1709,7 +1726,7 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
     collected.forEach(list=>{all=all.concat(list);});
     all.sort((a,b)=>itemTime(b)-itemTime(a));
     newsItems=all.slice(0,CONFIG.MAX_NEWS);
-    remix();                     // les actus ne sont qu'une moitié du fil
+    remix(true);                 // les actus ne sont qu'une moitié du fil
   }
 
   /* Repeinture GROUPÉE. Repeindre à chaque source qui répond donnait, avec 40
@@ -2204,7 +2221,7 @@ async function loadMore(){
     const fresh=more.filter(m=>!have.has(m.title)).map(markKind("learn"));
     if(fresh.length){
       learnItems=learnItems.concat(fresh);
-      remix();render();
+      remix(true);render();
     }
   }catch(e){warn("load more",e);/* on réessaiera au prochain scroll */}
   finally{loadingMore=false;renderLoadMoreCard();}
@@ -2734,7 +2751,7 @@ function renderMixUI(){updateDoseBtn();renderFilters();renderMix();}
 function applyMix(){
   const m=mixLevel();
   const alt=survivingLink(m);
-  remix();render(false,alt);renderMixUI();
+  remix(true);render(false,alt);renderMixUI();
   // Une moitié réclamée mais jamais chargée (dose montée depuis « actus
   // seules », par exemple) : loadFeeds va la chercher, et ne touche pas à
   // l'autre — elle est déjà à l'écran, donc fraîche à ses propres yeux.
