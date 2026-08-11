@@ -734,9 +734,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=90"></script>
-<script src="src/learn-core.js?v=90"></script>
-<script src="src/i18n.js?v=90"></script>
+<script src="src/lib.js?v=91"></script>
+<script src="src/learn-core.js?v=91"></script>
+<script src="src/i18n.js?v=91"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1179,7 +1179,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="90";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="91";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1724,12 +1724,19 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
      largement le fil : aucune limite en pratique. Avec des centaines de sources
      importées, elle empêche l'une d'elles d'occuper toutes les places. */
   const perFeed=Math.max(CONFIG.MIN_PER_FEED,Math.ceil(CONFIG.MAX_NEWS/active.length));
-  function rebuild(){
+  /* `top` : vrai uniquement pour le rendu FINAL (voir paint ci-dessous). Geler
+     la tête du fil (remix(true)) n'a de sens que pour les repeintures
+     PROGRESSIVES, pour ne pas faire bouger une carte déjà affichée pendant que
+     d'autres sources répondent encore. Le rendu final, lui, remonte
+     l'utilisateur en tête EXPRÈS pour lui montrer du contenu neuf (voir
+     forceTop, plus bas) : la geler aussi annulait ce but — un rafraîchissement,
+     automatique ou ↻, ne changeait alors jamais l'article en tête du fil. */
+  function rebuild(top){
     let all=[];
     collected.forEach(list=>{all=all.concat(list);});
     all.sort((a,b)=>itemTime(b)-itemTime(a));
     newsItems=all.slice(0,CONFIG.MAX_NEWS);
-    remix(true);                 // les actus ne sont qu'une moitié du fil
+    remix(!top);
   }
 
   /* Repeinture GROUPÉE. Repeindre à chaque source qui répond donnait, avec 40
@@ -1746,7 +1753,7 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
     // n'en reçoivent aucun : elles gardent l'ancrage sur l'article lu.
     whenFeedIdle(()=>{
       if(my!==loadSeq)return;                       // périmé pendant l'attente du contact
-      rebuild();render(top);hideStates();feedKeyShown=key;
+      rebuild(top);render(top);hideStates();feedKeyShown=key;
     });
   }
   /* Fenêtre progressive : courte pour le tout premier rendu (le contenu doit
