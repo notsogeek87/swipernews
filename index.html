@@ -674,7 +674,7 @@
 
     <h3 class="secttl" data-i18n="sheet.sources.title">📰 Sources d'actualité</h3>
     <p class="sub" data-i18n="sheet.sources.sub">Coche les flux à afficher, ajoute ceux que tu veux.</p>
-    <label class="sponsorrow"><input type="checkbox" id="sponsorFilterChk"><span data-i18n="sheet.sources.filterSponsored">Filtrer les articles sponsorisés</span></label>
+    <label class="sponsorrow"><input type="checkbox" id="sponsorFilterChk"><span data-i18n="sheet.sources.filterSponsored">Filtrer les articles sponsorisés et bons plans</span></label>
     <div id="feedList"></div>
     <div class="addbox">
       <input id="newUrl" type="url" data-i18n-attr="placeholder:sheet.sources.placeholder" placeholder="https://exemple.com/rss" inputmode="url">
@@ -746,9 +746,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=101"></script>
-<script src="src/learn-core.js?v=101"></script>
-<script src="src/i18n.js?v=101"></script>
+<script src="src/lib.js?v=102"></script>
+<script src="src/learn-core.js?v=102"></script>
+<script src="src/i18n.js?v=102"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -756,7 +756,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds","interleave","isSponsoredItem","isPaywallCandidateDomain","isPaywalledHtml"],
+  const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds","interleave","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -835,7 +835,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,interleave,isSponsoredItem,isPaywallCandidateDomain,isPaywalledHtml,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,interleave,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1191,7 +1191,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="101";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="102";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1250,12 +1250,14 @@ const LS_ADS="fluxswipe.ads.v1";
    activer sciemment, pas un comportement subi. */
 let adsPref=(()=>{try{return localStorage.getItem(LS_ADS)==="block"?"block":"allow";}catch(e){return "allow";}})();
 
-/* Filtre des articles sponsorisés dans le FLUX (pas les pubs de la page
-   ouverte, voir reader_ads.js pour ça). Réglage global, web ET natif —
-   contrairement aux réglages du lecteur ci-dessus, réservés à l'app
-   packagée. Défaut ACTIVÉ : contrairement au blocage de pub, ça ne prive
-   aucun éditeur de revenu ni ne déclenche de mur anti-adblock, ça reflète
-   juste ce que l'utilisateur veut voir dans son propre fil déjà curaté. */
+/* Filtre des articles sponsorisés ET bons plans dans le FLUX (pas les pubs de
+   la page ouverte, voir reader_ads.js pour ça) — un seul réglage pour les
+   deux, tous deux du contenu promotionnel plutôt qu'éditorial (voir
+   isPromotionalItem, src/lib.js). Réglage global, web ET natif — contrairement
+   aux réglages du lecteur ci-dessus, réservés à l'app packagée. Défaut
+   ACTIVÉ : contrairement au blocage de pub, ça ne prive aucun éditeur de
+   revenu ni ne déclenche de mur anti-adblock, ça reflète juste ce que
+   l'utilisateur veut voir dans son propre fil déjà curaté. */
 const LS_SPONSOR="fluxswipe.sponsorfilter.v1";
 let filterSponsored=(()=>{
   try{const v=localStorage.getItem(LS_SPONSOR);return v===null?true:v==="1";}
@@ -1445,14 +1447,14 @@ async function fetchFeedRss2Json(feed){
   })).filter(i=>i.title);
 }
 /* Récupération robuste d'un flux : backend/proxys + XML d'abord, puis repli rss2json.
-   Filtre sponsorisé appliqué ICI, après le repli : un flux entièrement composé
-   d'articles sponsorisés ne doit pas déclencher le repli rss2json, réservé aux
-   échecs/réponses vides réels. */
+   Filtre sponsorisé/bons plans appliqué ICI, après le repli : un flux
+   entièrement composé de ce genre d'articles ne doit pas déclencher le repli
+   rss2json, réservé aux échecs/réponses vides réels. */
 async function fetchFeedRobust(feed){
   let a;
   try{a=await fetchFeed(feed);}catch(e){/* repli rss2json */}
   if(!a||!a.length)a=await fetchFeedRss2Json(feed);
-  return filterSponsored?a.filter(i=>!isSponsoredItem(i)):a;
+  return filterSponsored?a.filter(i=>!isPromotionalItem(i)):a;
 }
 async function fetchFeed(feed){
   const text=await fetchText(feed.url);
@@ -1463,8 +1465,9 @@ async function fetchFeed(feed){
     let link=get("link");if(!link){const l=n.querySelector("link");link=l?.getAttribute("href")||"";}
     const raw=get("description")||get("summary")||get("content");
     const fi=findImage(n,raw);
-    // <category> : pas affiché, seulement lu par isSponsoredItem — certains
-    // éditeurs y posent « Sponsorisé » plutôt que dans le titre/résumé.
+    // <category> : pas affiché, seulement lu par isPromotionalItem — certains
+    // éditeurs y posent « Sponsorisé » ou « Bons plans » plutôt que dans le
+    // titre/résumé.
     const tags=[...n.querySelectorAll("category")].map(c=>c.textContent.trim()).filter(Boolean).join(" ");
     return {source:feed.name,title:get("title"),desc:stripHtml(raw),link,
       img:fi.url,imgFrom:fi.from,imgW:fi.w,tags,

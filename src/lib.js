@@ -346,14 +346,30 @@
    *  seul ne matchait pas. */
   const SPONSORED_TAG_PATTERN =
     /\bsponsoris[ée]e?s?|\bpubli[-\s]?repor?tage\b|\bpubli[-\s]?communiqu[ée]|\badvertorial\b|\bsponsored\b/i;
-  /** Vrai si le titre/résumé/catégories d'un item porte un marqueur de
-   *  contenu sponsorisé. `tags` (catégories RSS, voir fetchFeed dans
-   *  index.html) est optionnel — un flux qui n'en publie pas n'y perd rien. */
-  function isSponsoredItem(item) {
+
+  /** Articles « bons plans » (sélections de promos, souvent affiliées) : PAS
+   *  de motif de titre/résumé — un titre de bon plan est en général purement
+   *  descriptif du produit et de son prix (« 50 Go à 7,99 € sur le réseau
+   *  d'Orange… »), sans jamais dire « bon plan ». Le chemin d'URL, lui, est
+   *  une convention répandue chez les sites tech français (Frandroid, Les
+   *  Numériques, Numerama…) : /bons-plans/ y désigne toujours cette rubrique,
+   *  jamais un article éditorial classique — bien plus fiable qu'un mot-clé.
+   *  Complété par la catégorie RSS quand le flux la publie. */
+  const DEAL_PATH_PATTERN = /\/bons?-plans?\//i;
+  const DEAL_TAG_PATTERN = /\bbons?[\s-]?plans?\b/i;
+
+  /** Vrai si l'item est un contenu commercial que l'utilisateur a choisi de
+   *  filtrer : sponsorisé (titre/résumé/catégories) OU bon plan (chemin de
+   *  l'URL/catégories) — un seul réglage couvre les deux, tous deux étant du
+   *  contenu promotionnel plutôt qu'éditorial. `tags` (catégories RSS, voir
+   *  fetchFeed dans index.html) est optionnel — un flux qui n'en publie pas
+   *  n'y perd rien. */
+  function isPromotionalItem(item) {
     const text = `${(item && item.title) || ""} ${(item && item.desc) || ""}`;
     if (SPONSORED_PATTERNS.some((re) => re.test(text))) return true;
     const tags = (item && item.tags) || "";
-    return SPONSORED_TAG_PATTERN.test(tags);
+    if (SPONSORED_TAG_PATTERN.test(tags) || DEAL_TAG_PATTERN.test(tags)) return true;
+    return DEAL_PATH_PATTERN.test((item && item.link) || "");
   }
 
   /** Sites où au moins UNE PARTIE du contenu est réservée aux abonnés — quasi
@@ -521,7 +537,7 @@
     dropSeen,
     dedupAndRank,
     interleave,
-    isSponsoredItem,
+    isPromotionalItem,
     isPaywallCandidateDomain,
     isPaywalledHtml,
     hostOf,

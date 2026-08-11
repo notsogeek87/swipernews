@@ -99,20 +99,20 @@ test("dropSeen écarte le déjà-vu mais ne tarit jamais le fil", () => {
   assert.equal(lib.dropSeen(list, allSeen).length, 2);
 });
 
-test("isSponsoredItem détecte les libellés éditoriaux standard", () => {
-  assert.ok(lib.isSponsoredItem({ title: "[Sponsorisé] Une offre incroyable" }));
-  assert.ok(lib.isSponsoredItem({ title: "Sponsorisé : ce produit change tout" }));
+test("isPromotionalItem détecte les libellés éditoriaux standard (sponsorisé)", () => {
+  assert.ok(lib.isPromotionalItem({ title: "[Sponsorisé] Une offre incroyable" }));
+  assert.ok(lib.isPromotionalItem({ title: "Sponsorisé : ce produit change tout" }));
   assert.ok(
-    lib.isSponsoredItem({ title: "X", desc: "Contenu sponsorisé par la marque Y." })
+    lib.isPromotionalItem({ title: "X", desc: "Contenu sponsorisé par la marque Y." })
   );
-  assert.ok(lib.isSponsoredItem({ title: "Un publi-reportage pour découvrir Z" }));
-  assert.ok(lib.isSponsoredItem({ title: "Publireportage : la nouvelle gamme" }));
-  assert.ok(lib.isSponsoredItem({ title: "This is Sponsored Content" }));
-  assert.ok(lib.isSponsoredItem({ title: "An advertorial about widgets" }));
+  assert.ok(lib.isPromotionalItem({ title: "Un publi-reportage pour découvrir Z" }));
+  assert.ok(lib.isPromotionalItem({ title: "Publireportage : la nouvelle gamme" }));
+  assert.ok(lib.isPromotionalItem({ title: "This is Sponsored Content" }));
+  assert.ok(lib.isPromotionalItem({ title: "An advertorial about widgets" }));
   // Cas réel manqué en production : « Dossier sponsorisé » (Les Numériques),
   // ni « contenu » ni « article » sponsorisé, aucune ponctuation à suivre.
   assert.ok(
-    lib.isSponsoredItem({
+    lib.isPromotionalItem({
       title: "Shark StainStriker HairPro Pet : la shampouineuse efficace pour tous",
       desc: "Dossier sponsorisé",
     })
@@ -120,23 +120,23 @@ test("isSponsoredItem détecte les libellés éditoriaux standard", () => {
   // Le même libellé posé en catégorie RSS plutôt que dans le titre/résumé —
   // c'est là que certains éditeurs le mettent, voir fetchFeed (index.html).
   assert.ok(
-    lib.isSponsoredItem({
+    lib.isPromotionalItem({
       title: "Un test produit tout à fait normal",
       tags: "Sponsorisé",
     })
   );
   assert.ok(
-    lib.isSponsoredItem({
+    lib.isPromotionalItem({
       title: "Un communiqué banal",
       tags: "Actualité, Publi-reportage",
     })
   );
 });
 
-test("isSponsoredItem ne filtre pas du contenu éditorial qui parle juste de sponsoring", () => {
+test("isPromotionalItem ne filtre pas du contenu éditorial qui parle juste de sponsoring", () => {
   // Un article DE FOND sur le sponsoring sportif, pas un article sponsorisé.
   assert.ok(
-    !lib.isSponsoredItem({
+    !lib.isPromotionalItem({
       title: "Le sponsoring sportif en question",
       desc: "Enquête sur les contrats entre marques et clubs.",
     })
@@ -144,21 +144,63 @@ test("isSponsoredItem ne filtre pas du contenu éditorial qui parle juste de spo
   // « partenaire » seul, sans marqueur explicite : trop générique pour un vrai
   // article de partenariat éditorial (ex: co-organisation d'un événement).
   assert.ok(
-    !lib.isSponsoredItem({
+    !lib.isPromotionalItem({
       title: "Notre partenaire local ouvre une nouvelle salle",
     })
   );
   // « communiqué de presse » n'est pas forcément un contenu sponsorisé.
   assert.ok(
-    !lib.isSponsoredItem({
+    !lib.isPromotionalItem({
       title: "Communiqué de presse : résultats du 2e trimestre",
     })
   );
-  assert.ok(!lib.isSponsoredItem({ title: "Titre normal", desc: "Rien à signaler." }));
-  assert.ok(!lib.isSponsoredItem({}));
+  assert.ok(!lib.isPromotionalItem({ title: "Titre normal", desc: "Rien à signaler." }));
+  assert.ok(!lib.isPromotionalItem({}));
   // Catégories RSS ordinaires, sans rapport avec le sponsoring.
   assert.ok(
-    !lib.isSponsoredItem({ title: "Un article normal", tags: "Économie, France" })
+    !lib.isPromotionalItem({ title: "Un article normal", tags: "Économie, France" })
+  );
+});
+
+test("isPromotionalItem détecte les bons plans via le chemin de l'URL", () => {
+  // Cas réel : le titre est purement descriptif (produit + prix), aucun mot-clé
+  // à chercher — seul le chemin /bons-plans/ trahit la rubrique.
+  assert.ok(
+    lib.isPromotionalItem({
+      title:
+        "50 Go à 7,99 euros sur le réseau d'Orange : le forfait qui suffit sans se ruiner",
+      link: "https://www.frandroid.com/bons-plans/3209229_50-go-a-799-euros-sur-le-reseau-dorange-le-forfait-qui-suffit-sans-se-ruiner",
+    })
+  );
+  // Variantes de graphie plausibles chez d'autres éditeurs.
+  assert.ok(
+    lib.isPromotionalItem({ title: "X", link: "https://www.exemple.fr/bon-plan/y" })
+  );
+  assert.ok(
+    lib.isPromotionalItem({ title: "X", link: "https://www.exemple.fr/bons-plan/y" })
+  );
+  // Catégorie RSS "Bons plans" plutôt que le chemin.
+  assert.ok(
+    lib.isPromotionalItem({
+      title: "Un article sans rapport dans son titre",
+      link: "https://www.exemple.fr/actu/z",
+      tags: "High-Tech, Bons plans",
+    })
+  );
+});
+
+test("isPromotionalItem ne filtre pas un article normal dont l'URL contient juste des mots proches", () => {
+  assert.ok(
+    !lib.isPromotionalItem({
+      title: "Un article éditorial classique",
+      link: "https://www.exemple.fr/actu/bonjour-plans-de-relance.html",
+    })
+  );
+  assert.ok(
+    !lib.isPromotionalItem({
+      title: "Un article normal",
+      link: "https://www.exemple.fr/actu/x",
+    })
   );
 });
 
