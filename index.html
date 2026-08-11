@@ -734,9 +734,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=87"></script>
-<script src="src/learn-core.js?v=87"></script>
-<script src="src/i18n.js?v=87"></script>
+<script src="src/lib.js?v=88"></script>
+<script src="src/learn-core.js?v=88"></script>
+<script src="src/i18n.js?v=88"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1162,7 +1162,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="87";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="88";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1582,6 +1582,10 @@ const RETRY_DELAYS_MS=[1500,3000,5000];
 async function loadLearnPart(my,key,force,attempt=0){
   if(!mixLevel().learn)return;      // dose « actus seules » : Wikipédia n'est pas appelé
   if(!force&&learnItems.length)return;
+  // Même signal que côté actus (voir loadNewsPart) : sans lui, un rechargement
+  // Wikipédia en arrière-plan (dose augmentée, réserve qui se tarit en
+  // scrollant) n'avait AUCUN indice visible avant que les cartes ne changent.
+  syncing(true);
   try{
     let arr=await fetchLearn(CONFIG.BATCH_SIZE);
     if(my!==loadSeq)return;                        // chargement obsolète → on abandonne
@@ -1600,6 +1604,7 @@ async function loadLearnPart(my,key,force,attempt=0){
     learnItems=arr.map(markKind("learn"));
     remix();render();hideStates();feedKeyShown=key;
     if(newsSettled)cacheSave(key);                 // sinon les actus l'enregistreront
+    syncing(false);
   }catch(e){
     if(my!==loadSeq)return;
     warn("learn load",e);
@@ -1613,8 +1618,9 @@ async function loadLearnPart(my,key,force,attempt=0){
     // rafraîchissement qui échoue.
     if(attempt<RETRY_DELAYS_MS.length&&!learnItems.length){
       setTimeout(()=>{if(my===loadSeq)loadLearnPart(my,key,true,attempt+1);},RETRY_DELAYS_MS[attempt]);
-      return;
+      return;                                       // encore en cours : syncing reste allumé
     }
+    syncing(false);
     // Repli hors-ligne : les articles de démo, mais seulement s'il n'y a rien
     // d'autre à montrer — les actus, elles, ont pu répondre.
     if(items.length){
@@ -2419,9 +2425,12 @@ function onScrollFrame(){
   onCardChange();   // carte courante : marquage « vu », position, rail
   // Un lot de plus avant d'atteindre le bas → fil sans fin. Ou, dès que la
   // réserve Wikipédia s'annonce maigre alors que la dose en réclame : voir
-  // learnCardsAhead ci-dessus.
+  // learnCardsAhead ci-dessus. Le seuil (10, pas 5) laisse de la marge pour
+  // que le lot arrive AVANT que l'utilisateur ne swipe jusqu'à la zone
+  // remélangée — sinon le réentrelacement retombe exactement sous le doigt
+  // pendant un swipe rapide, ce qui se voit comme une carte qui saute.
   const nearEnd=top+h*3>=feedEl.scrollHeight;
-  const lowOnLearn=!!mixLevel().learn&&learnCardsAhead()<5;
+  const lowOnLearn=!!mixLevel().learn&&learnCardsAhead()<10;
   if(!loadingMore&&items.length&&(nearEnd||lowOnLearn))loadMore();
 }
 feedEl.addEventListener("scroll",()=>{
