@@ -746,9 +746,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=100"></script>
-<script src="src/learn-core.js?v=100"></script>
-<script src="src/i18n.js?v=100"></script>
+<script src="src/lib.js?v=101"></script>
+<script src="src/learn-core.js?v=101"></script>
+<script src="src/i18n.js?v=101"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1191,7 +1191,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="100";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="101";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2214,6 +2214,38 @@ function observePaywall(scope){
     else checkPaywall(el);
   });
 }
+/* Filet pour les cartes SANS AUCUNE image (flux qui n'en publient pas, WordPress
+   nu et consorts) : tente un og:image une fois la carte proche de l'écran,
+   comme applyBg() le fait déjà pour une image simplement trop petite — jamais
+   essayé jusqu'ici pour une image totalement absente. Même cache/déduplication
+   (articleMetaFor), donc pas de requête en double avec la vérification payante
+   si le même article est aussi un candidat. */
+async function checkMissingImage(el){
+  const link=el.dataset.noimgLink;
+  delete el.dataset.noimgLink;
+  if(!link)return;
+  try{
+    const meta=await articleMetaFor(link);
+    if(!meta.image)return;
+    const card=el.closest(".card");
+    el.className="card__bg";
+    el.style.backgroundImage='url("'+cssString(meta.image)+'")';
+    if(card)card.classList.add("card--img");
+  }catch(e){warn("checkMissingImage",e);}
+}
+const noImgObserver=("IntersectionObserver" in self)?new IntersectionObserver((entries,obs)=>{
+  entries.forEach(en=>{
+    if(!en.isIntersecting)return;
+    obs.unobserve(en.target);
+    checkMissingImage(en.target);
+  });
+},{root:feedEl,rootMargin:"150% 0px"}):null;
+function observeMissingImages(scope){
+  (scope||feedEl).querySelectorAll(".card__noimg[data-noimg-link]").forEach(el=>{
+    if(noImgObserver)noImgObserver.observe(el);
+    else checkMissingImage(el);
+  });
+}
 /* Plus de carte de fin : le fil ne finit plus. Quand les actus sont épuisées,
    les articles Wikipédia prennent le relais et le défilement reste infini. */
 /* Reconstruit le fil en gardant l'utilisateur SUR SON ARTICLE.
@@ -2304,7 +2336,7 @@ function render(forceTop,altAnchor){
   // Conserver le scroll d'un fil précédent laisserait l'utilisateur au milieu
   // d'un contenu qui n'a rien à voir.
   if(!top)setScrollTopInstant(feedEl,0);
-  observeBackgrounds();observePaywall();
+  observeBackgrounds();observePaywall();observeMissingImages();
   if(DEBUG){const e=posEntry(),l=(e&&e.link)||"";const i=e?resolveResume(e):-1;
     dbg(`v${APP_VERSION}  items=${items.length} (${newsItems.length} actus / ${learnItems.length} wiki)\n`+
         `mémorisé=…${l.slice(-24)||"(rien)"}\n`+
@@ -2380,14 +2412,21 @@ const ICON_CHEV=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const ICON_PAYWALL=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>`;
 function cardHTML(it,id){
   const img=safeImg(it.img,location.href);
-  // data-bg (et non un style inline) : chargement paresseux + pas d'URL de flux
-  // interprétée comme du CSS. Voir observeBackgrounds().
-  const bg=img?`<div class="card__bg" data-bg="${escAttr(img)}"></div>`:`<div class="card__noimg"></div>`;
   const link=safeLink(it.link,location.href);
   // La nature de la carte suit l'ARTICLE, plus le mode : les deux se succèdent
   // dans le même fil, et c'est ce qui les distingue d'un coup d'œil (typographie
   // plus dense, badge de thème, verbe d'action différent).
   const learnCard=it.kind==="learn";
+  // data-bg (et non un style inline) : chargement paresseux + pas d'URL de flux
+  // interprétée comme du CSS. Voir observeBackgrounds().
+  // Aucune image dans le flux (WordPress et consorts n'en publient pas
+  // toujours) : data-noimg-link tente un og:image de secours une fois la
+  // carte proche de l'écran, voir observeMissingImages/checkMissingImage —
+  // même filet que pour une image trop petite, jamais essayé jusqu'ici pour
+  // une image totalement absente. Sans objet pour Wikipédia (image directe
+  // de l'API, pas de page HTML tierce à interroger).
+  const bg=img?`<div class="card__bg" data-bg="${escAttr(img)}"></div>`
+    :(!learnCard&&link?`<div class="card__noimg" data-noimg-link="${escAttr(link)}"></div>`:`<div class="card__noimg"></div>`);
   const openLabel=learnCard?T("card.discover"):T("card.readArticle");
   const openIcon=learnCard?ICON_DISCOVER:ICON_READ;
   const catB=it.cat&&catLabelT(it.cat)?`<span class="card__cat">${esc(catLabelT(it.cat))}</span>`:"";
@@ -2865,7 +2904,7 @@ function restoreFeed(){
   // mélanges peuvent avoir la même LONGUEUR sans avoir le même ordre, d'où la
   // comparaison de la dose plutôt que du nombre de cartes.
   if(s.mix!==mixScore)render();
-  observeBackgrounds();observePaywall();updateRail();
+  observeBackgrounds();observePaywall();observeMissingImages();updateRail();
   onCardChange();                                   // recalage du suivi de carte
   return true;
 }
