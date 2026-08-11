@@ -744,9 +744,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=96"></script>
-<script src="src/learn-core.js?v=96"></script>
-<script src="src/i18n.js?v=96"></script>
+<script src="src/lib.js?v=97"></script>
+<script src="src/learn-core.js?v=97"></script>
+<script src="src/i18n.js?v=97"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1189,7 +1189,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="96";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="97";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1439,7 +1439,7 @@ async function fetchFeedRss2Json(feed){
     source:feed.name,title:(it.title||"").trim(),
     desc:stripHtml(it.description||it.content||""),link:it.link||"",
     img:it.thumbnail||(it.enclosure&&it.enclosure.link)||imgFromHtml(it.content||it.description||""),
-    date:it.pubDate||""
+    date:it.pubDate||"",tags:Array.isArray(it.categories)?it.categories.join(" "):""
   })).filter(i=>i.title);
 }
 /* Récupération robuste d'un flux : backend/proxys + XML d'abord, puis repli rss2json.
@@ -1461,8 +1461,11 @@ async function fetchFeed(feed){
     let link=get("link");if(!link){const l=n.querySelector("link");link=l?.getAttribute("href")||"";}
     const raw=get("description")||get("summary")||get("content");
     const fi=findImage(n,raw);
+    // <category> : pas affiché, seulement lu par isSponsoredItem — certains
+    // éditeurs y posent « Sponsorisé » plutôt que dans le titre/résumé.
+    const tags=[...n.querySelectorAll("category")].map(c=>c.textContent.trim()).filter(Boolean).join(" ");
     return {source:feed.name,title:get("title"),desc:stripHtml(raw),link,
-      img:fi.url,imgFrom:fi.from,imgW:fi.w,
+      img:fi.url,imgFrom:fi.from,imgW:fi.w,tags,
       date:get("pubDate")||get("published")||get("updated")};
   }).filter(i=>i.title);
 }

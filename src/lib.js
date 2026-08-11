@@ -320,8 +320,10 @@
    *  générique comme « partenaire » ou « communiqué de presse » : trop de
    *  faux positifs sur du contenu éditorial légitime. */
   const SPONSORED_PATTERNS = [
-    /\bcontenu\s+sponsoris[ée]/i,
-    /\barticle\s+sponsoris[ée]/i,
+    // « Contenu/Article/Dossier/Billet sponsorisé » — les noms qui précèdent
+    // le mot varient selon l'éditeur (Les Numériques dit « Dossier
+    // sponsorisé »), un seul motif pour tous plutôt qu'une entrée par nom.
+    /\b(contenu|article|dossier|billet)\s+sponsoris[ée]/i,
     /\bsponsoris[ée]e?s?\s*[\]:\-–]/i, // « [Sponsorisé] », « Sponsorisé : »
     /^\s*\[?\s*sponsoris[ée]/i,
     /\bpubli[-\s]?repor?tage/i,
@@ -331,10 +333,27 @@
     /\bpaid\s+content\b/i,
     /\bpromoted\s+content\b/i,
   ];
-  /** Vrai si le titre/résumé d'un item porte un marqueur de contenu sponsorisé. */
+  /** Motif plus large, réservé au champ `tags` (catégories RSS) : un
+   *  <category> n'est jamais de la prose, c'est une étiquette délibérée — un
+   *  simple « Sponsorisé » comme valeur suffit à trancher, sans le contexte
+   *  qu'exige SPONSORED_PATTERNS pour éviter les faux positifs dans un texte
+   *  libre (titre/résumé, où « sponsorisé » peut aussi être le SUJET d'un
+   *  article, pas son statut).
+   *  PAS de `\b` final après [ée] : accentué, `é` n'est pas un caractère de
+   *  mot pour `\b` en JS (qui ne connaît que [A-Za-z0-9_] sans indicateur
+   *  Unicode) — un `\b` juste après lui échoue TOUJOURS, y compris en toute
+   *  fin de chaîne. Piège rencontré en écrivant ce motif : « Sponsorisé »
+   *  seul ne matchait pas. */
+  const SPONSORED_TAG_PATTERN =
+    /\bsponsoris[ée]e?s?|\bpubli[-\s]?repor?tage\b|\bpubli[-\s]?communiqu[ée]|\badvertorial\b|\bsponsored\b/i;
+  /** Vrai si le titre/résumé/catégories d'un item porte un marqueur de
+   *  contenu sponsorisé. `tags` (catégories RSS, voir fetchFeed dans
+   *  index.html) est optionnel — un flux qui n'en publie pas n'y perd rien. */
   function isSponsoredItem(item) {
     const text = `${(item && item.title) || ""} ${(item && item.desc) || ""}`;
-    return SPONSORED_PATTERNS.some((re) => re.test(text));
+    if (SPONSORED_PATTERNS.some((re) => re.test(text))) return true;
+    const tags = (item && item.tags) || "";
+    return SPONSORED_TAG_PATTERN.test(tags);
   }
 
   /** Sites où au moins UNE PARTIE du contenu est réservée aux abonnés — quasi

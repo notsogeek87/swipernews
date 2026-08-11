@@ -109,6 +109,28 @@ test("isSponsoredItem détecte les libellés éditoriaux standard", () => {
   assert.ok(lib.isSponsoredItem({ title: "Publireportage : la nouvelle gamme" }));
   assert.ok(lib.isSponsoredItem({ title: "This is Sponsored Content" }));
   assert.ok(lib.isSponsoredItem({ title: "An advertorial about widgets" }));
+  // Cas réel manqué en production : « Dossier sponsorisé » (Les Numériques),
+  // ni « contenu » ni « article » sponsorisé, aucune ponctuation à suivre.
+  assert.ok(
+    lib.isSponsoredItem({
+      title: "Shark StainStriker HairPro Pet : la shampouineuse efficace pour tous",
+      desc: "Dossier sponsorisé",
+    })
+  );
+  // Le même libellé posé en catégorie RSS plutôt que dans le titre/résumé —
+  // c'est là que certains éditeurs le mettent, voir fetchFeed (index.html).
+  assert.ok(
+    lib.isSponsoredItem({
+      title: "Un test produit tout à fait normal",
+      tags: "Sponsorisé",
+    })
+  );
+  assert.ok(
+    lib.isSponsoredItem({
+      title: "Un communiqué banal",
+      tags: "Actualité, Publi-reportage",
+    })
+  );
 });
 
 test("isSponsoredItem ne filtre pas du contenu éditorial qui parle juste de sponsoring", () => {
@@ -134,6 +156,10 @@ test("isSponsoredItem ne filtre pas du contenu éditorial qui parle juste de spo
   );
   assert.ok(!lib.isSponsoredItem({ title: "Titre normal", desc: "Rien à signaler." }));
   assert.ok(!lib.isSponsoredItem({}));
+  // Catégories RSS ordinaires, sans rapport avec le sponsoring.
+  assert.ok(
+    !lib.isSponsoredItem({ title: "Un article normal", tags: "Économie, France" })
+  );
 });
 
 test("isPaywallCandidateDomain repère les domaines à vérifier, sous-domaines compris", () => {
