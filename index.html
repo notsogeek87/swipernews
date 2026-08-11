@@ -169,12 +169,14 @@
   .card__open:hover{filter:brightness(1.15)}
   .card__open svg{width:18px;height:18px;flex:0 0 auto}
   .card__open:active{transform:translateY(1px) scale(.98)}
-  /* Indicateur « payant » : l'icône SEULE, sans encadré — une INFO à côté du
-     bouton, pas une seconde action à toucher. Élément à part dans
+  /* Indicateur « payant » : l'icône SEULE, sans encadré, discrète — une INFO
+     en retrait à côté du bouton, pas une alerte. Couleur ash (comme
+     .card__meta, jamais l'accent flare qui signale plutôt une action ou une
+     alerte) et plus petite que les icônes de bouton. Élément à part dans
      .card__actions, jamais dans .card__open. */
   .card__paywall{display:inline-flex;align-items:center;justify-content:center;
-    flex:0 0 auto;color:var(--flare)}
-  .card__paywall svg{width:22px;height:22px}
+    flex:0 0 auto;color:var(--ash);opacity:.8}
+  .card__paywall svg{width:16px;height:16px}
 
   /* Rail UNIQUE en position:fixed, hors des cartes. Auparavant chaque carte
      portait son propre rail avec backdrop-filter:blur(12px) — l'un des effets
@@ -744,9 +746,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=99"></script>
-<script src="src/learn-core.js?v=99"></script>
-<script src="src/i18n.js?v=99"></script>
+<script src="src/lib.js?v=100"></script>
+<script src="src/learn-core.js?v=100"></script>
+<script src="src/i18n.js?v=100"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1189,7 +1191,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="99";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="100";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un

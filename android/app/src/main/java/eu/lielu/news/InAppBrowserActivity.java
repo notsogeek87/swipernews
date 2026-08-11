@@ -276,13 +276,28 @@ public class InAppBrowserActivity extends AppCompatActivity {
     }
 
     /**
-     * Marges de la WebView : la barre en haut, les barres système sur les côtés.
-     * En mode lecture, la marge haute est celle de la page (voir readerApplied) —
-     * en remettre une ici la doublerait.
+     * Marges de la WebView : les barres système sur les côtés et en bas,
+     * JAMAIS de marge haute réservée ici.
+     *
+     * <p>En mode lecture, la marge haute est celle de la page elle-même
+     * (--sn-top, voir pushReaderTop/readerApplied) — poser aussi une marge
+     * ici la doublerait, exactement comme avant.
+     *
+     * <p>En mode page complète, réserver {@code barHeight} en haut poussait
+     * bien le flux normal de la page, mais PAS son en-tête quand celui-ci est
+     * en {@code position:fixed}/{@code sticky} — ce qu'utilise la plupart des
+     * sites de presse pour le leur. Ce n'est pas une bizarrerie de WebView :
+     * un padding sur un ancêtre ne déplace jamais un élément fixe, quel que
+     * soit le moteur de rendu, c'est le modèle de boîte CSS. L'en-tête du
+     * site restait donc partiellement caché sous notre propre barre. Notre
+     * barre flotte désormais par-dessus le site, comme la barre d'adresse de
+     * n'importe quel navigateur mobile, et s'efface au premier geste vers le
+     * bas (voir onWebScroll) pour dégager l'en-tête — au prix d'un très bref
+     * recouvrement au tout premier affichage, avant le premier scroll.
      */
     private void applyWebPadding() {
         if (web == null) return;
-        web.setPadding(insetLeft, readerApplied ? 0 : barHeight, insetRight, insetBottom);
+        web.setPadding(insetLeft, 0, insetRight, insetBottom);
     }
 
     /** Hauteur de la barre en pixels CSS, la seule unité que comprend la page. */
@@ -516,8 +531,10 @@ public class InAppBrowserActivity extends AppCompatActivity {
 
         applyReaderColors();
 
-        // clipToPadding=false : la marge haute n'est pas une zone morte, le texte
-        // la traverse en défilant et passe sous la barre au lieu d'être coupé.
+        // clipToPadding=false : la marge basse (barre système/geste) n'est pas
+        // une zone morte, le texte la traverse en défilant plutôt que d'être
+        // coupé net à son bord. Plus de marge haute à traverser depuis que
+        // applyWebPadding() n'en réserve plus (voir son commentaire).
         web.setClipToPadding(false);
         web.setOnScrollListener(this::onWebScroll);
 
