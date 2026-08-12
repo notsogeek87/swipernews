@@ -66,6 +66,14 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
   candidats, une fois la carte proche de l'écran — jamais pour tout le fil.
   Voir `isPaywallCandidateDomain`/`isPaywalledHtml` (`src/lib.js`) et
   `articleMetaFor` (`index.html`)
+- **Sponsoring d'auteur** (fait partie du même filtre « sponsorisé et bons
+  plans ») : certains partenariats commerciaux ne se déclarent que sur la page
+  de l'article elle-même, via le lien de byline vers la fiche de l'auteur —
+  invisible dans le flux RSS. Même mécanique que l'indicateur payant (lecture
+  par article, une fois la carte proche de l'écran), mais la carte est retirée
+  du fil une fois confirmée plutôt que simplement marquée. Voir
+  `isSponsorCandidateDomain`/`isSponsoredHtml` (`src/lib.js`) et
+  `checkSponsor` (`index.html`)
 - Gestion des sources : ajout, suppression, activation/désactivation
 - Import / export des sources aux formats **OPML** (standard) et **JSON** — importe tes sources et lis-les directement
 - Partage d'un article (feuille de partage du système — celle de l'appareil, avec ses applications — ou, à défaut, menu WhatsApp / Telegram / mail / X / copie du lien),
@@ -1040,21 +1048,28 @@ ouvrir la demande d'inclusion sur `gitlab.com/fdroid/fdroiddata`.
 ## Architecture
 
 - **Actus** : `api/feed.js` (proxy RSS durci) ou, en repli, proxys CORS publics.
-- **Images et statut payant** : `api/og.js` lit la page d'un article pour DEUX
-  signaux distincts, extraits d'une même requête — jamais deux appels pour une
-  seule page. Image : quand un flux ne publie qu'une vignette (Franceinfo sert
-  des URL Thumbor **signées** en 432 px, où la taille fait partie de la
-  signature — donc non modifiable) ou n'en publie **aucune**, `api/og.js` va
-  lire la balise `og:image` de l'article, qui pointe vers la version pleine
-  taille ou comble l'absence. Statut payant : le signal `isAccessibleForFree`
-  (JSON-LD schema.org, celui qu'utilise Google Actualités) est cherché dans la
-  même page — lu plus profondément que la simple balise `og:image` (paramètre
-  `paywall=1`) quand le domaine appartient à une liste de candidats
-  (`isPaywallCandidateDomain`, `src/lib.js`), parce que ce signal vit souvent
-  après le `<head>` sur les sites en rendu serveur (Next.js et consorts), là
-  où `og:image` seul n'a jamais besoin d'aller chercher aussi loin. Résultat
-  mémorisé côté client (un seul cache pour les deux signaux) et mis en cache
-  24 h par le CDN.
+- **Images, statut payant et sponsoring d'auteur** : `api/og.js` lit la page
+  d'un article pour TROIS signaux distincts, extraits d'une même requête —
+  jamais deux appels pour une seule page. Image : quand un flux ne publie
+  qu'une vignette (Franceinfo sert des URL Thumbor **signées** en 432 px, où
+  la taille fait partie de la signature — donc non modifiable) ou n'en publie
+  **aucune**, `api/og.js` va lire la balise `og:image` de l'article, qui
+  pointe vers la version pleine taille ou comble l'absence. Statut payant : le
+  signal `isAccessibleForFree` (JSON-LD schema.org, celui qu'utilise Google
+  Actualités) est cherché dans la même page. Sponsoring d'auteur : certains
+  partenariats commerciaux ne se déclarent QUE via le lien de byline vers la
+  fiche de l'auteur (`isSponsoredHtml`, `src/lib.js` — cas connu : « L'équipe
+  Promo » de Les Numériques), jamais dans le flux RSS ni le titre/résumé. Les
+  deux derniers signaux sont lus plus profondément que la simple balise
+  `og:image` (paramètre `deep=1`) quand le domaine appartient à une liste de
+  candidats (`isPaywallCandidateDomain` / `isSponsorCandidateDomain`,
+  `src/lib.js`), parce qu'ils vivent souvent après le `<head>` sur les sites en
+  rendu serveur (Next.js et consorts), là où `og:image` seul n'a jamais besoin
+  d'aller chercher aussi loin. Résultat mémorisé côté client (un seul cache
+  pour les trois signaux) et mis en cache 24 h par le CDN. Un article confirmé
+  sponsorisé par ce biais est retiré du fil (`checkSponsor`, index.html) —
+  contrairement au paywall (simple badge), puisque `filterSponsored` dit que
+  l'utilisateur ne veut voir aucun contenu promotionnel.
 - **Wikipédia** : `api/learn.js` agrège **côté serveur** les catégories
   demandées (cache CDN mutualisé entre utilisateurs). Le front l'appelle en priorité et
   se rabat sur son agrégation client si l'endpoint n'est pas déployé (hébergement statique).

@@ -326,6 +326,11 @@
     /\b(contenu|article|dossier|billet)\s+sponsoris[ée]/i,
     /\bsponsoris[ée]e?s?\s*[\]:\-–]/i, // « [Sponsorisé] », « Sponsorisé : »
     /^\s*\[?\s*sponsoris[ée]/i,
+    // « [Sponso] » : abréviation utilisée par Frandroid en fin de titre,
+    // jamais un mot de prose ordinaire — même logique de bordure que
+    // « sponsorisé » ci-dessus, sur la forme tronquée.
+    /\bsponso\s*[\]:\-–]/i,
+    /^\s*\[?\s*sponso\b/i,
     /\bpubli[-\s]?repor?tage/i,
     /\bpubli[-\s]?communiqu[ée]/i,
     /\badvertorial\b/i,
@@ -473,6 +478,32 @@
     );
   }
 
+  /** Auteurs « maison » dont les articles sont en réalité des partenariats
+   *  commerciaux, sans jamais le dire dans le flux RSS (ni titre, ni résumé,
+   *  ni catégorie) — seule LA PAGE de l'article porte le signal, via le lien
+   *  de byline vers la fiche de l'auteur. Contrairement à SPONSORED_PATTERNS,
+   *  aucun mot-clé de texte libre : « promo » seul donnerait bien trop de
+   *  faux positifs (un forfait mobile « en promo » n'est pas du contenu
+   *  sponsorisé). Liste au mérite, un seul cas connu pour l'instant : Les
+   *  Numériques et son « équipe Promo » (fiche auteur /auteur/682/l-equipe-promo). */
+  const SPONSOR_AUTHOR_LINK_PATTERNS = [/\/auteur\/\d+\/l-equipe-promo\b/i];
+  /** Vrai si LA PAGE de l'article (pas le flux RSS) contient un lien de
+   *  byline vers un de ces auteurs. */
+  function isSponsoredHtml(html) {
+    if (!html) return false;
+    const s = String(html);
+    return SPONSOR_AUTHOR_LINK_PATTERNS.some((re) => re.test(s));
+  }
+  /** Domaines où ce signal existe et vaut la peine d'une lecture profonde de
+   *  la page d'article — même principe que PAYWALL_CANDIDATE_DOMAINS, pour ne
+   *  pas imposer cette requête supplémentaire à tous les sites. */
+  const SPONSOR_CANDIDATE_DOMAINS = ["lesnumeriques.com"];
+  /** Vrai si le lien pointe vers un domaine candidat, sous-domaines compris. */
+  function isSponsorCandidateDomain(url) {
+    const host = hostOf(url).toLowerCase();
+    return SPONSOR_CANDIDATE_DOMAINS.some((d) => host === d || host.endsWith("." + d));
+  }
+
   /** Sources depuis un export JSON (tableau, ou objet {feeds:[...]}) . */
   function parseJsonFeeds(text) {
     const data = JSON.parse(text);
@@ -540,6 +571,8 @@
     isPromotionalItem,
     isPaywallCandidateDomain,
     isPaywalledHtml,
+    isSponsoredHtml,
+    isSponsorCandidateDomain,
     hostOf,
     parseJsonFeeds,
     parseOpmlFeeds,

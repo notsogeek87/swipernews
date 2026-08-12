@@ -1,9 +1,11 @@
 // Fonction serverless Vercel : extrait, côté serveur, l'image de partage
-// (og:image) et l'indicateur d'accès payant d'un article — les DEUX depuis LA
-// MÊME lecture, pour ne jamais payer deux requêtes vers l'éditeur pour une
-// seule page. La profondeur de lecture diffère selon ce qui est demandé (voir
-// `deep`, paramètre `paywall=1`) : og:image seul reste tête-seule (rapide),
-// le paywall a besoin de lire plus loin (voir MAX_BYTES_DEEP ci-dessous).
+// (og:image) et DEUX indicateurs — accès payant et auteur « maison » qui
+// signale un partenariat commercial — d'un article, les TROIS depuis LA
+// MÊME lecture, pour ne jamais payer plusieurs requêtes vers l'éditeur pour
+// une seule page. La profondeur de lecture diffère selon ce qui est demandé
+// (voir `deep`, paramètre `deep=1`) : og:image seul reste tête-seule
+// (rapide), payant/sponsorisé ont besoin de lire plus loin (voir
+// MAX_BYTES_DEEP ci-dessous).
 //
 // Image — pourquoi : certains éditeurs ne publient dans leur flux RSS qu'une
 // vignette très réduite. Franceinfo, par exemple, sert des URL Thumbor
@@ -20,15 +22,20 @@
 // index.html) — pas systématiquement, un article gratuit sur un domaine hors
 // liste ne déclenche jamais cet appel.
 //
+// Sponsorisé — pourquoi : voir isSponsoredHtml (src/lib.js). Même principe,
+// pour les domaines d'une liste de candidats séparée (isSponsorCandidateDomain) —
+// certains partenariats commerciaux ne se déclarent QUE via le lien de byline
+// vers la fiche de l'auteur, jamais dans le flux RSS.
+//
 // Coût maîtrisé : le front n'appelle ce point d'accès QUE pour les articles
 // dont l'image de flux est réellement petite OU dont le domaine fait partie
-// des candidats payants (voir index.html) — jamais pour tout le fil. La
-// réponse est minuscule et mise en cache longuement par le CDN, donc
+// des candidats payants/sponsorisés (voir index.html) — jamais pour tout le
+// fil. La réponse est minuscule et mise en cache longuement par le CDN, donc
 // mutualisée entre tous les utilisateurs.
 "use strict";
 
 const { assertSafeUrl } = require("./feed.js");
-const { metaContent, isPaywalledHtml } = require("../src/lib.js");
+const { metaContent, isPaywalledHtml, isSponsoredHtml } = require("../src/lib.js");
 
 const FETCH_TIMEOUT_MS = 6000;
 // Les balises Open Graph vivent dans le <head> : inutile de lire l'article
@@ -98,10 +105,11 @@ async function handler(req, res) {
     res.status(400).json({ error: "Paramètre 'url' manquant" });
     return;
   }
-  // Posé par index.html uniquement pour les domaines candidats au paywall
-  // (voir isPaywallCandidateDomain) : un simple appel de secours pour
-  // og:image reste en lecture courte, tête seule.
-  const deep = req.query && req.query.paywall === "1";
+  // Posé par index.html uniquement pour les domaines candidats au paywall OU
+  // au sponsoring d'auteur (voir isPaywallCandidateDomain,
+  // isSponsorCandidateDomain) : un simple appel de secours pour og:image
+  // reste en lecture courte, tête seule.
+  const deep = req.query && req.query.deep === "1";
   // Même garde anti-SSRF que le proxy de flux : pas de réseau interne.
   try {
     await assertSafeUrl(url);
@@ -125,9 +133,10 @@ async function handler(req, res) {
     if (!upstream.ok || !/html/i.test(type)) throw new Error("pas une page HTML");
 
     const html = await readHead(upstream, deep ? MAX_BYTES_DEEP : MAX_BYTES, !deep);
-    // Payant : calculé quel que soit le sort de l'image ci-dessous — les deux
-    // signaux viennent de la même lecture, aucune requête de plus.
+    // Payant/sponsorisé : calculés quel que soit le sort de l'image ci-dessous —
+    // les trois signaux viennent de la même lecture, aucune requête de plus.
     const paywalled = isPaywalledHtml(html);
+    const sponsored = isSponsoredHtml(html);
 
     let image = "";
     let width = 0;
@@ -150,14 +159,17 @@ async function handler(req, res) {
     // Ni l'image ni l'indicateur payant ne changent en pratique une fois
     // l'article publié : cache CDN long, mutualisé entre tous les utilisateurs.
     res.setHeader("Cache-Control", "s-maxage=86400, stale-while-revalidate=604800");
-    res.status(200).json({ image, width, paywalled });
+    res.status(200).json({ image, width, paywalled, sponsored });
   } catch (e) {
     // Page injoignable ou pas HTML : réponse explicite et cacheable, pour ne
     // pas réinterroger la même page à chaque affichage.
     res.setHeader("Cache-Control", "s-maxage=3600");
-    res
-      .status(200)
-      .json({ image: "", paywalled: false, error: (e && e.message) || "indisponible" });
+    res.status(200).json({
+      image: "",
+      paywalled: false,
+      sponsored: false,
+      error: (e && e.message) || "indisponible",
+    });
   } finally {
     clearTimeout(t);
   }

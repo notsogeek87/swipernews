@@ -746,9 +746,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=102"></script>
-<script src="src/learn-core.js?v=102"></script>
-<script src="src/i18n.js?v=102"></script>
+<script src="src/lib.js?v=103"></script>
+<script src="src/learn-core.js?v=103"></script>
+<script src="src/i18n.js?v=103"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -756,7 +756,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds","interleave","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml"],
+  const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds","interleave","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -835,7 +835,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,interleave,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,interleave,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1191,7 +1191,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="102";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="103";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2088,30 +2088,32 @@ function ogRemember(link,meta){
 async function nativeArticleMeta(link){
   const html=await nativeGet(link,6000);
   const paywalled=isPaywalledHtml(html);
+  const sponsored=isSponsoredHtml(html);
   let image="";
   const raw=metaContent(html,["og:image:secure_url","og:image:url","og:image","twitter:image","twitter:image:src"]);
   if(raw){
     const abs=new URL(decodeEntities(raw),link);
     if(abs.protocol==="http:"||abs.protocol==="https:")image=abs.href;
   }
-  return {image,paywalled};
+  return {image,paywalled,sponsored};
 }
 const ogPending=new Map();
 function articleMetaFor(link){
-  if(!link)return Promise.resolve({image:"",paywalled:false});
+  if(!link)return Promise.resolve({image:"",paywalled:false,sponsored:false});
   if(Object.prototype.hasOwnProperty.call(ogCache,link))return Promise.resolve(ogCache[link]);
   if(ogPending.has(link))return ogPending.get(link);
-  // paywall=1 : demande à /api/og de lire plus loin que le <head> (voir
-  // MAX_BYTES_DEEP côté api/og.js — le signal isAccessibleForFree vit souvent
-  // en fin de page sur les sites en rendu serveur). Seulement pour les
-  // domaines candidats : inutile d'alourdir chaque appel de secours og:image.
-  const deep=isPaywallCandidateDomain(link);
-  const api="/api/og?url="+encodeURIComponent(link)+(deep?"&paywall=1":"");
+  // deep=1 : demande à /api/og de lire plus loin que le <head> (voir
+  // MAX_BYTES_DEEP côté api/og.js — isAccessibleForFree et le lien de byline
+  // sponsorisé vivent souvent en fin de page sur les sites en rendu serveur).
+  // Seulement pour les domaines candidats : inutile d'alourdir chaque appel
+  // de secours og:image.
+  const deep=isPaywallCandidateDomain(link)||isSponsorCandidateDomain(link);
+  const api="/api/og?url="+encodeURIComponent(link)+(deep?"&deep=1":"");
   const p=(isNativeApp?nativeArticleMeta(link):fetchWithTimeout(api,{},CONFIG.FETCH_TIMEOUT)
       .then(r=>r.ok?r.json():null)
-      .then(d=>({image:safeImg(d&&d.image,location.href)||"",paywalled:!!(d&&d.paywalled)})))
+      .then(d=>({image:safeImg(d&&d.image,location.href)||"",paywalled:!!(d&&d.paywalled),sponsored:!!(d&&d.sponsored)})))
     .then(meta=>{ogRemember(link,meta);return meta;})
-    .catch(e=>{warn("og",e);const meta={image:"",paywalled:false};ogRemember(link,meta);return meta;})
+    .catch(e=>{warn("og",e);const meta={image:"",paywalled:false,sponsored:false};ogRemember(link,meta);return meta;})
     .finally(()=>ogPending.delete(link));
   ogPending.set(link,p);
   return p;
@@ -2215,6 +2217,38 @@ function observePaywall(scope){
   (scope||feedEl).querySelectorAll(".card[data-pw]").forEach(el=>{
     if(pwObserver)pwObserver.observe(el);
     else checkPaywall(el);
+  });
+}
+/* Contenu « sponsorisé » qui ne se déclare que via le lien de byline vers la
+   fiche de l'auteur (voir isSponsoredHtml, src/lib.js) — jamais dans le flux
+   RSS, donc invérifiable avant que la carte n'existe déjà. Contrairement au
+   paywall (simple badge), on retire ici la carte du fil une fois confirmée :
+   filterSponsored dit que l'utilisateur ne veut voir AUCUN contenu
+   promotionnel, ce signal n'en est qu'une variante plus tardive à trancher.
+   La carte peut donc apparaître très brièvement avant de disparaître — coût
+   accepté, la vérification ne peut pas se faire plus tôt. */
+async function checkSponsor(el){
+  const it=cardReg.get(+el.dataset.id);
+  if(!filterSponsored||!it||!it.link)return;
+  try{
+    const meta=await articleMetaFor(it.link);
+    if(!meta.sponsored)return;
+    const key=seenKey(it);
+    newsItems=newsItems.filter(i=>seenKey(i)!==key);
+    remix();render();
+  }catch(e){warn("checkSponsor",e);}
+}
+const sponsorObserver=("IntersectionObserver" in self)?new IntersectionObserver((entries,obs)=>{
+  entries.forEach(en=>{
+    if(!en.isIntersecting)return;
+    obs.unobserve(en.target);
+    checkSponsor(en.target);
+  });
+},{root:feedEl,rootMargin:"150% 0px"}):null;
+function observeSponsor(scope){
+  (scope||feedEl).querySelectorAll(".card[data-sponsor]").forEach(el=>{
+    if(sponsorObserver)sponsorObserver.observe(el);
+    else checkSponsor(el);
   });
 }
 /* Filet pour les cartes SANS AUCUNE image (flux qui n'en publient pas, WordPress
@@ -2339,7 +2373,7 @@ function render(forceTop,altAnchor){
   // Conserver le scroll d'un fil précédent laisserait l'utilisateur au milieu
   // d'un contenu qui n'a rien à voir.
   if(!top)setScrollTopInstant(feedEl,0);
-  observeBackgrounds();observePaywall();observeMissingImages();
+  observeBackgrounds();observePaywall();observeMissingImages();observeSponsor();
   if(DEBUG){const e=posEntry(),l=(e&&e.link)||"";const i=e?resolveResume(e):-1;
     dbg(`v${APP_VERSION}  items=${items.length} (${newsItems.length} actus / ${learnItems.length} wiki)\n`+
         `mémorisé=…${l.slice(-24)||"(rien)"}\n`+
@@ -2439,7 +2473,9 @@ function cardHTML(it,id){
   // qu'une CANDIDATURE, que checkPaywall confirmera ou non une fois la carte
   // à l'écran. Sans objet pour Wikipédia, jamais payant.
   const pwCandidate=!learnCard&&link&&isPaywallCandidateDomain(link);
-  return `<article class="card${img?" card--img":""}${learnCard?" card--learn":""}" data-id="${id}"${pwCandidate?" data-pw":""}>
+  // Sponsorisé par auteur : même principe de candidature, voir checkSponsor.
+  const sponsorCandidate=!learnCard&&link&&isSponsorCandidateDomain(link);
+  return `<article class="card${img?" card--img":""}${learnCard?" card--learn":""}" data-id="${id}"${pwCandidate?" data-pw":""}${sponsorCandidate?" data-sponsor":""}>
     ${bg}
     <div class="card__body">
       ${catB}
@@ -2907,7 +2943,7 @@ function restoreFeed(){
   // mélanges peuvent avoir la même LONGUEUR sans avoir le même ordre, d'où la
   // comparaison de la dose plutôt que du nombre de cartes.
   if(s.mix!==mixScore)render();
-  observeBackgrounds();observePaywall();observeMissingImages();updateRail();
+  observeBackgrounds();observePaywall();observeMissingImages();observeSponsor();updateRail();
   onCardChange();                                   // recalage du suivi de carte
   return true;
 }

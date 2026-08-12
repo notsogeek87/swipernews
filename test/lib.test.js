@@ -131,6 +131,25 @@ test("isPromotionalItem détecte les libellés éditoriaux standard (sponsorisé
       tags: "Actualité, Publi-reportage",
     })
   );
+  // Cas réel manqué en production : Frandroid abrège en « [Sponso] » plutôt
+  // que d'écrire « sponsorisé » en toutes lettres, en fin de titre.
+  assert.ok(
+    lib.isPromotionalItem({
+      title:
+        "L'offre Pure Fibre avec WiFi 7 est à 24,99 euros sans engagement, pile à temps pour la rentrée [Sponso]",
+    })
+  );
+  assert.ok(lib.isPromotionalItem({ title: "Sponso : cette offre est limitée" }));
+});
+
+test("isPromotionalItem ne filtre pas un titre qui contient juste « sponsor » en prose", () => {
+  // Sans bordure ([ ] : - en fin de mot), « sponso »/« sponsor » reste un mot
+  // de prose ordinaire — la même règle de bordure que pour « sponsorisé ».
+  assert.ok(
+    !lib.isPromotionalItem({
+      title: "Le sponsoring sportif attire de nouveaux investisseurs",
+    })
+  );
 });
 
 test("isPromotionalItem ne filtre pas du contenu éditorial qui parle juste de sponsoring", () => {
@@ -251,6 +270,37 @@ test("isPaywalledHtml lit aussi le texte visible « Réservé aux abonnés »", 
   );
   assert.ok(lib.isPaywalledHtml("<p>Contenu RÉSERVÉ AUX ABONNÉS Le Monde</p>"));
   assert.ok(!lib.isPaywalledHtml("<p>Article accessible à tous, sans restriction.</p>"));
+});
+
+test("isSponsoredHtml repère le lien de byline vers un auteur sponsor connu", () => {
+  assert.ok(
+    lib.isSponsoredHtml('<a href="/auteur/682/l-equipe-promo">L\'équipe Promo</a>')
+  );
+  // sous-domaine/URL absolue de la même fiche auteur
+  assert.ok(
+    lib.isSponsoredHtml(
+      '<a href="https://www.lesnumeriques.com/auteur/682/l-equipe-promo">L\'équipe Promo</a>'
+    )
+  );
+  // un ID d'auteur différent ne doit PAS déclencher : seul ce slug précis est connu
+  assert.ok(!lib.isSponsoredHtml('<a href="/auteur/12/jean-dupont">Jean Dupont</a>'));
+  // le mot « promo » seul, hors lien d'auteur, est un faux positif qu'on refuse
+  // sciemment (voir SPONSORED_PATTERNS : pas de mot-clé de texte libre pour ça)
+  assert.ok(!lib.isSponsoredHtml("<p>Ce forfait est en promo ce mois-ci.</p>"));
+  assert.ok(!lib.isSponsoredHtml("<html><body>Un article ordinaire.</body></html>"));
+  assert.ok(!lib.isSponsoredHtml(""));
+  assert.ok(!lib.isSponsoredHtml(null));
+});
+
+test("isSponsorCandidateDomain ne cible que les domaines connus pour ce signal", () => {
+  assert.ok(
+    lib.isSponsorCandidateDomain(
+      "https://www.lesnumeriques.com/forfait-mobile/x-n259660.html"
+    )
+  );
+  assert.ok(lib.isSponsorCandidateDomain("https://sub.lesnumeriques.com/x"));
+  assert.ok(!lib.isSponsorCandidateDomain("https://www.lemonde.fr/x"));
+  assert.ok(!lib.isSponsorCandidateDomain(""));
 });
 
 test("parseJsonFeeds lit les deux formes d'export et ignore les entrées sans url", () => {
