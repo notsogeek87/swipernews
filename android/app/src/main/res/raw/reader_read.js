@@ -48,8 +48,33 @@
     var UNLIKELY = /(comment|sidebar|side-bar|footer|nav|menu|masthead|share|social|promo|related|recommend|newsletter|banner|cookie|consent|advert|sponsor|breadcrumb|pagination|modal|popup|widget|teaser|abonn|paywall|subscri)/i;
     var LIKELY = /(article|content|post|story|entry|main|body|text|prose|chapo|contenu)/i;
 
+    /* `.textContent` inclut le texte des <noscript> — quand le JS est actif
+       (donc toujours ici, dans une WebView), le HTML mis en repli à
+       l'intérieur n'est JAMAIS analysé en éléments : le navigateur le garde
+       comme un unique nœud texte, balises comprises. Cas réel rencontré
+       (Frandroid) : un widget « Les derniers articles » aux images en
+       <picture><noscript><img …></noscript>… gonflait ainsi son propre score
+       (ce balisage brut compté comme prose) tout en NOYANT sa densité de lien
+       (des kilooctets de HTML, aucun dans un <a>) largement sous 0.4 — le
+       garde-fou juste en dessous ne voyait donc jamais passer un widget qui
+       n'était pourtant QUE des liens. `visibleText` ignore ces sous-arbres,
+       comme le ferait l'affichage réel de la page. */
+    function visibleText(el) {
+      var out = "";
+      (function walk(node) {
+        for (var c = node.firstChild; c; c = c.nextSibling) {
+          if (c.nodeType === 3) out += c.nodeValue;
+          else if (c.nodeType === 1) {
+            var t = c.tagName;
+            if (t === "SCRIPT" || t === "STYLE" || t === "NOSCRIPT" || t === "TEMPLATE") continue;
+            walk(c);
+          }
+        }
+      })(el);
+      return out;
+    }
     function len(el) {
-      return (el.textContent || "").replace(/\s+/g, " ").trim().length;
+      return visibleText(el).replace(/\s+/g, " ").trim().length;
     }
     /* "has-sidebar"/"with-sidebar" (Bulma et consorts) qualifient la colonne
        de CONTENU PRINCIPAL comme ayant un frère sidebar à côté, jamais comme
@@ -76,6 +101,19 @@
       for (var i = 0; i < links.length; i++) l += len(links[i]);
       return Math.min(l / total, 1);
     }
+    /* Le <li> le plus proche, sans sortir de `bound` : un widget de type
+       « Les derniers articles » enveloppe presque toujours son texte dans un
+       <p>/<span> À L'INTÉRIEUR du <li> (titre de carte, date…), jamais en
+       texte direct du <li>. Cas réel rencontré (Frandroid) : classer sur le
+       tag du bloc lui-même (voir score() plus bas) comptait alors tout
+       comme PROSE, jamais comme liste, et le garde-fou liLen>proseLen ne se
+       déclenchait donc jamais — quel que soit le nombre d'entrées. */
+    function closestLi(node, bound) {
+      for (var n = node; n && n !== bound; n = n.parentNode) {
+        if (n.nodeType === 1 && n.tagName === "LI") return n;
+      }
+      return null;
+    }
     function score(el) {
       var blocks = el.querySelectorAll("p,li,blockquote,pre");
       var s = 0, liLen = 0, proseLen = 0;
@@ -83,7 +121,8 @@
         var n = len(blocks[i]);
         if (n > 25) {
           s += Math.min(n, 1200);   // plafond : un pavé unique ne doit pas tout emporter
-          if (blocks[i].tagName === "LI") liLen += n; else proseLen += n;
+          var inList = blocks[i].tagName === "LI" || closestLi(blocks[i].parentNode, el);
+          if (inList) liLen += n; else proseLen += n;
         }
       }
       if (!s) return 0;
