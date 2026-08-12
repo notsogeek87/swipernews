@@ -77,7 +77,23 @@
       if (UNLIKELY.test(sig)) s *= 0.2;
       if (LIKELY.test(sig)) s *= 1.5;
       if (el.tagName === "ARTICLE") s *= 1.5;
-      return s * (1 - linkDensity(el) * 0.9);
+      /* Densité de lien : élevée au carré, pas juste pondérée linéairement.
+         Cas réel rencontré (Frandroid, « Les derniers articles ») : un widget
+         de 8 liens vers d'autres articles, densité ~0.75, franchissait quand
+         même le seuil d'extraction (bestScore >= 400 plus bas) dès lors que sa
+         classe contenait un mot de LIKELY comme « post » (post-list, très
+         répandu) sans mot d'UNLIKELY pour compenser — un simple
+         `* (1 - densité * 0.9)` ne pénalise jamais plus de 90 %. Si ce widget
+         gagnait alors que le VRAI article n'était pas encore rendu (site en
+         React/Next.js, contenu hydraté après coup), l'extraction "réussissait"
+         sur le mauvais bloc, ce qui empêchait la seule retentative prévue
+         (voir injectReadScript, InAppBrowserActivity.java) : elle ne se
+         déclenche que si RIEN n'a été extrait, jamais si le mauvais bloc l'a
+         été. Au carré, ce même widget ((1-0,75)² ≈ 0,06 de facteur restant,
+         contre 0,325 avec l'ancienne formule) ne franchit plus le seuil seul,
+         et un vrai article (densité proche de 0, donc quasiment inchangé)
+         n'en pâtit pas. */
+      return s * Math.pow(1 - linkDensity(el), 2);
     }
 
     var candidates = document.querySelectorAll("article,main,section,div,td");
