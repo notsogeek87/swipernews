@@ -67,33 +67,47 @@
     }
     function score(el) {
       var blocks = el.querySelectorAll("p,li,blockquote,pre");
-      var s = 0;
+      var s = 0, liLen = 0, proseLen = 0;
       for (var i = 0; i < blocks.length; i++) {
         var n = len(blocks[i]);
-        if (n > 25) s += Math.min(n, 1200);   // plafond : un pavé unique ne doit pas tout emporter
+        if (n > 25) {
+          s += Math.min(n, 1200);   // plafond : un pavé unique ne doit pas tout emporter
+          if (blocks[i].tagName === "LI") liLen += n; else proseLen += n;
+        }
       }
       if (!s) return 0;
+      var density = linkDensity(el);
+      /* Liste de liens (widget « Les derniers articles », « À lire aussi »…) :
+         dominée par des <li>, densité de lien franchement au-dessus de ce
+         qu'écrit un article. Cas réel rencontré (Frandroid) : un tel widget a
+         fait échouer le mode lecture À DEUX REPRISES avant ce garde-fou —
+         d'abord parce que sa classe contenait un mot de LIKELY comme « post »
+         (très répandu) sans mot d'UNLIKELY pour compenser, puis, une fois la
+         pénalité de densité durcie (au carré plutôt que linéaire), parce
+         qu'un nombre d'entrées suffisant compensait quand même la baisse par
+         article PAR item — aucune pénalité purement MULTIPLICATIVE ne peut
+         empêcher ça : plus d'entrées, plus de score, quel que soit le facteur.
+         D'où un vrai COUPERET plutôt qu'une pondération : liLen>proseLen (le
+         texte vient majoritairement de <li>, pas de <p>) ET density>0.4 →
+         zéro, quelle que soit la taille du widget. Une vraie liste éditoriale
+         (recette, tutoriel numéroté) a ses <li> pleins de PROSE, presque sans
+         lien : density y reste bas, ce garde-fou ne la touche pas. Si ce bloc
+         gagnait alors que le VRAI article n'était pas encore rendu (site en
+         React/Next.js, contenu hydraté après coup), l'extraction
+         « réussissait » sur le mauvais bloc, ce qui empêchait la seule
+         retentative prévue (voir injectReadScript, InAppBrowserActivity.java) :
+         elle ne se déclenche que si RIEN n'a été extrait, jamais si le mauvais
+         bloc l'a été. */
+      if (liLen > proseLen && density > 0.4) return 0;
       var sig = signature(el);
       if (UNLIKELY.test(sig)) s *= 0.2;
       if (LIKELY.test(sig)) s *= 1.5;
       if (el.tagName === "ARTICLE") s *= 1.5;
-      /* Densité de lien : élevée au carré, pas juste pondérée linéairement.
-         Cas réel rencontré (Frandroid, « Les derniers articles ») : un widget
-         de 8 liens vers d'autres articles, densité ~0.75, franchissait quand
-         même le seuil d'extraction (bestScore >= 400 plus bas) dès lors que sa
-         classe contenait un mot de LIKELY comme « post » (post-list, très
-         répandu) sans mot d'UNLIKELY pour compenser — un simple
-         `* (1 - densité * 0.9)` ne pénalise jamais plus de 90 %. Si ce widget
-         gagnait alors que le VRAI article n'était pas encore rendu (site en
-         React/Next.js, contenu hydraté après coup), l'extraction "réussissait"
-         sur le mauvais bloc, ce qui empêchait la seule retentative prévue
-         (voir injectReadScript, InAppBrowserActivity.java) : elle ne se
-         déclenche que si RIEN n'a été extrait, jamais si le mauvais bloc l'a
-         été. Au carré, ce même widget ((1-0,75)² ≈ 0,06 de facteur restant,
-         contre 0,325 avec l'ancienne formule) ne franchit plus le seuil seul,
-         et un vrai article (densité proche de 0, donc quasiment inchangé)
-         n'en pâtit pas. */
-      return s * Math.pow(1 - linkDensity(el), 2);
+      // Densité de lien restante : élevée au carré, pas juste pondérée
+      // linéairement — un `* (1 - densité * 0.9)` ne pénalisait jamais plus
+      // de 90 %, insuffisant pour les cas qui passent SOUS le couperet
+      // ci-dessus (density <= 0.4) mais restent tout de même link-denses.
+      return s * Math.pow(1 - density, 2);
     }
 
     var candidates = document.querySelectorAll("article,main,section,div,td");
