@@ -51,10 +51,21 @@
     function len(el) {
       return (el.textContent || "").replace(/\s+/g, " ").trim().length;
     }
+    /* "has-sidebar"/"with-sidebar" (Bulma et consorts) qualifient la colonne
+       de CONTENU PRINCIPAL comme ayant un frère sidebar à côté, jamais comme
+       étant elle-même une sidebar — sans ce filtre, UNLIKELY (qui cherche
+       juste « sidebar ») prenait le VRAI corps de l'article pour l'encart à
+       jeter. Cas réel rencontré (Frandroid) : le conteneur de l'article
+       porte la classe « article-content--has-sidebar », ce qui le faisait
+       soit sous-noter à la sélection, soit supprimer entièrement au nettoyage
+       (étape 2) s'il finissait comme descendant d'un candidat plus large —
+       laissant survivre le widget « Les derniers articles » à sa place, lui
+       épargné puisque son propre balisage ne contient jamais ce mot. */
     function signature(el) {
       var c = el.className;
       if (typeof c !== "string") c = "";   // SVG : className est un objet
-      return c + " " + (el.id || "");
+      var stripped = c.replace(/\b(?:has|with)-sidebar\b/gi, "");
+      return stripped + " " + (el.id || "");
     }
     /* Part du texte qui est dans des liens : un sommaire ou un menu tend vers 1,
        un article vers 0. C'est ce qui distingue le mieux les deux. */
