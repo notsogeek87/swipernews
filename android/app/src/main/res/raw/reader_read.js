@@ -85,11 +85,20 @@
        soit sous-noter à la sélection, soit supprimer entièrement au nettoyage
        (étape 2) s'il finissait comme descendant d'un candidat plus large —
        laissant survivre le widget « Les derniers articles » à sa place, lui
-       épargné puisque son propre balisage ne contient jamais ce mot. */
+       épargné puisque son propre balisage ne contient jamais ce mot.
+       Même chose pour « article-paywall » : plusieurs sites du groupe La
+       Dépêche (Midi Libre confirmé, gabarit visiblement partagé avec
+       ladepeche.fr, L'Indépendant…) posent cette classe sur le conteneur du
+       CORPS de l'article — marqueur systématique du système de paywall
+       (Poool), présent que l'article soit payant ou non — jamais sur un
+       vrai bandeau d'abonnement. Cas réel rencontré : sur un article
+       GRATUIT, ce conteneur portait tout le texte réel ; supprimé comme
+       UNLIKELY à l'étape 2, il ne restait que le chapo et les liens
+       « Sur le même sujet » qui l'entourent. */
     function signature(el) {
       var c = el.className;
       if (typeof c !== "string") c = "";   // SVG : className est un objet
-      var stripped = c.replace(/\b(?:has|with)-sidebar\b/gi, "");
+      var stripped = c.replace(/\b(?:has|with)-sidebar\b/gi, "").replace(/\barticle-paywall\b/gi, "");
       return stripped + " " + (el.id || "");
     }
     /* Part du texte qui est dans des liens : un sommaire ou un menu tend vers 1,
@@ -179,22 +188,52 @@
     var junk = art.querySelectorAll(DROP), k;
     for (k = 0; k < junk.length; k++) if (junk[k].parentNode) junk[k].parentNode.removeChild(junk[k]);
 
+    /* Étiquettes d'habillage que le site écrit en toutes lettres. Un vrai
+       paragraphe n'est jamais ces trois mots-là et rien d'autre : la comparaison
+       porte sur le texte ENTIER du bloc, pas sur une occurrence. Définie ici
+       (avant l'étape 2) pour servir aussi à startsWithLabel() ci-dessous. */
+    var LABELS = /^(publicité|pub|sponsorisé|contenu sponsorisé|partager|partagez|partager l'article|à lire aussi|lire aussi|voir aussi|sur le même sujet|à voir également|commentaires|voir les commentaires|newsletter|abonnez-vous|s'abonner|suivez-nous|temps de lecture|article réservé aux abonnés|réservé aux abonnés|mis à jour|sommaire)\s*[:.]?$/i;
+    /* Un widget « Sur le même sujet »/« À lire aussi » peut vivre dans un
+       conteneur au nom de classe propre au gabarit du site (ici « Midi
+       Libre » / groupe La Dépêche : article-full__childs) — aucun mot-clé de
+       UNLIKELY ne peut viser un nom pareil sans viser aussi de vrais
+       articles. Son TITRE, en revanche, est un texte fixe déjà repéré par
+       LABELS. Cas réel rencontré (Midi Libre) : ce conteneur, plein de
+       liens vers D'AUTRES articles, survivait tel quel après l'étape 2 (son
+       propre balisage ne contient ni « related » ni « widget » ni rien
+       d'UNLIKELY) et restait donc accolé au vrai texte en fin d'extraction.
+       On remonte donc le premier enfant à texte non vide, sur quelques
+       niveaux d'emballage, et on retient le conteneur ENTIER si ce texte
+       est À LUI SEUL une de ces étiquettes. */
+    function startsWithLabel(el) {
+      var n = el;
+      for (var depth = 0; depth < 6 && n; depth++) {
+        var child = null;
+        for (var c = n.firstElementChild; c; c = c.nextElementSibling) {
+          if ((c.textContent || "").trim()) { child = c; break; }
+        }
+        if (!child) return false;
+        var txt = (child.textContent || "").replace(/\s+/g, " ").trim();
+        if (txt.length <= 40 && LABELS.test(txt)) return true;
+        n = child;
+      }
+      return false;
+    }
+
     /* 2. Blocs périphériques restés à l'intérieur (« À lire aussi », partage…). */
     var inner = art.querySelectorAll("div,section,ul,ol,figure,aside,p");
     for (k = 0; k < inner.length; k++) {
       var el = inner[k];
       if (!el.parentNode) continue;
       if (UNLIKELY.test(signature(el))) { el.parentNode.removeChild(el); continue; }
+      if (startsWithLabel(el)) { el.parentNode.removeChild(el); continue; }
       // Liste de liens sans texte propre : un sommaire, pas du contenu.
       if ((el.tagName === "UL" || el.tagName === "OL") && linkDensity(el) > 0.8) {
         el.parentNode.removeChild(el);
       }
     }
 
-    /* 3. Étiquettes d'habillage que le site écrit en toutes lettres. Un vrai
-       paragraphe n'est jamais ces trois mots-là et rien d'autre : la comparaison
-       porte sur le texte ENTIER du bloc, pas sur une occurrence. */
-    var LABELS = /^(publicité|pub|sponsorisé|contenu sponsorisé|partager|partagez|partager l'article|à lire aussi|lire aussi|voir aussi|sur le même sujet|à voir également|commentaires|voir les commentaires|newsletter|abonnez-vous|s'abonner|suivez-nous|temps de lecture|article réservé aux abonnés|réservé aux abonnés|mis à jour|sommaire)\s*[:.]?$/i;
+    /* 3. Le label lui-même, si un exemplaire isolé a survécu ailleurs. */
     var labelled = art.querySelectorAll("p,h2,h3,h4,div,span,strong");
     for (k = 0; k < labelled.length; k++) {
       var lb = labelled[k];
