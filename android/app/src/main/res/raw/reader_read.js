@@ -235,6 +235,41 @@
       return (m && m.getAttribute("content")) || "";
     }
     var title = (meta('meta[property="og:title"]') || document.title || "").trim();
+    var description = meta('meta[property="og:description"]') || meta('meta[name="description"]');
+
+    /* Dernier filet : le bloc choisi doit au moins PARLER du sujet de la page.
+       Cas réel rencontré (Frandroid) : un widget « Les derniers articles »
+       peut franchir tous les seuils précédents (texte abondant, classe qui
+       ressemble à du contenu, densité de lien tout juste sous le couperet) —
+       tout en ne parlant QUE d'AUTRES articles, jamais du sujet de la page en
+       cours. Titre et méta-description sont posés par le site AVANT toute
+       extraction, indépendamment du bloc choisi (contrairement au « début de
+       l'article », qui n'existe que si le bloc est déjà le bon — se comparer
+       à soi-même ne validerait rien) : les comparer ne coûte qu'une poignée
+       d'opérations sur des chaînes déjà en mémoire, aucune requête de plus.
+       Un seul mot significatif en commun suffit : on ne cherche pas une
+       extraction PARFAITE, seulement à écarter un bloc qui n'a RIEN à voir
+       avec le sujet que la page annonce elle-même. Aucun mot significatif
+       dans le titre/la description (rare) : rien à vérifier, on laisse
+       passer. */
+    var STOPWORDS = /^(le|la|les|un|une|des|du|de|et|ou|qui|que|quoi|dont|ce|cet|cette|ces|son|sa|ses|leur|leurs|notre|nos|votre|vos|dans|pour|avec|sans|sur|sous|par|chez|vers|entre|depuis|avant|apres|mais|donc|or|ni|car|tout|tous|toute|toutes|plus|moins|tres|bien|comme|alors|selon|ainsi|aussi|encore|deja|the|and|for|with|from|this|that|these|those|are|was|were|been|has|have|had|its|his|her)$/;
+    function keywords(text) {
+      return (text || "")
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter(function (w) { return w.length >= 3 && !STOPWORDS.test(w); });
+    }
+    var refWords = keywords(title + " " + description);
+    if (refWords.length) {
+      var bodyWords = keywords(art.textContent), bodySet = {}, hasMatch = false;
+      for (var bw = 0; bw < bodyWords.length; bw++) bodySet[bodyWords[bw]] = true;
+      for (var rw = 0; rw < refWords.length; rw++) {
+        if (bodySet[refWords[rw]]) { hasMatch = true; break; }
+      }
+      if (!hasMatch) return;
+    }
+
     var host = location.hostname.replace(/^www\./, "");
     var published = meta('meta[property="article:published_time"]') || meta('meta[name="date"]');
     var when = "";
