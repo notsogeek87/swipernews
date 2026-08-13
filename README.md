@@ -41,6 +41,10 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
   du flux entre-temps (un RSS ne garde
   que ses N derniers items), la reprise se rabat sur le repère temporel puis sur
   l'index, au lieu de retomber en tête du fil
+- **Articles en mémoire** : un bouton de la barre du haut liste toutes les cartes
+  que le fil garde sous la main, dans l'ordre, avec un repère sur celle qu'on
+  lit — pour revenir sur un article dépassé d'un swipe de trop, sans remonter à
+  l'aveugle
 - Lisibilité sur photo : l'image n'est **jamais assombrie**, mais elle est floutée
   localement derrière le bloc de texte, et les textes portent un halo discret. Un flou
   supprime le détail sans changer la luminance — c'est le halo qui rend lisible sur un
@@ -150,7 +154,7 @@ de chacun** seulement tenaient à l'écran — le filtre actif pouvait être hor
 champ, hors de portée du regard comme de la main.
 
 Les deux barres sont devenues **deux pastilles** (*Toutes ▾* / *Tous ▾*), posées
-sur la **même rangée que les trois boutons** et à la même hauteur qu'eux : la
+sur la **même rangée que les boutons d'action** et à la même hauteur qu'eux : la
 barre tombe à 103 px (13 %), et surtout elle n'a plus qu'une seule ligne
 d'outils, là où les pastilles étaient calées à gauche pendant que les boutons
 l'étaient à droite, sur deux rangées. La marque garde la ligne du dessus.
@@ -185,6 +189,31 @@ Les emoji restent là où ils sont une **valeur** et non une décoration : le ba
 de thème sur les cartes, et les puces des listes (chaque centre d'intérêt a le
 sien). Chaque liste garde d'ailleurs son langage — les sources sont des noms
 nus, les thèmes portent tous leur emoji.
+
+### Retrouver un article dépassé
+
+Le fil n'a pas de marche arrière fine : un swipe de trop et l'article est passé,
+on le cherche alors à l'aveugle en remontant carte par carte — le retour arrière
+d'Android, lui, ferme les panneaux, il ne remonte pas les cartes.
+
+Un quatrième bouton (une liste) ouvre donc **ce que le fil garde en mémoire** :
+toutes ses cartes, dans l'ordre, en rangées — vignette, source (ou thème, côté
+Wikipédia), date, titre sur trois lignes au plus. Celles déjà dépassées reculent
+d'un cran, celle qu'on lit porte un repère *ICI*, et la liste **s'ouvre sur
+elle** : ce qu'on vient y chercher est presque toujours juste au-dessus. Un tap
+y ramène.
+
+Ce n'est **pas** un historique de lecture, et le nom le dit : rien n'est stocké,
+rien n'est téléchargé, c'est une vue de la liste en cours. Ce que le fil a déjà
+jeté — sa tête au-delà de 180 cartes, ou tout le fil quand un filtre change —
+n'y est pas. Et c'est une feuille, non une vraie page : une page déchargerait le
+fil derrière elle, donc le rechargerait, et ferait perdre la position qu'on
+venait justement retrouver.
+
+Détail de mise en page : ce quatrième bouton coûtait deux pixels aux pastilles
+voisines, qui coupaient alors « Toutes » d'un cheveu. L'écart entre boutons est
+passé de 8 à 6 px — leur boîte de 38 px, elle, est la cible du doigt et n'a pas
+bougé.
 
 ## Dose d'apprentissage
 

@@ -39,6 +39,15 @@
       "top.settings.title": "Sources, centres d'intérêt et réglages",
       "top.settings.aria": "Réglages",
       "top.feed.aria": "Fil d'articles",
+      "top.history.title": "Les articles que le fil garde en mémoire",
+      "top.history.aria": "Articles en mémoire",
+
+      "hist.title": "Articles en mémoire",
+      "hist.sub": "{n} articles gardés sous la main. Touche-en un pour y revenir.",
+      "hist.subEmpty": "Rien en mémoire pour l'instant.",
+      "hist.empty": "Le fil n'a encore rien chargé.",
+      "hist.here": "Ici",
+      "hist.gone": "Cet article n'est plus dans le fil",
 
       "rail.share.aria": "Partager cet article",
       "rail.share.title": "Partager",
@@ -228,6 +237,15 @@
       "top.settings.title": "Sources, interests and settings",
       "top.settings.aria": "Settings",
       "top.feed.aria": "Article feed",
+      "top.history.title": "The articles the feed keeps in memory",
+      "top.history.aria": "Articles in memory",
+
+      "hist.title": "Articles in memory",
+      "hist.sub": "{n} articles kept at hand. Tap one to go back to it.",
+      "hist.subEmpty": "Nothing in memory yet.",
+      "hist.empty": "The feed hasn't loaded anything yet.",
+      "hist.here": "Here",
+      "hist.gone": "This article is no longer in the feed",
 
       "rail.share.aria": "Share this article",
       "rail.share.title": "Share",

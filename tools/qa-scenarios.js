@@ -1004,6 +1004,111 @@ const scenarios = {
     );
     await browser.close();
   },
+
+  // 23. Articles en mémoire : retrouver une carte dépassée d'un swipe de trop
+  async memoire() {
+    const { browser, page, errors } = await boot({ storage: READY });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    // La barre du haut se masque à chaque défilement (hideTop) : comme
+    // l'utilisateur, on la ramène d'un tap AVANT de viser son bouton — et
+    // toujours après que le défilement en cours a fini de la faire fuir.
+    const ouvrirMemoire = async () => {
+      await page.waitForTimeout(400);
+      await page.evaluate(() => showTop());
+      await page.waitForTimeout(250);
+      await page.click("#histBtn");
+      await page.waitForTimeout(350);
+    };
+    // On swipe loin
+    await page.evaluate(() => {
+      feedEl.scrollTop = feedEl.children[8].offsetTop;
+      onCardChange();
+    });
+    const depasse = await page.evaluate(() => items[3].title);
+    await ouvrirMemoire();
+    const vue = await page.evaluate(() => {
+      const p = document.querySelector("#histSheet .sheet__panel");
+      const now = document.querySelector(".histrow--now");
+      const r = now.getBoundingClientRect(),
+        pr = p.getBoundingClientRect();
+      return {
+        rangees: document.querySelectorAll(".histrow").length,
+        articles: items.length,
+        surLaCarte: now.querySelector(".histrow__ttl").textContent.trim(),
+        memeQueLeFil:
+          now.querySelector(".histrow__ttl").textContent.trim() === currentItem().title,
+        passees: document.querySelectorAll(".histrow--past").length,
+        idx: currentIndex(),
+        // La liste doit s'ouvrir SUR la position courante, pas en haut
+        couranteVisible: r.top >= pr.top - 2 && r.bottom <= pr.bottom + 2,
+      };
+    });
+    console.log(
+      `${vue.rangees} rangées pour ${vue.articles} articles | repère « ici » sur ${vue.surLaCarte}`,
+      `(carte du fil : ${vue.memeQueLeFil}) | ${vue.passees} dépassées pour un index de ${vue.idx}`
+    );
+    console.log("liste ouverte sur la position courante :", vue.couranteVisible);
+    // Retour sur un article déjà dépassé
+    await page.$$eval(".histrow", (rows) => rows[3].click());
+    await page.waitForTimeout(700);
+    const apres = await page.evaluate(() => ({
+      idx: currentIndex(),
+      titre: (currentItem() || {}).title,
+      fermee: !document.getElementById("histSheet").classList.contains("open"),
+      inert: !!feedEl.inert,
+    }));
+    console.log(
+      `retour sur : ${apres.titre} (index ${apres.idx}) — visé : ${depasse}`,
+      apres.titre === depasse ? "→ OK" : "→ inattendu"
+    );
+    console.log(
+      "feuille refermée :",
+      apres.fermee,
+      "| fond rendu au fil :",
+      !apres.inert
+    );
+    // Retour arrière système : la feuille se ferme sans quitter l'app
+    const url = page.url();
+    await ouvrirMemoire();
+    await page.goBack();
+    await page.waitForTimeout(400);
+    console.log(
+      "retour arrière → feuille fermée :",
+      !(await page.$eval("#histSheet", (e) => e.classList.contains("open"))),
+      "| même page :",
+      page.url() === url,
+      "| toujours sur l'index",
+      await page.evaluate(() => currentIndex())
+    );
+    // Article jeté du fil entre l'ouverture de la feuille et le toucher
+    await ouvrirMemoire();
+    await page.evaluate(() => {
+      items = items.slice(10);
+      render(true);
+    });
+    await page.$$eval(".histrow", (rows) => rows[0].click());
+    await page.waitForTimeout(400);
+    console.log(
+      "article disparu → prévenu :",
+      await page.$eval("#toast", (e) => e.classList.contains("show") && e.textContent)
+    );
+    // Fil vide : aucune rangée, un message, aucune erreur
+    await page.evaluate(() => {
+      items = [];
+      render(true);
+    });
+    await ouvrirMemoire();
+    console.log(
+      "fil vide →",
+      await page.$eval(".histempty", (e) => e.textContent),
+      "|",
+      await page.$$eval(".histrow", (e) => e.length),
+      "rangée(s)"
+    );
+    console.log("erreurs :", errors);
+    await browser.close();
+  },
 };
 
 const which = process.argv[2];

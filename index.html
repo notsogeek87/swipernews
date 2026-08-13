@@ -251,7 +251,11 @@
     vertical-align:-.06em;margin-left:2px;opacity:0;
     animation:brandBlink .62s linear 680ms 3 forwards}
   @keyframes brandBlink{0%,49.9%{opacity:1}50%,100%{opacity:0}}
-  .top .actions{display:flex;gap:8px;flex:0 0 auto;margin-left:auto}
+  /* 6 px entre les boutons, pas 8 : à quatre icônes, les deux pixels de trop
+     se prenaient sur les pastilles voisines, qui coupaient alors « Toutes » à
+     deux pixels près. Les boutons, eux, gardent leur boîte de 38 px — c'est
+     la cible du doigt, elle ne se rogne pas. */
+  .top .actions{display:flex;gap:6px;flex:0 0 auto;margin-left:auto}
   .top .actions button{background:transparent;border:1.5px solid var(--redline);color:var(--ink);
     padding:9px 14px;border-radius:var(--radius-sm);font-family:var(--font-sans);font-weight:500;font-size:13px;
     letter-spacing:-.01em;cursor:pointer;transition:background .2s}
@@ -454,6 +458,53 @@
   .iobtn:hover{background:rgba(149,28,4,.15)}
   .iobtn:active{transform:scale(.97)}
 
+  /* Articles en mémoire. L'en-tête reste au-dessus de la liste pendant qu'on la
+     parcourt : fond opaque et marges négatives pour couvrir toute la largeur du
+     panneau, padding compris — sinon les rangées défileraient visiblement à
+     travers ses côtés. */
+  /* Le padding haut du panneau passe DANS l'en-tête et dans la poignée : une
+     bande de padding au-dessus d'un élément collant reste au-dessus de lui, et
+     les rangées défilaient visiblement dedans. */
+  #histSheet .sheet__panel{padding-top:0}
+  #histSheet .sheet__grip{margin:22px auto 10px}
+  .histhead{position:sticky;top:0;z-index:1;background:var(--surface);
+    margin:0 -20px;padding:10px 20px}
+  .histhead p.sub{margin-bottom:0}
+  /* Des RANGÉES, pas des cartes : on
+     vient y chercher un titre déjà croisé, c'est donc le texte qui prime — la
+     vignette n'est qu'un repère, à taille fixe pour que tous les titres
+     commencent sur la même verticale et que l'œil descende en ligne droite. */
+  .histrow{display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;
+    background:transparent;border:none;border-bottom:1px solid rgba(149,28,4,.3);
+    color:var(--ink);font-family:var(--font-sans);padding:12px 2px;cursor:pointer}
+  .histrow:hover{background:rgba(149,28,4,.12)}
+  .histrow:active{transform:scale(.99)}
+  .histrow__th{flex:0 0 auto;width:58px;height:58px;border-radius:var(--radius-sm);
+    background:var(--surface);object-fit:cover;display:block;border:1px solid var(--redline)}
+  .histrow__txt{min-width:0;flex:1 1 auto;display:flex;flex-direction:column;gap:4px}
+  .histrow__top{display:flex;align-items:center;gap:8px;color:var(--ash);
+    font-size:12px;min-width:0}
+  /* Le nom de la source peut être un titre de flux entier : il se coupe au
+     filet, la date à sa droite ne se laisse jamais pousser hors de la rangée. */
+  .histrow__src{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .histrow__date{flex:0 0 auto;font-family:var(--font-mono);letter-spacing:-.03em}
+  /* Trois lignes au plus : au-delà, une rangée redevient une carte et la liste
+     ne se parcourt plus d'un coup d'œil. */
+  .histrow__ttl{font-size:14.5px;font-weight:600;line-height:1.35;
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  /* Déjà dépassé : la rangée recule d'un cran. C'est précisément l'information
+     qu'on vient chercher — « celui-là est derrière moi, donc plus haut ». */
+  .histrow--past{opacity:.5}
+  /* La carte sous les yeux : repère de position dans la liste. Aplat + titre
+     corail, pas une simple nuance de teinte (voir .intchip.on). */
+  .histrow--now{background:rgba(149,28,4,.18)}
+  .histrow--now .histrow__ttl{color:var(--flare)}
+  /* Même « Eyebrow Tag » que .card__cat / .badge-ko */
+  .histnow{background:var(--flare);border:none;color:var(--bg);font-family:var(--font-mono);
+    letter-spacing:-.03em;text-transform:uppercase;font-size:10.5px;padding:2px 7px;
+    border-radius:var(--radius-sm);white-space:nowrap;flex:0 0 auto}
+  .histempty{color:var(--ash);font-size:14px;padding:14px 0}
+
   /* Réglage « Ouvrir les articles » (app packagée uniquement, voir renderReadPref).
      Segmenté plutôt qu'un interrupteur : les deux destinations sont nommées, on
      n'a pas à deviner ce que « activé » veut dire. */
@@ -597,7 +648,7 @@
     <div class="brand"><span class="brand__logo"><img src="logo-192.png?v=42" alt="" width="28" height="28"></span><span class="brand__text" data-text="SwiperNews">SwiperNews</span></div>
   </div>
   <!-- UNE seule rangée d'outils : les deux pastilles de filtre à gauche, les
-       trois boutons à droite, tout sur la même ligne de base. Les pastilles
+       boutons d'action à droite, tout sur la même ligne de base. Les pastilles
        étaient auparavant sur une rangée à elles, calées à gauche pendant que
        les boutons l'étaient à droite : deux alignements pour une même barre.
        Les icônes sont posées par setIcons() depuis les mêmes constantes que
@@ -610,6 +661,9 @@
       <button class="filterbtn" id="catBtn" aria-haspopup="dialog"><span class="filterbtn__i" aria-hidden="true"></span><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true"></span></button>
     </div>
     <div class="actions">
+      <!-- Articles en mémoire : la liste de ce que le fil garde sous la main,
+           pour revenir sur une carte dépassée d'un swipe de trop. -->
+      <button id="histBtn" class="iconbtn" aria-haspopup="dialog" data-i18n-attr="title:top.history.title,aria-label:top.history.aria"></button>
       <!-- Boussole : ouvre la dose d'apprentissage. Son état (plein/fantôme)
            dit si Wikipédia est dans le fil ; voir updateDoseBtn(). -->
       <button id="doseBtn" class="iconbtn iconbtn--toggle" aria-haspopup="dialog"></button>
@@ -711,6 +765,26 @@
   </div>
 </div>
 
+<!-- Articles en mémoire, ouverts depuis la barre du haut. Une feuille comme le
+     reste de l'app, et non une vraie page : le fil doit rester EXACTEMENT où on
+     l'a laissé derrière (une page le déchargerait, donc le rechargerait, et on
+     perdrait la position qu'on venait justement chercher). Le fond passe en
+     inert, le retour arrière la referme — voir openDialog/pushDialogState. -->
+<div class="sheet" id="histSheet" role="dialog" aria-modal="true" aria-labelledby="histTitle">
+  <div class="sheet__panel" tabindex="-1">
+    <div class="sheet__grip"></div>
+    <!-- En-tête COLLANT : cette feuille s'ouvre déjà défilée, sur la carte
+         courante (voir openHistory). Sans cela, son titre serait hors champ dès
+         l'ouverture — on verrait une liste surgie de nulle part, sans rien pour
+         dire de quoi elle est la liste. -->
+    <div class="histhead">
+      <h2 id="histTitle" data-i18n="hist.title">Articles en mémoire</h2>
+      <p class="sub" id="histSub"></p>
+    </div>
+    <div id="histList"></div>
+  </div>
+</div>
+
 <!-- Liste d'un filtre, ouverte depuis sa pastille. Une feuille plutôt qu'un
      menu flottant : c'est la forme que le reste de l'app utilise déjà, et les
      puces y tiennent toutes, sur plusieurs lignes s'il le faut. -->
@@ -750,9 +824,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=112"></script>
-<script src="src/learn-core.js?v=112"></script>
-<script src="src/i18n.js?v=112"></script>
+<script src="src/lib.js?v=113"></script>
+<script src="src/learn-core.js?v=113"></script>
+<script src="src/i18n.js?v=113"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1280,7 +1354,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="112";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="113";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2822,6 +2896,7 @@ const ICON_READ=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const ICON_RSS=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1" fill="currentColor" stroke="none"></circle></svg>`;
 const ICON_TAG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>`;
 const ICON_RELOAD=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>`;
+const ICON_LIST=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="9" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="9" y1="18" x2="21" y2="18"></line><line x1="4" y1="6" x2="4.01" y2="6"></line><line x1="4" y1="12" x2="4.01" y2="12"></line><line x1="4" y1="18" x2="4.01" y2="18"></line></svg>`;
 const ICON_SETTINGS=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`;
 const ICON_CHEV=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
 // Signale un article payant, une fois confirmé par checkPaywall() (voir plus bas).
@@ -3461,6 +3536,79 @@ function updateDoseBtn(){
 }
 doseBtn.onclick=()=>{renderMix();openDialog(mixSheet);};
 
+/* ---------- Articles en mémoire ----------
+   Un swipe de trop et l'article est passé : le fil n'a aucune marche arrière
+   fine (le retour arrière ferme les panneaux, il ne remonte pas les cartes), et
+   on le cherche alors à l'aveugle en remontant carte par carte. Cette feuille
+   montre ce que le fil garde EN MÉMOIRE — `items`, dans son ordre exact — et y
+   ramène d'un toucher.
+   Ce n'est PAS un historique de lecture et elle ne prétend pas l'être : rien
+   n'est stocké, rien n'est chargé, c'est une VUE de `items`. Ce que le fil a
+   déjà jeté (la tête au-delà de MAX_ITEMS, ou tout le fil quand un filtre
+   change) n'y est donc pas — d'où le nom.
+   Les rangées sont refaites à CHAQUE ouverture plutôt que tenues à jour : le
+   fil bouge sans cesse en arrière-plan (loadMore, remix, filets asynchrones), et
+   une liste qui se recompose sous le doigt pendant qu'on la parcourt serait pire
+   qu'inutile. */
+const histSheet=document.getElementById("histSheet"),histList=document.getElementById("histList");
+/* `etat` : "now" (la carte à l'écran), "past" (déjà dépassée), "" (à venir).
+   Vignette en chargement paresseux NATIF, sans IntersectionObserver ni variante
+   plus grande (voir applyBg) : 58 px de côté n'en réclament aucune, et la liste
+   ne survit pas à sa fermeture. */
+function histRowHTML(it,etat){
+  const img=safeImg(it.img,location.href);
+  // Wikipédia n'a pas de source qui informe (c'est toujours la même) : c'est
+  // son thème qui distingue une carte d'une autre, comme sur la carte elle-même.
+  const src=(it.kind==="learn"&&it.cat&&catLabelT(it.cat))||it.source||"";
+  return `<button type="button" class="histrow${etat?" histrow--"+etat:""}" data-hk="${escAttr(seenKey(it))}">
+    ${img?`<img class="histrow__th" src="${escAttr(img)}" alt="" loading="lazy" decoding="async" width="58" height="58">`
+    :`<span class="histrow__th"></span>`}
+    <span class="histrow__txt">
+      <span class="histrow__top">
+        <span class="histrow__src">${esc(src)}</span>
+        ${it.date?`<span class="histrow__date">${esc(relTime(it.date))}</span>`:""}
+        ${etat==="now"?`<span class="histnow">${esc(T("hist.here"))}</span>`:""}
+      </span>
+      <span class="histrow__ttl">${esc(it.title||"")}</span>
+    </span>
+  </button>`;
+}
+function openHistory(){
+  const cur=currentIndex();
+  histList.innerHTML=items.length
+    ? items.map((it,i)=>histRowHTML(it,i===cur?"now":(i<cur?"past":""))).join("")
+    : `<p class="histempty">${esc(T("hist.empty"))}</p>`;
+  document.getElementById("histSub").textContent=
+    items.length?T("hist.sub",{n:items.length}):T("hist.subEmpty");
+  openDialog(histSheet);
+  // La liste s'ouvre SUR la position courante, jamais en haut : ce qu'on vient
+  // y chercher est presque toujours juste au-dessus de la carte en cours.
+  // Position calculée plutôt que scrollIntoView, pour ne bouger que ce panneau —
+  // la rangée et le panneau partagent le même offsetParent (la feuille, seule
+  // positionnée), leur différence est donc directement le décalage voulu.
+  const row=histList.querySelector(".histrow--now");
+  if(row){
+    const p=histSheet.querySelector(".sheet__panel");
+    p.scrollTop=Math.max(0,row.offsetTop-p.offsetTop-p.clientHeight/2);
+  }
+}
+document.getElementById("histBtn").onclick=openHistory;
+histSheet.onclick=e=>{if(e.target===histSheet)closeDialog(histSheet);};
+histList.addEventListener("click",e=>{
+  const b=e.target.closest("[data-hk]");
+  if(!b)return;
+  closeDialog(histSheet);              // d'abord refermer : le fil se repositionne derrière
+  // Recherche par CLÉ, jamais par l'index de la rangée : entre l'ouverture de la
+  // feuille et le toucher, un lot arrivé en arrière-plan a pu réentrelacer le
+  // fil — le même index désignerait alors un autre article.
+  const i=items.findIndex(it=>seenKey(it)===b.dataset.hk);
+  // Le fil a jeté l'article entre-temps (remix au-delà de MAX_ITEMS) : le dire,
+  // plutôt que de ne rien faire ou d'atterrir à côté.
+  if(i<0){toast(T("hist.gone"));return;}
+  scrollToCard(i);
+  onCardChange();   // position mémorisée aussitôt, sans attendre une frame de défilement
+});
+
 /* ---------- Les deux filtres : une pastille chacun ----------
    📰 restreint la moitié « actus » à UNE source, 🎓 la moitié Wikipédia à UN
    thème — depuis la page principale, sans ouvrir les réglages. Les sources
@@ -3478,6 +3626,7 @@ const srcBtn=document.getElementById("srcBtn"),catBtn=document.getElementById("c
    des mêmes tracés, à corriger deux fois. */
 function setIcons(){
   doseBtn.innerHTML=ICON_DISCOVER;
+  document.getElementById("histBtn").innerHTML=ICON_LIST;
   document.getElementById("reloadBtn").innerHTML=ICON_RELOAD;
   document.getElementById("openSheet").innerHTML=ICON_SETTINGS;
   srcBtn.querySelector(".filterbtn__i").innerHTML=ICON_RSS;

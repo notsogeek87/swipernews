@@ -351,6 +351,13 @@ genre de script dérape.
 - `renderFilters()` / `openPicker()` — les deux pastilles de filtre et leur
   feuille. `filterChips()` fabrique les puces une seule fois pour les deux, qui
   ne peuvent donc pas diverger.
+- `openHistory()` / `histRowHTML()` — la feuille « Articles en mémoire »
+  (bouton liste de la barre du haut) : une VUE de `items`, refaite à chaque
+  ouverture, qui ramène sur une carte dépassée d'un swipe de trop. Rien n'est
+  stocké ni chargé — ce que le fil a jeté (tête au-delà de `MAX_ITEMS`,
+  changement de filtre) n'y est pas, d'où le nom. Le retour se fait par
+  `seenKey()`, JAMAIS par l'index de la rangée : un lot arrivé en arrière-plan
+  entre l'ouverture et le toucher a pu réentrelacer le fil.
 - `filterSponsored` / `isPromotionalItem()` (`src/lib.js`) — filtre sponsorisé
   ET bons plans, un seul réglage (case dans le panneau Sources, activée par
   défaut). Appliqué dans `fetchFeedRobust()`, donc identique web/natif sans
@@ -567,11 +574,11 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 
 `npm test` ne voit que `src/` et `api/` : **tout le JS en ligne d'`index.html`
 — le fil, l'état, le stockage local — n'est couvert par aucun test**. Ce banc
-comble le trou en jouant 18 scénarios réels dans Chromium, réseau entièrement
+comble le trou en jouant 23 scénarios réels dans Chromium, réseau entièrement
 simulé (rien ne part vers une vraie source) : hors-ligne, réseau lent, coupure en
 cours de requête, API en 500, RSS vide/tronqué/HTML, contenu démesuré, doublons,
 120 sources, stockage et cache abîmés, quota saturé, actions enchaînées, retour
-arrière, arrière-plan, relancement à froid.
+arrière, arrière-plan, relancement à froid, articles en mémoire.
 
 ```bash
 npm i playwright-core --prefix /tmp/qa       # hors package.json, à dessein
