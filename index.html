@@ -750,9 +750,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=110"></script>
-<script src="src/learn-core.js?v=110"></script>
-<script src="src/i18n.js?v=110"></script>
+<script src="src/lib.js?v=111"></script>
+<script src="src/learn-core.js?v=111"></script>
+<script src="src/i18n.js?v=111"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1280,7 +1280,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="110";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="111";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1491,7 +1491,7 @@ if(isNativeApp){
    même après des heures.
    Solution : revérifier périodiquement pendant que l'app est au premier plan.
    Sans coût réseau : loadFeeds() sans `force` fait déjà tout le travail de
-   vérifier l'âge du cache et ressort immédiatement si le seuil n'est pas
+   vérifier l'âge du cache (voir `perime`) et ressort immédiatement si le seuil n'est pas
    atteint — l'appeler chaque minute ne déclenche un vrai appel aux sources
    qu'une fois toutes les AUTO_RELOAD_MS, comme prévu. */
 setInterval(()=>{
@@ -1800,8 +1800,21 @@ async function loadFeeds(force){
     // est transparent, il ne masquerait pas les cartes du fil précédent.
     newsItems=[];learnItems=[];items=[];render();show("loading");
   }
-  loadLearnPart(my,key,force);
-  loadNewsPart(my,key,force,cached,sameFeed,0,premier);
+  /* Fraîcheur : UNE seule décision, pour les DEUX moitiés.
+     Elle vivait dans loadNewsPart, et Wikipédia avait sa propre règle — « jamais
+     remplacé tant qu'il reste une réserve ». Les deux moitiés du même fil
+     vieillissaient donc séparément : les actus repartaient à neuf toutes les 30
+     minutes pendant que la moitié Wikipédia, elle, restait celle du tout premier
+     chargement, rejouée depuis le cache disque à chaque ouverture — d'où des
+     articles déjà lus qui revenaient. Un seul seuil, une seule notion de
+     « périmé », et le fil entier se renouvelle d'un bloc.
+     Le tirage neuf écarte ce qui est déjà vu (dropSeen, mémoire persistante) :
+     un fil rafraîchi est donc réellement neuf, pas un nouveau tirage au hasard
+     dans ce qu'on vient de lire. */
+  const age=Date.now()-(cached?cacheTime(key):lastNewsLoad);
+  const perime=!!force||!(cached||sameFeed)||age>=AUTO_RELOAD_MS;
+  loadLearnPart(my,key,perime);
+  loadNewsPart(my,key,perime,cached,sameFeed,0,premier);
 }
 
 /* Délais des tentatives automatiques après un premier échec (news ET learn) :
@@ -1813,12 +1826,20 @@ const RETRY_DELAYS_MS=[1500,3000,5000];
 
 /* ---------- Moitié Wikipédia ----------
    Un seul lot au chargement ; le fil s'allonge ensuite tout seul au scroll
-   (loadMore). On ne redemande rien tant qu'il reste des articles en réserve :
-   les remplacer ferait disparaître, sous les yeux, la carte en cours de
-   lecture — le tirage aléatoire ne la contient presque jamais. */
-async function loadLearnPart(my,key,force,attempt=0){
+   (loadMore).
+   La réserve n'est REMPLACÉE que quand le fil est périmé — la même règle que
+   les actus, et le même seuil (voir `perime` dans loadFeeds). Elle avait sa
+   règle à part (« jamais remplacée tant qu'elle n'est pas vide »), au motif que
+   remplacer ferait disparaître la carte en cours de lecture, le tirage aléatoire
+   ne la contenant presque jamais. Le motif ne tient plus : le rendu qui suit
+   GÈLE la tête du fil (`remix(true)` plus bas), donc la carte affichée et son
+   aperçu survivent au remplacement — seul ce qui vient APRÈS est renouvelé.
+   Ce que coûtait l'exception, en revanche, était réel : la moitié Wikipédia
+   restait celle du premier chargement, rejouée depuis le cache disque à chaque
+   ouverture, et ramenait des articles déjà lus. */
+async function loadLearnPart(my,key,perime,attempt=0){
   if(!mixLevel().learn)return;      // dose « actus seules » : Wikipédia n'est pas appelé
-  if(!force&&learnItems.length)return;
+  if(!perime&&learnItems.length)return;
   // Même signal que côté actus (voir loadNewsPart) : sans lui, un rechargement
   // Wikipédia en arrière-plan (dose augmentée, réserve qui se tarit en
   // scrollant) n'avait AUCUN indice visible avant que les cartes ne changent.
@@ -1905,19 +1926,20 @@ async function loadLearnPart(my,key,force,attempt=0){
 }
 
 /* ---------- Moitié actualités ----------
-   Fraîcheur : une seule règle. Un rafraîchissement AUTOMATIQUE n'interroge les
-   sources que si le dernier lot a plus de AUTO_RELOAD_MS. En deçà, le cache
-   local est servi tel quel, sans le moindre appel réseau. La date vit DANS le
-   cache (cacheTime), pas en mémoire : rouvrir l'app dix fois en dix minutes ne
-   déclenche donc qu'un seul aller-retour.
+   Fraîcheur : une seule règle, et depuis peu une seule DÉCISION, partagée avec
+   la moitié Wikipédia (voir `perime` dans loadFeeds). Un rafraîchissement
+   AUTOMATIQUE n'interroge les sources que si le dernier lot a plus de
+   AUTO_RELOAD_MS. En deçà, le cache local est servi tel quel, sans le moindre
+   appel réseau. La date vit DANS le cache (cacheTime), pas en mémoire : rouvrir
+   l'app dix fois en dix minutes ne déclenche donc qu'un seul aller-retour.
 
    Une action EXPLICITE (bouton ↻, réessai, changement de sources, import OPML)
-   passe `force` et ignore le seuil : l'utilisateur qui demande une mise à jour
-   doit l'obtenir. La position est préservée : render() se réancre sur
-   l'article affiché. */
+   passe `force` à loadFeeds, ce qui rend `perime` vrai et ignore le seuil :
+   l'utilisateur qui demande une mise à jour doit l'obtenir. La position est
+   préservée : render() se réancre sur l'article affiché. */
 const AUTO_RELOAD_MS=30*60*1000;
 let lastNewsLoad=cacheTime(feedKey());   // repris du cache : survit à la fermeture de l'app
-async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0,premier=false){
+async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0,premier=false){
   // Dose « Wikipédia seul » : aucun flux n'est interrogé. Le fil ne contient
   // aucune actu, aller les chercher serait du réseau pour rien.
   if(!mixLevel().news){newsSettled=true;return;}
@@ -1930,12 +1952,10 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0,premier=false
      vrai). Sans cette garde, un changement de dose qui redemande les actus
      (voir applyMix) tombait sur ce seuil et ne relançait RIEN : `newsItems`
      restait vide jusqu'à un rechargement forcé (bouton ↻). */
-  // Fraîcheur de CE fil : chaque source filtrée a sa propre entrée de cache,
-  // datée. `lastNewsLoad` (global) ne vaut que pour ce qui est déjà à l'écran.
-  const age=Date.now()-(cached?cacheTime(key):lastNewsLoad);
-  if(!force&&(cached||sameFeed)&&age<AUTO_RELOAD_MS&&newsItems.length){
-    if(DEBUG)dbg(`v${APP_VERSION}  cache servi\n${items.length} articles, ${Math.round(age/60000)} min\n`+
-                 `prochaine actualisation dans ${Math.round((AUTO_RELOAD_MS-age)/60000)} min`);
+  // `perime` est calculé UNE fois dans loadFeeds, pour les deux moitiés (voir
+  // son commentaire) : la fraîcheur de CE fil, cache daté à l'appui.
+  if(!perime&&newsItems.length){
+    if(DEBUG)dbg(`v${APP_VERSION}  cache servi\n${items.length} articles`);
     newsSettled=true;
     resumePending=false;      // aucun rendu ne suivra : inutile de guetter la reprise
     return;

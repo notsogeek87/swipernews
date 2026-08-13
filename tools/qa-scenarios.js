@@ -882,6 +882,112 @@ const scenarios = {
     );
     await browser.close();
   },
+
+  /* 21. Le fil est-il VRAIMENT infini ? La moitié Wikipédia doit se
+     réapprovisionner d'elle-même en descendant, sans fin et sans redite.
+     Temps réel : le défilement passe par requestAnimationFrame, qu'une horloge
+     simulée fausserait. */
+  async infini() {
+    let wiki = 0,
+      lot = 0;
+    const WIKI = () =>
+      JSON.stringify({
+        query: {
+          pages: Array.from({ length: 20 }, (_, i) => ({
+            title: `Wiki L${lot}-${i}`, // des articles NEUFS à chaque lot
+            extract: "x".repeat(200),
+            canonicalurl: `https://fr.wikipedia.org/wiki/W${lot}_${i}`,
+            thumbnail: { source: "https://img.test/w.jpg" },
+          })),
+        },
+      });
+    const { browser, page, errors } = await boot({ storage: READY });
+    await page.route(/wikipedia\.org\/w\/api\.php|\/api\/learn/, (r) => {
+      wiki++;
+      lot++;
+      return r.fulfill({ status: 200, contentType: "application/json", body: WIKI() });
+    });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    const etat = async (l) =>
+      console.log(
+        l.padEnd(20),
+        JSON.stringify(
+          await page.evaluate(() => ({
+            reserve: learnItems.length,
+            cartes: feedEl.querySelectorAll(".card").length,
+            vus: seen.size,
+            toursVides: learnMoreVide,
+            doublons: items.length - new Set(items.map((i) => i.title)).size,
+          }))
+        )
+      );
+    await etat("au lancement");
+    for (let i = 0; i < 60; i++) {
+      await page.evaluate(() => feedEl.scrollBy({ top: feedEl.clientHeight }));
+      await page.waitForTimeout(180);
+      if (i === 39) await etat("après 40 écrans");
+    }
+    await page.waitForTimeout(1500);
+    await etat("après 60 écrans");
+    console.log("lots Wikipédia demandés :", wiki);
+    console.log(
+      "erreurs :",
+      errors.filter((e) => /PAGEERROR/.test(e))
+    );
+    await browser.close();
+  },
+
+  /* 22. On quitte l'app SUR une carte Wikipédia, le cache vieillit au-delà de
+     30 min, on rouvre : la moitié Wikipédia est renouvelée (voir `perime`), donc
+     cet article a disparu du tirage. La reprise de lecture doit tenir quand même
+     — c'est `remix(true)` qui gèle la carte affichée et tout ce qui la précède. */
+  async reprisewiki() {
+    let lot = 0;
+    const WIKI = () =>
+      JSON.stringify({
+        query: {
+          pages: Array.from({ length: 20 }, (_, i) => ({
+            title: `Wiki L${lot}-${i}`,
+            extract: "x".repeat(200),
+            canonicalurl: `https://fr.wikipedia.org/wiki/W${lot}_${i}`,
+            thumbnail: { source: "https://img.test/w.jpg" },
+          })),
+        },
+      });
+    const { browser, page } = await boot({ storage: READY });
+    await page.route(/wikipedia\.org\/w\/api\.php|\/api\/learn/, (r) => {
+      lot++;
+      return r.fulfill({ status: 200, contentType: "application/json", body: WIKI() });
+    });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    const quitte = await page.evaluate(() => {
+      const i = items.findIndex((it, n) => n > 2 && it.kind === "learn");
+      feedEl.scrollTop = feedEl.children[i].offsetTop;
+      onCardChange();
+      persistAll();
+      return { i, lien: items[i].link, titre: items[i].title };
+    });
+    console.log("quitté sur la carte Wikipédia :", quitte.titre, `(index ${quitte.i})`);
+    await page.evaluate(() => {
+      const c = JSON.parse(localStorage.getItem("fluxswipe.cache.v1") || "{}");
+      for (const k in c) c[k].t = Date.now() - 45 * 60 * 1000;
+      localStorage.setItem("fluxswipe.cache.v1", JSON.stringify(c));
+    });
+    await page.reload();
+    await page.waitForTimeout(3000);
+    const s = await page.evaluate(() => ({
+      idx: currentIndex(),
+      haut: Math.round(feedEl.scrollTop),
+      surLaCarte: (currentItem() || {}).title,
+    }));
+    console.log(
+      `retrouvé sur : ${s.surLaCarte} (index ${s.idx}, scrollTop ${s.haut})`,
+      s.surLaCarte === quitte.titre ? "→ reprise INTACTE" : "→ reprise perdue"
+    );
+    await browser.close();
+  },
 };
 
 const which = process.argv[2];

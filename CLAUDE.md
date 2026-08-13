@@ -452,6 +452,15 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   la position à l'ouverture. `forceTop` ne vaut que pour les rafraîchissements
   suivants. Confondre les deux annulait la reprise à presque chaque ouverture
   (voir §2.3 du même audit).
+- **Les DEUX moitiés du fil partagent une seule décision de fraîcheur**
+  (`perime`, calculé dans `loadFeeds`) : passé `AUTO_RELOAD_MS`, actus ET
+  Wikipédia repartent ensemble. Wikipédia avait sa règle à part (« jamais
+  remplacé tant que la réserve n'est pas vide ») ; conséquence, la moitié
+  Wikipédia restait celle du premier chargement, rejouée depuis le cache disque à
+  chaque ouverture, et ramenait des articles déjà lus. Le motif de l'exception
+  (« remplacer ferait disparaître la carte en cours de lecture ») ne tient pas :
+  le rendu qui suit gèle la tête du fil (`remix(true)`), donc la carte affichée
+  survit — vérifié par le scénario `reprisewiki`.
 - **Les trois déclencheurs automatiques de fraîcheur passent par
   `refreshIfStale()`**, qui refuse d'en lancer un quand un chargement d'actus est
   déjà en vol : le filet tourne toutes les 60 s, un chargement de 40 sources dure

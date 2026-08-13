@@ -9,7 +9,7 @@ Périmètre : `index.html` (3 752 l.), `src/*.js`, `api/*.js`, `sw.js`, le proje
 natif `android/`, et le comportement observé **dans un vrai navigateur**.
 
 > **Méthode.** Rien n'est signalé ici sur la seule lecture du code. Un banc de QA
-> (Chromium piloté par Playwright, réseau entièrement simulé) a joué 20 scénarios
+> (Chromium piloté par Playwright, réseau entièrement simulé) a joué 22 scénarios
 > — première installation, hors-ligne, réseau lent, coupure en cours de requête,
 > API en 500, RSS vide/tronqué/HTML, article sans image ni description, contenu
 > démesuré, doublons, 120 sources, stockage local abîmé, cache abîmé, quota
@@ -382,7 +382,7 @@ paie, les suivantes non, et le ramasse-miettes la lâche sous pression mémoire
 
 ### Réalisés
 
-Banc de QA (Chromium + Playwright, réseau simulé de bout en bout), **20
+Banc de QA (Chromium + Playwright, réseau simulé de bout en bout), **22
 scénarios**, tous rejoués après correction :
 
 | Scénario | Ce qui est vérifié | Résultat |
@@ -406,6 +406,8 @@ scénarios**, tous rejoués après correction :
 | Relancement à froid, cache vieilli | Reprise de lecture | ✅ après correction (§2.3) |
 | ↻ et rafraîchissement en session | Saut en tête conservé | ✅ (non-régression de §2.3) |
 | Rafraîchissement des 30 min, horloge simulée | Rien à t+25 min, rafraîchi seul à t+31 min | ✅ (`autorefresh`) |
+| Fil infini (60 écrans de descente) | Réserve 20 → 40 → 60, zéro doublon, zéro tour à vide | ✅ (`infini`) |
+| Ouverture à froid quittée sur une carte Wikipédia | Reprise intacte malgré le renouvellement de la réserve | ✅ (`reprisewiki`) |
 | Chargement plus long que le filet de 60 s | Le tour suivant respecte le chargement en cours, et la garde se relève | ✅ après correction (§2.7) |
 
 Côté code : `npm test` **79 tests** (76 + 3 ajoutés), `npm run lint` et
@@ -450,5 +452,5 @@ l'absence d'`android.jar` (aucune erreur de syntaxe introduite), XML bien formé
    `android/app/build.gradle` **dans le commit qui précède le tag** — non fait
    ici, ce commit ne prépare pas une version.
 
-Le triple bump web est fait : `APP_VERSION` **110**, `?v=110` sur les trois
-modules, `CACHE = "flux-v110"` dans `sw.js`.
+Le triple bump web est fait : `APP_VERSION` **111**, `?v=111` sur les trois
+modules, `CACHE = "flux-v111"` dans `sw.js`.
