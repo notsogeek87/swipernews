@@ -502,12 +502,16 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   sources, jamais d'une seule : l'inset CSS, la mesure native
   (`InAppBrowserPlugin.systemInsets` → `--systop`, voir `applySystemInsets`) et
   un plancher (`--systop-min`, 34 px) réservé aux écrans TACTILES et étroits
-  dont la page occupe tout l'écran — une PWA de bureau est aussi « standalone »
-  et n'a pas de barre d'état. « Occuper tout l'écran » demande DEUX règles :
-  `display-mode` ne suffit pas, un navigateur mobile bord à bord dessine sous la
-  barre d'état en se déclarant `browser` (constaté sur un vrai téléphone). D'où
-  `majPleinEcran()`, qui compare `innerHeight` à `screen.height` et pose
-  `html.plein` — aucune media query ne sait comparer deux hauteurs. La mesure native est un
+  dont RIEN n'occupe le haut de l'écran devant la page (`majPleinEcran()` →
+  `html.plein`). Deux critères plausibles ont été essayés et sont FAUX : le
+  `display-mode` (un navigateur mobile bord à bord dessine sous la barre d'état
+  en se déclarant `browser`) et la comparaison `innerHeight`/`screen.height`
+  (elle ne voit rien quand l'interface du navigateur est en bas — cas réel :
+  384×736 sur un écran de 832, les 96 px manquants tous en bas). Le critère qui
+  marche est `window.screenY` : au-delà de 0, une interface occupe déjà le haut.
+  Les moteurs qui ne le renseignent pas rendent 0, donc on réserve — seul côté
+  sûr, et presque gratuit : la barre du haut est un CALQUE, la bande ne pousse
+  aucun contenu. La mesure native est un
   CHEVAUCHEMENT avec la WebView, jamais l'inset brut : si une couche quelconque
   a déjà décalé la WebView, elle rend 0 et rien n'est réservé deux fois.
   Le pied du panneau de réglages (`renderAbout`) affiche la marge réellement

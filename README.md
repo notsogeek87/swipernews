@@ -251,15 +251,27 @@ et le CSS retient **la plus grande** — aucune n'a besoin d'être fiable seule 
    ces 34 px sont perdus — une bande vide se voit et se corrige, un bouton à
    moitié mangé ne se rattrape pas.
 
-« Occuper tout l'écran » se reconnaît à deux choses, et il faut les deux :
-`display-mode` (PWA installée, plein écran) **et la géométrie**. Car un
-navigateur mobile bord à bord dessine la page sous la barre d'état tout en se
-déclarant `browser` — mesuré sur un vrai téléphone : marge haute 12 px, bouton
-rogné par le poinçon, alors qu'aucune règle ne s'appliquait. La hauteur, elle,
-tranche : quand la fenêtre fait celle de l'écran **entier**, plus rien ne
-protège le haut de la page. Une PWA installée sur un **ordinateur** est aussi
-en `display-mode:standalone` et un ordinateur peut être en plein écran : les
-deux sont exclus par `pointer:coarse`.
+La vraie question n'est pas « la page est-elle en plein écran » mais **« y a-t-il
+quelque chose entre le haut de l'écran et le haut de la page »**. Deux réponses
+plausibles se sont révélées fausses avant la bonne :
+
+- `display-mode` répond `browser` sur un navigateur mobile qui dessine pourtant
+  la page sous la barre d'état ;
+- comparer la hauteur de la fenêtre à celle de l'écran ne marche que si
+  l'interface du navigateur est **en haut**. Sur le téléphone qui posait
+  problème : 384×736 pour un écran de 832 — les 96 px manquants étaient tous
+  **en bas** (barre d'adresse en bas, barre d'état masquée), et la page touchait
+  bel et bien le poinçon.
+
+Reste `window.screenY` : la position du haut du contenu sur l'écran. Au-delà de
+zéro, une interface de navigateur occupe déjà le haut. Les moteurs qui ne le
+renseignent pas rendent 0 — et la bande est alors réservée, seul côté sûr. Le
+tout est limité à `pointer:coarse` : un ordinateur, même en plein écran, n'a ni
+barre d'état ni découpe.
+
+Ce que la bande coûte quand elle ne sert à rien : **presque rien**. La barre du
+haut est un calque (`position:fixed`, effacé pendant le swipe) — elle ne pousse
+aucun contenu, la bande ne fait que descendre ce que la barre affiche.
 
 La valeur est bornée à 120 px et rejouée à chaque redimensionnement (tourner
 l'écran déplace la découpe). Le pied du panneau de réglages affiche la marge
