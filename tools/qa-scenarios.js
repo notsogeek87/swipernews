@@ -662,53 +662,67 @@ const scenarios = {
     await browser.close();
   },
 
-  // 17. Longue mise en arrière-plan puis reprise (et reprise de position)
+  /* 17. Les DEUX fenêtres de la règle produit :
+       — rouvrir AVANT 30 min : aucun appel réseau, on reprend où on en était ;
+       — rouvrir APRÈS 30 min : tout est rafraîchi et la première carte sous les
+         yeux est l'article publié le plus récemment, la reprise est abandonnée.
+     Les deux fonctions ont chacune leur fenêtre : elles ne se disputent plus le
+     même rendu (voir `perime` / resumePending, index.html). */
   async resume() {
     const { browser, page, errors } = await boot({ storage: READY });
+    let requetes = 0;
+    await page.route(/allorigins|corsproxy|codetabs|thingproxy|api\/feed/, (r) => {
+      requetes++;
+      return r.fulfill({ status: 200, contentType: "application/xml", body: RSS_OK });
+    });
     await page.goto(URL_APP);
     await page.waitForTimeout(2500);
-    await page.evaluate(() => {
+    const lu = await page.evaluate(() => {
       feedEl.scrollTop = feedEl.children[6].offsetTop;
       onCardChange();
+      persistAll();
+      return { idx: currentIndex(), carte: (currentItem() || {}).title };
     });
-    await page.waitForTimeout(300);
-    const pos = await page.evaluate(
-      () => JSON.parse(localStorage.getItem("fluxswipe.pos.v1")).mix.link
+    console.log(`quitté sur : ${lu.carte} (index ${lu.idx})`);
+
+    // 1) réouverture DANS la fenêtre : le cache est servi tel quel
+    const avant = requetes;
+    await page.reload();
+    await page.waitForTimeout(3000);
+    const dans = await page.evaluate(() => ({
+      idx: currentIndex(),
+      carte: (currentItem() || {}).title,
+    }));
+    console.log(
+      `avant 30 min → ${dans.carte} (index ${dans.idx}), ${requetes - avant} requête(s) réseau`,
+      dans.carte === lu.carte && requetes === avant
+        ? "→ REPRISE, sans réseau"
+        : "→ inattendu"
     );
-    console.log("position mémorisée :", pos.slice(-12));
-    // Arrière-plan long : on vieillit le cache de 45 min puis on revient
+
+    // 2) réouverture AU-DELÀ : le fil est neuf, le plus récent en tête
     await page.evaluate(() => {
-      document.dispatchEvent(new Event("visibilitychange"));
-      const c = JSON.parse(localStorage.getItem("fluxswipe.cache.v1"));
+      const c = JSON.parse(localStorage.getItem("fluxswipe.cache.v1") || "{}");
       for (const k in c) c[k].t = Date.now() - 45 * 60 * 1000;
       localStorage.setItem("fluxswipe.cache.v1", JSON.stringify(c));
-      lastNewsLoad = Date.now() - 45 * 60 * 1000;
     });
-    await page.evaluate(() => loadFeeds()); // ce que fait onResume / le filet 60 s
-    await page.waitForTimeout(3000);
-    console.log(
-      "après reprise → cartes :",
-      await page.$$eval("#feed .card", (e) => e.length),
-      "| en haut du fil :",
-      await page.evaluate(() => feedEl.scrollTop < 5),
-      "| sync éteinte :",
-      await page.$eval("#syncbar", (e) => !e.classList.contains("on"))
-    );
-    // Relancement à froid : la position doit être retrouvée. On relit la
-    // position JUSTE avant de relancer — le rafraîchissement en session ci-dessus
-    // remonte en tête à dessein (forceTop), donc la position mémorisée n'est plus
-    // celle du départ.
-    const cible = await page.evaluate(
-      () => (JSON.parse(localStorage.getItem("fluxswipe.pos.v1") || "{}").mix || {}).link
-    );
     await page.reload();
     await page.waitForTimeout(3500);
-    const after = await page.evaluate(() => ({
-      scroll: Math.round(feedEl.scrollTop),
+    const apres = await page.evaluate(() => ({
       idx: currentIndex(),
-      lien: (currentItem() || {}).link,
+      carte: (currentItem() || {}).title,
+      haut: Math.round(feedEl.scrollTop),
+      plusRecent: newsItems.length
+        ? newsItems.reduce((a, b) => (Date.parse(a.date) >= Date.parse(b.date) ? a : b))
+            .title
+        : null,
     }));
-    console.log("après relancement :", after, "| retrouvée :", after.lien === cible);
+    console.log(
+      `après 30 min → ${apres.carte} (index ${apres.idx}, scrollTop ${apres.haut})`,
+      apres.idx === 0 && apres.carte === apres.plusRecent
+        ? "→ EN TÊTE, sur l'article le plus récemment publié"
+        : `→ inattendu (le plus récent est ${apres.plusRecent})`
+    );
     console.log(
       "erreurs :",
       errors.filter((e) => /PAGEERROR/.test(e))
@@ -938,10 +952,10 @@ const scenarios = {
     await browser.close();
   },
 
-  /* 22. On quitte l'app SUR une carte Wikipédia, le cache vieillit au-delà de
-     30 min, on rouvre : la moitié Wikipédia est renouvelée (voir `perime`), donc
-     cet article a disparu du tirage. La reprise de lecture doit tenir quand même
-     — c'est `remix(true)` qui gèle la carte affichée et tout ce qui la précède. */
+  /* 22. Même règle, vue depuis une carte Wikipédia : on quitte l'app dessus, le
+     cache vieillit au-delà de 30 min, on rouvre. La moitié Wikipédia est
+     renouvelée (voir `perime`) et le fil repart en tête — la reprise ne vaut que
+     dans la fenêtre de fraîcheur. */
   async reprisewiki() {
     let lot = 0;
     const WIKI = () =>
@@ -984,7 +998,9 @@ const scenarios = {
     }));
     console.log(
       `retrouvé sur : ${s.surLaCarte} (index ${s.idx}, scrollTop ${s.haut})`,
-      s.surLaCarte === quitte.titre ? "→ reprise INTACTE" : "→ reprise perdue"
+      s.idx === 0
+        ? "→ EN TÊTE, comme attendu au-delà du seuil"
+        : "→ inattendu : pas en tête"
     );
     await browser.close();
   },

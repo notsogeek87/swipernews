@@ -447,11 +447,14 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   `AUDIT-ROBUSTESSE-2026-08.md` — `feeds` et le cache disque étaient lus sans
   garde, et une valeur d'une autre forme laissait l'app noire ou en chargement
   perpétuel **à vie**, sans aucune sortie depuis l'interface.
-- **Le tout premier chargement d'une session ne remonte PAS en tête du fil**
-  (`premier` → `paint(final, top)`) : c'est la reprise de lecture qui décide de
-  la position à l'ouverture. `forceTop` ne vaut que pour les rafraîchissements
-  suivants. Confondre les deux annulait la reprise à presque chaque ouverture
-  (voir §2.3 du même audit).
+- **La reprise de lecture ne vaut que DANS la fenêtre de fraîcheur.** Rouvrir
+  avant `AUTO_RELOAD_MS` ne déclenche aucun appel réseau : le fil est celui qu'on
+  a quitté, on y revient à sa place. Au-delà — réouverture, filet des 30 min, ↻ —
+  le fil est neuf et l'article le plus récemment publié est la première carte
+  sous les yeux. `resumePending` est donc désarmé dans `loadFeeds` dès que
+  `perime` est vrai, AVANT la peinture du cache : le défaire après coup
+  repositionnait sur l'ancien article pour le quitter d'un saut une seconde plus
+  tard (voir §2.3 de `AUDIT-ROBUSTESSE-2026-08.md`).
 - **Les DEUX moitiés du fil partagent une seule décision de fraîcheur**
   (`perime`, calculé dans `loadFeeds`) : passé `AUTO_RELOAD_MS`, actus ET
   Wikipédia repartent ensemble. Wikipédia avait sa règle à part (« jamais

@@ -750,9 +750,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=111"></script>
-<script src="src/learn-core.js?v=111"></script>
-<script src="src/i18n.js?v=111"></script>
+<script src="src/lib.js?v=112"></script>
+<script src="src/learn-core.js?v=112"></script>
+<script src="src/i18n.js?v=112"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1280,7 +1280,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="111";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="112";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1766,10 +1766,6 @@ let newsSettled=false;   // les actus ont fini leur tour (ou n'avaient rien à f
    l'autre. Une source RSS lente ne doit pas retenir les articles Wikipédia, et
    réciproquement ; chacune se rend de son côté, remix() recompose. */
 async function loadFeeds(force){
-  // Tout premier chargement de la session : c'est le seul où la reprise de
-  // lecture a quelque chose à dire, donc le seul qui ne remonte pas en tête du
-  // fil (voir flushRender). Lu AVANT que feedLoadStarted ne passe à vrai.
-  const premier=!feedLoadStarted;
   const my=++loadSeq;feedLoadStarted=true;
   demobadge(false);syncReset();newsSettled=false;
   learnMoreVide=0;   // nouveau fil : la réserve Wikipédia repart avec ses chances (voir learnMoreVide)
@@ -1813,8 +1809,17 @@ async function loadFeeds(force){
      dans ce qu'on vient de lire. */
   const age=Date.now()-(cached?cacheTime(key):lastNewsLoad);
   const perime=!!force||!(cached||sameFeed)||age>=AUTO_RELOAD_MS;
+  /* Reprise de lecture : elle ne vaut QUE dans la fenêtre de fraîcheur.
+     Rouvrir l'app avant AUTO_RELOAD_MS ne déclenche aucun appel réseau, le fil
+     est exactement celui qu'on a quitté, et on y revient à sa place. Au-delà,
+     c'est un fil NEUF qu'on affiche : le plus récemment publié doit être la
+     première carte sous les yeux, la position d'avant n'a plus d'objet.
+     Désarmée ICI, avant même la peinture du cache, et pas défaite après coup :
+     sinon on repositionnait sur l'ancien article pour le quitter d'un saut une
+     seconde plus tard, à l'écran comme un sursaut au lancement. */
+  if(perime)resumePending=false;
   loadLearnPart(my,key,perime);
-  loadNewsPart(my,key,perime,cached,sameFeed,0,premier);
+  loadNewsPart(my,key,perime,cached,sameFeed);
 }
 
 /* Délais des tentatives automatiques après un premier échec (news ET learn) :
@@ -1939,7 +1944,7 @@ async function loadLearnPart(my,key,perime,attempt=0){
    préservée : render() se réancre sur l'article affiché. */
 const AUTO_RELOAD_MS=30*60*1000;
 let lastNewsLoad=cacheTime(feedKey());   // repris du cache : survit à la fermeture de l'app
-async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0,premier=false){
+async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
   // Dose « Wikipédia seul » : aucun flux n'est interrogé. Le fil ne contient
   // aucune actu, aller les chercher serait du réseau pour rien.
   if(!mixLevel().news){newsSettled=true;return;}
@@ -2034,22 +2039,18 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0,premier=fals
      cartes bougeaient sans arrêt. On accumule et on repeint au plus une fois
      par fenêtre, ce qui correspond en pratique à un lot de MAX_PARALLEL. */
   let renderT=null,painted=false;
-  /* DEUX drapeaux, et non un seul : « c'est la repeinture FINALE » (`final` —
-     elle rend le jeton de chargement et enregistre le cache) et « remonter en
-     tête du fil » (`top`). Ils étaient confondus, ce qui rendait impossible de
-     conclure un chargement SANS déplacer l'utilisateur — voir flushRender. */
-  function paint(final,top){
+  function paint(top){
     renderT=null;painted=true;
     if(my!==loadSeq)return;
     whenFeedIdle(()=>{
-      if(final)rendreJeton();                       // repeinture finale : le chargement s'achève ICI
+      if(top)rendreJeton();                         // repeinture finale : le chargement s'achève ICI
       if(my!==loadSeq)return;                       // périmé pendant l'attente du contact
       rebuild(top);render(top);hideStates();feedKeyShown=key;
-      // Repeinture finale seule : cacheSave() lit `items`, que rebuild()
+      // Repeinture finale seule (`top`) : cacheSave() lit `items`, que rebuild()
       // vient tout juste de recalculer ci-dessus — l'appeler depuis finish()
       // AVANT que ce bloc ne s'exécute (un doigt posé sur le fil le reporte)
       // enregistrerait encore l'ancien `items` sous la nouvelle clé.
-      if(final&&collected.size)cacheSave(key);
+      if(top&&collected.size)cacheSave(key);
     });
   }
   /* Fenêtre progressive : courte pour le tout premier rendu (le contenu doit
@@ -2065,30 +2066,21 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0,premier=fals
     if(renderT)return;
     // Repeintures progressives : ni finales, ni en tête — elles gardent
     // l'ancrage sur l'article lu.
-    renderT=setTimeout(()=>paint(false,false),painted?CONFIG.RENDER_COALESCE_MS:CONFIG.FIRST_PAINT_MS);
+    renderT=setTimeout(()=>paint(false),painted?CONFIG.RENDER_COALESCE_MS:CONFIG.FIRST_PAINT_MS);
   }
   function flushRender(){
     if(renderT){clearTimeout(renderT);renderT=null;}
-    /* Rafraîchissement RÉEL terminé : on remonte en tête — automatique (seuil
-       30 min, filet, natif) comme bouton ↻, les deux passent par ici.
-       SAUF pour le tout premier chargement de la session, où la reprise de
-       lecture doit gagner. C'était un vrai conflit entre deux intentions du
-       projet, tranché du mauvais côté : dès que le cache dépassait
-       AUTO_RELOAD_MS — donc à presque toutes les ouvertures réelles, 30 minutes
-       étant court à l'échelle d'une journée — le lancement restaurait bien
-       l'article quitté (posMap, resolveResume) puis le rafraîchissement le
-       jetait aussitôt en tête. Mesuré au navigateur : l'article revenait à
-       l'écran quelques centaines de millisecondes, puis le fil sautait en haut.
-       La reprise de lecture, annoncée comme une fonction du projet, ne marchait
-       donc que dans la fenêtre de 30 minutes où l'on se souvient encore de où
-       l'on en était.
-       Le contenu neuf n'est pas perdu pour autant : ce rendu gèle la tête du fil
-       (comme toute repeinture progressive, voir remix) et le reste est retrié par
-       date — les articles frais se rangent donc JUSTE APRÈS la carte reprise, on
-       les atteint en continuant à swiper. Et ↻ remonte en tête d'un tap, lui.
-       Les rafraîchissements SUIVANTS gardent le saut en tête : c'est là qu'il
-       sert (des heures de lecture continue sans jamais revoir le haut du fil). */
-    paint(true,!premier);
+    /* Rafraîchissement RÉEL terminé : on remonte en tête, SANS exception.
+       Automatique (seuil 30 min, filet, retour au premier plan, onResume natif),
+       bouton ↻, réouverture de l'app au-delà du seuil : tous passent par ici, et
+       tous doivent poser sous les yeux l'article publié le plus récemment.
+       C'est la règle produit, et elle prime sur la reprise de lecture — laquelle
+       ne vaut, à dessein, que DANS la fenêtre de fraîcheur : rouvrir avant 30
+       minutes ne rafraîchit rien, donc ne passe jamais ici, donc reprend
+       exactement où l'on en était (voir `perime` et resumePending dans
+       loadFeeds). Les deux fonctions ne se marchent plus dessus : chacune a sa
+       fenêtre, au lieu de se disputer le même rendu. */
+    paint(true);
   }
 
   // Récupération par lots bornés plutôt que tout en parallèle.
@@ -2142,7 +2134,7 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0,premier=fals
         // Voir la même garde côté Wikipédia (loadLearnPart) : rendre le jeton
         // d'un chargement périmé retomberait sur le compteur du suivant.
         if(my!==loadSeq)return;
-        loadNewsPart(my,key,true,cached,sameFeed,attempt+1,premier);
+        loadNewsPart(my,key,true,cached,sameFeed,attempt+1);
         syncing(false);
       },RETRY_DELAYS_MS[attempt]);
       return;

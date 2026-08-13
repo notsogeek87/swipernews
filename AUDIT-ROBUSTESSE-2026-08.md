@@ -108,38 +108,51 @@ dans un `try/catch` : **quoi qu'il arrive** dans le cache, le chargement réseau
 suit. C'est la couche qui compte : elle rend la classe de panne impossible, pas
 seulement ses deux formes connues.
 
-### 2.3 — Élevée · La reprise de lecture était annulée à presque chaque ouverture
+### 2.3 — Élevée · Reprise de lecture et retour en tête se disputaient le même rendu
 
-`index.html`, `flushRender()` / `paint()`.
+`index.html`, `loadFeeds()` / `flushRender()` / `paint()`.
 
-Deux intentions du projet se contredisaient, et c'était la mauvaise qui gagnait :
+Deux intentions du projet s'appliquaient au MÊME instant, sans que rien n'arbitre
+entre elles :
 
 - `posMap` + `resolveResume()` (lien exact → date → index) restaurent l'article
   quitté à l'ouverture — la « reprise de lecture » annoncée dans le README ;
-- `forceTop` remonte en tête après un rafraîchissement des actus, pour qu'une
-  longue session de lecture ne cache pas indéfiniment le haut du fil.
+- `forceTop` remonte en tête après un rafraîchissement des actus, pour poser
+  sous les yeux ce qui vient de paraître.
 
 Or dès que le cache dépasse `AUTO_RELOAD_MS` (30 min), le lancement **est** un
-rafraîchissement. Séquence mesurée au navigateur, échantillonnée toutes les
-300 ms : l'article quitté est bien restauré (`scrollTop=5400`, `idx=6`), puis la
-repeinture finale le jette en tête (`scrollTop=0`, `idx=0`) quelques centaines de
-millisecondes plus tard. À l'écran : on revoit son article, puis le fil saute.
+rafraîchissement : les deux se déclenchaient l'une après l'autre. Séquence
+mesurée au navigateur, échantillonnée toutes les 300 ms : l'article quitté est
+restauré (`scrollTop=5400`, `idx=6`), puis la repeinture finale le jette en tête
+(`scrollTop=0`, `idx=0`) quelques centaines de millisecondes plus tard. À
+l'écran, un sursaut au lancement : on revoit son article, puis le fil saute.
 
-La reprise ne fonctionnait donc que dans la fenêtre de 30 minutes où l'on se
-souvient encore de soi-même où l'on en était — c'est-à-dire là où elle sert le
-moins.
+Le défaut n'est donc pas « la mauvaise a gagné » — c'est qu'aucune règle ne
+disait laquelle devait gagner, et que le travail de l'une était systématiquement
+jeté par l'autre.
 
-**Correction.** `paint()` prenait un seul drapeau pour deux choses distinctes ;
-il en prend deux : `final` (rendre le jeton de chargement, enregistrer le cache)
-et `top` (remonter en tête). Le **tout premier** chargement de la session
-(`premier`, lu avant que `feedLoadStarted` ne bascule) conclut sans remonter en
-tête ; tous les suivants gardent le comportement d'avant. Vérifié : ↻ explicite
-→ tête du fil ; rafraîchissement automatique en cours de session → tête du fil ;
-lancement à froid → article retrouvé.
+**Correction, en deux temps.** Le premier commit a séparé les deux drapeaux de
+`paint()` (`final` : rendre le jeton et enregistrer le cache ; `top` : remonter
+en tête), ce qui rendait la question ARBITRABLE — elle ne l'était pas avant, un
+seul drapeau portant les deux sens. Le propriétaire du projet a ensuite tranché,
+et c'est la règle en vigueur :
 
-Le contenu neuf n'est pas perdu : ce rendu gèle la tête du fil (`remix(true)`,
-comme toute repeinture progressive) et retrie le reste par date, donc les
-articles frais se rangent juste **après** la carte reprise.
+> **La reprise ne vaut que DANS la fenêtre de fraîcheur.** Rouvrir l'app avant
+> 30 minutes ne déclenche aucun appel réseau (mesuré : zéro requête), le fil est
+> exactement celui qu'on a quitté, on y revient à sa place. Au-delà — réouverture
+> comme rafraîchissement en session comme ↻ — le fil est NEUF et l'article publié
+> le plus récemment est la première carte sous les yeux.
+
+Chacune a donc sa fenêtre, au lieu de se disputer le même rendu. `paint()` est
+revenu à un seul drapeau (les deux ne divergent plus) et `resumePending` est
+désarmé dans `loadFeeds` dès que `perime` est vrai — AVANT la peinture du cache,
+et non défait après coup : c'est ce qui supprime le sursaut visible au
+lancement, que la version d'origine avait aussi.
+
+Vérifié aux deux bornes (scénario `resume`) : avant 30 min → même carte, **zéro
+requête réseau** ; après 30 min → index 0, sur l'article le plus récemment publié
+selon sa date. Idem quand on avait quitté sur une carte Wikipédia
+(`reprisewiki`).
 
 ### 2.4 — Élevée · Les sources ajoutées n'étaient pas appliquées
 
@@ -403,11 +416,11 @@ scénarios**, tous rejoués après correction :
 | 40 défilements rapides | Bornes du fil, fuite de registre | ✅ 140 cartes / 140 entrées |
 | Retour arrière (3 cas) | Panneaux, sélection appliquée, sortie franche | ✅ (§2.10) |
 | Arrière-plan long puis reprise | Rafraîchissement, barre éteinte | ✅ |
-| Relancement à froid, cache vieilli | Reprise de lecture | ✅ après correction (§2.3) |
-| ↻ et rafraîchissement en session | Saut en tête conservé | ✅ (non-régression de §2.3) |
+| Réouverture avant / après 30 min | Reprise sans réseau / plus récent en tête | ✅ (`resume`, §2.3) |
+| ↻ et rafraîchissement en session | Retour en tête | ✅ (`forcetop`) |
 | Rafraîchissement des 30 min, horloge simulée | Rien à t+25 min, rafraîchi seul à t+31 min | ✅ (`autorefresh`) |
-| Fil infini (60 écrans de descente) | Réserve 20 → 40 → 60, zéro doublon, zéro tour à vide | ✅ (`infini`) |
-| Ouverture à froid quittée sur une carte Wikipédia | Reprise intacte malgré le renouvellement de la réserve | ✅ (`reprisewiki`) |
+| Fil infini (60 puis 220 écrans de descente) | Réserve qui suit, zéro doublon, et fil plafonné à 180 cartes | ✅ (`infini`) |
+| Ouverture à froid quittée sur une carte Wikipédia | Fil neuf, retour en tête comme partout au-delà du seuil | ✅ (`reprisewiki`) |
 | Chargement plus long que le filet de 60 s | Le tour suivant respecte le chargement en cours, et la garde se relève | ✅ après correction (§2.7) |
 
 Côté code : `npm test` **79 tests** (76 + 3 ajoutés), `npm run lint` et
@@ -452,5 +465,5 @@ l'absence d'`android.jar` (aucune erreur de syntaxe introduite), XML bien formé
    `android/app/build.gradle` **dans le commit qui précède le tag** — non fait
    ici, ce commit ne prépare pas une version.
 
-Le triple bump web est fait : `APP_VERSION` **111**, `?v=111` sur les trois
-modules, `CACHE = "flux-v111"` dans `sw.js`.
+Le triple bump web est fait : `APP_VERSION` **112**, `?v=112` sur les trois
+modules, `CACHE = "flux-v112"` dans `sw.js`.
