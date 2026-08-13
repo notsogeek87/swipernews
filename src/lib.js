@@ -316,6 +316,112 @@
     }
   }
 
+  /* ---------- Dédoublonnage des actus entre flux ----------
+     Un même site publie couramment le MÊME article dans plusieurs de ses flux :
+     le flux « à la une » et celui de la rubrique, ou deux rubriques qui se
+     recoupent. Coché l'un et l'autre, on voyait donc l'article deux fois dans le
+     fil — deux cartes à passer, et deux fois la même chose à lire.
+     La moitié Wikipédia dédoublonne depuis toujours (dedupAndRank) ; la moitié
+     actus, jamais : chaque flux était plafonné puis simplement concaténé. */
+
+  /** Paramètres d'URL qui ne désignent PAS un contenu différent : campagnes,
+   *  provenance, identifiants de partage. Deux flux d'un même site servent
+   *  souvent le même article en s'y distinguant seulement par là
+   *  (?xtor=RSS-1 sur le flux général, RSS-2 sur celui de la rubrique). */
+  const TRACKING_PARAM =
+    /^(utm_|xtor|ncid|cmpid|campaign|at_|at_medium|at_campaign|ref|referer|referrer|from|s_cid|sr_share|fbclid|gclid|mc_cid|mc_eid|igshid|spm|__twitter_impression)/i;
+  /** Forme canonique d'un lien d'article : hôte sans « www. », chemin sans barre
+   *  finale, requête débarrassée du pistage, fragment jeté. Une URL non parsable
+   *  est rendue telle quelle, faute de mieux. */
+  function canonicalLink(url) {
+    try {
+      const u = new URL(url);
+      for (const k of [...u.searchParams.keys()]) {
+        if (TRACKING_PARAM.test(k)) u.searchParams.delete(k);
+      }
+      const host = u.hostname.replace(/^www\./, "").toLowerCase();
+      return host + u.pathname.replace(/\/+$/, "") + (u.search || "");
+    } catch (_) {
+      return (url || "").trim();
+    }
+  }
+  /** Titre réduit à ce qui le distingue : sans accents, sans casse, sans
+   *  ponctuation. « Guerre en Ukraine : le point » et « Guerre en Ukraine - Le
+   *  point » sont le même titre, écrit par deux gabarits de flux différents. */
+  function titleKey(t) {
+    return (t || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  }
+  /* Six heures, et non vingt-quatre : une chronique au titre fixe (« Programme
+     TV du jour ») reparaît à exactement 24 h d'écart, qu'une fenêtre d'un jour
+     laisserait donc passer — pile le faux positif à éviter. Deux flux d'un même
+     site servant le même article, eux, en publient la date depuis le même champ
+     du CMS : elle est identique, ou séparée de quelques minutes quand l'un
+     donne la date de mise à jour et l'autre celle de publication. */
+  const PROCHE_MS = 6 * 60 * 60 * 1000;
+  /** Deux dates assez proches pour parler du même article. Une date absente ou
+   *  illisible ne DISQUALIFIE pas (beaucoup de flux n'en publient pas) : elle
+   *  laisse simplement le titre trancher seul. */
+  function sameDayish(a, b) {
+    const ta = Date.parse(a || "");
+    const tb = Date.parse(b || "");
+    if (isNaN(ta) || isNaN(tb)) return true;
+    return Math.abs(ta - tb) <= PROCHE_MS;
+  }
+  /** Des deux copies d'un même article, celle qui apporte le plus : une image
+   *  d'abord (un flux de rubrique en publie souvent une là où le flux général
+   *  n'en met pas), puis le résumé le plus complet. Départage DÉTERMINISTE :
+   *  l'ordre d'arrivée des flux, lui, dépend du réseau. */
+  function richerItem(a, b) {
+    const ia = a && a.img ? 1 : 0;
+    const ib = b && b.img ? 1 : 0;
+    if (ia !== ib) return ia > ib;
+    return ((a && a.desc) || "").length > ((b && b.desc) || "").length;
+  }
+  /**
+   * Dédoublonne une liste d'actus venues de PLUSIEURS flux. Deux articles sont
+   * le même si :
+   *   — leur lien canonique est identique (cas de loin le plus fréquent) ;
+   *   — OU, sur le MÊME site, leur titre normalisé est identique et leurs dates
+   *     ne se contredisent pas (voir PROCHE_MS).
+   *
+   * Les deux garde-fous du second critère comptent. Sans le même hôte, deux
+   * rédactions qui titrent pareil sur la même dépêche AFP — cas courant —
+   * perdraient l'une des deux versions, alors que ce sont bien deux articles.
+   * Sans la proximité de date, une chronique au titre fixe (« Le point sur la
+   * situation », « Programme TV du jour ») s'effacerait elle-même d'un jour sur
+   * l'autre.
+   */
+  function dedupNews(list) {
+    const parLien = new Map();
+    const parTitre = new Map();
+    const out = [];
+    for (const it of list || []) {
+      const lien = canonicalLink((it && it.link) || "");
+      const tk = titleKey(it && it.title);
+      const titre = tk ? hostOf((it && it.link) || "").toLowerCase() + "|" + tk : "";
+      let i = -1;
+      if (lien && parLien.has(lien)) i = parLien.get(lien);
+      else if (titre && parTitre.has(titre)) {
+        const j = parTitre.get(titre);
+        if (sameDayish(it && it.date, out[j] && out[j].date)) i = j;
+      }
+      if (i < 0) {
+        i = out.length;
+        out.push(it);
+      } else if (richerItem(it, out[i])) {
+        out[i] = it;
+      }
+      if (lien) parLien.set(lien, i);
+      if (titre) parTitre.set(titre, i);
+    }
+    return out;
+  }
+
   /** Libellés éditoriaux standard du contenu sponsorisé (fr + en), pas de mot
    *  générique comme « partenaire » ou « communiqué de presse » : trop de
    *  faux positifs sur du contenu éditorial légitime. */
@@ -567,6 +673,8 @@
     seenKey,
     dropSeen,
     dedupAndRank,
+    dedupNews,
+    canonicalLink,
     interleave,
     isPromotionalItem,
     isPaywallCandidateDomain,

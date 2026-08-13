@@ -746,9 +746,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=106"></script>
-<script src="src/learn-core.js?v=106"></script>
-<script src="src/i18n.js?v=106"></script>
+<script src="src/lib.js?v=107"></script>
+<script src="src/learn-core.js?v=107"></script>
+<script src="src/i18n.js?v=107"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -756,7 +756,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds","interleave","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain"],
+  const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds","interleave","dedupNews","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -835,7 +835,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,interleave,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,interleave,dedupNews,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1009,7 +1009,9 @@ function adoptItems(list){
   // sponsorOut : un instantané ou un cache disque peut avoir été écrit AVANT
   // qu'un sponsoring d'auteur ne soit confirmé (voir checkSponsor) — le
   // reprendre tel quel le ferait réapparaître.
-  newsItems=list.filter(i=>i.kind!=="learn"&&!(filterSponsored&&sponsorOut.has(i.link)));
+  // dedupNews : un cache écrit par une version antérieure au dédoublonnage peut
+  // contenir le même article deux fois ; on ne le ressert pas tel quel.
+  newsItems=dedupNews(list.filter(i=>i.kind!=="learn"&&!(filterSponsored&&sponsorOut.has(i.link))));
   learnItems=list.filter(i=>i.kind==="learn");
   remix();
 }
@@ -1206,7 +1208,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="106";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="107";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1822,6 +1824,11 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
     // le contient toujours (le flux RSS ne le déclare pas), c'est ici qu'il se
     // retire — sinon chaque repeinture le ramenait. Voir sponsorOut.
     if(filterSponsored&&sponsorOut.size)all=all.filter(i=>!sponsorOut.has(i.link));
+    // ICI et pas par flux : c'est justement ENTRE les flux que le même article
+    // se répète (le « à la une » d'un site et sa rubrique servent le même
+    // papier). Avant le tri par date, donc avant le plafond MAX_NEWS — sinon
+    // les doublons mangeraient des places à des articles distincts.
+    all=dedupNews(all);
     all.sort((a,b)=>itemTime(b)-itemTime(a));
     newsItems=all.slice(0,CONFIG.MAX_NEWS);
     remix(!top);

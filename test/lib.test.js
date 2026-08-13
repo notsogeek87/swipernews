@@ -428,3 +428,127 @@ test("interleave est stable sur les préfixes (le fil déjà lu ne bouge pas)", 
   // Cadence dégénérée : jamais de boucle infinie, jamais de division par zéro.
   assert.deepEqual(lib.interleave(["n1"], ["w1"], 0), ["n1", "w1"]);
 });
+
+/* ---------- Dédoublonnage des actus entre flux ---------- */
+
+const art = (o) =>
+  Object.assign({ source: "S", title: "", desc: "", link: "", img: "", date: "" }, o);
+
+test("dedupNews fusionne le même article servi par deux flux d'un même site", () => {
+  // Cas réel : le flux « à la une » et celui de la rubrique servent le même
+  // article, en s'y distinguant par un paramètre de campagne.
+  const out = lib.dedupNews([
+    art({ title: "Un titre", link: "https://lemonde.fr/a/x.html?xtor=RSS-1" }),
+    art({ title: "Un titre", link: "https://www.lemonde.fr/a/x.html?xtor=RSS-3001" }),
+  ]);
+  assert.equal(out.length, 1);
+});
+
+test("dedupNews ignore la barre finale, le fragment et le www", () => {
+  const out = lib.dedupNews([
+    art({ title: "T", link: "https://lemonde.fr/a/x/" }),
+    art({ title: "T", link: "https://www.lemonde.fr/a/x#intro" }),
+  ]);
+  assert.equal(out.length, 1);
+});
+
+test("dedupNews garde un paramètre qui désigne un contenu différent", () => {
+  // ?page=2 n'est pas du pistage : c'est un autre contenu.
+  const out = lib.dedupNews([
+    art({ title: "A", link: "https://s.fr/a?page=1" }),
+    art({ title: "B", link: "https://s.fr/a?page=2" }),
+  ]);
+  assert.equal(out.length, 2);
+});
+
+test("dedupNews rapproche par titre quand les liens diffèrent, sur le même site", () => {
+  const out = lib.dedupNews([
+    art({
+      title: "Guerre en Ukraine : le point",
+      link: "https://s.fr/monde/ukraine",
+      date: "Wed, 12 Aug 2026 10:00:00 GMT",
+    }),
+    art({
+      title: "Guerre en Ukraine - Le Point",
+      link: "https://s.fr/a-la-une/ukraine",
+      date: "Wed, 12 Aug 2026 10:05:00 GMT",
+    }),
+  ]);
+  assert.equal(out.length, 1);
+});
+
+test("dedupNews ne fusionne PAS deux sites qui titrent pareil (même dépêche AFP)", () => {
+  const out = lib.dedupNews([
+    art({
+      title: "Le même titre",
+      link: "https://lemonde.fr/a",
+      date: "Wed, 12 Aug 2026 10:00:00 GMT",
+    }),
+    art({
+      title: "Le même titre",
+      link: "https://lefigaro.fr/b",
+      date: "Wed, 12 Aug 2026 10:00:00 GMT",
+    }),
+  ]);
+  assert.equal(out.length, 2);
+});
+
+test("dedupNews ne fusionne PAS une chronique au titre fixe d'un jour à l'autre", () => {
+  const out = lib.dedupNews([
+    art({
+      title: "Programme TV du jour",
+      link: "https://s.fr/tv/lundi",
+      date: "Mon, 10 Aug 2026 06:00:00 GMT",
+    }),
+    art({
+      title: "Programme TV du jour",
+      link: "https://s.fr/tv/mardi",
+      date: "Tue, 11 Aug 2026 06:00:00 GMT",
+    }),
+  ]);
+  assert.equal(out.length, 2);
+});
+
+test("dedupNews garde la copie la plus riche, pas la première venue", () => {
+  // L'ordre d'arrivée des flux dépend du réseau : le départage doit être stable.
+  const pauvre = art({ title: "T", link: "https://s.fr/a", desc: "court" });
+  const riche = art({
+    title: "T",
+    link: "https://s.fr/a",
+    desc: "un résumé bien plus complet",
+    img: "https://s.fr/i.jpg",
+  });
+  assert.equal(lib.dedupNews([pauvre, riche])[0].img, "https://s.fr/i.jpg");
+  assert.equal(lib.dedupNews([riche, pauvre])[0].img, "https://s.fr/i.jpg");
+  // À image égale, le résumé le plus long l'emporte.
+  const a = art({ title: "U", link: "https://s.fr/u", desc: "court" });
+  const b = art({ title: "U", link: "https://s.fr/u", desc: "beaucoup plus long" });
+  assert.equal(lib.dedupNews([a, b])[0].desc, "beaucoup plus long");
+  assert.equal(lib.dedupNews([b, a])[0].desc, "beaucoup plus long");
+});
+
+test("dedupNews préserve l'ordre d'entrée et ne perd rien d'unique", () => {
+  const out = lib.dedupNews([
+    art({ title: "A", link: "https://s.fr/a" }),
+    art({ title: "B", link: "https://s.fr/b" }),
+    art({ title: "A", link: "https://s.fr/a" }),
+    art({ title: "C", link: "https://s.fr/c" }),
+  ]);
+  assert.deepEqual(
+    out.map((i) => i.title),
+    ["A", "B", "C"]
+  );
+});
+
+test("dedupNews encaisse les entrées dégradées", () => {
+  assert.deepEqual(lib.dedupNews([]), []);
+  assert.deepEqual(lib.dedupNews(null), []);
+  // Lien non parsable : comparé tel quel, jamais fusionné à tort.
+  const out = lib.dedupNews([
+    art({ title: "T", link: "pas une url" }),
+    art({ title: "T", link: "pas une url" }),
+    art({ title: "", link: "" }),
+    art({ title: "", link: "" }),
+  ]);
+  assert.equal(out.length, 3); // les deux sans titre NI lien restent distincts
+});

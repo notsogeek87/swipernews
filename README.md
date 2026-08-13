@@ -51,6 +51,19 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
   Si le flux n'en publie aucune (fréquent chez les sites WordPress nus), l'app
   tente de son côté une image de partage (`og:image`) une fois la carte proche
   de l'écran
+- **Dédoublonnage entre flux** : un même site publie couramment le même article
+  dans son flux « à la une » ET dans celui de la rubrique. Cocher les deux
+  donnait deux cartes pour le même papier. Deux articles sont fusionnés quand
+  leur lien canonique coïncide (paramètres de campagne et fragment retirés :
+  `?xtor=RSS-1` contre `?xtor=RSS-3208`), ou quand, **sur le même site**, leur
+  titre normalisé est identique et leurs dates ne se contredisent pas. Ces deux
+  garde-fous évitent les faux positifs qui coûteraient un vrai article : sans
+  « même site », deux rédactions reprenant la même dépêche AFP au même titre
+  n'en garderaient qu'une ; sans la proximité de date, une chronique au titre
+  fixe (« Programme TV du jour ») s'effacerait d'un jour sur l'autre. Des deux
+  copies, on garde la plus riche — celle qui a une image, puis le résumé le plus
+  complet — plutôt que la première arrivée, dont l'ordre dépend du réseau. Voir
+  `dedupNews` (`src/lib.js`)
 - **Filtre sponsorisé et bons plans** (activé par défaut, réglage dans le
   panneau Sources) : écarte du fil les articles marqués comme contenu
   sponsorisé (titre, résumé ou catégorie RSS) et les articles de la rubrique
