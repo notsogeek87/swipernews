@@ -49,6 +49,9 @@
       "hist.here": "Ici",
       "hist.gone": "Cet article n'est plus dans le fil",
 
+      "about.version": "Version {v}",
+      "about.systop": "marge haute {n} px",
+
       "rail.share.aria": "Partager cet article",
       "rail.share.title": "Partager",
 
@@ -246,6 +249,9 @@
       "hist.empty": "The feed hasn't loaded anything yet.",
       "hist.here": "Here",
       "hist.gone": "This article is no longer in the feed",
+
+      "about.version": "Version {v}",
+      "about.systop": "top inset {n} px",
 
       "rail.share.aria": "Share this article",
       "rail.share.title": "Share",

@@ -493,16 +493,23 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 
 ## Pièges rencontrés (ne pas les refaire)
 
-- **`env(safe-area-inset-top)` ne décrit PAS la barre d'état sur WebView
-  Android**, et plusieurs versions le rapportent à zéro même avec un poinçon de
-  caméra. Or l'APK s'étend sous les barres système (bord à bord, imposé depuis
-  `targetSdk 35`) : tout ce qu'on pose en haut de l'écran se dessine donc dans
-  la bande de l'horloge et du poinçon — et un poinçon CENTRÉ tombe pile sur un
-  bouton de la barre d'outils. La mesure vient du natif
-  (`InAppBrowserPlugin.systemInsets` → `--systop`, voir `applySystemInsets`), et
-  c'est un CHEVAUCHEMENT avec la WebView, jamais l'inset brut : si une couche
-  quelconque a déjà décalé la WebView, la réponse est 0 et rien n'est réservé
-  deux fois. Le CSS prend `max()` des deux sources, jamais l'une des deux.
+- **`env(safe-area-inset-top)` ne suffit pas à éviter le poinçon de caméra** :
+  sur WebView Android il ne décrit que la découpe d'écran, et plusieurs moteurs
+  mobiles le rapportent à zéro. Or dès que la page occupe tout l'écran (APK —
+  bord à bord imposé depuis `targetSdk 35` —, PWA installée, plein écran), son
+  haut se dessine dans la bande de la barre d'état : un poinçon CENTRÉ tombe
+  pile sur un bouton de la barre d'outils. Le CSS prend donc `max()` de TROIS
+  sources, jamais d'une seule : l'inset CSS, la mesure native
+  (`InAppBrowserPlugin.systemInsets` → `--systop`, voir `applySystemInsets`) et
+  un plancher (`--systop-min`, 34 px) réservé aux écrans TACTILES et étroits en
+  `display-mode:standalone/fullscreen` — une PWA de bureau est aussi
+  « standalone » et n'a pas de barre d'état. La mesure native est un
+  CHEVAUCHEMENT avec la WebView, jamais l'inset brut : si une couche quelconque
+  a déjà décalé la WebView, elle rend 0 et rien n'est réservé deux fois.
+  Le pied du panneau de réglages (`renderAbout`) affiche la marge réellement
+  appliquée, lue sur le style CALCULÉ de `.top` : sans elle, un « ça rogne
+  encore » n'est pas débogable — ni l'APK ni une PWA installée n'ont de barre
+  d'URL où ajouter `?debug=1`.
 - **Commentaires XML** : `--` y est interdit. Écrire `« accent »` plutôt que
   `--accent` en citant une variable CSS.
 - **`setPadding()` écrase le padding du XML**, insets compris : ajouter la

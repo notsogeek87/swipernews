@@ -44,11 +44,18 @@
     --bg:#190501;--surface:#340a01;--molten:#631303;--redline:#951c04;
     --flare:#fa5838;--blush:#fcac9c;--ink:#f7f6ff;--ash:#baadab;--black:#000;
     --radius-sm:4px;--radius-md:8px;
-    /* Ce que le système dessine PAR-DESSUS le haut de la WebView : barre d'état
-       et poinçon/encoche de caméra. Zéro partout, sauf dans l'app packagée où
-       applySystemInsets() le remplit depuis le natif — voir là-bas pourquoi
-       env(safe-area-inset-top) n'y suffit pas. */
+    /* Ce que le système dessine PAR-DESSUS le haut de la page : barre d'état et
+       poinçon/encoche de caméra. Zéro par défaut ; l'app packagée le remplit
+       depuis le natif (applySystemInsets), qui sait le mesurer. */
     --systop:0px;
+    /* Plancher, quand la page occupe TOUT l'écran — PWA installée, plein écran,
+       APK. Là, et seulement là, le haut de la page tombe dans la bande de la
+       barre d'état et de la découpe de caméra. Dans un onglet ordinaire, c'est
+       l'interface du navigateur qui occupe cette bande : rien à réserver.
+       Il faut un plancher parce que `env(safe-area-inset-top)`, qui devrait
+       renseigner, rend 0 sur plusieurs moteurs mobiles face à un poinçon —
+       et un poinçon centré tombe pile sur un bouton de la barre d'outils. */
+    --systop-min:0px;
     --shadow-ember:inset 0 0 20px rgb(99,19,3);
     --font-sans:'Matter','Inter','Söhne','Geist Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
     --font-mono:'Fabrikatmono','JetBrains Mono','IBM Plex Mono','Berkeley Mono',ui-monospace,
@@ -224,8 +231,16 @@
      renseigne (encoche d'iPhone, PWA installée), dans l'APK c'est le natif —
      et prendre le plus grand des deux ne peut jamais laisser un bouton sous
      le poinçon, quelle que soit celle des deux sources qui répond. */
+  /* Réservé aux écrans TACTILES et étroits : une PWA installée sur un ordinateur
+     est aussi en display-mode:standalone, et n'a ni barre d'état ni poinçon —
+     lui prendre 34 px en haut serait une bande vide pour rien. */
+  @media (pointer:coarse) and (max-width:560px){
+    @media (display-mode:standalone),(display-mode:fullscreen),(display-mode:minimal-ui){
+      :root{--systop-min:34px}
+    }
+  }
   .top{position:fixed;top:0;left:0;right:0;z-index:15;padding:12px 16px 14px;
-    padding-top:calc(12px + max(env(safe-area-inset-top),var(--systop,0px)));
+    padding-top:calc(12px + max(env(safe-area-inset-top),var(--systop,0px),var(--systop-min,0px)));
     display:flex;flex-direction:column;gap:11px;background:linear-gradient(rgba(25,5,1,.82),rgba(25,5,1,.5) 65%,transparent);
     transition:transform .32s ease,opacity .32s ease}
   .top.top--away{transform:translateY(-115%);opacity:0;pointer-events:none}  /* masqué pendant le swipe */
@@ -393,7 +408,7 @@
   /* Étiquette (mode démo) : même traitement que .card__cat. */
   /* Sous la barre du haut : 113 px de barre + 13 px d'air, plus ce que le
      système occupe au-dessus d'elle (voir « systop »). */
-  .demobadge{position:fixed;top:calc(126px + max(env(safe-area-inset-top),var(--systop,0px)));left:50%;transform:translateX(-50%);z-index:14;
+  .demobadge{position:fixed;top:calc(126px + max(env(safe-area-inset-top),var(--systop,0px),var(--systop-min,0px)));left:50%;transform:translateX(-50%);z-index:14;
     background:var(--surface);border:1px solid var(--redline);color:var(--flare);
     padding:6px 14px;border-radius:var(--radius-sm);font-family:var(--font-mono);letter-spacing:-.03em;
     text-transform:uppercase;font-size:12px}
@@ -426,7 +441,7 @@
      élément qui n'est même pas une cible). */
   /* Au centre du bord haut, donc pile où se loge un poinçon de caméra : il
      descend avec la barre (voir « systop »). */
-  .peek{position:fixed;top:calc(7px + max(env(safe-area-inset-top),var(--systop,0px)));left:50%;transform:translate(-50%,0);z-index:14;
+  .peek{position:fixed;top:calc(7px + max(env(safe-area-inset-top),var(--systop,0px),var(--systop-min,0px)));left:50%;transform:translate(-50%,0);z-index:14;
     width:46px;height:21px;display:grid;place-items:center;pointer-events:none;
     color:var(--ash);font-size:14px;line-height:1;opacity:0;transition:opacity .32s ease}
   body.top-away .peek{opacity:.4}
@@ -529,6 +544,9 @@
     letter-spacing:-.03em;text-transform:uppercase;font-size:10.5px;padding:2px 7px;
     border-radius:var(--radius-sm);white-space:nowrap;flex:0 0 auto}
   .histempty{color:var(--ash);font-size:14px;padding:14px 0}
+  /* Pied du panneau de réglages : discret, jamais un titre. */
+  .about{color:var(--ash);font-family:var(--font-mono);letter-spacing:-.03em;
+    font-size:11.5px;text-align:center;margin-top:16px;opacity:.75}
 
   /* Réglage « Ouvrir les articles » (app packagée uniquement, voir renderReadPref).
      Segmenté plutôt qu'un interrupteur : les deux destinations sont nommées, on
@@ -781,6 +799,11 @@
     <div data-readmount></div>
 
     <button class="applybtn" id="applySettings" data-i18n="sheet.apply">Voir mon fil</button>
+    <!-- Pied de panneau : la version, et dans l'app packagée la marge haute
+         réellement retenue (voir applySystemInsets). Sans elle, « le poinçon
+         rogne encore » est indébogable à distance — l'APK n'a pas de barre
+         d'URL où ajouter ?debug=1. Rempli par renderAbout(). -->
+    <p class="about" id="about"></p>
   </div>
 </div>
 
@@ -854,9 +877,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=115"></script>
-<script src="src/learn-core.js?v=115"></script>
-<script src="src/i18n.js?v=115"></script>
+<script src="src/lib.js?v=116"></script>
+<script src="src/learn-core.js?v=116"></script>
+<script src="src/i18n.js?v=116"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -983,6 +1006,8 @@ function applyI18n(){
       el.setAttribute(attr,T(key));
     });
   });
+  // Contenu généré : il n'a pas de data-i18n à relire (voir renderAbout).
+  if(typeof renderAbout==="function")renderAbout();
 }
 document.documentElement.lang=LANG;
 applyI18n();
@@ -1384,7 +1409,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="115";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="116";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1409,20 +1434,54 @@ const isNativeApp=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window
    WebView — zéro si une couche quelconque l'a déjà décalée, donc jamais de
    marge comptée deux fois.
    Rejoué au redimensionnement : tourner l'écran change la découpe de place. */
+/* Plancher, appliqué à la seule app packagée : la mesure native est la bonne
+   réponse quand elle arrive, mais elle peut ne pas arriver (APK plus ancien que
+   ce code, WebView qui rend un inset nul, bogue d'OEM) — et sans elle, un
+   bouton reste sous le poinçon. 34 px couvrent une barre d'état Android
+   (24-30 dp) et la découpe qui s'y loge.
+   Contrepartie assumée : sur un APK où la WebView serait DÉJÀ décalée sous les
+   barres système, ces 34 px sont perdus. C'est le mauvais côté à choisir — une
+   bande vide se voit et se corrige, un bouton à moitié mangé ne se rattrape
+   pas. Le jour où la mesure répond, `max` reprend la main de toute façon. */
+const SYSTOP_MIN=34;
+let systopPx=0;
+/* Pied du panneau de réglages : version, et marge haute RÉELLEMENT appliquée.
+   Elle est lue sur le style calculé de la barre, pas sur la variable : c'est la
+   seule valeur qui dise la vérité, quelle que soit celle des trois sources
+   (inset CSS, mesure native, plancher) qui l'a emporté. Sans ça, « le poinçon
+   rogne encore » n'est pas débogable à distance — ni l'APK ni une PWA installée
+   n'ont de barre d'URL où ajouter ?debug=1.
+   `__aboutReady` : applyI18n() tourne AVANT que APP_VERSION ne soit défini
+   (déclarations hoistées, const en zone morte) — sans ce drapeau, le premier
+   appel lèverait une ReferenceError. */
+function renderAbout(){
+  const el=document.getElementById("about");
+  if(!el||!window.__aboutReady)return;
+  let haut=0;
+  try{haut=Math.round(parseFloat(getComputedStyle(document.querySelector(".top")).paddingTop)||0);}
+  catch(e){warn("about",e);}
+  el.textContent=T("about.version",{v:APP_VERSION})+" · "+T("about.systop",{n:haut});
+}
+function setSystop(px){
+  systopPx=Math.max(0,Math.min(120,Math.round(px)||0));
+  document.documentElement.style.setProperty("--systop",systopPx+"px");
+  renderAbout();          // la ligne d'info du panneau dit la valeur retenue
+}
 function applySystemInsets(){
   if(!isNativeApp)return;
   const p=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
-  if(!p||!p.systemInsets)return;                 // APK plus ancien que ce code
+  // APK plus ancien que ce code, ou pont indisponible : le plancher tient seul.
+  if(!p||!p.systemInsets){setSystop(SYSTOP_MIN);return;}
   Promise.resolve(p.systemInsets()).then(r=>{
-    // Borné : une valeur aberrante (unité inattendue, bogue d'OEM) ne doit pas
-    // pouvoir pousser la barre hors de l'écran.
-    const t=Math.max(0,Math.min(120,Math.round(Number(r&&r.top)||0)));
-    document.documentElement.style.setProperty("--systop",t+"px");
-  }).catch(e=>warn("insets",e));
+    const t=Number(r&&r.top);
+    setSystop(Math.max(SYSTOP_MIN,isFinite(t)?t:0));
+  }).catch(e=>{warn("insets",e);setSystop(SYSTOP_MIN);});
 }
+window.__aboutReady=true;   // APP_VERSION est défini : renderAbout peut parler
 applySystemInsets();
+renderAbout();              // le web n'appelle pas setSystop : c'est ici qu'il s'affiche
 addEventListener("resize",()=>{clearTimeout(applySystemInsets.t);
-  applySystemInsets.t=setTimeout(applySystemInsets,200);});
+  applySystemInsets.t=setTimeout(()=>{applySystemInsets();renderAbout();},200);});
 
 /* Où s'ouvre un article, dans l'app packagée : "app" = navigateur INTÉGRÉ
    (plugin maison InAppBrowser, voir

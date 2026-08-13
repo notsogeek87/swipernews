@@ -227,22 +227,36 @@ déclenché le rééquilibrage des deux rangées décrit plus haut.
 
 ### Poinçon de caméra et barre d'état
 
-Dans l'APK, la WebView s'étend **sous les barres système** (bord à bord, imposé
-depuis `targetSdk 35`) : ce qu'on pose en haut de l'écran se dessine dans la
-bande de l'horloge — et un **poinçon de caméra centré** tombe pile sur un bouton
-de la barre d'outils, qu'il rogne. Tant que cette rangée ne portait que la
-marque, alignée à gauche, le centre était vide et personne ne le voyait.
+Dès que la page occupe **tout l'écran** — APK, PWA installée, plein écran — son
+haut se dessine dans la bande de la barre d'état. Un **poinçon de caméra
+centré** tombe alors pile sur un bouton de la barre d'outils, qu'il rogne. Tant
+que cette rangée ne portait que la marque, alignée à gauche, le centre était
+vide et personne ne le voyait ; les boutons y sont montés, le problème est
+apparu. (Dans un onglet ordinaire, rien à faire : c'est l'interface du
+navigateur qui occupe cette bande.)
 
-`env(safe-area-inset-top)`, qui devrait le dire, ne le dit pas : sur WebView
-Android il ne décrit que la découpe d'écran, et plusieurs versions le rapportent
-à zéro. La mesure est donc **demandée au natif**
-(`InAppBrowserPlugin.systemInsets`), et c'est un **chevauchement** avec la
-WebView, jamais l'inset brut : si une couche quelconque — Capacitor, un thème,
-une future version d'Android — a déjà décalé la WebView, la réponse est 0 et
-rien n'est réservé deux fois. Le CSS retient le plus grand des deux
-(`max(env(…), var(--systop))`), si bien qu'aucune des deux sources n'a besoin
-d'être fiable seule. La valeur est bornée à 120 px et rejouée à chaque
-redimensionnement : tourner l'écran déplace la découpe.
+`env(safe-area-inset-top)`, qui devrait le dire, ne le dit pas toujours : sur
+WebView Android il ne décrit que la découpe d'écran, et plusieurs moteurs
+mobiles le rapportent à zéro face à un poinçon. Trois sources se relaient donc,
+et le CSS retient **la plus grande** — aucune n'a besoin d'être fiable seule :
+
+1. `env(safe-area-inset-top)`, quand le moteur le renseigne (encoche d'iPhone) ;
+2. dans l'APK, une **mesure native** (`InAppBrowserPlugin.systemInsets`). C'est
+   un **chevauchement** avec la WebView, jamais l'inset brut : si une couche
+   quelconque — Capacitor, un thème, une future version d'Android — a déjà
+   décalé la WebView, la réponse est 0 et rien n'est réservé deux fois ;
+3. un **plancher de 34 px**, appliqué aux seuls écrans tactiles étroits en mode
+   plein écran. Il couvre une barre d'état Android (24-30 dp) et la découpe qui
+   s'y loge. Contrepartie assumée : là où rien ne recouvrait la page, ces 34 px
+   sont perdus — une bande vide se voit et se corrige, un bouton à moitié mangé
+   ne se rattrape pas. Une PWA installée sur un **ordinateur** est aussi en
+   `display-mode:standalone` : elle est exclue par `pointer:coarse`.
+
+La valeur est bornée à 120 px et rejouée à chaque redimensionnement (tourner
+l'écran déplace la découpe). Le pied du panneau de réglages affiche la marge
+**réellement appliquée**, lue sur le style calculé : ni l'APK ni une PWA
+installée n'ont de barre d'URL où ajouter `?debug=1`, et « le poinçon rogne
+encore » n'est pas débogable à distance sans ce chiffre.
 
 ## Dose d'apprentissage
 
