@@ -153,17 +153,29 @@ défilaient horizontalement, si bien qu'avec cinq sources et six thèmes, **troi
 de chacun** seulement tenaient à l'écran — le filtre actif pouvait être hors
 champ, hors de portée du regard comme de la main.
 
-Les deux barres sont devenues **deux pastilles** (*Toutes ▾* / *Tous ▾*), posées
-sur la **même rangée que les boutons d'action** et à la même hauteur qu'eux : la
-barre tombe à 103 px (13 %), et surtout elle n'a plus qu'une seule ligne
-d'outils, là où les pastilles étaient calées à gauche pendant que les boutons
-l'étaient à droite, sur deux rangées. La marque garde la ligne du dessus.
-Chaque pastille affiche le filtre en cours et s'allume quand il n'est plus
-« tout » ; un tap ouvre une feuille où la liste complète tient d'un coup, sans
-rien couper. Une pastille disparaît
-quand elle n'a pas de choix à offrir (une seule source cochée, aucun centre
-d'intérêt) ou quand la dose a retiré sa moitié du fil — les deux muettes, la
-rangée entière s'efface.
+Les deux barres sont devenues **deux pastilles** (*Toutes ▾* / *Tous ▾*) : la
+barre tombe à 113 px (14 %). Chaque pastille affiche le filtre en cours et
+s'allume quand il n'est plus « tout » ; un tap ouvre une feuille où la liste
+complète tient d'un coup, sans rien couper. Une pastille disparaît quand elle
+n'a pas de choix à offrir (une seule source cochée, aucun centre d'intérêt) ou
+quand la dose a retiré sa moitié du fil — les deux muettes, la rangée entière
+s'efface.
+
+Restent **deux rangées, et chacune a un seul métier** : la marque et les quatre
+boutons d'action en haut, les deux filtres en dessous. Les pastilles ont d'abord
+partagé la rangée des boutons, ce qui tenait tant qu'ils étaient trois ; au
+quatrième, elles tombaient à 68 px — soit « T… », un filtre qui ne dit plus quel
+filtre il est — pendant que la rangée de la marque restait à moitié vide. Les
+boutons sont donc remontés là où la place était.
+
+Les pastilles prennent alors **une moitié de rangée chacune**, chevron calé à
+droite comme un sélecteur : de 40 px de texte utile à 125 px sur un écran de
+412, et plus rien de tronqué jusqu'à 320 px. C'est exactement là qu'il fallait
+mettre la place : une pastille affiche un **titre de flux**, texte quelconque et
+souvent long (« Courrier international - Actualités France et Monde »), quand un
+bouton n'a jamais qu'une icône de 20 px à montrer. Sur un écran très étroit,
+c'est désormais la **marque** qui se coupe la première : « SwiperNe… » se devine
+encore, « T… » ne dit plus rien.
 
 Le compromis assumé : un tap de plus pour filtrer. C'est un geste rare (la
 plupart restent sur « Toutes »), et il devient en échange complet et lisible.
@@ -210,10 +222,8 @@ n'y est pas. Et c'est une feuille, non une vraie page : une page déchargerait l
 fil derrière elle, donc le rechargerait, et ferait perdre la position qu'on
 venait justement retrouver.
 
-Détail de mise en page : ce quatrième bouton coûtait deux pixels aux pastilles
-voisines, qui coupaient alors « Toutes » d'un cheveu. L'écart entre boutons est
-passé de 8 à 6 px — leur boîte de 38 px, elle, est la cible du doigt et n'a pas
-bougé.
+C'est ce quatrième bouton qui a fait déborder la rangée d'outils, et donc
+déclenché le rééquilibrage des deux rangées décrit plus haut.
 
 ## Dose d'apprentissage
 

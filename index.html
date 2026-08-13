@@ -216,11 +216,13 @@
     transition:transform .32s ease,opacity .32s ease}
   .top.top--away{transform:translateY(-115%);opacity:0;pointer-events:none}  /* masqué pendant le swipe */
   .topline{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  /* Rangée d'outils : filtres à gauche, boutons à droite, une seule ligne de
-     base. Les pastilles se rétrécissent (min-width:0 + ellipsis) plutôt que de
-     pousser les boutons hors de l'écran. */
+  /* Rangée des filtres, et d'eux seuls. C'est la marque qui cède la place aux
+     boutons (elle se coupe au filet sur un écran étroit), jamais les pastilles :
+     « SwiperNe… » se devine encore, « T… » ne dit plus rien du filtre en cours. */
   .toprow{display:flex;align-items:center;gap:8px;min-width:0}
-  .brand{font-weight:700;font-size:18px;letter-spacing:-.03em;display:flex;align-items:center;gap:8px}
+  .brand{font-weight:700;font-size:18px;letter-spacing:-.03em;display:flex;align-items:center;gap:8px;
+    min-width:0;overflow:hidden}
+  .brand__text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .brand__logo{display:flex;align-items:center}
   .brand__logo img{height:28px;width:28px;border-radius:var(--radius-sm);display:block;object-fit:cover}
   .brand__text{color:var(--flare)}
@@ -251,11 +253,10 @@
     vertical-align:-.06em;margin-left:2px;opacity:0;
     animation:brandBlink .62s linear 680ms 3 forwards}
   @keyframes brandBlink{0%,49.9%{opacity:1}50%,100%{opacity:0}}
-  /* 6 px entre les boutons, pas 8 : à quatre icônes, les deux pixels de trop
-     se prenaient sur les pastilles voisines, qui coupaient alors « Toutes » à
-     deux pixels près. Les boutons, eux, gardent leur boîte de 38 px — c'est
-     la cible du doigt, elle ne se rogne pas. */
-  .top .actions{display:flex;gap:6px;flex:0 0 auto;margin-left:auto}
+  /* Les quatre boutons, à droite de la marque. Ils ne partagent plus leur
+     rangée avec les pastilles : leur écart peut donc rester à 8 px, et leur
+     boîte de 38 px — la cible du doigt — n'a jamais à se rogner. */
+  .top .actions{display:flex;gap:8px;flex:0 0 auto;margin-left:auto}
   .top .actions button{background:transparent;border:1.5px solid var(--redline);color:var(--ink);
     padding:9px 14px;border-radius:var(--radius-sm);font-family:var(--font-sans);font-weight:500;font-size:13px;
     letter-spacing:-.01em;cursor:pointer;transition:background .2s}
@@ -290,10 +291,13 @@
      au toucher, d'un coup et sans rien couper. Une rangée en moins.
      Chacune disparaît quand elle n'a rien à proposer (une seule source cochée,
      aucun centre d'intérêt) ou quand la dose a retiré sa moitié du fil. */
-  .filters{display:flex;gap:8px;min-width:0;flex:0 1 auto}
-  /* Même hauteur que les boutons voisins (38 px) : la rangée se lit comme une
-     seule bande, pas comme deux familles d'objets de tailles différentes. */
-  .filterbtn{flex:0 1 auto;min-width:0;display:inline-flex;align-items:center;gap:6px;
+  /* Même hauteur que les boutons de la rangée du dessus (38 px) : la barre se
+     lit comme une seule famille d'objets, pas comme deux tailles différentes. */
+  /* Chacune prend sa MOITIÉ de la rangée (flex:1 1 0), et jamais plus
+     (max-width) : quand l'autre s'efface — une seule source cochée, dose sans
+     Wikipédia — une pastille étirée sur toute la largeur pour dire « Toutes »
+     se lirait comme un bouton d'action, pas comme un filtre au repos. */
+  .filterbtn{flex:1 1 0;max-width:calc(50% - 4px);min-width:0;display:inline-flex;align-items:center;gap:6px;
     min-height:38px;background:transparent;border:1px solid var(--redline);color:var(--ash);
     font-family:var(--font-sans);font-weight:500;font-size:13px;letter-spacing:-.01em;
     padding:0 11px;border-radius:var(--radius-sm);cursor:pointer;
@@ -310,7 +314,10 @@
      complet reste dans le DOM, donc dans le nom accessible — et la coupe suit
      la largeur réelle des glyphes, ce qu'un nombre de caractères ne sait pas
      faire. min-width:0 est ce qui autorise le rétrécissement sous le contenu. */
-  .filterbtn__v{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* Le nom prend toute la place restante, ce qui pousse le chevron contre le
+     bord droit : la pastille se lit alors comme un sélecteur, et non comme un
+     libellé perdu au milieu d'un bouton trop large. */
+  .filterbtn__v{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
   /* Icône de tête (flux / étiquette) et chevron : deux tailles, une seule
      famille de tracés — c'est elle qui dit de quel filtre il s'agit, à la place
      des emoji de couleur qui juraient avec le reste de la barre. */
@@ -644,22 +651,15 @@
 <div class="syncbar" id="syncbar" aria-hidden="true"></div>
 
 <header class="top">
-  <div class="topline">
-    <div class="brand"><span class="brand__logo"><img src="logo-192.png?v=42" alt="" width="28" height="28"></span><span class="brand__text" data-text="SwiperNews">SwiperNews</span></div>
-  </div>
-  <!-- UNE seule rangée d'outils : les deux pastilles de filtre à gauche, les
-       boutons d'action à droite, tout sur la même ligne de base. Les pastilles
-       étaient auparavant sur une rangée à elles, calées à gauche pendant que
-       les boutons l'étaient à droite : deux alignements pour une même barre.
+  <!-- Rangée 1 : la marque À GAUCHE, les boutons d'action À DROITE. Elle ne
+       portait que la marque, pendant que la rangée du dessous entassait deux
+       pastilles ET quatre boutons — les pastilles y étaient réduites à « T… ».
+       Une rangée à moitié vide au-dessus d'une rangée saturée : les boutons
+       sont donc remontés là où la place était.
        Les icônes sont posées par setIcons() depuis les mêmes constantes que
        les cartes : une seule famille de tracés dans toute l'app. -->
-  <div class="toprow">
-    <!-- Deux pastilles, une par filtre : elles DISENT le filtre en cours, et
-         ouvrent la liste complète au toucher (voir renderFilters/openPicker). -->
-    <div class="filters" id="filters">
-      <button class="filterbtn" id="srcBtn" aria-haspopup="dialog"><span class="filterbtn__i" aria-hidden="true"></span><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true"></span></button>
-      <button class="filterbtn" id="catBtn" aria-haspopup="dialog"><span class="filterbtn__i" aria-hidden="true"></span><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true"></span></button>
-    </div>
+  <div class="topline">
+    <div class="brand"><span class="brand__logo"><img src="logo-192.png?v=42" alt="" width="28" height="28"></span><span class="brand__text" data-text="SwiperNews">SwiperNews</span></div>
     <div class="actions">
       <!-- Articles en mémoire : la liste de ce que le fil garde sous la main,
            pour revenir sur une carte dépassée d'un swipe de trop. -->
@@ -670,6 +670,18 @@
       <button id="reloadBtn" class="iconbtn" data-i18n-attr="title:top.reload.title,aria-label:top.reload.aria"></button>
       <button id="openSheet" class="iconbtn" data-i18n-attr="title:top.settings.title,aria-label:top.settings.aria"></button>
     </div>
+  </div>
+  <!-- Rangée 2 : les deux filtres, et rien qu'eux — chacun sa MOITIÉ de la
+       largeur. Ils DISENT le filtre en cours, et c'est un titre de flux, donc
+       un texte quelconque et souvent long : c'est la seule chose de la barre
+       qui ait vraiment besoin de place. -->
+  <!-- La rangée EST la rangée des filtres : un conteneur de moins, et surtout
+       c'est elle que renderFilters() masque quand aucun filtre n'a de choix à
+       offrir — masquer seulement son contenu laissait une rangée vide, donc
+       l'écart de 11 px qui la sépare de celle du dessus. -->
+  <div class="toprow filters" id="filters">
+    <button class="filterbtn" id="srcBtn" aria-haspopup="dialog"><span class="filterbtn__i" aria-hidden="true"></span><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true"></span></button>
+    <button class="filterbtn" id="catBtn" aria-haspopup="dialog"><span class="filterbtn__i" aria-hidden="true"></span><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true"></span></button>
   </div>
 </header>
 
@@ -824,9 +836,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=113"></script>
-<script src="src/learn-core.js?v=113"></script>
-<script src="src/i18n.js?v=113"></script>
+<script src="src/lib.js?v=114"></script>
+<script src="src/learn-core.js?v=114"></script>
+<script src="src/i18n.js?v=114"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1354,7 +1366,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="113";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="114";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un

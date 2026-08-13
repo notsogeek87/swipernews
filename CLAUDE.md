@@ -350,7 +350,12 @@ genre de script dérape.
   l'instantané ne lui correspond plus.
 - `renderFilters()` / `openPicker()` — les deux pastilles de filtre et leur
   feuille. `filterChips()` fabrique les puces une seule fois pour les deux, qui
-  ne peuvent donc pas diverger.
+  ne peuvent donc pas diverger. La barre du haut tient en DEUX rangées, un
+  métier chacune : marque + boutons d'action (`.topline`), puis les filtres
+  seuls (`.toprow.filters`, une moitié de largeur par pastille). Ne pas
+  remettre les boutons avec les pastilles : à quatre icônes, elles retombent à
+  « T… ». `filtersEl` EST la rangée — la masquer ne doit pas laisser une rangée
+  vide, donc l'écart de 11 px qui la précède.
 - `openHistory()` / `histRowHTML()` — la feuille « Articles en mémoire »
   (bouton liste de la barre du haut) : une VUE de `items`, refaite à chaque
   ouverture, qui ramène sur une carte dépassée d'un swipe de trop. Rien n'est
