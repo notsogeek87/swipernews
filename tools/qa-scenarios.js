@@ -694,7 +694,13 @@ const scenarios = {
       "| sync éteinte :",
       await page.$eval("#syncbar", (e) => !e.classList.contains("on"))
     );
-    // Relancement à froid : la position doit être retrouvée
+    // Relancement à froid : la position doit être retrouvée. On relit la
+    // position JUSTE avant de relancer — le rafraîchissement en session ci-dessus
+    // remonte en tête à dessein (forceTop), donc la position mémorisée n'est plus
+    // celle du départ.
+    const cible = await page.evaluate(
+      () => (JSON.parse(localStorage.getItem("fluxswipe.pos.v1") || "{}").mix || {}).link
+    );
     await page.reload();
     await page.waitForTimeout(3500);
     const after = await page.evaluate(() => ({
@@ -702,7 +708,7 @@ const scenarios = {
       idx: currentIndex(),
       lien: (currentItem() || {}).link,
     }));
-    console.log("après relancement :", after, "| retrouvée :", after.lien === pos);
+    console.log("après relancement :", after, "| retrouvée :", after.lien === cible);
     console.log(
       "erreurs :",
       errors.filter((e) => /PAGEERROR/.test(e))
@@ -752,6 +758,127 @@ const scenarios = {
     console.log(
       "erreurs :",
       errors.filter((e) => /PAGEERROR/.test(e))
+    );
+    await browser.close();
+  },
+
+  /* 19. Le rafraîchissement des 30 minutes se déclenche-t-il tout seul ?
+     Horloge SIMULÉE : Date.now(), setInterval et setTimeout suivent le temps
+     qu'on avance à la main, donc le filet périodique et le seuil de fraîcheur
+     jouent leur vraie partition, sans attendre une demi-heure. */
+  async autorefresh() {
+    const lot = (prefixe, n, ageMin) =>
+      '<?xml version="1.0"?><rss><channel>' +
+      Array.from(
+        { length: n },
+        (_, i) =>
+          `<item><title>${prefixe} ${i}</title><link>https://ex.test/${prefixe}${i}</link>` +
+          `<description>Un resume de longueur ordinaire</description>` +
+          `<pubDate>${new Date(Date.now() - (ageMin + i) * 60000).toUTCString()}</pubDate></item>`
+      ).join("") +
+      "</channel></rss>";
+
+    const browser = await chromium.launch({
+      executablePath: "/opt/pw-browsers/chromium",
+    });
+    const page = await (
+      await browser.newContext({ viewport: { width: 412, height: 900 } })
+    ).newPage();
+    await page.clock.install(); // AVANT tout chargement
+    let rss = lot("Vieux", 10, 120);
+    let requetes = 0;
+    await page.addInitScript((kv) => {
+      for (const [k, v] of Object.entries(kv)) localStorage.setItem(k, v);
+    }, READY);
+    await page.route("**/*", (r) => {
+      const u = r.request().url();
+      if (/wikipedia|api\/learn/.test(u))
+        return r.fulfill({ status: 200, contentType: "application/json", body: WIKI_OK });
+      if (/allorigins|corsproxy|codetabs|thingproxy|api\/feed/.test(u)) {
+        requetes++;
+        return r.fulfill({ status: 200, contentType: "application/xml", body: rss });
+      }
+      if (u.startsWith("http://localhost:8124")) return r.continue();
+      return r.fulfill({ status: 200, body: "" });
+    });
+    const etat = async () =>
+      page.evaluate(() => (newsItems.slice(0, 3).map((i) => i.title) || []).join(", "));
+
+    await page.goto(URL_APP);
+    await page.clock.runFor(3000);
+    await page.waitForTimeout(1500);
+    console.log(`t+0      ${requetes} requêtes  ${await etat()}`);
+    rss = lot("Frais", 6, 0); // les sources publient du neuf
+    await page.clock.runFor(25 * 60 * 1000);
+    await page.waitForTimeout(1500);
+    console.log(`t+25min  ${requetes} requêtes  ${await etat()}   ← doit être INCHANGÉ`);
+    await page.clock.runFor(6 * 60 * 1000);
+    await page.waitForTimeout(2500);
+    console.log(
+      `t+31min  ${requetes} requêtes  ${await etat()}   ← doit s'être RAFRAÎCHI`
+    );
+    await browser.close();
+  },
+
+  /* 20. Chargement plus long que le filet périodique (réseau lent) : les tours
+     suivants doivent RESPECTER le chargement en cours, pas tout relancer — et la
+     garde doit se relever une fois les délais d'expiration écoulés, sinon plus
+     aucun rafraîchissement ne serait possible de la session. */
+  async relance() {
+    const { browser, page } = await boot({ storage: READY });
+    let requetes = 0;
+    let lent = false;
+    const gele = [];
+    // Le chargement initial se passe NORMALEMENT ; c'est ensuite que le réseau
+    // devient trop lent pour répondre avant le tour suivant du filet.
+    await page.route(/allorigins|corsproxy|codetabs|thingproxy|api\/feed/, (r) => {
+      requetes++;
+      if (lent) {
+        gele.push(r);
+        return;
+      }
+      return r.fulfill({ status: 200, contentType: "application/xml", body: RSS_OK });
+    });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    console.log(`chargement initial : ${requetes} requêtes`);
+    lent = true;
+    const vieillir = () =>
+      page.evaluate(() => {
+        const c = JSON.parse(localStorage.getItem("fluxswipe.cache.v1") || "{}");
+        for (const k in c) c[k].t = Date.now() - 45 * 60 * 1000;
+        localStorage.setItem("fluxswipe.cache.v1", JSON.stringify(c));
+        lastNewsLoad = Date.now() - 45 * 60 * 1000;
+      });
+    await vieillir();
+    const tours = [];
+    for (let i = 0; i < 3; i++) {
+      const avant = requetes;
+      await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+      await page.waitForTimeout(800);
+      tours.push(requetes - avant);
+    }
+    console.log(
+      `requêtes par tour du filet : ${tours.join(", ")}`,
+      tours[1] + tours[2] === 0
+        ? "→ le chargement en cours est respecté"
+        : "→ CHAQUE tour relance tout"
+    );
+    // La garde doit se relever une fois les délais d'expiration écoulés, sinon
+    // plus aucun rafraîchissement ne serait possible de toute la session.
+    const avant = requetes;
+    await page.waitForTimeout(30000);
+    console.log(
+      "encore en vol après 30 s :",
+      await page.evaluate(() => newsLoadingSeq === loadSeq)
+    );
+    await vieillir();
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    await page.waitForTimeout(1000);
+    console.log(
+      requetes - avant > 0
+        ? "→ la garde s'est relevée, un nouveau tour repart"
+        : "→ BLOQUÉ : plus aucun rafraîchissement possible"
     );
     await browser.close();
   },

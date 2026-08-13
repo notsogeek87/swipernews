@@ -9,7 +9,7 @@ Périmètre : `index.html` (3 752 l.), `src/*.js`, `api/*.js`, `sw.js`, le proje
 natif `android/`, et le comportement observé **dans un vrai navigateur**.
 
 > **Méthode.** Rien n'est signalé ici sur la seule lecture du code. Un banc de QA
-> (Chromium piloté par Playwright, réseau entièrement simulé) a joué 18 scénarios
+> (Chromium piloté par Playwright, réseau entièrement simulé) a joué 20 scénarios
 > — première installation, hors-ligne, réseau lent, coupure en cours de requête,
 > API en 500, RSS vide/tronqué/HTML, article sans image ni description, contenu
 > démesuré, doublons, 120 sources, stockage local abîmé, cache abîmé, quota
@@ -36,7 +36,7 @@ Les défauts trouvés se rangent en trois familles :
 | Famille | Ce qui a été trouvé |
 | --- | --- |
 | **États bloqués définitifs** | Deux valeurs de stockage local abîmées suffisent à tuer l'app **pour toujours**, sans aucune sortie depuis l'interface. C'est de loin le plus grave (§2.1, §2.2). |
-| **Fonctions désarmées en silence** | Trois fonctions annoncées cessent de marcher sans que rien ne le dise : la reprise de lecture à presque toutes les ouvertures (§2.3), l'application des sources ajoutées (§2.4), le filtre sponsorisé et la pastille « payant » sur un article donné (§2.5). |
+| **Fonctions désarmées en silence** | Quatre fonctions annoncées cessent de marcher sans que rien ne le dise : la reprise de lecture à presque toutes les ouvertures (§2.3), l'application des sources ajoutées (§2.4), le filtre sponsorisé et la pastille « payant » sur un article donné (§2.5), et le rafraîchissement lui-même sur réseau lent (§2.7). |
 | **Croissance non bornée** | Texte de flux, cache disque, instantanés en mémoire, cibles d'observateurs : quatre choses grandissaient sans plafond (§3). |
 
 **Tout ce qui est listé aux §2 et §3 est corrigé dans ce commit** (le §4 liste ce
@@ -186,7 +186,44 @@ tout de harceler l'éditeur. Vérifié : `fluxswipe.artmeta.v1` reste vide.
 | La carte « chargement d'autres articles » fait partie du HTML mémorisé : restaurée depuis un instantané sans rendu qui suit, elle restait en queue **à jamais**. | `restoreFeed()` | `renderLoadMoreCard()` la remet d'accord avec `loadingMore`. |
 | Deux fois la même URL de source n'était refusé nulle part dans « ajouter un flux » (la suggestion et l'import, eux, vérifient) : une requête par chargement pour rien, `collected` étant indexé par URL — la seconde ligne écrasait la première. | `addFeed()` | Refus explicite, message « Sources déjà présentes ». |
 
-### 2.7 — Moyenne · Natif : un plantage, et un écran d'erreur qui restait
+### 2.7 — Élevée · Sur réseau lent, le rafraîchissement se relançait sans jamais aboutir
+
+`index.html`, déclencheurs automatiques de fraîcheur → `refreshIfStale()`.
+
+Trois déclencheurs appellent `loadFeeds()` sans `force` : retour au premier plan,
+filet périodique (`setInterval`, **60 s**) et `onResume()` natif. Aucun ne
+regardait si un chargement d'actus était **déjà en vol**.
+
+Or un chargement dure facilement plus d'une minute : 40 sources par lots de 6,
+chacune avec son repli proxy puis `rss2json` à 7 s. Chaque tour du filet
+repartait donc de zéro — le chargement en cours était invalidé par `loadSeq`
+sans que ses requêtes soient annulées, et le suivant rejouait tout. Sur un réseau
+assez lent pour qu'aucune génération n'atteigne son `finish()` avant le tour
+suivant, **le fil ne se met plus jamais à jour tout en interrogeant les sources
+en boucle** : le pire des deux mondes, et rien à l'écran ne le dit.
+
+Mesuré au navigateur, réseau qui ne répond pas : **4, 4, 4** requêtes pour un
+seul rafraîchissement, quatre générations en vol (scénario `relance`).
+
+**Correction.** Un point de passage unique, `refreshIfStale()`, partagé par les
+trois déclencheurs, qui refuse de lancer un chargement quand un autre est en
+cours. La garde est une **estampille de génération** (`newsLoadingSeq`), pas un
+booléen : un drapeau posé par une génération qui n'atteindra jamais son
+`finish()` (abandon sur `my!==loadSeq`) resterait vrai à jamais et bloquerait
+alors TOUT rafraîchissement automatique de la session — soit précisément le
+genre d'état bloqué que cet audit corrige ailleurs. Comparée à `loadSeq`, une
+estampille périmée ne peut rien bloquer.
+
+Une action **explicite** garde le droit de préempter : ↻, réglages et import
+passent par `loadFeeds(true)`, jamais par `refreshIfStale()`.
+
+Vérifié après correction : **4, 0, 0** requêtes, une seule génération ; la garde
+se relève bien une fois les délais d'expiration écoulés (sinon elle aurait
+remplacé un défaut par un pire) ; et le rafraîchissement des 30 minutes joue
+toujours sa partition (scénario `autorefresh`, horloge simulée) : rien à
+t+25 min, rafraîchi tout seul à t+31 min.
+
+### 2.8 — Moyenne · Natif : un plantage, et un écran d'erreur qui restait
 
 `android/app/src/main/java/eu/lielu/news/InAppBrowserActivity.java`
 
@@ -203,7 +240,7 @@ tout de harceler l'éditeur. Vérifié : `fluxswipe.artmeta.v1` reste vide.
    fonctionnait. `hideError()` est appelé au **début** de chaque navigation ;
    l'erreur du chargement en cours, elle, arrive toujours après ce point.
 
-### 2.8 — Faible · Service worker : un module servi en HTML hors-ligne
+### 2.9 — Faible · Service worker : un module servi en HTML hors-ligne
 
 `sw.js`
 
@@ -215,7 +252,7 @@ et recharge — hors ligne, donc en boucle jusqu'à l'écran « Mise à jour
 incomplète ». Le repli est désormais réservé aux navigations ; une requête de
 module échoue franchement, ce que la page sait déjà traiter.
 
-### 2.9 — Faible · La barre de chargement s'éteignait pendant un chargement
+### 2.10 — Faible · La barre de chargement s'éteignait pendant un chargement
 
 `index.html`, retentatives de `loadLearnPart` / `loadNewsPart`.
 
@@ -226,7 +263,7 @@ travaillait encore. Le compteur est borné à zéro, donc rien ne cassait — ma
 l'indicateur mentait. Le jeton n'est plus rendu que si le chargement est encore
 le sien.
 
-### 2.10 — Faible · Retour arrière : le panneau ouvert faisait quitter l'app
+### 2.11 — Faible · Retour arrière : le panneau ouvert faisait quitter l'app
 
 `index.html`, `openDialog()` / `closeDialog()` / `openShareMenu()`.
 
@@ -345,7 +382,7 @@ paie, les suivantes non, et le ramasse-miettes la lâche sous pression mémoire
 
 ### Réalisés
 
-Banc de QA (Chromium + Playwright, réseau simulé de bout en bout), **18
+Banc de QA (Chromium + Playwright, réseau simulé de bout en bout), **20
 scénarios**, tous rejoués après correction :
 
 | Scénario | Ce qui est vérifié | Résultat |
@@ -368,6 +405,8 @@ scénarios**, tous rejoués après correction :
 | Arrière-plan long puis reprise | Rafraîchissement, barre éteinte | ✅ |
 | Relancement à froid, cache vieilli | Reprise de lecture | ✅ après correction (§2.3) |
 | ↻ et rafraîchissement en session | Saut en tête conservé | ✅ (non-régression de §2.3) |
+| Rafraîchissement des 30 min, horloge simulée | Rien à t+25 min, rafraîchi seul à t+31 min | ✅ (`autorefresh`) |
+| Chargement plus long que le filet de 60 s | Le tour suivant respecte le chargement en cours, et la garde se relève | ✅ après correction (§2.7) |
 
 Côté code : `npm test` **79 tests** (76 + 3 ajoutés), `npm run lint` et
 `npm run format:check` propres, syntaxe des trois blocs JS en ligne d'`index.html`
@@ -393,8 +432,8 @@ l'absence d'`android.jar` (aucune erreur de syntaxe introduite), XML bien formé
 4. **Un test de non-régression sur la reprise de lecture** (§2.3) : c'est
    exactement le genre de comportement qu'une correction future peut défaire sans
    qu'on s'en aperçoive.
-5. **Natif, non testable ici** (pas de SDK Android) : le plantage du §2.7.1 et
-   l'écran d'erreur du §2.7.2 sont corrigés par lecture et vérifiés
+5. **Natif, non testable ici** (pas de SDK Android) : le plantage du §2.8.1 et
+   l'écran d'erreur du §2.8.2 sont corrigés par lecture et vérifiés
    syntaxiquement, **pas exécutés**. À confirmer sur appareil : ouvrir un article
    en mode lecture puis revenir immédiatement, plusieurs fois de suite.
 
@@ -403,7 +442,7 @@ l'absence d'`android.jar` (aucune erreur de syntaxe introduite), XML bien formé
 ## 6. À faire avant publication
 
 1. **Faire compiler un APK par la CI** (`staging` ou une PR) : les corrections
-   natives du §2.7 n'ont pas pu être compilées ici (`dl.google.com` bloqué, pas
+   natives du §2.8 n'ont pas pu être compilées ici (`dl.google.com` bloqué, pas
    de SDK). Pousser une branche de travail seule ne déclenche **rien**.
 2. **Vérifier sur appareil** les deux corrections natives (§5, point 5) et le
    retour arrière du §2.10, qui change un comportement système.
@@ -411,5 +450,5 @@ l'absence d'`android.jar` (aucune erreur de syntaxe introduite), XML bien formé
    `android/app/build.gradle` **dans le commit qui précède le tag** — non fait
    ici, ce commit ne prépare pas une version.
 
-Le triple bump web est fait : `APP_VERSION` **109**, `?v=109` sur les trois
-modules, `CACHE = "flux-v109"` dans `sw.js`.
+Le triple bump web est fait : `APP_VERSION` **110**, `?v=110` sur les trois
+modules, `CACHE = "flux-v110"` dans `sw.js`.

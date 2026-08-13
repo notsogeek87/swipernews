@@ -452,6 +452,15 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   la position à l'ouverture. `forceTop` ne vaut que pour les rafraîchissements
   suivants. Confondre les deux annulait la reprise à presque chaque ouverture
   (voir §2.3 du même audit).
+- **Les trois déclencheurs automatiques de fraîcheur passent par
+  `refreshIfStale()`**, qui refuse d'en lancer un quand un chargement d'actus est
+  déjà en vol : le filet tourne toutes les 60 s, un chargement de 40 sources dure
+  souvent plus longtemps, et sans cette garde chaque tour relançait tout sans
+  qu'aucun n'aboutisse. La garde est une ESTAMPILLE de génération
+  (`newsLoadingSeq`), jamais un booléen — un drapeau posé par une génération
+  abandonnée sur `my!==loadSeq` resterait vrai à vie et bloquerait alors tout
+  rafraîchissement. Une action explicite (↻, réglages) préempte par
+  `loadFeeds(true)`.
 - **Tout texte venu d'un flux est borné** (`clampText`) : un `<description>` n'a
   aucune obligation d'être un résumé, et beaucoup de flux y publient l'article
   entier — mesuré à 400 Ko de cache pour cinq articles, contre ~5 Mo de quota.

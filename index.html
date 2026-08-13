@@ -750,9 +750,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=109"></script>
-<script src="src/learn-core.js?v=109"></script>
-<script src="src/i18n.js?v=109"></script>
+<script src="src/lib.js?v=110"></script>
+<script src="src/learn-core.js?v=110"></script>
+<script src="src/i18n.js?v=110"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1280,7 +1280,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="109";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="110";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1445,13 +1445,32 @@ function dbg(msg){
 // Persiste sans attendre le debounce quand l'app passe en arrière-plan / se ferme
 function persistAll(){persistSeen();persistPos();}
 window.addEventListener("pagehide",persistAll);
+/* Point de passage UNIQUE des trois déclencheurs automatiques de fraîcheur :
+   retour au premier plan, filet périodique, et onResume() natif. Le seuil
+   (AUTO_RELOAD_MS) reste appliqué par loadFeeds lui-même, pour que tous suivent
+   la MÊME règle que le lancement de l'app.
+
+   La garde `newsLoadingSeq` manquait, et elle compte : ces déclencheurs
+   appellent loadFeeds() jusqu'à une fois par minute, alors qu'un chargement
+   d'actus peut durer BIEN plus longtemps — 40 sources par lots de 6, chacune
+   avec son repli proxy puis rss2json à 7 s, dépasse couramment la minute sur un
+   réseau lent. Chaque tour repartait donc de zéro : le chargement en cours était
+   invalidé (loadSeq) sans que ses requêtes soient annulées, et le suivant
+   rejouait tout. Mesuré au navigateur, réseau qui ne répond pas : 4, 4, 4
+   requêtes pour UN seul rafraîchissement, quatre générations en vol. Sur un
+   réseau assez lent, aucune n'aboutit jamais — le fil ne se met plus à jour DU
+   TOUT, tout en interrogeant les sources en boucle.
+
+   Une action EXPLICITE garde le droit de préempter : ↻, réglages et import
+   passent par loadFeeds(true), jamais par ici. */
+function refreshIfStale(){
+  if(!feedLoadStarted)return;
+  if(newsLoadingSeq===loadSeq)return;   // un chargement d'actus est déjà en vol
+  loadFeeds();
+}
 document.addEventListener("visibilitychange",()=>{
   if(document.visibilityState==="hidden"){persistAll();return;}
-  // Retour au premier plan : on rafraîchit les actus si elles ont vieilli.
-  // Le seuil (AUTO_RELOAD_MS) est appliqué par loadFeeds lui-même, pour que le
-  // retour d'arrière-plan et le lancement de l'app suivent la MÊME règle.
-  if(!feedLoadStarted)return;
-  loadFeeds();
+  refreshIfStale();
 });
 /* App natif uniquement (@capacitor/app) : signal de reprise plus fiable que
    visibilitychange dans cette WebView, car adossé DIRECTEMENT à onResume() de
@@ -1461,10 +1480,7 @@ document.addEventListener("visibilitychange",()=>{
    loadSeq. Sur le web, window.Capacitor n'existe pas : ce bloc ne fait rien. */
 if(isNativeApp){
   const CapApp=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
-  if(CapApp&&CapApp.addListener)CapApp.addListener("resume",()=>{
-    if(!feedLoadStarted)return;
-    loadFeeds();
-  });
+  if(CapApp&&CapApp.addListener)CapApp.addListener("resume",refreshIfStale);
 }
 /* Filet de sécurité : visibilitychange seul ne suffit pas. Le commentaire de
    rememberPos() le dit déjà pour un autre cas — « quand l'app est tuée depuis
@@ -1479,9 +1495,8 @@ if(isNativeApp){
    atteint — l'appeler chaque minute ne déclenche un vrai appel aux sources
    qu'une fois toutes les AUTO_RELOAD_MS, comme prévu. */
 setInterval(()=>{
-  if(!feedLoadStarted)return;
   if(document.visibilityState!=="visible")return;   // pas de réseau en arrière-plan
-  loadFeeds();
+  refreshIfStale();
 },60*1000);
 
 /* ---------- Récupération avec plusieurs proxys de secours ---------- */
@@ -1737,6 +1752,14 @@ function cacheTime(key){const e=cacheEntry(key);return e?(e.t||0):0;}
 // Compteur de génération : chaque appel invalide le précédent (annule proprement
 // un chargement obsolète après un changement rapide de filtre).
 let loadSeq=0,feedLoadStarted=false;
+/* Génération du chargement d'actus actuellement EN VOL (0 : aucun). Estampillée
+   plutôt que booléenne, à dessein : un drapeau posé par une génération qui n'ira
+   jamais jusqu'à son `finish()` (abandon sur `my!==loadSeq`) resterait vrai pour
+   toujours et bloquerait alors TOUT rafraîchissement automatique de la session —
+   exactement le genre d'état bloqué que cet audit corrige ailleurs. Comparée à
+   `loadSeq`, une estampille périmée ne peut rien bloquer : elle cesse d'être
+   égale dès qu'un chargement plus récent commence. Voir refreshIfStale. */
+let newsLoadingSeq=0;
 let feedKeyShown=null;   // clé du fil actuellement affiché (source + thème filtrés)
 let newsSettled=false;   // les actus ont fini leur tour (ou n'avaient rien à faire)
 /* Charge le fil : ses DEUX moitiés, en parallèle et sans que l'une attende
@@ -2104,6 +2127,10 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0,premier=false
       },RETRY_DELAYS_MS[attempt]);
       return;
     }
+    // Chargement clos (plus de retentative en attente) : les déclencheurs
+    // automatiques peuvent de nouveau en lancer un. Sous garde d'estampille,
+    // pour ne jamais effacer celle d'un chargement plus récent.
+    if(newsLoadingSeq===my)newsLoadingSeq=0;
     newsSettled=true;
     // Le jeton part avec la repeinture FINALE (voir paint) quand il y en a une :
     // tant qu'un doigt posé la reporte, le chargement n'est pas fini pour
@@ -2144,6 +2171,10 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0,premier=false
     }
     resumePending=false;   // chargement terminé : on n'essaie plus de reprendre
   }
+  // À partir d'ici les sources sont réellement interrogées : les déclencheurs
+  // automatiques doivent respecter ce chargement plutôt que le relancer (voir
+  // refreshIfStale). Levé dans finish(), une fois l'affaire close.
+  newsLoadingSeq=my;
   pump();
 }
 
