@@ -202,4 +202,64 @@ public class InAppBrowserPlugin extends Plugin {
         if (BlocklistStore.clear(getContext())) call.resolve();
         else call.reject("cache non supprimable");
     }
+
+    /**
+     * Hauteur, en px CSS, de ce que le système dessine PAR-DESSUS le haut de la
+     * WebView : barre d'état et poinçon/encoche de caméra.
+     *
+     * <p>Pourquoi le natif et pas {@code env(safe-area-inset-top)} : sur une
+     * WebView Android qui s'étend sous les barres système (bord à bord, imposé
+     * depuis {@code targetSdk 35}), cet inset CSS ne décrit que la découpe
+     * d'écran, et plusieurs versions de WebView le rapportent tout simplement à
+     * zéro. Le haut de la barre d'outils se retrouve alors sous le poinçon —
+     * qui, centré, tombe pile sur un bouton.
+     *
+     * <p>La valeur rendue est un CHEVAUCHEMENT, jamais l'inset brut : on
+     * retranche la position à l'écran de la WebView. Si une couche quelconque
+     * (Capacitor, un thème, une future version d'Android) a déjà décalé la
+     * WebView sous la barre d'état, la réponse est 0 et le web ne réserve rien —
+     * sans quoi on compterait la marge deux fois, et la barre descendrait d'une
+     * hauteur de barre d'état pour rien.
+     *
+     * <p>Lu sur le fil principal (accès à une vue), et rendu en px CSS : avec
+     * {@code width=device-width, initial-scale=1}, 1 px CSS = 1 dp.
+     */
+    @PluginMethod
+    public void systemInsets(final PluginCall call) {
+        final Activity activity = getActivity();
+        if (activity == null) {
+            call.reject("pas d'activité");
+            return;
+        }
+        activity.runOnUiThread(() -> {
+            JSObject res = new JSObject();
+            res.put("top", topOverlapDp(activity));
+            call.resolve(res);
+        });
+    }
+
+    private int topOverlapDp(Activity activity) {
+        try {
+            android.view.View view = getBridge() != null ? getBridge().getWebView() : null;
+            if (view == null) view = activity.getWindow().getDecorView();
+            android.view.WindowInsets insets = view.getRootWindowInsets();
+            if (insets == null) return 0;
+            int top;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                top = insets.getInsets(
+                    android.view.WindowInsets.Type.statusBars()
+                        | android.view.WindowInsets.Type.displayCutout()).top;
+            } else {
+                top = insets.getSystemWindowInsetTop();
+            }
+            int[] pos = new int[2];
+            view.getLocationOnScreen(pos);
+            int overlap = Math.max(0, top - Math.max(0, pos[1]));
+            float density = activity.getResources().getDisplayMetrics().density;
+            if (density <= 0) return 0;
+            return Math.round(overlap / density);
+        } catch (Exception e) {
+            return 0;   // aucune raison de faire échouer le fil pour une marge
+        }
+    }
 }

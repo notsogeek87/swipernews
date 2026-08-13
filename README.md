@@ -225,6 +225,25 @@ venait justement retrouver.
 C'est ce quatrième bouton qui a fait déborder la rangée d'outils, et donc
 déclenché le rééquilibrage des deux rangées décrit plus haut.
 
+### Poinçon de caméra et barre d'état
+
+Dans l'APK, la WebView s'étend **sous les barres système** (bord à bord, imposé
+depuis `targetSdk 35`) : ce qu'on pose en haut de l'écran se dessine dans la
+bande de l'horloge — et un **poinçon de caméra centré** tombe pile sur un bouton
+de la barre d'outils, qu'il rogne. Tant que cette rangée ne portait que la
+marque, alignée à gauche, le centre était vide et personne ne le voyait.
+
+`env(safe-area-inset-top)`, qui devrait le dire, ne le dit pas : sur WebView
+Android il ne décrit que la découpe d'écran, et plusieurs versions le rapportent
+à zéro. La mesure est donc **demandée au natif**
+(`InAppBrowserPlugin.systemInsets`), et c'est un **chevauchement** avec la
+WebView, jamais l'inset brut : si une couche quelconque — Capacitor, un thème,
+une future version d'Android — a déjà décalé la WebView, la réponse est 0 et
+rien n'est réservé deux fois. Le CSS retient le plus grand des deux
+(`max(env(…), var(--systop))`), si bien qu'aucune des deux sources n'a besoin
+d'être fiable seule. La valeur est bornée à 120 px et rejouée à chaque
+redimensionnement : tourner l'écran déplace la découpe.
+
 ## Dose d'apprentissage
 
 La composition du fil tient à un seul réglage — un **curseur** à six crans, en

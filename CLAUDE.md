@@ -412,7 +412,7 @@ genre de script dérape.
 | Fichier | Rôle |
 | --- | --- |
 | `MainActivity` | `registerPlugin(InAppBrowserPlugin)` **avant** `super.onCreate` ; `onResume()` évalue directement `loadFeeds()` dans la WebView — signal de reprise le plus fiable, sans passer par le pont `@capacitor/app` |
-| `InAppBrowserPlugin` | Pont JS→natif : `open`, `share`, `saveFile`, `syncBlocklist`, `clearBlocklist` |
+| `InAppBrowserPlugin` | Pont JS→natif : `open`, `share`, `saveFile`, `syncBlocklist`, `clearBlocklist`, `systemInsets` |
 | `InAppBrowserActivity` | Le lecteur : barre escamotable, insets, injections. `applyWebPadding()` pose une **marge de vue** (`topMargin`), jamais un padding, sur `reader_web` — un padding ne pousse jamais un élément `position:fixed`/`sticky` (l'en-tête de la plupart des sites de presse), qui resterait donc caché sous la barre |
 | `ReaderWebView` | Sous-classe minimale, seulement pour exposer `onScrollChanged` |
 | `BlocklistStore` | Liste de blocage : parsing, téléchargement, cache, fusion |
@@ -493,6 +493,16 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 
 ## Pièges rencontrés (ne pas les refaire)
 
+- **`env(safe-area-inset-top)` ne décrit PAS la barre d'état sur WebView
+  Android**, et plusieurs versions le rapportent à zéro même avec un poinçon de
+  caméra. Or l'APK s'étend sous les barres système (bord à bord, imposé depuis
+  `targetSdk 35`) : tout ce qu'on pose en haut de l'écran se dessine donc dans
+  la bande de l'horloge et du poinçon — et un poinçon CENTRÉ tombe pile sur un
+  bouton de la barre d'outils. La mesure vient du natif
+  (`InAppBrowserPlugin.systemInsets` → `--systop`, voir `applySystemInsets`), et
+  c'est un CHEVAUCHEMENT avec la WebView, jamais l'inset brut : si une couche
+  quelconque a déjà décalé la WebView, la réponse est 0 et rien n'est réservé
+  deux fois. Le CSS prend `max()` des deux sources, jamais l'une des deux.
 - **Commentaires XML** : `--` y est interdit. Écrire `« accent »` plutôt que
   `--accent` en citant une variable CSS.
 - **`setPadding()` écrase le padding du XML**, insets compris : ajouter la
