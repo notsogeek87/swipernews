@@ -216,7 +216,7 @@ ne change côté web.
 ## Commandes
 
 ```bash
-npm test            # node --test — 49 tests, aucune dépendance à installer
+npm test            # node --test — 59 tests, aucune dépendance à installer
 npm run lint        # eslint api src test eslint.config.js  (PAS index.html)
 npm run format:check
 npm run cap:sync    # régénère www/ puis cap sync android

@@ -746,9 +746,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=105"></script>
-<script src="src/learn-core.js?v=105"></script>
-<script src="src/i18n.js?v=105"></script>
+<script src="src/lib.js?v=106"></script>
+<script src="src/learn-core.js?v=106"></script>
+<script src="src/i18n.js?v=106"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -984,7 +984,11 @@ function mixLists(news,learn,m){
    une IDENTITÉ DE FIL DIFFÉRENTE) doit garder le défaut `false` : figer des
    cartes de l'ANCIEN fil les ferait apparaître au début du nouveau. */
 function remix(geleAvant){
-  const fige=geleAvant?items.slice(0,Math.min(Math.max(0,currentIndex())+2,items.length)):[];
+  let fige=geleAvant?items.slice(0,Math.min(Math.max(0,currentIndex())+2,items.length)):[];
+  // Le gel ne protège JAMAIS un article dont on vient de confirmer qu'il est
+  // sponsorisé (voir sponsorOut) : c'est précisément une carte proche de
+  // l'écran, donc dans cette fenêtre, et la figer la garderait à jamais.
+  if(filterSponsored&&sponsorOut.size)fige=fige.filter(i=>!sponsorOut.has(i.link));
   const pris=new Set(fige.map(seenKey));
   const resteNews=newsItems.filter(i=>!pris.has(seenKey(i)));
   const resteLearn=learnItems.filter(i=>!pris.has(seenKey(i)));
@@ -1002,7 +1006,10 @@ function remix(geleAvant){
    servir l'ancien mélange tel quel remettrait dans le fil des cartes que la
    dose courante écarte. */
 function adoptItems(list){
-  newsItems=list.filter(i=>i.kind!=="learn");
+  // sponsorOut : un instantané ou un cache disque peut avoir été écrit AVANT
+  // qu'un sponsoring d'auteur ne soit confirmé (voir checkSponsor) — le
+  // reprendre tel quel le ferait réapparaître.
+  newsItems=list.filter(i=>i.kind!=="learn"&&!(filterSponsored&&sponsorOut.has(i.link)));
   learnItems=list.filter(i=>i.kind==="learn");
   remix();
 }
@@ -1108,10 +1115,9 @@ function persistPos(){try{localStorage.setItem(LS_POS,JSON.stringify(posMap));}c
    ni pagehide ni visibilitychange ne sont garantis. Le coût est négligeable —
    quelques dizaines d'octets, au plus une fois par swipe — et une écriture
    repoussée en temps mort perd purement et simplement la position. */
-function rememberPos(){
+function rememberPos(it=currentItem()){
   // via le registre de cartes : capDom() retire des cartes en tête du fil
   // infini, donc l'index DOM et celui de `items` ne coïncident plus après un cap.
-  const it=currentItem();
   if(!it||!it.link)return;
   const prev=posEntry();                  // tolère l'ancien format
   if(prev&&prev.link===it.link)return;
@@ -1163,11 +1169,20 @@ function currentIndex(){
 function currentCardEl(){const i=currentIndex();return i<0?null:feedEl.children[i];}
 /* Appelé à chaque frame de défilement : marquage « vu », mémorisation de la
    position, mise à jour du rail. Les trois sont idempotents. */
+/* Rend l'index de la carte courante, pour que l'appelant n'ait pas à le
+   redemander (voir onScrollFrame). Les trois appels ci-dessous voulaient chacun
+   la carte courante et la recalculaient chacun de leur côté : trois recherches
+   binaires sur `offsetTop` par frame de défilement, dont deux APRÈS l'écriture
+   de classe d'updateRail(), donc autant de reflows forcés. Une seule lecture,
+   partagée. */
 function onCardChange(){
-  markVisibleSeen();
-  rememberPos();
-  updateRail();
+  const i=currentIndex();
+  const it=itemAt(i);
+  markVisibleSeen(it);
+  rememberPos(it);
+  updateRail(it);
   if(DEBUG)dbgImage();
+  return i;
 }
 /* ?debug=1 : montre d'où vient l'image de la carte courante et sa taille réelle.
    Sert à diagnostiquer un flux dont les images sont floues, directement depuis
@@ -1191,7 +1206,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="105";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="106";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1263,6 +1278,16 @@ let filterSponsored=(()=>{
   try{const v=localStorage.getItem(LS_SPONSOR);return v===null?true:v==="1";}
   catch(e){return true;}
 })();
+/* Liens écartés APRÈS coup par checkSponsor (sponsoring d'auteur : invisible
+   dans le flux RSS, confirmé seulement en lisant la page — voir isSponsoredHtml).
+   Un ensemble à part, et pas un simple retrait de `newsItems`, parce que
+   `newsItems` est RECONSTRUIT depuis `collected` à chaque repeinture
+   (rebuild(), loadNewsPart) : l'article revenait donc à la repeinture suivante,
+   sa carte était recréée, revérifiée (par le cache, sans réseau) puis retirée à
+   nouveau — un clignotement, et un article sponsorisé enregistré au passage
+   dans le cache disque. Mémoire de session seulement : au prochain lancement la
+   vérification se refait, toujours sans réseau (ogCache est persistant). */
+const sponsorOut=new Set();
 
 /* Liste de blocage distante (facultative). La liste intégrée à l'APK (178
    domaines, res/raw/reader_blocklist.txt) ne bouge qu'au rythme des
@@ -1599,7 +1624,7 @@ let newsSettled=false;   // les actus ont fini leur tour (ou n'avaient rien à f
    réciproquement ; chacune se rend de son côté, remix() recompose. */
 async function loadFeeds(force){
   const my=++loadSeq;feedLoadStarted=true;feedsDirty=false;
-  demobadge(false);syncing(false);newsSettled=false;
+  demobadge(false);syncReset();newsSettled=false;
   const key=feedKey();                            // cache distinct par source et par thème filtrés
   // « Même fil » = le contenu affiché appartient à la MÊME clé que celle qu'on
   // charge (un filtre a pu changer entre-temps).
@@ -1637,6 +1662,12 @@ async function loadLearnPart(my,key,force,attempt=0){
   // Même signal que côté actus (voir loadNewsPart) : sans lui, un rechargement
   // Wikipédia en arrière-plan (dose augmentée, réserve qui se tarit en
   // scrollant) n'avait AUCUN indice visible avant que les cartes ne changent.
+  // Le jeton pris ici est rendu dans le `finally`, QUELLE QUE SOIT la sortie —
+  // les abandons sur `my!==loadSeq` le gardaient sinon pour de bon, et la barre
+  // ne s'éteignait plus jamais. `garde` passe à faux quand le jeton est CONFIÉ
+  // à quelqu'un d'autre (rendu reporté par whenFeedIdle, retentative), qui
+  // l'éteindra à notre place.
+  let garde=true;
   syncing(true);
   try{
     let arr=await fetchLearn(CONFIG.BATCH_SIZE);
@@ -1659,12 +1690,16 @@ async function loadLearnPart(my,key,force,attempt=0){
     }
     if(!arr.length)throw new Error("empty");
     learnItems=arr.map(markKind("learn"));
+    // Le jeton part avec le rendu : tant qu'un doigt reporte celui-ci, le
+    // chargement n'est pas fini pour l'utilisateur — l'éteindre ici annonçait
+    // la fin avant que la moindre carte n'ait bougé.
     whenFeedIdle(()=>{
+      syncing(false);
       if(my!==loadSeq)return;                       // périmé pendant l'attente du contact
       remix(true);render();hideStates();feedKeyShown=key;
       if(newsSettled)cacheSave(key);                // sinon les actus l'enregistreront
     });
-    syncing(false);
+    garde=false;
   }catch(e){
     if(my!==loadSeq)return;
     warn("learn load",e);
@@ -1677,10 +1712,17 @@ async function loadLearnPart(my,key,force,attempt=0){
     // réserve déjà présente n'est, elle, jamais effacée pour un
     // rafraîchissement qui échoue.
     if(attempt<RETRY_DELAYS_MS.length&&!learnItems.length){
-      setTimeout(()=>{if(my===loadSeq)loadLearnPart(my,key,true,attempt+1);},RETRY_DELAYS_MS[attempt]);
-      return;                                       // encore en cours : syncing reste allumé
+      // Le jeton reste pris pendant l'attente — c'est toujours le même
+      // chargement, la barre ne doit pas clignoter entre deux tentatives — et
+      // n'est rendu qu'APRÈS que la suivante ait pris le sien, sinon le
+      // compteur retomberait à zéro entre les deux.
+      garde=false;
+      setTimeout(()=>{
+        if(my===loadSeq)loadLearnPart(my,key,true,attempt+1);
+        syncing(false);
+      },RETRY_DELAYS_MS[attempt]);
+      return;
     }
-    syncing(false);
     // Repli hors-ligne : les articles de démo, mais seulement s'il n'y a rien
     // d'autre à montrer — les actus, elles, ont pu répondre.
     if(items.length){
@@ -1693,6 +1735,8 @@ async function loadLearnPart(my,key,force,attempt=0){
     }
     learnItems=DEMO_LEARN.map(markKind("learn"));
     remix();demobadge(true);render();hideStates();feedKeyShown=key;
+  }finally{
+    if(garde)syncing(false);
   }
 }
 
@@ -1774,6 +1818,10 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
   function rebuild(top){
     let all=[];
     collected.forEach(list=>{all=all.concat(list);});
+    // Sponsoring d'auteur déjà confirmé sur un chargement précédent : `collected`
+    // le contient toujours (le flux RSS ne le déclare pas), c'est ici qu'il se
+    // retire — sinon chaque repeinture le ramenait. Voir sponsorOut.
+    if(filterSponsored&&sponsorOut.size)all=all.filter(i=>!sponsorOut.has(i.link));
     all.sort((a,b)=>itemTime(b)-itemTime(a));
     newsItems=all.slice(0,CONFIG.MAX_NEWS);
     remix(!top);
@@ -1792,6 +1840,7 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
     // bas). Les repeintures progressives (via scheduleRender→setTimeout(paint))
     // n'en reçoivent aucun : elles gardent l'ancrage sur l'article lu.
     whenFeedIdle(()=>{
+      if(top)rendreJeton();                         // repeinture finale : le chargement s'achève ICI
       if(my!==loadSeq)return;                       // périmé pendant l'attente du contact
       rebuild(top);render(top);hideStates();feedKeyShown=key;
       // `top` seul (rendu final) : cacheSave() lit `items`, que rebuild()
@@ -1823,7 +1872,13 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
   }
 
   // Récupération par lots bornés plutôt que tout en parallèle.
-  let cursor=0,inFlight=0,done=0;
+  let cursor=0,inFlight=0,done=0,jeton=true;
+  /* Jeton de l'indicateur de chargement (voir syncing, devenu un COMPTEUR
+     puisque les deux moitiés du fil le pilotent en parallèle) : rendu UNE seule
+     fois, quelle que soit la sortie. Le chemin qui manquait : un chargement
+     périmé (`my!==loadSeq`) n'atteint jamais finish(), et gardait donc le jeton
+     — barre allumée pour de bon, quelle que soit la suite. */
+  function rendreJeton(){if(jeton){jeton=false;syncing(false);}}
   syncing(true);
   function pump(){
     while(inFlight<CONFIG.MAX_PARALLEL&&cursor<active.length){
@@ -1840,7 +1895,7 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
       }).catch(()=>{if(my===loadSeq)failed.push(f);})
         .finally(()=>{
           inFlight--;
-          if(my!==loadSeq)return;
+          if(my!==loadSeq){rendreJeton();return;}
           if(++done<active.length){pump();return;}   // au suivant
           finish();
         });
@@ -1858,11 +1913,25 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
     // présente, elle, n'est jamais effacée pour un rafraîchissement en
     // arrière-plan qui échoue.
     if(!collected.size&&attempt<RETRY_DELAYS_MS.length&&!newsItems.length){
-      setTimeout(()=>{if(my===loadSeq)loadNewsPart(my,key,true,cached,sameFeed,attempt+1);},RETRY_DELAYS_MS[attempt]);
+      // Le jeton reste pris pendant l'attente (c'est le même chargement, la
+      // barre ne doit pas clignoter) et n'est rendu qu'APRÈS que la
+      // retentative ait pris le sien — sinon le compteur retomberait à zéro
+      // entre les deux, et la barre avec.
+      jeton=false;
+      setTimeout(()=>{
+        if(my===loadSeq)loadNewsPart(my,key,true,cached,sameFeed,attempt+1);
+        syncing(false);
+      },RETRY_DELAYS_MS[attempt]);
       return;
     }
-    syncing(false);newsSettled=true;
+    newsSettled=true;
+    // Le jeton part avec la repeinture FINALE (voir paint) quand il y en a une :
+    // tant qu'un doigt posé la reporte, le chargement n'est pas fini pour
+    // l'utilisateur, et éteindre la barre ici annoncerait la fin avant que la
+    // moindre carte n'ait bougé. Sans repeinture (rien de collecté), plus rien
+    // ne viendra : on le rend tout de suite.
     if(collected.size)flushRender();   // état final exact, sans attendre la fenêtre
+    else rendreJeton();
     if(!collected.size){
       // On ne vide JAMAIS un fil déjà affiché parce qu'un rafraîchissement a
       // échoué : mieux vaut du contenu un peu ancien qu'un écran d'erreur. Et
@@ -1941,14 +2010,26 @@ const feedEl=document.getElementById("feed");
    attend un effet immédiat. */
 // Pointer Events plutôt que touch* : couvre aussi bien le doigt (natif) que
 // la souris (web, tests), avec un seul jeu d'écouteurs.
-let feedTouching=false,pendingFeedUpdates=[];
-feedEl.addEventListener("pointerdown",()=>{feedTouching=true;});
-function releaseFeedTouch(){
-  feedTouching=false;
+/* La POSE se guette sur le fil (c'est lui qu'on protège), mais le RELÂCHEMENT
+   se guette sur `window`, en phase de capture. Sans `setPointerCapture`, un
+   `pointerup` est délivré à l'élément survolé AU MOMENT DU RELÂCHEMENT : le rail
+   de partage et la barre du haut sont en `position:fixed` HORS de `feedEl` (voir
+   « Rail UNIQUE en position:fixed, hors des cartes »), donc lever le doigt
+   au-dessus de l'un d'eux ne repassait jamais par `feedEl`. Le drapeau restait
+   alors vrai POUR TOUJOURS, et tout ce qui passe par whenFeedIdle s'empilait
+   sans jamais s'exécuter — les actus qui arrivent, la réserve Wikipédia,
+   loadMore, checkSponsor, et l'enregistrement du cache avec eux. Le fil se
+   figeait en silence.
+   Un ENSEMBLE de pointeurs, pas un booléen : à deux doigts posés, en lever un
+   seul libérait la file alors que l'autre touchait encore l'écran. */
+const feedPointers=new Set();let pendingFeedUpdates=[];
+feedEl.addEventListener("pointerdown",e=>{feedPointers.add(e.pointerId);});
+function releaseFeedTouch(e){
+  if(!feedPointers.delete(e.pointerId)||feedPointers.size)return;   // pas le nôtre, ou il en reste
   if(pendingFeedUpdates.length){const fns=pendingFeedUpdates;pendingFeedUpdates=[];fns.forEach(fn=>fn());}
 }
-feedEl.addEventListener("pointerup",releaseFeedTouch);
-feedEl.addEventListener("pointercancel",releaseFeedTouch);
+addEventListener("pointerup",releaseFeedTouch,true);
+addEventListener("pointercancel",releaseFeedTouch,true);
 /* À utiliser pour tout réentrelacement déclenché EN ARRIÈRE-PLAN : reporte
    l'exécution si un doigt est actuellement posé sur le fil. Une FILE, pas un
    simple dernier-remplace-le-précédent : loadLearnPart et loadNewsPart
@@ -1958,7 +2039,7 @@ feedEl.addEventListener("pointercancel",releaseFeedTouch);
    relâche est sans risque : chaque fonction relit l'état partagé courant
    (collected, newsItems…) et se protège elle-même via `my!==loadSeq`. */
 function whenFeedIdle(fn){
-  if(feedTouching){pendingFeedUpdates.push(fn);return;}
+  if(feedPointers.size){pendingFeedUpdates.push(fn);return;}
   fn();
 }
 let loadingMore=false;
@@ -1966,11 +2047,15 @@ let loadingMore=false;
 // tableau, ce qui permet de retirer d'anciennes cartes du DOM sans tout casser.
 const cardReg=new Map();
 let cardSeq=0;
-/* Article actuellement à l'écran (sert au rail de partage et à l'ancrage). */
-function currentItem(){
-  const card=currentCardEl();
+/* Article porté par la carte d'index `i` dans le fil, sans relire la géométrie :
+   c'est ce qui permet à onCardChange() de ne calculer l'index qu'une fois pour
+   ses trois usages. */
+function itemAt(i){
+  const card=i>=0?feedEl.children[i]:null;
   return card?cardReg.get(+card.dataset.id)||null:null;
 }
+/* Article actuellement à l'écran (sert au rail de partage et à l'ancrage). */
+function currentItem(){return itemAt(currentIndex());}
 /* Lien de la carte visible, pour réancrer le fil après une mutation.
    Vide si on est encore en haut : dans ce cas c'est la reprise de session qui
    décide de la position, pas l'ancrage. */
@@ -2033,8 +2118,7 @@ function scrollToCard(i){
 // Marque comme « vu » la carte actuellement à l'écran. Ne concerne que les
 // articles Wikipédia : c'est leur tirage aléatoire qui doit éviter les redites.
 // Une actu, elle, sort naturellement du fil quand elle vieillit.
-function markVisibleSeen(){
-  const it=currentItem();
+function markVisibleSeen(it=currentItem()){
   if(it&&it.kind==="learn")addSeen(it);
 }
 
@@ -2070,7 +2154,8 @@ const MIN_GOOD_W=800;
    - paywalled : voir isPaywalledHtml (src/lib.js) — lu sur la même page,
      jamais interrogé seul.
    Résultats mémorisés (session + localStorage) pour n'interroger qu'une fois
-   par article, y compris les échecs. */
+   par article. Les ÉCHECS, eux, ne sont pas mémorisés : voir le .catch
+   d'articleMetaFor. */
 const LS_OG="fluxswipe.artmeta.v1";
 let ogCache=(()=>{try{return JSON.parse(localStorage.getItem(LS_OG)||"{}");}catch(e){return {};}})();
 let ogSaveT;
@@ -2116,9 +2201,23 @@ function articleMetaFor(link){
   const api="/api/og?url="+encodeURIComponent(link)+(deep?"&deep=1":"");
   const p=(isNativeApp?nativeArticleMeta(link):fetchWithTimeout(api,{},CONFIG.FETCH_TIMEOUT)
       .then(r=>r.ok?r.json():null)
-      .then(d=>({image:safeImg(d&&d.image,location.href)||"",paywalled:!!(d&&d.paywalled),sponsored:!!(d&&d.sponsored)})))
-    .then(meta=>{ogRemember(link,meta);return meta;})
-    .catch(e=>{warn("og",e);const meta={image:"",paywalled:false,sponsored:false};ogRemember(link,meta);return meta;})
+      .then(d=>({image:(d&&d.image)||"",paywalled:!!(d&&d.paywalled),sponsored:!!(d&&d.sponsored)})))
+    // safeImg ICI, sur le chemin COMMUN : le poser dans la seule branche web
+    // laissait le natif hors de l'invariant « toute URL d'image passe par
+    // safeImg », sans que le prochain appelant ait de quoi le deviner.
+    .then(meta=>{
+      meta={...meta,image:safeImg(meta.image,location.href)||""};
+      ogRemember(link,meta);return meta;
+    })
+    /* Un échec n'est PAS un verdict : on rend le neutre sans le mémoriser.
+       L'écrire dans ogCache (persisté en localStorage) figeait « pas de
+       paywall, pas de sponsor » à vie pour cet article sur un simple timeout —
+       acceptable tant que seule l'image en dépendait, plus du tout depuis que
+       la pastille $ et le filtre sponsorisé en dépendent aussi. Rien ne
+       s'emballe pour autant : l'IntersectionObserver n'observe chaque carte
+       qu'une fois (unobserve), la page ne sera redemandée qu'à une prochaine
+       apparition. */
+    .catch(e=>{warn("og",e);return {image:"",paywalled:false,sponsored:false};})
     .finally(()=>ogPending.delete(link));
   ogPending.set(link,p);
   return p;
@@ -2238,15 +2337,18 @@ function observePaywall(scope){
    sous ce doigt déjà en contact et ouvrant, au relâchement, un AUTRE article
    que celui visé (voir whenFeedIdle plus haut pour le mécanisme complet). */
 async function checkSponsor(el){
+  delete el.dataset.sponsor;         // une seule vérification par carte, comme checkPaywall
   const it=cardReg.get(+el.dataset.id);
   if(!filterSponsored||!it||!it.link)return;
   try{
     const meta=await articleMetaFor(it.link);
     if(!meta.sponsored)return;
+    sponsorOut.add(it.link);         // durable : rebuild() le relit (voir sponsorOut)
     whenFeedIdle(()=>{
       const key=seenKey(it);
       newsItems=newsItems.filter(i=>seenKey(i)!==key);
-      remix();render();
+      remix(true);                   // comme tout réentrelacement d'arrière-plan : on gèle la tête
+      render();
     });
   }catch(e){warn("checkSponsor",e);}
 }
@@ -2440,10 +2542,11 @@ async function loadMore(){
     }
     fresh=fresh.map(markKind("learn"));
     if(fresh.length){
+      learnMoreVide=0;
       learnItems=learnItems.concat(fresh);
       whenFeedIdle(()=>{remix(true);render();});
-    }
-  }catch(e){warn("load more",e);/* on réessaiera au prochain scroll */}
+    }else learnMoreVide++;              // tour à vide : voir learnMoreVide
+  }catch(e){warn("load more",e);learnMoreVide++;/* on réessaiera au prochain scroll */}
   finally{loadingMore=false;renderLoadMoreCard();}
 }
 /* ---------- Icônes ----------
@@ -2530,8 +2633,7 @@ feedEl.addEventListener("click",e=>{
 /* Rail unique : il agit sur la carte visible (une seule instance pour toute
    l'app au lieu d'une par carte). Masqué sur la carte de fin. */
 const railEl=document.getElementById("rail");
-function updateRail(){
-  const it=currentItem();
+function updateRail(it=currentItem()){
   railEl.classList.toggle("hidden",!it);
 }
 document.getElementById("shareBtn").onclick=e=>{
@@ -2664,11 +2766,19 @@ function hideTop(){topEl.classList.add("top--away");document.body.classList.add(
    une des deux listes est vide) : le seuil « près du bas de TOUT le fil »
    ne se déclenchait qu'après ce déversement, bien après que l'utilisateur
    ait déjà traversé plusieurs écrans d'actus sans le moindre article. */
-function learnCardsAhead(){
+function learnCardsAhead(depuis){
   let n=0;
-  for(let i=Math.max(0,currentIndex());i<items.length;i++)if(items[i].kind==="learn")n++;
+  for(let i=Math.max(0,depuis);i<items.length;i++)if(items[i].kind==="learn")n++;
   return n;
 }
+/* Tours de loadMore consécutifs qui n'ont RIEN rapporté (catégorie épuisée, et
+   le repli aléatoire pas plus fécond). Sans ce compteur, `lowOnLearn` restait
+   vrai indéfiniment — la réserve ne grandissant jamais — et relançait loadMore
+   à CHAQUE frame de scroll, deux requêtes Wikipédia à chaque fois. `nearEnd`,
+   lui, ne se déclenche qu'en bas du fil : il garde son comportement. Remis à
+   zéro dès qu'un lot rapporte quelque chose. */
+let learnMoreVide=0;
+const LEARN_MORE_VIDE_MAX=3;
 let scrollTick=false;
 function onScrollFrame(){
   scrollTick=false;
@@ -2678,16 +2788,22 @@ function onScrollFrame(){
   lastScrollY=top;
   // L'utilisateur a franchi au moins une carte avant la reprise → on l'annule
   if(resumePending&&top>h*0.5)resumePending=false;
-  onCardChange();   // carte courante : marquage « vu », position, rail
+  const idx=onCardChange();   // carte courante : marquage « vu », position, rail
   // Un lot de plus avant d'atteindre le bas → fil sans fin. Ou, dès que la
   // réserve Wikipédia s'annonce maigre alors que la dose en réclame : voir
   // learnCardsAhead ci-dessus. Le seuil (10, pas 5) laisse de la marge pour
   // que le lot arrive AVANT que l'utilisateur ne swipe jusqu'à la zone
   // remélangée — sinon le réentrelacement retombe exactement sous le doigt
   // pendant un swipe rapide, ce qui se voit comme une carte qui saute.
+  // Tout est court-circuité derrière `!loadingMore&&items.length` : learnCardsAhead
+  // parcourt le fil (jusqu'à MAX_ITEMS) et son point de départ vient d'une
+  // lecture de géométrie — le calculer à chaque frame, y compris pendant qu'un
+  // lot est déjà en route, ne servait qu'à forcer un reflow de plus juste après
+  // les écritures de style d'updateRail().
+  if(loadingMore||!items.length)return;
   const nearEnd=top+h*3>=feedEl.scrollHeight;
-  const lowOnLearn=!!mixLevel().learn&&learnCardsAhead()<10;
-  if(!loadingMore&&items.length&&(nearEnd||lowOnLearn))loadMore();
+  const lowOnLearn=learnMoreVide<LEARN_MORE_VIDE_MAX&&!!mixLevel().learn&&learnCardsAhead(idx)<10;
+  if(nearEnd||lowOnLearn)loadMore();
 }
 feedEl.addEventListener("scroll",()=>{
   if(scrollTick)return;
@@ -2934,7 +3050,12 @@ function feedKey(){
   // LANG en tête : changer de langue change le Wikipédia interrogé (voir
   // srcWikipedia/fetchLearn), donc le contenu — sans elle dans la clé, revenir
   // à une langue déjà vue resservirait un instantané dans l'AUTRE langue.
-  return "mix|"+LANG+"|"+newsSrc+"|"+cat+(cat==="all"?":"+interests.join(","):"");
+  // Le filtre sponsorisé change lui aussi le CONTENU du fil, pas seulement son
+  // affichage : sans lui dans la clé, le cache disque écrit avec le filtre
+  // actif était repeint au lancement suivant après l'avoir décoché, et les
+  // articles sponsorisés n'apparaissaient qu'à la seconde peinture.
+  return "mix|"+LANG+"|"+newsSrc+"|"+cat+(cat==="all"?":"+interests.join(","):"")+
+    (filterSponsored?"|s":"");
 }
 /* Instantané du fil, pour revenir d'un filtre à l'autre sans réseau : on
    restaure l'état exact (cartes affichées + position de scroll) au lieu de tout
@@ -3368,8 +3489,21 @@ function showEmpty(reason){
 }
 function demobadge(on){document.getElementById("demobadge").classList.toggle("hidden",!on);}
 /* Indicateur de chargement en arrière-plan (barre fine en haut). Ne bloque rien :
-   le fil déjà affiché reste lisible et utilisable pendant que les sources arrivent. */
-function syncing(on){document.getElementById("syncbar").classList.toggle("on",!!on);}
+   le fil déjà affiché reste lisible et utilisable pendant que les sources arrivent.
+   COMPTEUR, pas booléen : les DEUX moitiés du fil (loadLearnPart, loadNewsPart)
+   le pilotent, en parallèle et sans s'attendre. Avec un simple booléen, celle qui
+   finissait la première éteignait la barre pour l'autre — et Wikipédia (UNE
+   requête) finit presque toujours avant les actus (N flux), donc la barre
+   s'éteignait alors que l'essentiel du chargement restait à faire. */
+let syncCount=0;
+function syncing(on){
+  syncCount=Math.max(0,syncCount+(on?1:-1));
+  document.getElementById("syncbar").classList.toggle("on",syncCount>0);
+}
+/* Remise à zéro franche, au DÉBUT d'un chargement : les moitiés de la génération
+   précédente ont pu sortir sans décrémenter (abandon sur `my!==loadSeq`), leur
+   compte ne doit pas s'ajouter à celui du chargement qui commence. */
+function syncReset(){syncCount=0;document.getElementById("syncbar").classList.remove("on");}
 let toastT;function toast(m,ms){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");
   clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),ms||1800);}
 
