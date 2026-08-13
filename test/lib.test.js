@@ -552,3 +552,66 @@ test("dedupNews encaisse les entrées dégradées", () => {
   ]);
   assert.equal(out.length, 3); // les deux sans titre NI lien restent distincts
 });
+
+/* ---------- Distinguer des flux qui portent le même nom ---------- */
+
+test("feedDiscriminator retient le dernier segment parlant du chemin", () => {
+  const d = lib.feedDiscriminator;
+  assert.equal(d("https://www.courrierinternational.com/feed/all/rss.xml"), "all");
+  assert.equal(
+    d("https://www.courrierinternational.com/feed/rubrique/politique/rss.xml"),
+    "politique"
+  );
+  assert.equal(d("https://www.lemonde.fr/rss/une.xml"), "une");
+  assert.equal(d("https://www.lemonde.fr/international/rss_full.xml"), "international");
+  assert.equal(d("https://www.france24.com/fr/rss"), "fr");
+  // Tirets et souligné se lisent mieux en mots.
+  assert.equal(d("https://s.fr/feed/high-tech/rss.xml"), "high tech");
+});
+
+test("feedDiscriminator se rabat sur la requête puis le chemin", () => {
+  const d = lib.feedDiscriminator;
+  // Rien de parlant dans le chemin : la requête distingue quand même.
+  assert.equal(d("https://s.fr/feed?cat=12"), "cat=12");
+  // Ni l'un ni l'autre : mieux vaut le chemin brut que rien du tout.
+  assert.equal(d("https://s.fr/feed/"), "feed");
+  assert.equal(d("https://s.fr/"), "");
+});
+
+test("feedDiscriminator ne prend pas « rsspolitique » pour un mot générique", () => {
+  // La liste des segments génériques est FERMÉE : seul « rss_full » et
+  // consorts en sont, pas tout ce qui commence par rss.
+  assert.equal(lib.feedDiscriminator("https://s.fr/rsspolitique"), "rsspolitique");
+});
+
+test("feedLabels ne précise QUE les noms en double", () => {
+  const out = lib.feedLabels([
+    { name: "Le Monde", url: "https://www.lemonde.fr/rss/une.xml" },
+    {
+      name: "Courrier international",
+      url: "https://www.courrierinternational.com/feed/all/rss.xml",
+    },
+    {
+      name: "Courrier international",
+      url: "https://www.courrierinternational.com/feed/rubrique/asie/rss.xml",
+    },
+  ]);
+  assert.deepEqual(out, [
+    "Le Monde", // unique : nom nu
+    "Courrier international · all",
+    "Courrier international · asie",
+  ]);
+});
+
+test("feedLabels encaisse les entrées dégradées", () => {
+  assert.deepEqual(lib.feedLabels([]), []);
+  assert.deepEqual(lib.feedLabels(null), []);
+  // Nom absent : on retombe sur l'hôte plutôt que sur une ligne vide.
+  assert.deepEqual(lib.feedLabels([{ url: "https://www.s.fr/rss" }]), ["s.fr"]);
+  // Casse et espaces ne doivent pas faire croire à deux noms différents.
+  const out = lib.feedLabels([
+    { name: "Presse ", url: "https://s.fr/rss/une.xml" },
+    { name: "presse", url: "https://s.fr/rss/monde.xml" },
+  ]);
+  assert.deepEqual(out, ["Presse · une", "presse · monde"]);
+});

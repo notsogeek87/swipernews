@@ -111,10 +111,11 @@
       "lang.opt.fr": "Français",
       "lang.opt.en": "English",
 
-      "filter.src.label": "Source des actus",
+      "filter.src.label": "Sources des actus",
       "filter.src.sub":
-        "Le fil ne gardera que cette source. Pour en ajouter ou en retirer, c'est dans les réglages.",
+        "Coche les sources à garder dans le fil — plusieurs, si tu veux. Aucune cochée : elles y sont toutes. Pour en ajouter ou en retirer, c'est dans les réglages.",
       "filter.src.all": "Toutes",
+      "filter.src.count": "{n} sources",
       "filter.cat.label": "Thème des articles",
       "filter.cat.sub": "Les articles Wikipédia seront tirés dans ce thème.",
       "filter.cat.allChip": "🎓 Tous",
@@ -299,10 +300,11 @@
       "lang.opt.fr": "Français",
       "lang.opt.en": "English",
 
-      "filter.src.label": "News source",
+      "filter.src.label": "News sources",
       "filter.src.sub":
-        "The feed will only keep this source. To add or remove one, that's in settings.",
+        "Tick the sources to keep in the feed — as many as you like. None ticked: they are all in. To add or remove one, that's in settings.",
       "filter.src.all": "All",
+      "filter.src.count": "{n} sources",
       "filter.cat.label": "Article topic",
       "filter.cat.sub": "Wikipedia articles will be drawn from this topic.",
       "filter.cat.allChip": "🎓 All",

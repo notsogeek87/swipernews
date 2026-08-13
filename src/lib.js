@@ -316,6 +316,71 @@
     }
   }
 
+  /* ---------- Nommer des flux qui portent le même nom ----------
+     Suivre plusieurs flux d'un même site est la norme dès qu'on veut ses
+     rubriques (Courrier international en publie une par flux). Or ils arrivent
+     tous sous le MÊME titre : celui du site. Le panneau Sources affichait donc
+     trois lignes « Courrier international » identiques, et le filtre trois
+     puces identiques — impossible de dire laquelle on cochait, ni laquelle
+     était retenue. Ce qui les distingue est déjà dans l'URL : on va l'y
+     chercher, et on ne l'affiche QUE là où il y a ambiguïté. */
+
+  /** Segments d'URL qu'on retrouve chez tout le monde : ils ne disent rien de
+   *  CE flux-là. La liste est fermée à dessein — « rsspolitique » n'est pas
+   *  générique, seul l'est « rss_full » et consorts. */
+  const GENERIC_FEED_SEG =
+    /^(feeds?|rss|rss[-_](full|all|feed|index|2)|atom|xml|flux|index|default)$/i;
+  /** Ce qui distingue un flux des autres du même site : le dernier segment
+   *  PARLANT de son chemin, extension retirée.
+   *    /feed/all/rss.xml            → « all »
+   *    /rss/une.xml                 → « une »
+   *    /international/rss_full.xml  → « international »
+   *  Aucun segment parlant (« /feed/ ») : la requête, puis le chemin brut —
+   *  moins lisible, mais toujours mieux que deux libellés identiques. */
+  function feedDiscriminator(url) {
+    let path = "";
+    let query = "";
+    try {
+      const u = new URL(url);
+      path = u.pathname;
+      query = u.search.replace(/^\?/, "");
+    } catch (_) {
+      path = String(url || "");
+    }
+    const segs = path.split("/").filter(Boolean);
+    for (let i = segs.length - 1; i >= 0; i--) {
+      let base = segs[i];
+      try {
+        base = decodeURIComponent(base);
+      } catch (_) {
+        /* segment mal encodé : on le prend tel quel */
+      }
+      base = base.replace(/\.[a-z0-9]{1,5}$/i, "");
+      if (base && !GENERIC_FEED_SEG.test(base)) return base.replace(/[-_]+/g, " ");
+    }
+    return query || segs.join("/");
+  }
+  /** Libellés d'affichage d'une liste de sources, dans le même ordre : le nom
+   *  seul quand il est unique dans la liste, le nom SUIVI de ce qui le
+   *  distingue quand plusieurs sources le partagent. La précision n'apparaît
+   *  donc que là où elle sert — un fil unique garde son nom nu. */
+  function feedLabels(list) {
+    const arr = list || [];
+    const compte = new Map();
+    for (const f of arr) {
+      const k = ((f && f.name) || "").trim().toLowerCase();
+      compte.set(k, (compte.get(k) || 0) + 1);
+    }
+    return arr.map((f) => {
+      const url = (f && f.url) || "";
+      const nom = ((f && f.name) || "").trim() || hostOf(url);
+      const k = ((f && f.name) || "").trim().toLowerCase();
+      if ((compte.get(k) || 0) <= 1) return nom;
+      const d = feedDiscriminator(url);
+      return d ? nom + " · " + d : nom;
+    });
+  }
+
   /* ---------- Dédoublonnage des actus entre flux ----------
      Un même site publie couramment le MÊME article dans plusieurs de ses flux :
      le flux « à la une » et celui de la rubrique, ou deux rubriques qui se
@@ -675,6 +740,8 @@
     dedupAndRank,
     dedupNews,
     canonicalLink,
+    feedDiscriminator,
+    feedLabels,
     interleave,
     isPromotionalItem,
     isPaywallCandidateDomain,

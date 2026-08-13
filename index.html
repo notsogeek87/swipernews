@@ -720,6 +720,10 @@
     <h2 id="pickTitle"></h2>
     <p class="sub" id="pickSub"></p>
     <div class="intgrid" id="pickGrid"></div>
+    <!-- Seulement pour les sources, où le choix est MULTIPLE : il faut bien un
+         moment où l'on a fini de cocher. Le filtre des thèmes, choix unique,
+         s'applique au tap et n'affiche pas ce bouton. -->
+    <button class="applybtn hidden" id="pickApply" data-i18n="sheet.apply">Voir mon fil</button>
   </div>
 </div>
 
@@ -746,9 +750,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=107"></script>
-<script src="src/learn-core.js?v=107"></script>
-<script src="src/i18n.js?v=107"></script>
+<script src="src/lib.js?v=108"></script>
+<script src="src/learn-core.js?v=108"></script>
+<script src="src/i18n.js?v=108"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -756,7 +760,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds","interleave","dedupNews","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain"],
+  const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds","interleave","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -835,7 +839,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,interleave,dedupNews,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,interleave,dedupNews,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1015,18 +1019,38 @@ function adoptItems(list){
   learnItems=list.filter(i=>i.kind==="learn");
   remix();
 }
-/* Filtre des actus : "all", ou l'URL d'UNE source cochée. Le pendant de `cat`
-   pour les thèmes Wikipédia — même barre de puces, même mémorisation.
+/* Filtre des actus : les URL des sources retenues. Un TABLEAU, et une seule
+   source n'en est qu'un cas particulier — vouloir « Le Monde et Libération,
+   rien d'autre » est une demande aussi ordinaire que d'en vouloir une seule,
+   et n'était pas exprimable.
+   Tableau VIDE = toutes. Pas de sentinelle "all" : un fil d'actus sans aucune
+   source n'existe pas, « rien de retenu » et « tout » sont donc la même chose,
+   et une sentinelle aurait fallu être traitée à part partout.
    L'URL sert de clé plutôt que l'indice : supprimer une source du panneau
    décalerait tous les indices suivants, et le filtre désignerait alors une
-   autre source sans que rien ne l'indique. Une URL disparue retombe sur
-   « Toutes » (voir sanitizeNewsSrc). */
-let newsSrc=(()=>{try{return localStorage.getItem(LS_NSRC)||"all";}catch(e){return "all";}})();
+   autre source sans que rien ne l'indique. Une URL disparue est simplement
+   retirée de la sélection (voir sanitizeNewsSrc). */
+let newsSrc=(()=>{
+  try{
+    const v=localStorage.getItem(LS_NSRC);
+    if(!v)return [];
+    // Format d'avant le choix multiple : "all", ou UNE url en clair.
+    if(v[0]!=="[")return v==="all"?[]:[v];
+    const a=JSON.parse(v);
+    return Array.isArray(a)?a.filter(x=>typeof x==="string"):[];
+  }catch(e){return [];}
+})();
+function saveNewsSrc(){try{localStorage.setItem(LS_NSRC,JSON.stringify(newsSrc));}catch(e){warn("save newsSrc",e);}}
+/* Identité stable de la sélection, indépendante de l'ordre des taps : deux
+   sélections des mêmes sources sont le MÊME fil, donc la même clé de cache. */
+function newsSrcKey(sel){const a=sel||newsSrc;return a.length?[...a].sort().join(","):"all";}
 function sanitizeNewsSrc(){
-  if(newsSrc==="all")return false;
-  if(feeds.some(f=>f.on&&f.url===newsSrc))return false;
-  newsSrc="all";                      // source décochée, supprimée, ou jamais vue
-  try{localStorage.setItem(LS_NSRC,newsSrc);}catch(e){}
+  if(!newsSrc.length)return false;
+  const ok=new Set(feeds.filter(f=>f.on).map(f=>f.url));
+  const garde=newsSrc.filter(u=>ok.has(u));
+  if(garde.length===newsSrc.length)return false;
+  newsSrc=garde;                      // sources décochées, supprimées, ou jamais vues
+  saveNewsSrc();
   return true;
 }
 sanitizeNewsSrc();
@@ -1208,7 +1232,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="107";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="108";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1782,7 +1806,7 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
   // Une seule source quand la barre de filtres en désigne une : elle occupe
   // alors toute la part des actus (perFeed vaut MAX_NEWS, plus bas), au lieu de
   // la portion qu'elle a dans le mélange.
-  const allActive=feeds.filter(f=>f.on&&(newsSrc==="all"||f.url===newsSrc));
+  const allActive=feeds.filter(f=>f.on&&(!newsSrc.length||newsSrc.includes(f.url)));
   if(!allActive.length){
     // Aucune source cochée : ce n'est plus un fil vide, c'est un fil
     // entièrement Wikipédia. L'état vide n'a de sens que si celui-ci est vide
@@ -3040,7 +3064,9 @@ document.getElementById("suggestBox").addEventListener("click",e=>{
 document.addEventListener("keydown",e=>{
   if(e.key!=="Escape")return;
   const s=document.querySelector(".sheet.open");
-  if(s){closeDialog(s);return;}
+  // La feuille des filtres a sa propre sortie : elle applique la sélection en
+  // cours, pour qu'Échap ne la fasse pas disparaître en silence.
+  if(s){if(s===pickSheet)closePicker();else closeDialog(s);return;}
   const menu=document.querySelector(".sharemenu.open");
   if(menu){menu.classList.remove("open");setTimeout(()=>menu.remove(),200);}
 });
@@ -3061,7 +3087,7 @@ function feedKey(){
   // affichage : sans lui dans la clé, le cache disque écrit avec le filtre
   // actif était repeint au lancement suivant après l'avoir décoché, et les
   // articles sponsorisés n'apparaissaient qu'à la seconde peinture.
-  return "mix|"+LANG+"|"+newsSrc+"|"+cat+(cat==="all"?":"+interests.join(","):"")+
+  return "mix|"+LANG+"|"+newsSrcKey()+"|"+cat+(cat==="all"?":"+interests.join(","):"")+
     (filterSponsored?"|s":"");
 }
 /* Instantané du fil, pour revenir d'un filtre à l'autre sans réseau : on
@@ -3175,8 +3201,14 @@ setIcons();
    sur les cartes). D'où « Toutes » sans emoji d'un côté, « 🎓 Tous » de
    l'autre — l'incohérence serait d'en mettre un seul au milieu de noms nus. */
 function filterChips(kind){
-  if(kind==="src")return [{k:"all",label:T("filter.src.all")}]
-    .concat(feeds.filter(f=>f.on).map(f=>({k:f.url,label:f.name})));
+  if(kind==="src"){
+    // Libellés calculés sur les seules sources COCHÉES, celles que la liste
+    // montre : préciser « · asie » n'a de sens que s'il y a bien deux
+    // « Courrier international » sous les yeux (voir feedLabels, src/lib.js).
+    const on=feeds.filter(f=>f.on),lbl=feedLabels(on);
+    return [{k:"all",label:T("filter.src.all")}]
+      .concat(on.map((f,i)=>({k:f.url,label:lbl[i]})));
+  }
   return [{k:"all",label:T("filter.cat.allChip")}]
     .concat(interests.map(k=>CATEGORIES.find(c=>c.key===k)).filter(Boolean).map(c=>({k:c.key,label:catLabelT(c.key)})));
 }
@@ -3187,9 +3219,14 @@ function filterChips(kind){
    commence par un chiffre, qu'aucun filtre d'emoji ne doit rogner). */
 function filterValue(kind){
   if(kind==="src"){
-    if(newsSrc==="all")return T("filter.src.all");
-    const f=feeds.find(x=>x.url===newsSrc);
-    return f?f.name:hostOf(newsSrc);
+    if(!newsSrc.length)return T("filter.src.all");
+    // Au-delà d'une source, le compte plutôt que les noms bout à bout : la
+    // pastille tient sur une ligne, et trois noms concaténés y seraient
+    // tronqués au milieu d'un mot.
+    if(newsSrc.length>1)return T("filter.src.count",{n:newsSrc.length});
+    const on=feeds.filter(f=>f.on),lbl=feedLabels(on);
+    const i=on.findIndex(x=>x.url===newsSrc[0]);
+    return i>=0?lbl[i]:hostOf(newsSrc[0]);
   }
   if(cat==="all")return T("filter.cat.allShort");
   const c=CATEGORIES.find(x=>x.key===cat);
@@ -3211,7 +3248,7 @@ function renderFilters(){
     if(!on[kind])return;
     const val=filterValue(kind);
     btn.querySelector(".filterbtn__v").textContent=val;
-    btn.classList.toggle("on",(kind==="src"?newsSrc:cat)!=="all");
+    btn.classList.toggle("on",kind==="src"?newsSrc.length>0:cat!=="all");
     btn.setAttribute("aria-label",T(kind==="src"?"filter.src.label":"filter.cat.label")+" : "+val);
   });
   filtersEl.classList.toggle("hidden",!on.src&&!on.cat);
@@ -3220,24 +3257,77 @@ function renderFilters(){
    défilante cachait le reste : avec cinq sources, trois seulement tenaient à
    l'écran — et le filtre actif pouvait être hors champ. */
 const pickSheet=document.getElementById("pickSheet");
+const pickApply=document.getElementById("pickApply");
 let pickKind="src";
+/* Sélection EN COURS de la feuille des sources, tant qu'elle est ouverte. Elle
+   ne devient `newsSrc` qu'à la fermeture : cocher trois sources déclencherait
+   sinon trois recompositions du fil et trois chargements, dont deux jetés
+   aussitôt. Nulle pour le filtre des thèmes, qui reste un choix UNIQUE — un
+   article Wikipédia est tiré dans un thème, pas dans plusieurs. */
+let pickSel=null;
+/* Vrai quand la puce `k` doit paraître cochée. « Toutes » n'est pas une valeur
+   parmi les autres : elle s'allume quand RIEN n'est retenu. */
+function pickOn(k){
+  if(pickKind!=="src")return k===cat;
+  return k==="all"?pickSel.size===0:pickSel.has(k);
+}
+/* Construit la grille : UNE fois, à l'ouverture. */
+function renderPickGrid(){
+  const src=pickKind==="src";
+  document.getElementById("pickGrid").innerHTML=filterChips(pickKind).map(c=>
+    // role/aria-checked : une puce qui se coche et se décoche n'est pas un
+    // bouton ordinaire, et un choix multiple n'est pas un choix unique.
+    `<button class="intchip ${pickOn(c.k)?"on":""}" role="${src?"checkbox":"radio"}" `+
+    `aria-checked="${pickOn(c.k)?"true":"false"}" data-k="${escAttr(c.k)}">${esc(c.label)}</button>`
+  ).join("");
+}
+/* Rafraîchit l'état des puces EN PLACE, sans reconstruire la grille : refaire
+   l'innerHTML à chaque tap détruit la puce qu'on vient de toucher, donc le
+   focus avec — au clavier ou au lecteur d'écran, on perdait sa place à chaque
+   case cochée. */
+function syncPickGrid(){
+  document.getElementById("pickGrid").querySelectorAll("[data-k]").forEach(b=>{
+    const on=pickOn(b.dataset.k);
+    b.classList.toggle("on",on);
+    b.setAttribute("aria-checked",on?"true":"false");
+  });
+}
 function openPicker(kind){
   pickKind=kind;
-  const src=kind==="src",cur=src?newsSrc:cat;
+  const src=kind==="src";
+  pickSel=src?new Set(newsSrc):null;
   document.getElementById("pickTitle").textContent=T(src?"filter.src.label":"filter.cat.label");
   document.getElementById("pickSub").textContent=T(src?"filter.src.sub":"filter.cat.sub");
-  document.getElementById("pickGrid").innerHTML=filterChips(kind).map(c=>
-    `<button class="intchip ${c.k===cur?"on":""}" data-k="${escAttr(c.k)}">${esc(c.label)}</button>`).join("");
+  pickApply.classList.toggle("hidden",!src);   // le choix unique s'applique au tap, sans bouton
+  renderPickGrid();
   openDialog(pickSheet);
 }
 document.getElementById("pickGrid").addEventListener("click",e=>{
   const b=e.target.closest("[data-k]");
   if(!b)return;
   const k=b.dataset.k;
-  closeDialog(pickSheet);              // d'abord refermer : le fil se recompose derrière
-  if(pickKind==="src")setNewsSrc(k);else setCat(k);
+  if(pickKind!=="src"){
+    closeDialog(pickSheet);            // d'abord refermer : le fil se recompose derrière
+    setCat(k);
+    return;
+  }
+  // Choix multiple : la feuille RESTE ouverte, on coche et décoche à loisir.
+  if(k==="all")pickSel.clear();        // « Toutes » = plus aucune restriction
+  else if(pickSel.has(k))pickSel.delete(k);
+  else pickSel.add(k);
+  syncPickGrid();
 });
-pickSheet.onclick=e=>{if(e.target===pickSheet)closeDialog(pickSheet);};
+/* Toutes les sorties de la feuille des sources passent par ici — bouton, clic
+   sur le fond, Échap : une sélection ne doit pas se perdre parce qu'on a
+   refermé autrement qu'avec le bouton. */
+function closePicker(){
+  const sel=pickKind==="src"&&pickSel?[...pickSel]:null;
+  pickSel=null;
+  closeDialog(pickSheet);
+  if(sel)setNewsSrc(sel);
+}
+pickApply.onclick=closePicker;
+pickSheet.onclick=e=>{if(e.target===pickSheet)closePicker();};
 srcBtn.onclick=()=>openPicker("src");
 catBtn.onclick=()=>openPicker("cat");
 /* Les deux filtres se comportent pareil : instantané du fil qu'on quitte, puis
@@ -3250,14 +3340,20 @@ function setCat(k){
   try{localStorage.setItem(LS_CAT,cat);}catch(e){}
   renderFilters();switchFeed();
 }
-function setNewsSrc(k){
-  if(k===newsSrc)return;
-  // Instantané AVANT le changement de clé, sinon le fil qu'on quitte serait
-  // rangé sous la clé de celui qu'on ouvre. Permet l'aller-retour immédiat
-  // entre deux sources, sans réseau.
+function setNewsSrc(liste){
+  let sel=(liste||[]).filter((u,i,a)=>a.indexOf(u)===i);
+  // Toutes les sources cochées une par une, c'est « Toutes » : exactement le
+  // même fil, donc la même clé de cache — et la pastille le dit ainsi plutôt
+  // que d'annoncer « 8 sources ».
+  const actives=feeds.filter(f=>f.on).map(f=>f.url);
+  if(sel.length&&actives.length&&actives.every(u=>sel.includes(u)))sel=[];
+  if(newsSrcKey(sel)===newsSrcKey())return;   // même sélection : rien à recharger
+  // Instantané AVANT le changement de `newsSrc`, sinon le fil qu'on quitte
+  // serait rangé sous la clé de celui qu'on ouvre. Permet l'aller-retour
+  // immédiat entre deux sélections, sans réseau.
   snapshotFeed();
-  newsSrc=k;
-  try{localStorage.setItem(LS_NSRC,newsSrc);}catch(e){}
+  newsSrc=sel;
+  saveNewsSrc();
   renderFilters();switchFeed();
 }
 
@@ -3372,11 +3468,17 @@ renderMixUI();
    si elle est refermée sans valider. */
 const firstRun=!interestsChosen();
 if(firstRun)openSettings();
-function renderList(){document.getElementById("feedList").innerHTML=feeds.map((f,i)=>`
+/* Les libellés passent par feedLabels (src/lib.js) : plusieurs flux d'un même
+   site arrivent tous sous le titre du site, et trois lignes « Courrier
+   international » à l'identique ne disent pas laquelle on coche. L'URL en
+   dessous le disait déjà, mais elle est longue et se lit mal — la précision
+   remonte donc sur la ligne du nom, et seulement quand il y a ambiguïté. */
+function renderList(){const lbl=feedLabels(feeds);
+  document.getElementById("feedList").innerHTML=feeds.map((f,i)=>`
   <div class="feedrow"><input type="checkbox" ${f.on?"checked":""} data-toggle="${i}">
-    <div><div class="name">${esc(f.name)}${unreachable.has(f.url)?`<span class="badge-ko">${esc(T("sheet.sources.unreachable"))}</span>`:""}</div>
+    <div><div class="name">${esc(lbl[i])}${unreachable.has(f.url)?`<span class="badge-ko">${esc(T("sheet.sources.unreachable"))}</span>`:""}</div>
       <div class="url">${esc(f.url)}</div></div>
-    <button class="del" data-del="${i}" aria-label="${escAttr(T("sheet.sources.deleteAria",{name:f.name}))}">✕</button></div>`).join("");}
+    <button class="del" data-del="${i}" aria-label="${escAttr(T("sheet.sources.deleteAria",{name:lbl[i]}))}">✕</button></div>`).join("");}
 /* Suggestions : chips « + Source » pour celles pas encore présentes (plus de sources = plus d'articles) */
 function renderSuggest(){
   const box=document.getElementById("suggestBox");

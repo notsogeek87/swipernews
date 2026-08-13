@@ -51,6 +51,23 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
   Si le flux n'en publie aucune (fréquent chez les sites WordPress nus), l'app
   tente de son côté une image de partage (`og:image`) une fois la carte proche
   de l'écran
+- **Flux homonymes distingués** : suivre plusieurs flux d'un même site est la
+  norme dès qu'on en veut les rubriques (Courrier international en publie une
+  par flux), mais ils arrivent tous sous le titre du site — trois lignes
+  identiques dans le panneau Sources, trois puces identiques dans le filtre. Ce
+  qui les sépare est déjà dans l'URL : le dernier segment parlant de son chemin
+  (`/feed/rubrique/asie/rss.xml` → « asie ») est ajouté au nom, et **seulement
+  quand plusieurs sources le partagent** — un flux unique garde son nom nu. Voir
+  `feedLabels` (`src/lib.js`)
+- **Filtre des sources à choix multiple** : la pastille 📰 retient autant de
+  sources qu'on veut, pas une seule. Aucune cochée = toutes. Les puces se
+  cochent sans refermer la feuille, et le fil ne se recompose qu'à la validation
+  — cocher trois sources déclencherait sinon trois rechargements, dont deux
+  jetés aussitôt. Cocher toutes les sources une par une revient à « Toutes » :
+  même fil, donc même clé de cache. La pastille affiche le libellé quand il n'y
+  a qu'une source, le compte au-delà (trois noms concaténés y seraient tronqués
+  au milieu d'un mot). Le filtre des thèmes Wikipédia, lui, reste un choix
+  unique : un article est tiré dans un thème, pas dans plusieurs
 - **Dédoublonnage entre flux** : un même site publie couramment le même article
   dans son flux « à la une » ET dans celui de la rubrique. Cocher les deux
   donnait deux cartes pour le même papier. Deux articles sont fusionnés quand
