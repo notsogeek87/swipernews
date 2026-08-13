@@ -34,7 +34,7 @@
 // mutualisée entre tous les utilisateurs.
 "use strict";
 
-const { assertSafeUrl } = require("./feed.js");
+const { assertSafeUrl, safeFetch } = require("./feed.js");
 const { metaContent, isPaywalledHtml, isSponsoredHtml } = require("../src/lib.js");
 
 const FETCH_TIMEOUT_MS = 6000;
@@ -121,9 +121,11 @@ async function handler(req, res) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
   try {
-    const upstream = await fetch(url, {
+    // safeFetch, jamais fetch : chaque redirection repasse par la garde
+    // anti-SSRF (voir api/feed.js). `finalUrl` remplace `upstream.url`, que le
+    // suivi manuel ne renseigne plus.
+    const { res: upstream, url: finalUrl } = await safeFetch(url, {
       signal: ctl.signal,
-      redirect: "follow",
       headers: {
         "user-agent": "Mozilla/5.0 (compatible; SwiperNews/1.0; +https://news.lielu.eu)",
         accept: "text/html,application/xhtml+xml",
@@ -149,7 +151,7 @@ async function handler(req, res) {
     ]);
     if (raw) {
       // Résolution en absolu, et refus de tout ce qui n'est pas http(s).
-      const abs = new URL(decodeEntities(raw), upstream.url || url);
+      const abs = new URL(decodeEntities(raw), finalUrl || url);
       if (abs.protocol === "http:" || abs.protocol === "https:") {
         image = abs.href;
         width = parseInt(metaContent(html, ["og:image:width"]) || "0", 10) || 0;

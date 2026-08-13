@@ -49,3 +49,68 @@ test("assertSafeUrl refuse localhost et les IP privées littérales", async () =
 test("assertSafeUrl refuse une URL malformée", async () => {
   await assert.rejects(() => feed.assertSafeUrl("pas une url"));
 });
+
+// --- Redirections -----------------------------------------------------------
+// assertSafeUrl ne voit que l'URL de départ. Tant que le fetch suivait les
+// redirections tout seul, une page publique répondant « 302 vers 127.0.0.1 »
+// suffisait à traverser la garde : c'est ce que ces tests verrouillent.
+const http = require("node:http");
+
+// Petit serveur jetable : renvoie l'URL demandée à `route(chemin)`.
+function serve(route) {
+  const srv = http.createServer((q, r) => route(q, r));
+  return new Promise((res) =>
+    srv.listen(0, "127.0.0.1", () => res({ srv, port: srv.address().port }))
+  );
+}
+
+test("safeFetch refuse une redirection vers le réseau interne", async () => {
+  const secret = await serve((q, r) => r.end("SECRET-INTERNE"));
+  const redir = await serve((q, r) => {
+    r.writeHead(302, { Location: `http://127.0.0.1:${secret.port}/` });
+    r.end();
+  });
+  try {
+    await assert.rejects(
+      () => feed.safeFetch(`http://127.0.0.1:${redir.port}/`),
+      /Hôte non autorisé/,
+      "la redirection vers une IP privée doit être refusée"
+    );
+  } finally {
+    secret.srv.close();
+    redir.srv.close();
+  }
+});
+
+test("safeFetch refuse aussi une redirection RELATIVE vers l'interne", async () => {
+  // `Location: /interne` est résolu sur l'hôte courant : la garde doit voir
+  // l'URL réellement demandée, pas la chaîne brute de l'en-tête.
+  const s = await serve((q, r) => {
+    if (q.url === "/") {
+      r.writeHead(302, { Location: "/interne" });
+      r.end();
+    } else r.end("SECRET-INTERNE");
+  });
+  try {
+    await assert.rejects(() => feed.safeFetch(`http://127.0.0.1:${s.port}/`));
+  } finally {
+    s.srv.close();
+  }
+});
+
+test("safeFetch s'arrête au-delà de la limite de redirections", async () => {
+  // Boucle infinie sur un hôte public : sans plafond, la fonction tournerait
+  // jusqu'au timeout de la lambda.
+  const s = await serve((q, r) => {
+    r.writeHead(302, { Location: "/encore" });
+    r.end();
+  });
+  try {
+    await assert.rejects(
+      () => feed.safeFetch(`http://127.0.0.1:${s.port}/`, {}, 0),
+      /Trop de redirections/
+    );
+  } finally {
+    s.srv.close();
+  }
+});

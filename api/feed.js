@@ -70,6 +70,43 @@ async function assertSafeUrl(raw) {
   return u;
 }
 
+// Codes de redirection à suivre à la main (voir safeFetch).
+const REDIRECT_STATUS = new Set([301, 302, 303, 307, 308]);
+const MAX_REDIRECTS = 5;
+
+// `fetch(…, { redirect: "follow" })` ANNULE toute la garde ci-dessus :
+// assertSafeUrl ne voit que l'URL de DÉPART, et undici suit ensuite les
+// redirections sans rien revérifier. Une page parfaitement publique qui répond
+// `302 Location: http://169.254.169.254/…` ramène donc le réseau interne par la
+// bande, et son corps est renvoyé à l'appelant — la garde ne coûte à l'attaquant
+// qu'un saut de plus.
+//
+// On suit donc les redirections À LA MAIN, en repassant CHAQUE saut par
+// assertSafeUrl. Renvoie aussi l'URL finale : elle sert de base à la résolution
+// des URL relatives (voir api/og.js), que `res.url` ne donne plus en mode
+// manuel.
+async function safeFetch(url, init, maxRedirects = MAX_REDIRECTS) {
+  let current = url;
+  for (let hop = 0; ; hop++) {
+    const res = await fetch(current, { ...init, redirect: "manual" });
+    const loc = REDIRECT_STATUS.has(res.status) && res.headers.get("location");
+    if (!loc) return { res, url: current };
+    if (hop >= maxRedirects) throw new Error("Trop de redirections");
+    // `Location` est souvent relatif : on le résout avant de le valider, sans
+    // quoi on validerait une URL qui n'est pas celle qui sera demandée.
+    const next = new URL(loc, current).href;
+    await assertSafeUrl(next);
+    // Le corps de la redirection ne sert à rien : le libérer évite de garder
+    // la connexion ouverte jusqu'au GC.
+    try {
+      if (res.body) await res.body.cancel();
+    } catch {
+      /* ignore */
+    }
+    current = next;
+  }
+}
+
 // Lit le corps de la réponse en s'arrêtant net au-delà de MAX_BYTES.
 async function readCapped(upstream) {
   const reader = upstream.body && upstream.body.getReader && upstream.body.getReader();
@@ -136,9 +173,9 @@ async function handler(req, res) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
   try {
-    const upstream = await fetch(url, {
+    // safeFetch, jamais fetch : les redirections sont revalidées une à une.
+    const { res: upstream } = await safeFetch(url, {
       signal: ctl.signal,
-      redirect: "follow",
       headers: {
         "user-agent":
           "Mozilla/5.0 (compatible; FluxRSS/1.0; +https://swipernews.vercel.app)",
@@ -174,3 +211,4 @@ module.exports = handler;
 // Exports pour les tests unitaires (n'affectent pas le handler Vercel).
 module.exports.assertSafeUrl = assertSafeUrl;
 module.exports.isPrivateIp = isPrivateIp;
+module.exports.safeFetch = safeFetch;
