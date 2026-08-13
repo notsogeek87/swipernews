@@ -73,8 +73,34 @@
       })(el);
       return out;
     }
+    /* Mémo de la phase de NOTATION uniquement. `visibleText` remplace
+       `textContent` (natif, C++) par un parcours JS : nécessaire pour ignorer
+       les <noscript> (voir ci-dessus), mais bien plus cher à l'appel. Or
+       score() tourne sur jusqu'à 4000 candidats et appelle len() sur chaque
+       bloc p/li/blockquote/pre qu'ils contiennent — les mêmes blocs, une fois
+       par ancêtre candidat, soit une quinzaine de fois sur un gabarit de presse
+       ordinaire. Le voile du lecteur attend ce calcul avant de révéler la page,
+       et la retentative (voir injectReadScript, InAppBrowserActivity.java) peut
+       le refaire une seconde fois.
+       Mesuré au navigateur sur une page profonde et fournie : 55 ms → 41 ms.
+       Le reste du coût tient au parcours de sous-arbre COMPLET que fait
+       linkDensity() une fois par candidat, sur des nœuds tous distincts —
+       aucun mémo ne peut l'éviter, il faudrait un calcul ascendant, et la
+       normalisation des espaces n'est pas additive entre enfants.
+       Le mémo est EXACT tant que le DOM ne bouge pas — c'est le cas de bout en
+       bout de la boucle de notation, qui ne fait que lire. Il est donc coupé
+       (memo = null) dès `best` choisi : tout ce qui suit travaille sur un CLONE
+       que les étapes 1-6 élaguent, et une longueur mémorisée y serait fausse.
+       WeakMap et non Map : rien ne doit retenir un nœud de la page. */
+    var memo = typeof WeakMap === "function" ? new WeakMap() : null;
     function len(el) {
-      return visibleText(el).replace(/\s+/g, " ").trim().length;
+      if (memo) {
+        var hit = memo.get(el);
+        if (hit !== undefined) return hit;
+      }
+      var n = visibleText(el).replace(/\s+/g, " ").trim().length;
+      if (memo) memo.set(el, n);
+      return n;
     }
     /* "has-sidebar"/"with-sidebar" (Bulma et consorts) qualifient la colonne
        de CONTENU PRINCIPAL comme ayant un frère sidebar à côté, jamais comme
@@ -177,6 +203,10 @@
     }
     // Seuil : en dessous, ce n'est pas un article. On préfère ne rien faire.
     if (!best || bestScore < 400) return;
+
+    // Fin de la phase de lecture seule : à partir d'ici on élague, donc toute
+    // longueur mémorisée deviendrait fausse (voir le commentaire de `memo`).
+    memo = null;
 
     var art = best.cloneNode(true);
 
