@@ -239,6 +239,14 @@
       :root{--systop-min:34px}
     }
   }
+  /* Second filet, posé par majPleinEcran() : `display-mode` ne suffit pas. Un
+     navigateur mobile bord à bord dessine la page sous la barre d'état ET se
+     déclare `browser` — mesuré sur un vrai téléphone, marge haute 12 px, bouton
+     rogné par le poinçon. La géométrie, elle, ne ment pas : quand la fenêtre
+     fait la hauteur de l'écran ENTIER, plus rien ne protège le haut de la page.
+     Classe plutôt que media query : aucune règle CSS ne sait comparer deux
+     hauteurs. */
+  html.plein{--systop-min:34px}
   .top{position:fixed;top:0;left:0;right:0;z-index:15;padding:12px 16px 14px;
     padding-top:calc(12px + max(env(safe-area-inset-top),var(--systop,0px),var(--systop-min,0px)));
     display:flex;flex-direction:column;gap:11px;background:linear-gradient(rgba(25,5,1,.82),rgba(25,5,1,.5) 65%,transparent);
@@ -877,9 +885,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=116"></script>
-<script src="src/learn-core.js?v=116"></script>
-<script src="src/i18n.js?v=116"></script>
+<script src="src/lib.js?v=117"></script>
+<script src="src/learn-core.js?v=117"></script>
+<script src="src/i18n.js?v=117"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1409,7 +1417,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="116";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="117";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1457,10 +1465,16 @@ let systopPx=0;
 function renderAbout(){
   const el=document.getElementById("about");
   if(!el||!window.__aboutReady)return;
-  let haut=0;
-  try{haut=Math.round(parseFloat(getComputedStyle(document.querySelector(".top")).paddingTop)||0);}
-  catch(e){warn("about",e);}
-  el.textContent=T("about.version",{v:APP_VERSION})+" · "+T("about.systop",{n:haut});
+  let haut=0,geo="";
+  try{
+    haut=Math.round(parseFloat(getComputedStyle(document.querySelector(".top")).paddingTop)||0);
+    // Les deux hauteurs qui décident (voir majPleinEcran) et le mode d'affichage :
+    // sans elles, un « ça rogne encore » ne dit pas LAQUELLE des règles a manqué.
+    const mode=["standalone","fullscreen","minimal-ui"].find(m=>matchMedia("(display-mode:"+m+")").matches);
+    geo=" · "+T(mode?"about.mode.app":"about.mode.tab")
+      +" "+Math.round(innerWidth)+"×"+Math.round(innerHeight)+"/"+Math.round((self.screen&&screen.height)||0);
+  }catch(e){warn("about",e);}
+  el.textContent=T("about.version",{v:APP_VERSION})+" · "+T("about.systop",{n:haut})+geo;
 }
 function setSystop(px){
   systopPx=Math.max(0,Math.min(120,Math.round(px)||0));
@@ -1477,11 +1491,30 @@ function applySystemInsets(){
     setSystop(Math.max(SYSTOP_MIN,isFinite(t)?t:0));
   }).catch(e=>{warn("insets",e);setSystop(SYSTOP_MIN);});
 }
+/* La page couvre-t-elle vraiment TOUT l'écran ? C'est la question qui décide,
+   et `display-mode` n'y répond pas : un navigateur mobile bord à bord dessine
+   la page sous la barre d'état tout en se déclarant `browser`. La hauteur, elle,
+   tranche — si la fenêtre fait celle de l'écran entier, il n'y a plus ni barre
+   d'outils ni bande système au-dessus de la page, donc plus rien entre le
+   poinçon et nos boutons.
+   Restreint aux écrans tactiles étroits, pour la même raison que le plancher
+   CSS : un ordinateur en plein écran n'a ni barre d'état ni découpe.
+   La marge de 2 px absorbe les arrondis de densité (un écran de 915,43 px CSS
+   rend 915 d'un côté et 916 de l'autre selon le navigateur). */
+function majPleinEcran(){
+  let plein=false;
+  try{
+    plein=!!(screen&&screen.height&&innerHeight>=screen.height-2
+      &&matchMedia("(pointer:coarse)").matches&&innerWidth<=560);
+  }catch(e){warn("plein écran",e);}
+  document.documentElement.classList.toggle("plein",plein);
+}
 window.__aboutReady=true;   // APP_VERSION est défini : renderAbout peut parler
+majPleinEcran();
 applySystemInsets();
 renderAbout();              // le web n'appelle pas setSystop : c'est ici qu'il s'affiche
 addEventListener("resize",()=>{clearTimeout(applySystemInsets.t);
-  applySystemInsets.t=setTimeout(()=>{applySystemInsets();renderAbout();},200);});
+  applySystemInsets.t=setTimeout(()=>{majPleinEcran();applySystemInsets();renderAbout();},200);});
 
 /* Où s'ouvre un article, dans l'app packagée : "app" = navigateur INTÉGRÉ
    (plugin maison InAppBrowser, voir

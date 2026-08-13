@@ -51,6 +51,8 @@
 
       "about.version": "Version {v}",
       "about.systop": "marge haute {n} px",
+      "about.mode.app": "installée",
+      "about.mode.tab": "onglet",
 
       "rail.share.aria": "Partager cet article",
       "rail.share.title": "Partager",
@@ -252,6 +254,8 @@
 
       "about.version": "Version {v}",
       "about.systop": "top inset {n} px",
+      "about.mode.app": "installed",
+      "about.mode.tab": "tab",
 
       "rail.share.aria": "Share this article",
       "rail.share.title": "Share",

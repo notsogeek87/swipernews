@@ -501,9 +501,13 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   pile sur un bouton de la barre d'outils. Le CSS prend donc `max()` de TROIS
   sources, jamais d'une seule : l'inset CSS, la mesure native
   (`InAppBrowserPlugin.systemInsets` → `--systop`, voir `applySystemInsets`) et
-  un plancher (`--systop-min`, 34 px) réservé aux écrans TACTILES et étroits en
-  `display-mode:standalone/fullscreen` — une PWA de bureau est aussi
-  « standalone » et n'a pas de barre d'état. La mesure native est un
+  un plancher (`--systop-min`, 34 px) réservé aux écrans TACTILES et étroits
+  dont la page occupe tout l'écran — une PWA de bureau est aussi « standalone »
+  et n'a pas de barre d'état. « Occuper tout l'écran » demande DEUX règles :
+  `display-mode` ne suffit pas, un navigateur mobile bord à bord dessine sous la
+  barre d'état en se déclarant `browser` (constaté sur un vrai téléphone). D'où
+  `majPleinEcran()`, qui compare `innerHeight` à `screen.height` et pose
+  `html.plein` — aucune media query ne sait comparer deux hauteurs. La mesure native est un
   CHEVAUCHEMENT avec la WebView, jamais l'inset brut : si une couche quelconque
   a déjà décalé la WebView, elle rend 0 et rien n'est réservé deux fois.
   Le pied du panneau de réglages (`renderAbout`) affiche la marge réellement

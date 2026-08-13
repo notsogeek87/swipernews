@@ -245,12 +245,21 @@ et le CSS retient **la plus grande** — aucune n'a besoin d'être fiable seule 
    un **chevauchement** avec la WebView, jamais l'inset brut : si une couche
    quelconque — Capacitor, un thème, une future version d'Android — a déjà
    décalé la WebView, la réponse est 0 et rien n'est réservé deux fois ;
-3. un **plancher de 34 px**, appliqué aux seuls écrans tactiles étroits en mode
-   plein écran. Il couvre une barre d'état Android (24-30 dp) et la découpe qui
-   s'y loge. Contrepartie assumée : là où rien ne recouvrait la page, ces 34 px
-   sont perdus — une bande vide se voit et se corrige, un bouton à moitié mangé
-   ne se rattrape pas. Une PWA installée sur un **ordinateur** est aussi en
-   `display-mode:standalone` : elle est exclue par `pointer:coarse`.
+3. un **plancher de 34 px**, appliqué aux seuls écrans tactiles étroits dont la
+   page occupe tout l'écran. Il couvre une barre d'état Android (24-30 dp) et la
+   découpe qui s'y loge. Contrepartie assumée : là où rien ne recouvrait la page,
+   ces 34 px sont perdus — une bande vide se voit et se corrige, un bouton à
+   moitié mangé ne se rattrape pas.
+
+« Occuper tout l'écran » se reconnaît à deux choses, et il faut les deux :
+`display-mode` (PWA installée, plein écran) **et la géométrie**. Car un
+navigateur mobile bord à bord dessine la page sous la barre d'état tout en se
+déclarant `browser` — mesuré sur un vrai téléphone : marge haute 12 px, bouton
+rogné par le poinçon, alors qu'aucune règle ne s'appliquait. La hauteur, elle,
+tranche : quand la fenêtre fait celle de l'écran **entier**, plus rien ne
+protège le haut de la page. Une PWA installée sur un **ordinateur** est aussi
+en `display-mode:standalone` et un ordinateur peut être en plein écran : les
+deux sont exclus par `pointer:coarse`.
 
 La valeur est bornée à 120 px et rejouée à chaque redimensionnement (tourner
 l'écran déplace la découpe). Le pied du panneau de réglages affiche la marge
