@@ -487,4 +487,17 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   ouvre `ACTION_SEND`. Le chemin navigateur reste celui du web.
 - **Le mode lecture ne peut pas s'appliquer avant `onPageFinished`** (DOM
   incomplet ⇒ article tronqué). D'où le voile : on masque la WebView, on
-  transforme, on révèle en fondu.
+  transforme, on révèle en fondu. Et `onPageFinished` lui-même n'est qu'un
+  DÉBUT : un gabarit de presse moderne pose son texte plusieurs secondes plus
+  tard, d'où l'échelle de tentatives (`READ_RETRY_MS`). Le voile, lui, ne tient
+  que les deux premières (`READ_VEILED_TRIES`) — au-delà, mieux vaut une
+  bascule tardive qu'un écran noir de cinq secondes.
+- **Un bloc rejeté ne doit pas emporter l'extraction entière.** Les garde-fous
+  d'après élagage (trop peu de texte survivant, bloc hors sujet) s'appliquent au
+  bloc le MIEUX NOTÉ — qui n'est pas toujours l'article : un bandeau de
+  consentement resté dans le DOM, un tiroir de commentaires ou un gabarit
+  englobant rassemblent souvent plus de texte. `reader_read.js` classe donc les
+  candidats et essaie les cinq premiers, chacun devant passer les MÊMES
+  garde-fous. Symptôme quand ce filet manquait : l'article s'ouvrait en page
+  complète, alors que le bouton du lecteur, actionné à la main, le simplifiait
+  sans peine (le DOM ayant bougé entre-temps).

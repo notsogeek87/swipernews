@@ -129,6 +129,14 @@ public class InAppBrowserActivity extends AppCompatActivity {
      */
     private final Handler revealHandler = new Handler(Looper.getMainLooper());
 
+    /**
+     * Compteur de chargements, incrémenté à chaque page. Les tentatives du mode
+     * lecture sont étalées dans le temps (voir READ_RETRY_MS) : celles d'une
+     * page quittée entre-temps doivent se taire plutôt que de rendre leur
+     * verdict sur la suivante.
+     */
+    private int readGen;
+
     /** Filet : une page qui ne finit jamais de charger ne doit pas rester noire. */
     private static final long REVEAL_TIMEOUT_MS = 6000;
     private final Runnable revealTask = this::revealContent;
@@ -450,15 +458,31 @@ public class InAppBrowserActivity extends AppCompatActivity {
     }
 
     /**
-     * Nombre de tentatives supplémentaires si la première ne trouve rien : une
-     * page construite côté client (React/Next.js et consorts) peut avoir fini
-     * de CHARGER (onPageFinished) sans avoir fini de RENDRE son article — le
-     * script s'exécute alors sur un DOM encore squelette. Une seule retentative
-     * suffit à couvrir ce cas sans faire attendre indéfiniment un article
-     * réellement trop court.
+     * Retentatives si l'injection ne trouve rien, et leur délai : une page
+     * construite côté client (React/Next.js et consorts) peut avoir fini de
+     * CHARGER (onPageFinished, ce qui déclenche l'injection) sans avoir fini de
+     * RENDRE son article — le script s'exécute alors sur un DOM encore
+     * squelette. Une seule retentative à 700 ms ne suffisait pas : sur un
+     * téléphone, un gabarit de presse moderne met couramment plusieurs secondes
+     * à poser son texte, et l'échec était alors DÉFINITIF pour cet article —
+     * le lecteur restait en page complète, alors que le même bouton actionné à
+     * la main quelques secondes plus tard simplifiait la page sans peine. Le
+     * décalage entre les deux est exactement ce que rattrape cette échelle.
+     *
+     * <p>Le voile, lui, ne suit PAS jusqu'au bout (voir READ_VEILED_TRIES) :
+     * tenir l'écran noir cinq secondes pour une page qui n'est de toute façon
+     * pas un article serait pire que le défaut corrigé.
      */
-    private static final int READ_RETRY_MAX = 1;
-    private static final long READ_RETRY_DELAY_MS = 700;
+    private static final long[] READ_RETRY_MS = {700, 1500, 2500};
+
+    /**
+     * Tentatives faites SOUS le voile. Au-delà, la page du site est révélée et
+     * les tentatives continuent en silence : si l'une aboutit, l'article
+     * simplifié remplace ce qui est à l'écran (une bascule visible, mais tardive
+     * — c'est le prix à payer pour ne pas faire attendre devant un écran noir) ;
+     * si aucune n'aboutit, rien n'a été perdu.
+     */
+    private static final int READ_VEILED_TRIES = 2;
 
     private void injectReadScript() {
         injectReadScript(0);
@@ -474,18 +498,25 @@ public class InAppBrowserActivity extends AppCompatActivity {
         // ne peut arriver ici, donc rien à échapper.
         String prelude = "window.__snRead={size:\"" + readerSize + "\",theme:\"" + readerTheme
             + "\",top:" + barCssHeight() + "};\n";
+        // Génération en cours : une tentative programmée peut arriver APRÈS que
+        // la page a changé (lien suivi, redirection). Elle conclurait alors sur
+        // une page qui n'est plus la sienne — jusqu'à couper le mode lecture
+        // pendant que la nouvelle page, elle, essaie encore.
+        final int gen = readGen;
         web.evaluateJavascript(prelude + readScript, value -> web.evaluateJavascript(
             "document.documentElement.dataset.snRead || ''", state -> {
+                if (web == null || gen != readGen) return;
                 // evaluateJavascript rend du JSON : la chaîne arrive entre guillemets.
                 String s = state == null ? "" : state.replace("\"", "");
-                if (s.isEmpty() && attempt < READ_RETRY_MAX) {
+                if (s.isEmpty() && attempt < READ_RETRY_MS.length) {
                     // Rien trouvé : le script lui-même n'a rien touché (voir son
                     // garde-fou en tête, `dataset.snRead` déjà présent → sortie
                     // immédiate), donc le réinjecter tel quel est sans risque.
-                    // Le voile reste en place pendant l'attente.
+                    // Le voile ne tient que les premières tentatives.
+                    if (attempt + 1 >= READ_VEILED_TRIES) revealContent();
                     web.postDelayed(() -> {
-                        if (web != null) injectReadScript(attempt + 1);
-                    }, READ_RETRY_DELAY_MS);
+                        if (web != null && gen == readGen) injectReadScript(attempt + 1);
+                    }, READ_RETRY_MS[attempt]);
                     return;
                 }
                 // Quel que soit le verdict final, la page redevient visible ici :
@@ -614,6 +645,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
                 currentUrl = url;
                 hostView.setText(prettyHost(url));
                 progress.setVisibility(View.VISIBLE);
+                readGen++;          // les tentatives de la page précédente n'ont plus voix
                 // Nouvelle page : celle du site, pas encore simplifiée. La marge
                 // haute redevient celle de la WebView jusqu'à preuve du contraire.
                 readerApplied = false;

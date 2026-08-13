@@ -195,28 +195,36 @@
       return s * Math.pow(1 - density, 2);
     }
 
+    /* Les candidats sont CLASSÉS, et non réduits au seul mieux noté : les deux
+       garde-fous d'APRÈS élagage (trop peu de texte survivant, bloc étranger au
+       sujet annoncé par la page) peuvent rejeter le premier d'entre eux. Sans
+       classement, ce rejet valait abandon pur et simple — la page complète
+       restait affichée alors que le VRAI article attendait juste derrière.
+       Cas typique : un bloc englobant (gabarit de page, tiroir de commentaires,
+       bandeau de consentement resté dans le DOM) rassemble plus de texte que
+       l'article lui-même, puis se vide à l'élagage ou ne parle pas du sujet.
+       On essaie donc les mieux notés à la suite, chacun devant passer les MÊMES
+       garde-fous : on descend dans le SCORE, jamais dans les exigences. */
+    var MIN_SCORE = 400;   // en dessous, ce n'est pas un article : on ne fait rien
+    var MAX_TRIES = 5;     // au-delà, c'est un élagage de plus pour du fond de classement
     var candidates = document.querySelectorAll("article,main,section,div,td");
-    var best = null, bestScore = 0;
+    var scored = [];
     for (var i = 0; i < candidates.length && i < 4000; i++) {
       var s = score(candidates[i]);
-      if (s > bestScore) { bestScore = s; best = candidates[i]; }
+      if (s >= MIN_SCORE) scored.push({ el: candidates[i], s: s });
     }
-    // Seuil : en dessous, ce n'est pas un article. On préfère ne rien faire.
-    if (!best || bestScore < 400) return;
+    if (!scored.length) return;
+    scored.sort(function (a, b) { return b.s - a.s; });
 
     // Fin de la phase de lecture seule : à partir d'ici on élague, donc toute
     // longueur mémorisée deviendrait fausse (voir le commentaire de `memo`).
     memo = null;
-
-    var art = best.cloneNode(true);
 
     /* 1. Tout ce qui n'est ni texte ni image s'en va.
        « source » compte : dans un <picture>, il l'emporte sur le src qu'on vient
        de rétablir plus bas, et ramènerait l'image différée d'origine. */
     var DROP = "script,style,noscript,iframe,form,button,input,select,textarea,svg,canvas," +
                "nav,aside,footer,header,video,audio,object,embed,link,meta,dialog,source,track";
-    var junk = art.querySelectorAll(DROP), k;
-    for (k = 0; k < junk.length; k++) if (junk[k].parentNode) junk[k].parentNode.removeChild(junk[k]);
 
     /* Étiquettes d'habillage que le site écrit en toutes lettres. Un vrai
        paragraphe n'est jamais ces trois mots-là et rien d'autre : la comparaison
@@ -250,105 +258,6 @@
       return false;
     }
 
-    /* 2. Blocs périphériques restés à l'intérieur (« À lire aussi », partage…). */
-    var inner = art.querySelectorAll("div,section,ul,ol,figure,aside,p");
-    for (k = 0; k < inner.length; k++) {
-      var el = inner[k];
-      if (!el.parentNode) continue;
-      if (UNLIKELY.test(signature(el))) { el.parentNode.removeChild(el); continue; }
-      if (startsWithLabel(el)) { el.parentNode.removeChild(el); continue; }
-      // Liste de liens sans texte propre : un sommaire, pas du contenu.
-      if ((el.tagName === "UL" || el.tagName === "OL") && linkDensity(el) > 0.8) {
-        el.parentNode.removeChild(el);
-      }
-    }
-
-    /* 3. Le label lui-même, si un exemplaire isolé a survécu ailleurs. */
-    var labelled = art.querySelectorAll("p,h2,h3,h4,div,span,strong");
-    for (k = 0; k < labelled.length; k++) {
-      var lb = labelled[k];
-      if (!lb.parentNode) continue;
-      var txt = (lb.textContent || "").replace(/\s+/g, " ").trim();
-      if (txt.length <= 40 && LABELS.test(txt) && !lb.querySelector("img")) {
-        lb.parentNode.removeChild(lb);
-      }
-    }
-
-    /* 4. Images : rétablir les sources différées, écarter pixels et vignettes. */
-    var imgs = art.getElementsByTagName("img");
-    for (k = imgs.length - 1; k >= 0; k--) {
-      var img = imgs[k];
-      var src = img.getAttribute("src") || img.getAttribute("data-src")
-             || img.getAttribute("data-original") || img.getAttribute("data-lazy-src") || "";
-      if (!src) {
-        var ss = img.getAttribute("srcset") || img.getAttribute("data-srcset") || "";
-        if (ss) src = ss.split(",")[0].trim().split(/\s+/)[0];
-      }
-      var w = parseInt(img.getAttribute("width") || "0", 10);
-      var h = parseInt(img.getAttribute("height") || "0", 10);
-      // Traceurs 1×1 et puces décoratives : rien à lire là-dedans.
-      if (!src || src.indexOf("data:") === 0 || (w && w < 120) || (h && h < 120)) {
-        if (img.parentNode) img.parentNode.removeChild(img);
-        continue;
-      }
-      try { src = new URL(src, document.baseURI).href; } catch (e) {}
-      img.setAttribute("src", src);
-    }
-
-    /* 5. Aucun attribut de style ne survit : la feuille du site étant jetée,
-       une classe résiduelle ne servirait qu'à réintroduire du hasard. */
-    function strip(node) {
-      var keep = node.tagName === "A" ? "href" : (node.tagName === "IMG" ? "src" : null);
-      var attrs = node.attributes;
-      for (var a = attrs.length - 1; a >= 0; a--) {
-        var name = attrs[a].name;
-        if (name === keep || name === "alt") continue;
-        node.removeAttribute(name);
-      }
-    }
-    strip(art);   // la racine aussi : getElementsByTagName ne rend que les descendants
-    var all = art.getElementsByTagName("*");
-    for (k = 0; k < all.length; k++) strip(all[k]);
-
-    /* 6. Les trous laissés par tout ce qui précède. Un conteneur vidé de son
-       encart garde sa boîte : à l'écran, ce sont des blancs de plusieurs lignes
-       au milieu du texte — le défaut le plus visible d'une extraction. Deux
-       passes, parce qu'un parent ne devient vide qu'une fois ses enfants partis.
-       Les <br> en rafale, eux, servaient d'interlignes dans la feuille du site.
-       On en garde DEUX au plus : beaucoup de sites séparent leurs paragraphes
-       ainsi, et tout raboter recollerait le texte en un seul pavé. */
-    function prune() {
-      var blocks = art.querySelectorAll("p,div,section,figure,ul,ol,li,blockquote,span,h1,h2,h3,h4,h5,h6");
-      for (var b = blocks.length - 1; b >= 0; b--) {
-        var n = blocks[b];
-        if (!n.parentNode) continue;
-        if (!len(n) && !n.querySelector("img")) n.parentNode.removeChild(n);
-      }
-    }
-    prune(); prune();
-    var brs = art.querySelectorAll("br");
-    for (k = brs.length - 1; k >= 0; k--) {
-      var run = 0, prev = brs[k].previousSibling;
-      while (prev) {
-        if (prev.nodeType === 3 && !prev.nodeValue.trim()) { prev = prev.previousSibling; continue; }
-        if (prev.nodeName !== "BR") break;
-        run++;
-        prev = prev.previousSibling;
-      }
-      if (run >= 2 && brs[k].parentNode) brs[k].parentNode.removeChild(brs[k]);
-    }
-
-    /* Garde-fou final : le score du départ (étape « seuil ») porte sur le bloc
-       AVANT élagage — les étapes 1-6 ci-dessus peuvent l'avoir vidé (encarts
-       comptés comme du texte au score, puis retirés comme UNLIKELY/LABELS/
-       liens denses). Sans ce filet, un article qui franchit tout juste le
-       seuil initial pouvait finir en page de lecture QUASIMENT VIDE : ce n'est
-       pas un échec d'extraction (le message « pas assez de texte » ne
-       s'affiche que si `best` est resté introuvable), donc rien ne le
-       signale — juste un fond coloré sans rien dessus. On revérifie ici, sur
-       ce qui a RÉELLEMENT survécu, avant d'engager le remplacement. */
-    if (len(art) < 200 && !art.querySelector("img")) return;
-
     function meta(sel) {
       var m = document.querySelector(sel);
       return (m && m.getAttribute("content")) || "";
@@ -356,21 +265,9 @@
     var title = (meta('meta[property="og:title"]') || document.title || "").trim();
     var description = meta('meta[property="og:description"]') || meta('meta[name="description"]');
 
-    /* Dernier filet : le bloc choisi doit au moins PARLER du sujet de la page.
-       Cas réel rencontré (Frandroid) : un widget « Les derniers articles »
-       peut franchir tous les seuils précédents (texte abondant, classe qui
-       ressemble à du contenu, densité de lien tout juste sous le couperet) —
-       tout en ne parlant QUE d'AUTRES articles, jamais du sujet de la page en
-       cours. Titre et méta-description sont posés par le site AVANT toute
-       extraction, indépendamment du bloc choisi (contrairement au « début de
-       l'article », qui n'existe que si le bloc est déjà le bon — se comparer
-       à soi-même ne validerait rien) : les comparer ne coûte qu'une poignée
-       d'opérations sur des chaînes déjà en mémoire, aucune requête de plus.
-       Un seul mot significatif en commun suffit : on ne cherche pas une
-       extraction PARFAITE, seulement à écarter un bloc qui n'a RIEN à voir
-       avec le sujet que la page annonce elle-même. Aucun mot significatif
-       dans le titre/la description (rare) : rien à vérifier, on laisse
-       passer. */
+    /* Mots de référence de la PAGE (titre + description), posés par le site
+       avant toute extraction : ils servent de juge à chaque candidat, dans
+       prepare() ci-dessous. */
     var STOPWORDS = /^(le|la|les|un|une|des|du|de|et|ou|qui|que|quoi|dont|ce|cet|cette|ces|son|sa|ses|leur|leurs|notre|nos|votre|vos|dans|pour|avec|sans|sur|sous|par|chez|vers|entre|depuis|avant|apres|mais|donc|or|ni|car|tout|tous|toute|toutes|plus|moins|tres|bien|comme|alors|selon|ainsi|aussi|encore|deja|the|and|for|with|from|this|that|these|those|are|was|were|been|has|have|had|its|his|her)$/;
     function keywords(text) {
       return (text || "")
@@ -380,14 +277,151 @@
         .filter(function (w) { return w.length >= 3 && !STOPWORDS.test(w); });
     }
     var refWords = keywords(title + " " + description);
-    if (refWords.length) {
-      var bodyWords = keywords(art.textContent), bodySet = {}, hasMatch = false;
-      for (var bw = 0; bw < bodyWords.length; bw++) bodySet[bodyWords[bw]] = true;
-      for (var rw = 0; rw < refWords.length; rw++) {
-        if (bodySet[refWords[rw]]) { hasMatch = true; break; }
+
+    /* Élagage d'un candidat : rend l'article prêt à afficher, ou null si ce
+       bloc-là ne tient pas ses promesses. Tout se passe sur un CLONE, donc la
+       page reste intacte — c'est ce qui permet d'essayer le suivant. */
+    function prepare(pick) {
+      var art = pick.cloneNode(true), k;
+
+      // 1. Tout ce qui n'est ni texte ni image s'en va (voir DROP ci-dessus).
+      var junk = art.querySelectorAll(DROP);
+      for (k = 0; k < junk.length; k++) if (junk[k].parentNode) junk[k].parentNode.removeChild(junk[k]);
+
+      /* 2. Blocs périphériques restés à l'intérieur (« À lire aussi », partage…). */
+      var inner = art.querySelectorAll("div,section,ul,ol,figure,aside,p");
+      for (k = 0; k < inner.length; k++) {
+        var el = inner[k];
+        if (!el.parentNode) continue;
+        if (UNLIKELY.test(signature(el))) { el.parentNode.removeChild(el); continue; }
+        if (startsWithLabel(el)) { el.parentNode.removeChild(el); continue; }
+        // Liste de liens sans texte propre : un sommaire, pas du contenu.
+        if ((el.tagName === "UL" || el.tagName === "OL") && linkDensity(el) > 0.8) {
+          el.parentNode.removeChild(el);
+        }
       }
-      if (!hasMatch) return;
+
+      /* 3. Le label lui-même, si un exemplaire isolé a survécu ailleurs. */
+      var labelled = art.querySelectorAll("p,h2,h3,h4,div,span,strong");
+      for (k = 0; k < labelled.length; k++) {
+        var lb = labelled[k];
+        if (!lb.parentNode) continue;
+        var txt = (lb.textContent || "").replace(/\s+/g, " ").trim();
+        if (txt.length <= 40 && LABELS.test(txt) && !lb.querySelector("img")) {
+          lb.parentNode.removeChild(lb);
+        }
+      }
+
+      /* 4. Images : rétablir les sources différées, écarter pixels et vignettes. */
+      var imgs = art.getElementsByTagName("img");
+      for (k = imgs.length - 1; k >= 0; k--) {
+        var img = imgs[k];
+        var src = img.getAttribute("src") || img.getAttribute("data-src")
+               || img.getAttribute("data-original") || img.getAttribute("data-lazy-src") || "";
+        if (!src) {
+          var ss = img.getAttribute("srcset") || img.getAttribute("data-srcset") || "";
+          if (ss) src = ss.split(",")[0].trim().split(/\s+/)[0];
+        }
+        var w = parseInt(img.getAttribute("width") || "0", 10);
+        var h = parseInt(img.getAttribute("height") || "0", 10);
+        // Traceurs 1×1 et puces décoratives : rien à lire là-dedans.
+        if (!src || src.indexOf("data:") === 0 || (w && w < 120) || (h && h < 120)) {
+          if (img.parentNode) img.parentNode.removeChild(img);
+          continue;
+        }
+        try { src = new URL(src, document.baseURI).href; } catch (e) {}
+        img.setAttribute("src", src);
+      }
+
+      /* 5. Aucun attribut de style ne survit : la feuille du site étant jetée,
+         une classe résiduelle ne servirait qu'à réintroduire du hasard. */
+      function strip(node) {
+        var keep = node.tagName === "A" ? "href" : (node.tagName === "IMG" ? "src" : null);
+        var attrs = node.attributes;
+        for (var a = attrs.length - 1; a >= 0; a--) {
+          var name = attrs[a].name;
+          if (name === keep || name === "alt") continue;
+          node.removeAttribute(name);
+        }
+      }
+      strip(art);   // la racine aussi : getElementsByTagName ne rend que les descendants
+      var all = art.getElementsByTagName("*");
+      for (k = 0; k < all.length; k++) strip(all[k]);
+
+      /* 6. Les trous laissés par tout ce qui précède. Un conteneur vidé de son
+         encart garde sa boîte : à l'écran, ce sont des blancs de plusieurs lignes
+         au milieu du texte — le défaut le plus visible d'une extraction. Deux
+         passes, parce qu'un parent ne devient vide qu'une fois ses enfants partis.
+         Les <br> en rafale, eux, servaient d'interlignes dans la feuille du site.
+         On en garde DEUX au plus : beaucoup de sites séparent leurs paragraphes
+         ainsi, et tout raboter recollerait le texte en un seul pavé. */
+      function prune() {
+        var blocks = art.querySelectorAll("p,div,section,figure,ul,ol,li,blockquote,span,h1,h2,h3,h4,h5,h6");
+        for (var b = blocks.length - 1; b >= 0; b--) {
+          var n = blocks[b];
+          if (!n.parentNode) continue;
+          if (!len(n) && !n.querySelector("img")) n.parentNode.removeChild(n);
+        }
+      }
+      prune(); prune();
+      var brs = art.querySelectorAll("br");
+      for (k = brs.length - 1; k >= 0; k--) {
+        var run = 0, prev = brs[k].previousSibling;
+        while (prev) {
+          if (prev.nodeType === 3 && !prev.nodeValue.trim()) { prev = prev.previousSibling; continue; }
+          if (prev.nodeName !== "BR") break;
+          run++;
+          prev = prev.previousSibling;
+        }
+        if (run >= 2 && brs[k].parentNode) brs[k].parentNode.removeChild(brs[k]);
+      }
+
+      /* Garde-fou final : le score du départ (étape « seuil ») porte sur le bloc
+         AVANT élagage — les étapes 1-6 ci-dessus peuvent l'avoir vidé (encarts
+         comptés comme du texte au score, puis retirés comme UNLIKELY/LABELS/
+         liens denses). Sans ce filet, un article qui franchit tout juste le
+         seuil initial pouvait finir en page de lecture QUASIMENT VIDE : ce n'est
+         pas un échec d'extraction (le message « pas assez de texte » ne
+         s'affiche que si AUCUN candidat n'aboutit), donc rien ne le
+         signale — juste un fond coloré sans rien dessus. On revérifie ici, sur
+         ce qui a RÉELLEMENT survécu, avant d'engager le remplacement. Rejeter
+         ne coûte plus l'extraction entière : le candidat suivant est essayé. */
+      if (len(art) < 200 && !art.querySelector("img")) return null;
+
+      /* Dernier filet : le bloc choisi doit au moins PARLER du sujet de la page.
+         Cas réel rencontré (Frandroid) : un widget « Les derniers articles »
+         peut franchir tous les seuils précédents (texte abondant, classe qui
+         ressemble à du contenu, densité de lien tout juste sous le couperet) —
+         tout en ne parlant QUE d'AUTRES articles, jamais du sujet de la page en
+         cours. Titre et méta-description sont posés par le site AVANT toute
+         extraction, indépendamment du bloc choisi (contrairement au « début de
+         l'article », qui n'existe que si le bloc est déjà le bon — se comparer
+         à soi-même ne validerait rien) : les comparer ne coûte qu'une poignée
+         d'opérations sur des chaînes déjà en mémoire, aucune requête de plus.
+         Un seul mot significatif en commun suffit : on ne cherche pas une
+         extraction PARFAITE, seulement à écarter un bloc qui n'a RIEN à voir
+         avec le sujet que la page annonce elle-même. Aucun mot significatif
+         dans le titre/la description (rare) : rien à vérifier, on laisse
+         passer. */
+      if (refWords.length) {
+        var bodyWords = keywords(art.textContent), bodySet = {}, hasMatch = false;
+        for (var bw = 0; bw < bodyWords.length; bw++) bodySet[bodyWords[bw]] = true;
+        for (var rw = 0; rw < refWords.length; rw++) {
+          if (bodySet[refWords[rw]]) { hasMatch = true; break; }
+        }
+        if (!hasMatch) return null;
+      }
+
+      return art;
     }
+
+    // Le premier candidat qui franchit tout gagne ; aucun, on laisse la page.
+    var art = null;
+    for (var c = 0; c < scored.length && c < MAX_TRIES; c++) {
+      art = prepare(scored[c].el);
+      if (art) break;
+    }
+    if (!art) return;
 
     var host = location.hostname.replace(/^www\./, "");
     var published = meta('meta[property="article:published_time"]') || meta('meta[name="date"]');
