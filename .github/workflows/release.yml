@@ -52,8 +52,21 @@ jobs:
           java-version: "21" # exigé par Capacitor 8 / AGP 8.13
           cache: gradle
 
+      # Réessayée pour la même raison qu'ailleurs (voir android.yml) — et ici
+      # plus qu'ailleurs : c'est le build de PUBLICATION, celui que F-Droid
+      # recompile et compare. L'échouer sur un téléchargement de binaire raté
+      # laisse un tag sans APK, donc une version qui ne se publie nulle part.
+      # Aucune divergence introduite dans le build lui-même : la commande et son
+      # résultat sont les mêmes, seul le nombre d'essais change.
       - name: Install dependencies
-        run: npm ci
+        run: |
+          for essai in 1 2 3; do
+            if npm ci; then exit 0; fi
+            echo "::warning::npm ci a échoué (tentative $essai/3), nouvelle tentative"
+            sleep $((essai * 15))
+          done
+          echo "::error::npm ci a échoué trois fois de suite"
+          exit 1
 
       - name: Prépare le SDK Android
         run: |

@@ -13,8 +13,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      # Installation reproductible : package-lock.json fait foi. Réessayée, voir
+      # le commentaire de l'étape équivalente dans android.yml.
       - name: Install dependencies
-        run: npm ci   # installation reproductible : package-lock.json fait foi
+        run: |
+          for essai in 1 2 3; do
+            if npm ci; then exit 0; fi
+            echo "::warning::npm ci a échoué (tentative $essai/3), nouvelle tentative"
+            sleep $((essai * 15))
+          done
+          echo "::error::npm ci a échoué trois fois de suite"
+          exit 1
       - name: Lint
         run: npm run lint
       - name: Format check

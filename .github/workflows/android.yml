@@ -41,8 +41,32 @@ jobs:
           java-version: "21" # exigé par Capacitor 8 / AGP 8.13
           cache: gradle
 
+      # `sharp`, tiré par @capacitor/assets, télécharge à l'installation un
+      # binaire prébuilt depuis les releases GitHub. Ce téléchargement échoue de
+      # temps à autre (« socket hang up ») et emporte tout le build avec lui —
+      # alors que rien de ce que @capacitor/assets apporte n'entre dans l'APK :
+      # il ne sert qu'à `npm run android:assets`, pour régénérer les icônes. Un
+      # même commit a ainsi compilé sur staging et échoué sur main à une minute
+      # d'écart. D'où ces tentatives espacées.
+      #
+      # Le sortir des devDependencies réglerait la cause plutôt que le symptôme,
+      # mais c'est lui qui justifie les entrées `scanignore`/`scandelete` de la
+      # recette F-Droid — exactement celles qui ont passé leur scanner, et le
+      # champ est strict dans les deux sens. À ne pas toucher tant que la MR est
+      # en revue (voir fdroid/eu.lielu.news.yml).
+      #
+      # Sans effet sur l'équivalence avec la recette F-Droid : réessayer la même
+      # commande n'installe rien de différent, le `prebuild` de la recette reste
+      # un `npm ci` nu.
       - name: Install dependencies
-        run: npm ci
+        run: |
+          for essai in 1 2 3; do
+            if npm ci; then exit 0; fi
+            echo "::warning::npm ci a échoué (tentative $essai/3), nouvelle tentative"
+            sleep $((essai * 15))
+          done
+          echo "::error::npm ci a échoué trois fois de suite"
+          exit 1
 
       # compileSdk 36 n'est pas toujours présent sur l'image du runner.
       - name: Prépare le SDK Android
