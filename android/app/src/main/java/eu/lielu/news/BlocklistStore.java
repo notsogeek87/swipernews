@@ -8,6 +8,7 @@ import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.lang.ref.SoftReference;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -47,8 +48,34 @@ final class BlocklistStore {
         return new File(ctx.getFilesDir(), CACHE);
     }
 
+    /**
+     * Dernière liste construite, réutilisable tant que le système laisse la
+     * mémoire tranquille.
+     *
+     * <p>{@code load()} est appelé depuis {@code onCreate} du lecteur, donc SUR
+     * LE FIL PRINCIPAL, et à CHAQUE article ouvert. Avec une liste de référence
+     * (StevenBlack : plus de 200 000 lignes), c'est à chaque fois tout le
+     * fichier relu et réanalysé avant que la page ne commence à charger — des
+     * centaines de millisecondes rendues à l'ouverture sur un téléphone modeste,
+     * pour un résultat rigoureusement identique à celui de l'article précédent.
+     *
+     * <p>{@link SoftReference} et non un champ statique nu : les 200 000 chaînes
+     * pèsent, et l'intérêt d'un cache ne va pas jusqu'à provoquer l'éviction de
+     * l'app. Le ramasse-miettes la lâche sous pression mémoire, et on repaie
+     * simplement une lecture — le comportement d'avant.
+     */
+    private static volatile SoftReference<Set<String>> cachedHosts;
+
+    /** À appeler dès que le cache disque change (téléchargement, retrait). */
+    static void invalidate() {
+        cachedHosts = null;
+    }
+
     /** Liste intégrée + liste téléchargée, prête pour les recherches du lecteur. */
     static Set<String> load(Context ctx) {
+        SoftReference<Set<String>> ref = cachedHosts;
+        Set<String> memo = ref != null ? ref.get() : null;
+        if (memo != null) return memo;
         Set<String> hosts = new HashSet<>();
         readInto(hosts, () -> new BufferedReader(new InputStreamReader(
             ctx.getResources().openRawResource(R.raw.reader_blocklist), StandardCharsets.UTF_8)));
@@ -57,7 +84,9 @@ final class BlocklistStore {
             readInto(hosts, () -> new BufferedReader(new InputStreamReader(
                 new java.io.FileInputStream(cache), StandardCharsets.UTF_8)));
         }
-        return Collections.unmodifiableSet(hosts);
+        Set<String> out = Collections.unmodifiableSet(hosts);
+        cachedHosts = new SoftReference<>(out);
+        return out;
     }
 
     private interface ReaderFactory {
@@ -118,6 +147,7 @@ final class BlocklistStore {
             // jamais une liste à moitié écrite en service.
             if (cache.exists() && !cache.delete()) throw new Exception("cache non remplaçable");
             if (!tmp.renameTo(cache)) throw new Exception("cache non remplaçable");
+            invalidate();   // la liste en mémoire ne correspond plus au disque
         } finally {
             cnx.disconnect();
             if (tmp.exists()) tmp.delete();
@@ -127,6 +157,7 @@ final class BlocklistStore {
 
     static boolean clear(Context ctx) {
         File cache = cacheFile(ctx);
+        invalidate();   // sinon la liste retirée resterait en service jusqu'au prochain démarrage
         return !cache.exists() || cache.delete();
     }
 

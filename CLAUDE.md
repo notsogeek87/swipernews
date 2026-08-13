@@ -439,6 +439,22 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   de Chrome et une dépendance `androidx.browser`.
 - **L'APK n'appelle jamais `news.lielu.eu`** : il va chercher chaque source
   directement depuis l'appareil.
+- **Aucune donnée locale ne doit pouvoir empêcher le fil de se charger.** Tout ce
+  qui vient du `localStorage` est validé, pas seulement `JSON.parse`é
+  (`sanitizeFeeds`, `usableItem`, `readObject`), et la peinture du cache dans
+  `loadFeeds` est enveloppée d'un `try/catch` : le chargement réseau part
+  **quoi qu'il arrive**. C'est la leçon des deux pannes critiques de
+  `AUDIT-ROBUSTESSE-2026-08.md` — `feeds` et le cache disque étaient lus sans
+  garde, et une valeur d'une autre forme laissait l'app noire ou en chargement
+  perpétuel **à vie**, sans aucune sortie depuis l'interface.
+- **Le tout premier chargement d'une session ne remonte PAS en tête du fil**
+  (`premier` → `paint(final, top)`) : c'est la reprise de lecture qui décide de
+  la position à l'ouverture. `forceTop` ne vaut que pour les rafraîchissements
+  suivants. Confondre les deux annulait la reprise à presque chaque ouverture
+  (voir §2.3 du même audit).
+- **Tout texte venu d'un flux est borné** (`clampText`) : un `<description>` n'a
+  aucune obligation d'être un résumé, et beaucoup de flux y publient l'article
+  entier — mesuré à 400 Ko de cache pour cinq articles, contre ~5 Mo de quota.
 
 ---
 
@@ -501,3 +517,49 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   garde-fous. Symptôme quand ce filet manquait : l'article s'ouvrait en page
   complète, alors que le bouton du lecteur, actionné à la main, le simplifiait
   sans peine (le DOM ayant bougé entre-temps).
+- **Un rappel de `evaluateJavascript` est POSTÉ sur le fil principal**, donc il
+  peut s'exécuter après `onDestroy` — où `web` vaut `null`. Chaque rappel doit
+  reverifier `web` (et la génération `readGen`), y compris quand il ne fait
+  qu'appeler un second `evaluateJavascript` imbriqué : c'est le NPE qui plantait
+  l'app quand on refermait le lecteur juste après l'avoir ouvert.
+- **`onReceivedError` sur la trame principale n'est pas définitif.** Une
+  redirection abandonnée ou un lien suivi en déclenche un alors que la page
+  suivante se charge très bien : l'écran d'erreur doit être effacé au DÉBUT de
+  chaque navigation (`onPageStarted`), sinon il reste en travers d'un lecteur qui
+  fonctionne.
+- **Un `IntersectionObserver` retient FORTEMENT ses cibles.** Une carte retirée
+  du DOM sans avoir jamais croisé l'écran (tout ce qu'un changement de dose
+  écarte au-delà de l'horizon de 150 %) reste vivante toute la session si on ne
+  l'`unobserve` pas — d'où `unobserveCard()` dans la boucle de retrait de
+  `render()`.
+- **Le retour arrière d'Android n'est intercepté par rien par défaut.** Un
+  panneau ouvert, il QUITTE l'app (la WebView n'a pas d'historique, Capacitor
+  referme l'activité). Les panneaux posent donc une entrée d'historique
+  (`pushDialogState`) que `popstate` consomme. Corollaire : ne jamais passer
+  `closeDialog`/`closePicker` directement en gestionnaire d'événement — le
+  premier argument serait l'ÉVÉNEMENT, donc un `fromHistory` toujours vrai, et
+  l'entrée ne serait jamais consommée.
+
+---
+
+## Banc de QA (`tools/qa-scenarios.js`)
+
+`npm test` ne voit que `src/` et `api/` : **tout le JS en ligne d'`index.html`
+— le fil, l'état, le stockage local — n'est couvert par aucun test**. Ce banc
+comble le trou en jouant 18 scénarios réels dans Chromium, réseau entièrement
+simulé (rien ne part vers une vraie source) : hors-ligne, réseau lent, coupure en
+cours de requête, API en 500, RSS vide/tronqué/HTML, contenu démesuré, doublons,
+120 sources, stockage et cache abîmés, quota saturé, actions enchaînées, retour
+arrière, arrière-plan, relancement à froid.
+
+```bash
+npm i playwright-core --prefix /tmp/qa       # hors package.json, à dessein
+python3 -m http.server 8124                  # servir le dépôt
+NODE_PATH=/tmp/qa/node_modules node tools/qa-scenarios.js          # liste
+NODE_PATH=/tmp/qa/node_modules node tools/qa-scenarios.js corruptcache
+```
+
+C'est ce banc qui a trouvé les deux pannes critiques de
+`AUDIT-ROBUSTESSE-2026-08.md` — invisibles en lecture de code, parce qu'elles
+supposent une donnée locale abîmée. À rejouer après toute modification du
+chargement du fil, du cache ou de l'état.

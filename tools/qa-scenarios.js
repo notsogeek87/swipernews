@@ -1,0 +1,768 @@
+#!/usr/bin/env node
+/* Banc de QA de SwiperNews : joue des scénarios RÉELS dans Chromium, avec un
+ * réseau entièrement simulé (aucune requête ne part vers une vraie source).
+ *
+ * Ce que `npm test` ne peut pas voir : il ne couvre que `src/` et `api/`, jamais
+ * le JS en ligne d'`index.html` — c'est-à-dire tout le fil, tout l'état, tout le
+ * stockage local. Ces scénarios-là sont ceux qui ont trouvé les deux pannes
+ * critiques de AUDIT-ROBUSTESSE-2026-08.md (§2.1, §2.2), invisibles en lecture
+ * de code parce qu'elles supposent une donnée locale abîmée.
+ *
+ * Volontairement hors de `package.json` (playwright-core n'est pas une
+ * dépendance du projet, qui n'en a aucune à l'exécution) :
+ *
+ *   npm i playwright-core --prefix /tmp/qa
+ *   python3 -m http.server 8124            # servir le dépôt
+ *   NODE_PATH=/tmp/qa/node_modules node tools/qa-scenarios.js <scénario>
+ *
+ * Sans argument, la liste des scénarios s'affiche.
+ */
+const { chromium } = require("playwright-core");
+const URL_APP = "http://localhost:8124/index.html";
+
+const RSS_OK = `<?xml version="1.0"?><rss version="2.0"><channel><title>T</title>
+${Array.from({ length: 12 }, (_, i) => `<item><title>Actu ${i}</title><link>https://ex.test/a${i}</link><description>Resume ${i} un peu de texte</description><pubDate>${new Date(Date.now() - i * 3600e3).toUTCString()}</pubDate></item>`).join("\n")}
+</channel></rss>`;
+
+const WIKI_OK = JSON.stringify({
+  query: {
+    pages: Array.from({ length: 20 }, (_, i) => ({
+      title: "Wiki " + i,
+      extract: "x".repeat(200) + " article " + i,
+      canonicalurl: "https://fr.wikipedia.org/wiki/W" + i,
+      thumbnail: { source: "https://img.test/w" + i + ".jpg" },
+    })),
+  },
+});
+
+async function boot(opts = {}) {
+  const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
+  const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on("pageerror", (e) => errors.push("PAGEERROR: " + e.message));
+  page.on("console", (m) => {
+    if (m.type() === "warning" && /SwiperNews/.test(m.text()))
+      errors.push("WARN: " + m.text());
+    if (m.type() === "error") errors.push("CONSOLE: " + m.text());
+  });
+  // Réseau : tout ce qui sort est simulé, rien ne part vers de vraies sources.
+  await page.route("**/*", async (route) => {
+    const u = route.request().url();
+    const api = /\/api\/(feed|learn|og)/.test(u);
+    if (u.startsWith("http://localhost:8124") && !api) return route.continue();
+    if (opts.offline) return route.abort("internetdisconnected");
+    if (/api\/feed|allorigins|corsproxy|codetabs|thingproxy/.test(u))
+      return route.fulfill({
+        status: 200,
+        contentType: "application/xml",
+        body: opts.rss ?? RSS_OK,
+      });
+    if (/wikipedia\.org|api\/learn/.test(u))
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: opts.wiki ?? WIKI_OK,
+      });
+    if (/api\/og/.test(u))
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: '{"image":"","paywalled":false,"sponsored":false}',
+      });
+    if (/img\.test|images\.unsplash/.test(u))
+      return route.fulfill({
+        status: 200,
+        contentType: "image/gif",
+        body: Buffer.from("R0lGODlhAQABAAAAACw=", "base64"),
+      });
+    return route.fulfill({ status: 200, body: "" });
+  });
+  if (opts.storage) {
+    await page.addInitScript((kv) => {
+      for (const [k, v] of Object.entries(kv)) localStorage.setItem(k, v);
+    }, opts.storage);
+  }
+  await page.addInitScript(() => {
+    window.__rejections = [];
+    addEventListener("unhandledrejection", (e) => {
+      window.__rejections.push(String((e.reason && e.reason.message) || e.reason));
+    });
+  });
+  if (opts.init) await page.addInitScript(opts.init);
+  return { browser, ctx, page, errors };
+}
+
+const READY = {
+  "fluxswipe.interests.v1": JSON.stringify(["sciences", "histoire"]),
+  "fluxswipe.lang.v1": "fr",
+};
+
+const scenarios = {
+  // 1. Premier lancement, réseau nominal
+  async firstrun() {
+    const { browser, page, errors } = await boot();
+    await page.goto(URL_APP);
+    await page.waitForTimeout(1500);
+    const sheetOpen = await page.$eval("#sheet", (e) => e.classList.contains("open"));
+    console.log("panneau d'accueil ouvert :", sheetOpen);
+    await page.click("#applySettings");
+    await page.waitForTimeout(2500);
+    console.log("cartes :", await page.$$eval("#feed .card", (e) => e.length));
+    console.log("erreurs :", errors);
+    await browser.close();
+  },
+
+  // 2. Stockage local corrompu : feeds n'est pas un tableau
+  async corruptfeeds() {
+    for (const bad of ['{"a":1}', "[null]", '["https://x.test/rss"]', "42", '"texte"']) {
+      const { browser, page, errors } = await boot({
+        storage: {
+          ...READY,
+          "fluxswipe.feeds.v1": bad,
+          "fluxswipe.newssrc.v1": '["https://www.lemonde.fr/rss/une.xml"]',
+        },
+      });
+      await page.goto(URL_APP);
+      await page.waitForTimeout(1200);
+      const cards = await page.$$eval("#feed .card", (e) => e.length).catch(() => -1);
+      console.log(
+        `feeds=${bad.padEnd(26)} cartes=${cards} err=${errors.length ? errors[0].slice(0, 90) : "aucune"}`
+      );
+      await browser.close();
+    }
+  },
+
+  // 3. Cache disque corrompu
+  async corruptcache() {
+    const key = "mix|fr|all|all:sciences,histoire|s";
+    for (const bad of [
+      JSON.stringify({ [key]: { t: Date.now(), items: [null, null, null] } }),
+      JSON.stringify({ [key]: { t: Date.now(), items: ["a", "b", "c"] } }),
+      JSON.stringify({ [key]: { t: Date.now(), items: [{}, {}, {}] } }),
+      "pas du json",
+    ]) {
+      const { browser, page, errors } = await boot({
+        storage: { ...READY, "fluxswipe.cache.v1": bad },
+      });
+      await page.goto(URL_APP);
+      await page.waitForTimeout(2000);
+      const cards = await page.$$eval("#feed .card", (e) => e.length).catch(() => -1);
+      const rej = await page.evaluate(() => window.__rejections);
+      console.log("  rejets:", rej);
+      console.log(
+        `cache=${bad.slice(0, 40).padEnd(42)} cartes=${cards} err=${errors.length ? errors[0].slice(0, 80) : "aucune"}`
+      );
+      await browser.close();
+    }
+  },
+
+  // 4. Hors ligne total au 1er lancement
+  async offline() {
+    const { browser, page, errors } = await boot({ offline: true, storage: READY });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(14000);
+    console.log("cartes :", await page.$$eval("#feed .card", (e) => e.length));
+    console.log(
+      "badge démo :",
+      await page.$eval("#demobadge", (e) => !e.classList.contains("hidden"))
+    );
+    console.log(
+      "état vide :",
+      await page.$eval("#empty", (e) => !e.classList.contains("hidden"))
+    );
+    console.log(
+      "chargement visible :",
+      await page.$eval("#loading", (e) => !e.classList.contains("hidden"))
+    );
+    console.log(
+      "barre sync :",
+      await page.$eval("#syncbar", (e) => e.classList.contains("on"))
+    );
+    console.log("erreurs :", errors.slice(0, 3));
+    await browser.close();
+  },
+
+  // 5. RSS vide / malformé / items sans rien
+  async badrss() {
+    const cases = {
+      vide: "",
+      "xml tronqué": '<?xml version="1.0"?><rss><channel><item><title>A',
+      "html au lieu de xml":
+        "<html><body><h1>404 not found</h1></body></html>" + "x".repeat(300),
+      "items sans titre":
+        '<?xml version="1.0"?><rss><channel><item><link>https://x.test/1</link></item></channel></rss>',
+      "sans lien ni image":
+        '<?xml version="1.0"?><rss><channel>' +
+        Array.from(
+          { length: 5 },
+          (_, i) => `<item><title>Sans lien ${i}</title></item>`
+        ).join("") +
+        "</channel></rss>",
+      "desc énorme":
+        '<?xml version="1.0"?><rss><channel>' +
+        Array.from(
+          { length: 5 },
+          (_, i) =>
+            `<item><title>Long ${i}</title><link>https://x.test/l${i}</link><description>${"mot ".repeat(20000)}</description></item>`
+        ).join("") +
+        "</channel></rss>",
+      doublons:
+        '<?xml version="1.0"?><rss><channel>' +
+        Array.from(
+          { length: 8 },
+          () =>
+            `<item><title>Même titre</title><link>https://x.test/same</link><description>Texte assez long pour compter</description></item>`
+        ).join("") +
+        "</channel></rss>",
+    };
+    for (const [nom, rss] of Object.entries(cases)) {
+      const { browser, page, errors } = await boot({ rss, storage: READY });
+      await page.goto(URL_APP);
+      await page.waitForTimeout(3000);
+      const n = await page.$$eval("#feed .card", (e) => e.length);
+      const bytes = await page.evaluate(
+        () => (localStorage.getItem("fluxswipe.cache.v1") || "").length
+      );
+      console.log(
+        `${nom.padEnd(22)} cartes=${String(n).padEnd(4)} cacheOctets=${String(bytes).padEnd(9)} err=${errors.length ? errors[0].slice(0, 70) : "aucune"}`
+      );
+      await browser.close();
+    }
+  },
+
+  // 6. Le rafraîchissement périodique efface feedsDirty pendant qu'on règle
+  async dirty() {
+    const { browser, page } = await boot({ storage: READY });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    const avant = await page.$$eval("#feed .card", (e) => e.length);
+    await page.click("#openSheet");
+    await page.waitForTimeout(300);
+    // On ajoute une source (comme un tap sur une suggestion)
+    await page.evaluate(() => {
+      feeds.push({ name: "Neuf", url: "https://neuf.test/rss", on: true });
+      save();
+    });
+    console.log("feedsDirty après ajout :", await page.evaluate(() => feedsDirty));
+    // ... puis le filet périodique se déclenche (setInterval 60 s / retour au 1er plan)
+    await page.evaluate(() => loadFeeds());
+    await page.waitForTimeout(200);
+    console.log(
+      "feedsDirty après le filet périodique :",
+      await page.evaluate(() => feedsDirty)
+    );
+    // Validation : recharge-t-elle vraiment ?
+    const seqAvant = await page.evaluate(() => loadSeq);
+    await page.click("#applySettings");
+    await page.waitForTimeout(1500);
+    const seqApres = await page.evaluate(() => loadSeq);
+    console.log(
+      "loadSeq avant/après validation :",
+      seqAvant,
+      seqApres,
+      seqApres > seqAvant ? "→ rechargé" : "→ AUCUN rechargement"
+    );
+    console.log(
+      "la source ajoutée est-elle dans le fil ? ",
+      await page.evaluate(() => newsItems.some((i) => i.source === "Neuf"))
+    );
+    console.log(
+      "cartes avant/après :",
+      avant,
+      await page.$$eval("#feed .card", (e) => e.length)
+    );
+    await browser.close();
+  },
+
+  // 7. Doigt posé sur le fil : la file whenFeedIdle se vide-t-elle toujours ?
+  async pointer() {
+    const { browser, page } = await boot({ storage: READY });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    // Doigt posé sur une carte, puis relâché AILLEURS (rail fixe hors du fil)
+    await page.mouse.move(200, 500);
+    await page.mouse.down();
+    await page.evaluate(() => loadMore());
+    await page.waitForTimeout(800);
+    console.log(
+      "en attente pendant le contact :",
+      await page.evaluate(() => pendingFeedUpdates.length)
+    );
+    // L'app passe en arrière-plan pendant le contact (cas réel : appel entrant)
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+    console.log("pointeurs restants :", await page.evaluate(() => feedPointers.size));
+    console.log(
+      "file après relâche :",
+      await page.evaluate(() => pendingFeedUpdates.length)
+    );
+    await browser.close();
+  },
+
+  // 8. Instantanés : mémoire retenue par les allers-retours de filtre
+  async snapmem() {
+    const { browser, page } = await boot({ storage: READY });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    for (let i = 0; i < 12; i++) {
+      await page.evaluate((n) => setCat(n % 2 ? "sciences" : "histoire"), i);
+      await page.waitForTimeout(700);
+    }
+    const info = await page.evaluate(() => ({
+      snaps: Object.keys(feedSnap).length,
+      octets: Object.values(feedSnap).reduce((n, s) => n + s.html.length, 0),
+      caches: Object.keys(JSON.parse(localStorage.getItem("fluxswipe.cache.v1") || "{}"))
+        .length,
+      cacheOctets: (localStorage.getItem("fluxswipe.cache.v1") || "").length,
+    }));
+    console.log("instantanés :", info.snaps, "octets HTML retenus :", info.octets);
+    console.log("entrées de cache disque :", info.caches, "octets :", info.cacheOctets);
+    await browser.close();
+  },
+
+  // 9. Enchaînement rapide d'actions (swipes, filtres, dose)
+  async rapid() {
+    const { browser, page, errors } = await boot({ storage: READY });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    for (let i = 0; i < 25; i++) {
+      await page.evaluate((n) => {
+        if (n % 3 === 0) setMixScore(n % 6);
+        if (n % 3 === 1) setCat(n % 2 ? "sciences" : "all");
+        if (n % 3 === 2) feedEl.scrollBy({ top: 900 });
+        if (n % 7 === 0) loadFeeds(true);
+      }, i);
+      await page.waitForTimeout(60);
+    }
+    await page.waitForTimeout(4000);
+    const st = await page.evaluate(() => ({
+      cartes: feedEl.querySelectorAll(".card").length,
+      items: items.length,
+      sync: syncCount,
+      barre: document.getElementById("syncbar").classList.contains("on"),
+      loading: !document.getElementById("loading").classList.contains("hidden"),
+      vide: !document.getElementById("empty").classList.contains("hidden"),
+      rejets: window.__rejections,
+    }));
+    console.log(st);
+    console.log("erreurs :", errors.filter((e) => !/404/.test(e)).slice(0, 4));
+    await browser.close();
+  },
+
+  // 10. Quota localStorage saturé par le cache : le reste tient-il encore ?
+  async quota() {
+    const { browser, page, errors } = await boot({ storage: READY });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    // On sature comme le ferait le cache disque au fil des filtres et des langues
+    const rempli = await page.evaluate(() => {
+      const bloc = "x".repeat(512 * 1024);
+      let n = 0;
+      try {
+        for (; n < 40; n++) localStorage.setItem("bourrage." + n, bloc);
+      } catch (e) {
+        return n;
+      }
+      return n;
+    });
+    console.log("blocs de 512 Ko écrits avant saturation :", rempli);
+    // Position de lecture : écriture immédiate à chaque swipe (rememberPos)
+    const ok = await page.evaluate(() => {
+      localStorage.removeItem("fluxswipe.pos.v1");
+      feedEl.scrollTop = feedEl.children[3].offsetTop;
+      onCardChange();
+      return localStorage.getItem("fluxswipe.pos.v1");
+    });
+    console.log("position mémorisée :", ok);
+    const seen = await page.evaluate(async () => {
+      localStorage.removeItem("fluxswipe.seen.v1");
+      seenDirty = true;
+      persistSeen();
+      return localStorage.getItem("fluxswipe.seen.v1");
+    });
+    console.log("« déjà vu » mémorisé :", seen ? "oui" : "NON");
+    console.log("erreurs :", errors.filter((e) => /SwiperNews/.test(e)).slice(0, 3));
+    await browser.close();
+  },
+
+  // 11. /api/og répond 200 avec une erreur : verdict figé à vie ?
+  async ogerror() {
+    const { browser, page } = await boot({
+      storage: READY,
+      rss: '<?xml version="1.0"?><rss><channel><item><title>Article payant</title><link>https://www.lemonde.fr/politique/article/2026/08/x.html</link><description>Un resume de taille normale pour la carte</description></item></channel></rss>',
+    });
+    // /api/og en panne côté éditeur : la fonction répond 200 + error
+    await page.route(/\/api\/og/, (r) =>
+      r.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: '{"image":"","paywalled":false,"sponsored":false,"error":"fetch failed"}',
+      })
+    );
+    await page.goto(URL_APP);
+    await page.waitForTimeout(3000);
+    const cache = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("fluxswipe.artmeta.v1") || "{}")
+    );
+    console.log("cache artmeta persisté :", JSON.stringify(cache).slice(0, 200));
+    console.log(
+      "→ un échec amont est-il mémorisé comme verdict ?",
+      Object.keys(cache).length > 0 ? "OUI" : "non"
+    );
+    await browser.close();
+  },
+
+  // 12. Bornes : instantanés et cache disque sur beaucoup de fils différents
+  async bounds() {
+    const { browser, page } = await boot({
+      storage: {
+        "fluxswipe.interests.v1": JSON.stringify([
+          "sciences",
+          "histoire",
+          "espace",
+          "nature",
+          "tech",
+          "films",
+          "musique",
+          "philo",
+        ]),
+        "fluxswipe.lang.v1": "fr",
+      },
+    });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    for (const k of [
+      "sciences",
+      "histoire",
+      "espace",
+      "nature",
+      "tech",
+      "films",
+      "musique",
+      "philo",
+      "all",
+    ]) {
+      await page.evaluate((c) => setCat(c), k);
+      await page.waitForTimeout(600);
+    }
+    const info = await page.evaluate(() => ({
+      snaps: Object.keys(feedSnap).length,
+      caches: Object.keys(JSON.parse(localStorage.getItem("fluxswipe.cache.v1") || "{}"))
+        .length,
+      octets: (localStorage.getItem("fluxswipe.cache.v1") || "").length,
+      cartes: feedEl.querySelectorAll(".card").length,
+    }));
+    console.log("après 9 changements de thème :", info);
+    await browser.close();
+  },
+
+  // 13. Retour arrière : referme le panneau, ne quitte pas l'app
+  async back() {
+    const { browser, page, errors } = await boot({ storage: READY });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    const urlAvant = page.url();
+    // Panneau de réglages
+    await page.click("#openSheet");
+    await page.waitForTimeout(300);
+    console.log(
+      "panneau ouvert :",
+      await page.$eval("#sheet", (e) => e.classList.contains("open"))
+    );
+    await page.goBack();
+    await page.waitForTimeout(400);
+    console.log(
+      "après retour → panneau ouvert :",
+      await page.$eval("#sheet", (e) => e.classList.contains("open")),
+      "| même page :",
+      page.url() === urlAvant,
+      "| fil intact :",
+      (await page.$$eval("#feed .card", (e) => e.length)) > 0
+    );
+    // Fermeture normale : l'entrée d'historique doit être consommée
+    await page.click("#openSheet");
+    await page.waitForTimeout(200);
+    await page.click("#applySettings");
+    await page.waitForTimeout(1500);
+    console.log(
+      "panneau fermé au bouton :",
+      !(await page.$eval("#sheet", (e) => e.classList.contains("open")))
+    );
+    // ... donc un retour maintenant doit VRAIMENT quitter la page
+    await page.goBack().catch(() => {});
+    await page.waitForTimeout(600);
+    console.log(
+      "retour hors panneau → a quitté la page :",
+      page.url() !== urlAvant,
+      "(url:",
+      page.url(),
+      ")"
+    );
+    // Feuille de filtre : la sélection doit s'appliquer même en sortant par retour
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    const visible = await page.$eval("#srcBtn", (e) => !e.classList.contains("hidden"));
+    console.log("pastille sources visible :", visible);
+    if (visible) {
+      await page.click("#srcBtn");
+      await page.waitForTimeout(300);
+      await page.evaluate(() =>
+        document.querySelector('#pickGrid [data-k]:not([data-k="all"])').click()
+      );
+      await page.waitForTimeout(200);
+      await page.goBack();
+      await page.waitForTimeout(1200);
+      console.log(
+        "feuille fermée :",
+        !(await page.$eval("#pickSheet", (e) => e.classList.contains("open"))),
+        "| sélection appliquée :",
+        await page.evaluate(() => newsSrc.length)
+      );
+    }
+    console.log(
+      "erreurs :",
+      errors.filter((e) => !/404/.test(e))
+    );
+    await browser.close();
+  },
+
+  // 14. Réseau très lent, puis coupure au milieu des requêtes
+  async slow() {
+    const { browser, page, ctx, errors } = await boot({ storage: READY });
+    let coupe = false;
+    await page.route(/allorigins|corsproxy|codetabs|thingproxy|api\/feed/, async (r) => {
+      await new Promise((res) => setTimeout(res, 4000)); // au-delà du timeout de 7 s ? non : juste très lent
+      if (coupe) return r.abort("internetdisconnected");
+      return r.fulfill({ status: 200, contentType: "application/xml", body: RSS_OK });
+    });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(1500);
+    console.log(
+      "pendant l'attente → chargement visible :",
+      await page.$eval("#loading", (e) => !e.classList.contains("hidden")),
+      "| barre sync :",
+      await page.$eval("#syncbar", (e) => e.classList.contains("on"))
+    );
+    coupe = true;
+    await page.evaluate(() => loadFeeds(true)); // coupure pendant la requête
+    await page.waitForTimeout(16000);
+    console.log(
+      "après coupure → cartes :",
+      await page.$$eval("#feed .card", (e) => e.length),
+      "| barre sync :",
+      await page.$eval("#syncbar", (e) => e.classList.contains("on")),
+      "| écran vide :",
+      await page.$eval("#empty", (e) => !e.classList.contains("hidden")),
+      "| chargement :",
+      await page.$eval("#loading", (e) => !e.classList.contains("hidden"))
+    );
+    console.log(
+      "erreurs inattendues :",
+      errors.filter((e) => /PAGEERROR/.test(e))
+    );
+    await browser.close();
+  },
+
+  // 15. Backend et proxys tous en 500
+  async http500() {
+    const { browser, page, errors } = await boot({ storage: READY });
+    await page.route(
+      /allorigins|corsproxy|codetabs|thingproxy|api\/feed|rss2json|wikipedia|api\/learn/,
+      (r) => r.fulfill({ status: 500, body: "erreur serveur" })
+    );
+    await page.goto(URL_APP);
+    await page.waitForTimeout(16000);
+    console.log(
+      "cartes :",
+      await page.$$eval("#feed .card", (e) => e.length),
+      "| démo :",
+      await page.$eval("#demobadge", (e) => !e.classList.contains("hidden")),
+      "| vide :",
+      await page.$eval("#empty", (e) => !e.classList.contains("hidden")),
+      "| chargement :",
+      await page.$eval("#loading", (e) => !e.classList.contains("hidden")),
+      "| sync :",
+      await page.$eval("#syncbar", (e) => e.classList.contains("on"))
+    );
+    console.log(
+      "bouton réessayer utilisable :",
+      (await page.$eval("#emptyRetry", (e) => !!e.offsetParent)) ||
+        "écran vide non affiché"
+    );
+    console.log(
+      "erreurs :",
+      errors.filter((e) => /PAGEERROR/.test(e))
+    );
+    await browser.close();
+  },
+
+  // 16. Beaucoup de sources (OPML de 120 flux) et beaucoup d'articles
+  async manyfeeds() {
+    const feeds = Array.from({ length: 120 }, (_, i) => ({
+      name: "Source " + i,
+      url: "https://s" + i + ".test/rss",
+      on: true,
+    }));
+    const { browser, page, errors } = await boot({
+      storage: { ...READY, "fluxswipe.feeds.v1": JSON.stringify(feeds) },
+      rss: null,
+    });
+    let n = 0;
+    await page.route(/allorigins|corsproxy|codetabs|thingproxy|api\/feed/, (r) => {
+      const id = n++;
+      r.fulfill({
+        status: 200,
+        contentType: "application/xml",
+        body:
+          '<?xml version="1.0"?><rss><channel>' +
+          Array.from(
+            { length: 30 },
+            (_, i) =>
+              `<item><title>S${id} art ${i}</title><link>https://s${id}.test/a${i}</link><description>Un resume de longueur normale pour cet article</description><pubDate>${new Date(Date.now() - i * 6e5).toUTCString()}</pubDate></item>`
+          ).join("") +
+          "</channel></rss>",
+      });
+    });
+    const t0 = Date.now();
+    await page.goto(URL_APP);
+    await page.waitForTimeout(20000);
+    const st = await page.evaluate(() => ({
+      cartes: feedEl.querySelectorAll(".card").length,
+      items: items.length,
+      news: newsItems.length,
+      wiki: learnItems.length,
+      cacheKo: Math.round(
+        (localStorage.getItem("fluxswipe.cache.v1") || "").length / 1024
+      ),
+      sync: document.getElementById("syncbar").classList.contains("on"),
+    }));
+    console.log("requêtes flux émises :", n, "| en", Date.now() - t0, "ms");
+    console.log(st);
+    // Défilement long : le fil doit rester borné
+    for (let i = 0; i < 40; i++) {
+      await page.evaluate(() => feedEl.scrollBy({ top: 2000 }));
+      await page.waitForTimeout(120);
+    }
+    await page.waitForTimeout(2500);
+    console.log(
+      "après 40 défilements :",
+      await page.evaluate(() => ({
+        cartes: feedEl.querySelectorAll(".card").length,
+        items: items.length,
+        registre: cardReg.size,
+        vus: seen.size,
+      }))
+    );
+    console.log(
+      "erreurs :",
+      errors.filter((e) => /PAGEERROR/.test(e))
+    );
+    await browser.close();
+  },
+
+  // 17. Longue mise en arrière-plan puis reprise (et reprise de position)
+  async resume() {
+    const { browser, page, errors } = await boot({ storage: READY });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    await page.evaluate(() => {
+      feedEl.scrollTop = feedEl.children[6].offsetTop;
+      onCardChange();
+    });
+    await page.waitForTimeout(300);
+    const pos = await page.evaluate(
+      () => JSON.parse(localStorage.getItem("fluxswipe.pos.v1")).mix.link
+    );
+    console.log("position mémorisée :", pos.slice(-12));
+    // Arrière-plan long : on vieillit le cache de 45 min puis on revient
+    await page.evaluate(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+      const c = JSON.parse(localStorage.getItem("fluxswipe.cache.v1"));
+      for (const k in c) c[k].t = Date.now() - 45 * 60 * 1000;
+      localStorage.setItem("fluxswipe.cache.v1", JSON.stringify(c));
+      lastNewsLoad = Date.now() - 45 * 60 * 1000;
+    });
+    await page.evaluate(() => loadFeeds()); // ce que fait onResume / le filet 60 s
+    await page.waitForTimeout(3000);
+    console.log(
+      "après reprise → cartes :",
+      await page.$$eval("#feed .card", (e) => e.length),
+      "| en haut du fil :",
+      await page.evaluate(() => feedEl.scrollTop < 5),
+      "| sync éteinte :",
+      await page.$eval("#syncbar", (e) => !e.classList.contains("on"))
+    );
+    // Relancement à froid : la position doit être retrouvée
+    await page.reload();
+    await page.waitForTimeout(3500);
+    const after = await page.evaluate(() => ({
+      scroll: Math.round(feedEl.scrollTop),
+      idx: currentIndex(),
+      lien: (currentItem() || {}).link,
+    }));
+    console.log("après relancement :", after, "| retrouvée :", after.lien === pos);
+    console.log(
+      "erreurs :",
+      errors.filter((e) => /PAGEERROR/.test(e))
+    );
+    await browser.close();
+  },
+
+  // 18. Le saut en tête doit rester pour ↻ et pour un rafraîchissement en session
+  async forcetop() {
+    const { browser, page, errors } = await boot({ storage: READY });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(3000);
+    await page.evaluate(() => {
+      feedEl.scrollTop = feedEl.children[6].offsetTop;
+      onCardChange();
+    });
+    await page.waitForTimeout(200);
+    console.log("position de lecture :", await page.evaluate(() => currentIndex()));
+    // ↻ explicite
+    await page.evaluate(() => document.getElementById("reloadBtn").click()); // la barre se masque au swipe : clic programmatique
+    await page.waitForTimeout(3000);
+    console.log(
+      "après ↻ → en tête :",
+      await page.evaluate(() => feedEl.scrollTop < 5),
+      "idx =",
+      await page.evaluate(() => currentIndex())
+    );
+    // rafraîchissement AUTOMATIQUE en cours de session (cache vieilli)
+    await page.evaluate(() => {
+      feedEl.scrollTop = feedEl.children[6].offsetTop;
+      onCardChange();
+    });
+    await page.evaluate(() => {
+      const c = JSON.parse(localStorage.getItem("fluxswipe.cache.v1"));
+      for (const k in c) c[k].t = Date.now() - 45 * 60 * 1000;
+      localStorage.setItem("fluxswipe.cache.v1", JSON.stringify(c));
+      lastNewsLoad = Date.now() - 45 * 60 * 1000;
+    });
+    await page.evaluate(() => loadFeeds());
+    await page.waitForTimeout(3000);
+    console.log(
+      "après rafraîchissement auto en session → en tête :",
+      await page.evaluate(() => feedEl.scrollTop < 5),
+      "idx =",
+      await page.evaluate(() => currentIndex())
+    );
+    console.log(
+      "erreurs :",
+      errors.filter((e) => /PAGEERROR/.test(e))
+    );
+    await browser.close();
+  },
+};
+
+const which = process.argv[2];
+if (!scenarios[which]) {
+  console.log("scénarios :", Object.keys(scenarios).join(", "));
+  process.exit(1);
+}
+scenarios[which]().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

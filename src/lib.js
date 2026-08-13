@@ -73,6 +73,32 @@
     return collapse(decodeEntities(withoutScripts.replace(/<[^>]*>/g, " ")));
   }
 
+  /**
+   * Tronque un texte de flux à une longueur raisonnable, sur une frontière de
+   * mot quand c'est possible.
+   *
+   * Un flux RSS est écrit par un tiers : rien n'oblige `<description>` à être un
+   * résumé. Beaucoup de sites (WordPress nu, `content:encoded`) y publient
+   * l'ARTICLE ENTIER, soit des dizaines de kilooctets par item. Non borné, ce
+   * texte se retrouve trois fois : dans le DOM de la carte (où le CSS n'en
+   * montre que dix lignes, le reste ne coûtant que de la mémoire), dans le
+   * cache disque (mesuré : 400 Ko pour CINQ articles, contre un quota
+   * localStorage de ~5 Mo — au-delà, `cacheSave` échoue en silence et l'app
+   * repart du réseau à chaque lancement), et dans l'instantané de fil.
+   *
+   * La borne est très au-delà de ce qui est lisible sur une carte
+   * (`-webkit-line-clamp:10` sur ~46ch, soit ~500 caractères) : elle ne coupe
+   * donc jamais un résumé normal, seulement les articles complets.
+   */
+  function clampText(s, max) {
+    const t = s == null ? "" : String(s);
+    const n = max || 1000;
+    if (t.length <= n) return t;
+    const cut = t.slice(0, n);
+    const space = cut.lastIndexOf(" ");
+    return (space > n * 0.6 ? cut.slice(0, space) : cut).trimEnd() + "…";
+  }
+
   /** Première image d'un fragment HTML (attribut src d'un <img>), ou "". */
   function imgFromHtml(html) {
     const g = html && String(html).match(/<img[^>]+src=["']([^"']+)["']/i);
@@ -675,14 +701,34 @@
     return SPONSOR_CANDIDATE_DOMAINS.some((d) => host === d || host.endsWith("." + d));
   }
 
+  /**
+   * Une URL de flux utilisable, et rien d'autre : http(s) seulement.
+   *
+   * Le champ « ajouter un flux » l'exige déjà (voir addFeed, index.html) ; les
+   * IMPORTS, eux, ne le vérifiaient nulle part. Un OPML récupéré n'importe où
+   * pouvait donc glisser un `file:///…` ou un `content://…` dans la liste des
+   * sources, que l'app va ensuite chercher elle-même — côté natif par le réseau
+   * d'Android (CapacitorHttp), pas par un navigateur. Une source injoignable
+   * n'est qu'une ligne morte dans le panneau ; autant ne jamais l'y écrire.
+   */
+  function isFeedUrl(url) {
+    if (!url || typeof url !== "string") return false;
+    try {
+      const p = new URL(url).protocol;
+      return p === "http:" || p === "https:";
+    } catch (_) {
+      return false;
+    }
+  }
+
   /** Sources depuis un export JSON (tableau, ou objet {feeds:[...]}) . */
   function parseJsonFeeds(text) {
     const data = JSON.parse(text);
     const arr = Array.isArray(data) ? data : data && data.feeds ? data.feeds : [];
     return arr
-      .filter((f) => f && f.url && typeof f.url === "string")
+      .filter((f) => f && isFeedUrl(f.url))
       .map((f) => ({
-        name: f.name || hostOf(f.url),
+        name: clampText(typeof f.name === "string" ? f.name : "", 120) || hostOf(f.url),
         url: String(f.url),
         on: f.on !== false,
       }));
@@ -697,9 +743,9 @@
           .map((o) => {
             const url = o.getAttribute("xmlUrl");
             const name = o.getAttribute("text") || o.getAttribute("title") || hostOf(url);
-            return { name, url, on: true };
+            return { name: clampText(name, 120), url, on: true };
           })
-          .filter((f) => f.url);
+          .filter((f) => isFeedUrl(f.url));
       } catch (_) {
         /* repli ci-dessous */
       }
@@ -717,13 +763,17 @@
         (attrs.match(/\btext\s*=\s*"([^"]*)"/i) || [])[1] ||
         (attrs.match(/\btitle\s*=\s*"([^"]*)"/i) || [])[1] ||
         hostOf(url);
-      out.push({ name: decodeEntities(name), url: decodeEntities(url), on: true });
+      const href = decodeEntities(url);
+      if (!isFeedUrl(href)) continue;
+      out.push({ name: clampText(decodeEntities(name), 120), url: href, on: true });
     }
     return out;
   }
 
   return {
     stripHtml,
+    clampText,
+    isFeedUrl,
     imgFromHtml,
     safeLink,
     safeImg,

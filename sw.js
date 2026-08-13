@@ -19,7 +19,7 @@
 //
 // À CHAQUE modification de index.html ou de src/*.js : incrémenter APP_VERSION
 // dans index.html ET CACHE ci-dessous (garder les deux numéros alignés).
-const CACHE = "flux-v108";
+const CACHE = "flux-v109";
 
 // Mis en cache à l'installation : uniquement ce qui ne dépend pas de la version.
 // Les logos portent `?v=` comme les modules `src/*.js` : `/logo-*.png` est
@@ -96,7 +96,16 @@ self.addEventListener("fetch", (e) => {
           return fresh;
         } catch (_) {
           const cache = await caches.open(CACHE);
-          const cached = (await cache.match(req)) || (await cache.match("./"));
+          // Le repli sur le document ne vaut QUE pour une navigation. Servir
+          // `./` (du HTML) en réponse à `/src/lib.js?v=N` absent du cache
+          // donnait un « script » que le navigateur refuse d'exécuter
+          // (Content-Type, nosniff) : les modules manquaient, guardModules
+          // purgeait tout et rechargeait — hors ligne, donc en boucle jusqu'à
+          // l'écran « Mise à jour incomplète ». Sans ce repli, la requête échoue
+          // franchement, ce que la page sait déjà traiter.
+          const cached =
+            (await cache.match(req)) ||
+            (req.mode === "navigate" ? await cache.match("./") : null);
           if (cached) return cached;
           throw _;
         }

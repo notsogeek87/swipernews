@@ -503,7 +503,15 @@ public class InAppBrowserActivity extends AppCompatActivity {
         // une page qui n'est plus la sienne — jusqu'à couper le mode lecture
         // pendant que la nouvelle page, elle, essaie encore.
         final int gen = readGen;
-        web.evaluateJavascript(prelude + readScript, value -> web.evaluateJavascript(
+        // Le premier rappel doit vérifier `web` comme le second : evaluateJavascript
+        // rend la main tout de suite et son rappel est POSTÉ sur le fil principal.
+        // Fermer le lecteur juste après l'ouverture (retour immédiat, geste très
+        // ordinaire) exécute onDestroy — qui met `web` à null — avant que le
+        // message ne soit dépilé : l'appel imbriqué partait alors en
+        // NullPointerException sur le fil principal, donc en plantage de l'app.
+        web.evaluateJavascript(prelude + readScript, value -> {
+            if (web == null || gen != readGen) return;
+            web.evaluateJavascript(
             "document.documentElement.dataset.snRead || ''", state -> {
                 if (web == null || gen != readGen) return;
                 // evaluateJavascript rend du JSON : la chaîne arrive entre guillemets.
@@ -540,7 +548,8 @@ public class InAppBrowserActivity extends AppCompatActivity {
                 readerOn = false;
                 updateReaderIcon();
                 Toast.makeText(this, R.string.reader_read_ko, Toast.LENGTH_SHORT).show();
-            }));
+            });
+        });
     }
 
     private void injectCmpScript() {
@@ -645,6 +654,15 @@ public class InAppBrowserActivity extends AppCompatActivity {
                 currentUrl = url;
                 hostView.setText(prettyHost(url));
                 progress.setVisibility(View.VISIBLE);
+                // Une navigation qui DÉMARRE efface l'écran d'erreur de la
+                // précédente. Sans ça, un seul échec de trame principale le
+                // laissait en place pour de bon, WebView masquée — y compris
+                // quand la page suivante se chargeait très bien juste derrière
+                // (redirection abandonnée, chaîne de consentement, lien suivi
+                // dans l'article) : plus rien à l'écran que « réessayer », sur
+                // un lecteur qui fonctionnait. L'erreur, elle, arrive toujours
+                // APRÈS ce point pour le chargement en cours.
+                hideError();
                 readGen++;          // les tentatives de la page précédente n'ont plus voix
                 // Nouvelle page : celle du site, pas encore simplifiée. La marge
                 // haute redevient celle de la WebView jusqu'à preuve du contraire.

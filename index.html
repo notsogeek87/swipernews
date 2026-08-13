@@ -750,9 +750,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=108"></script>
-<script src="src/learn-core.js?v=108"></script>
-<script src="src/i18n.js?v=108"></script>
+<script src="src/lib.js?v=109"></script>
+<script src="src/learn-core.js?v=109"></script>
+<script src="src/i18n.js?v=109"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -760,7 +760,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","safeImg","cssString","parseOpmlFeeds","interleave","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain"],
+  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","interleave","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -838,7 +838,7 @@ const CONFIG = {
 
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
-const {stripHtml,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
+const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
   seenKey,dropSeen,interleave,dedupNews,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
@@ -1083,7 +1083,43 @@ function activeCatKey(){
   return "random";
 }
 
-function load(){try{const s=localStorage.getItem(LS_KEY);if(s)return JSON.parse(s);}catch(e){warn("load feeds",e);}return structuredClone(DEFAULT_FEEDS);}
+/* Les sources, relues du stockage. VALIDÉES entrée par entrée, et pas seulement
+   « JSON.parse a réussi » : `feeds` est parcouru dès le démarrage
+   (sanitizeNewsSrc, renderFilters), AVANT le premier chargement et avant la
+   pose des écouteurs. Une valeur d'une autre forme y levait donc une exception
+   au tout premier niveau du script — plus une seule ligne de JS ne
+   s'exécutait ensuite, l'app restait noire À VIE, et rien dans l'interface ne
+   permettait d'en sortir (dans l'APK : effacer les données de l'app).
+   Mesuré : `{"a":1}` ou `42` → « feeds.filter is not a function », `[null]` →
+   « Cannot read properties of null ». Trois écritures étrangères plausibles :
+   une version antérieure/ultérieure au schéma différent (retour arrière F-Droid
+   compris), une extension, ou un stockage WebView réellement abîmé après un
+   arrêt brutal.
+   Une liste vide reste une réponse légitime (tout supprimé à la main) : seule
+   une liste ILLISIBLE retombe sur les sources par défaut. */
+function sanitizeFeeds(raw){
+  if(!Array.isArray(raw))return null;
+  const out=[],vus=new Set();
+  for(const f of raw){
+    if(!f||typeof f!=="object")continue;
+    const url=typeof f.url==="string"?f.url:"";
+    if(!isFeedUrl(url)||vus.has(url))continue;             // http(s) seulement, sans doublon
+    vus.add(url);
+    out.push({name:(typeof f.name==="string"&&f.name.trim())?f.name:hostOf(url),url,on:f.on!==false});
+  }
+  return out;
+}
+function load(){
+  try{
+    const s=localStorage.getItem(LS_KEY);
+    if(s){
+      const ok=sanitizeFeeds(JSON.parse(s));
+      if(ok)return ok;
+      warn("load feeds","liste de sources illisible, retour aux sources par défaut");
+    }
+  }catch(e){warn("load feeds",e);}
+  return structuredClone(DEFAULT_FEEDS);
+}
 /* Vrai dès qu'une source a bougé depuis le dernier chargement du fil. Sert à
    ne recharger, à la validation du panneau, que s'il y a bien de quoi : ce
    panneau est aussi celui des centres d'intérêt, on l'ouvre donc pour un oui ou
@@ -1133,7 +1169,19 @@ function addSeen(it){
    rien, le fil qu'elles décrivaient n'existe plus. */
 const LS_POS="fluxswipe.pos.v1";
 const POS_KEY="mix";
-let posMap=(()=>{try{return JSON.parse(localStorage.getItem(LS_POS)||"{}");}catch(e){return {};}})();
+/* Un objet, ou rien. Le même `JSON.parse` réussi peut rendre un nombre, un
+   tableau ou une chaîne (voir sanitizeFeeds pour la façon dont ça arrive) : y
+   écrire une clé est alors ignoré EN SILENCE hors mode strict, et la reprise de
+   lecture comme le cache de métadonnées cessaient de fonctionner sans que rien
+   ne le dise — une panne muette, bien plus dure à comprendre qu'une exception. */
+function readObject(key){
+  try{const v=JSON.parse(localStorage.getItem(key)||"{}");
+    if(v&&typeof v==="object"&&!Array.isArray(v))return v;
+    warn("stockage",key+" n'est pas un objet, remis à zéro");
+  }catch(e){warn("stockage "+key,e);}
+  return {};
+}
+let posMap=readObject(LS_POS);
 let resumePending=true;   // reprise au démarrage, désarmée dès qu'elle a servi
 function persistPos(){try{localStorage.setItem(LS_POS,JSON.stringify(posMap));}catch(e){warn("save pos",e);}}
 /* Mémorise l'article courant, ÉCRITURE IMMÉDIATE.
@@ -1232,7 +1280,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="108";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="109";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1338,7 +1386,7 @@ const BL_SOURCES=[
    credit:"StevenBlack/hosts, MIT",
    url:"https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"},
 ];
-let blState=(()=>{try{return JSON.parse(localStorage.getItem(LS_BL)||"{}")||{};}catch(e){return {};}})();
+let blState=readObject(LS_BL);   // objet garanti : saveBl l'étale, un tableau y donnerait des clés numériques
 function saveBl(patch){
   blState={...blState,...patch};
   try{localStorage.setItem(LS_BL,JSON.stringify(blState));}catch(e){warn("save blocklist",e);}
@@ -1483,6 +1531,14 @@ async function fetchText(url){
   try{return await Promise.any(PROXIES.slice(1).map(m=>fetchViaProxy(m,url,7000)));}catch(e){}
   throw new Error("no-proxy");
 }
+/* Bornes du texte repris d'un flux (voir clampText, src/lib.js). Le résumé garde
+   la valeur par défaut (1000 caractères, soit le double de ce que la carte
+   affiche) ; un titre n'a aucune raison d'être long.
+   `tags` est LU par isPromotionalItem (jamais affiché) : sa borne est donc large
+   à dessein — de quoi tenir une quarantaine de catégories, là où un flux réel en
+   publie moins de dix — pour qu'une étiquette « Sponsorisé » en fin de liste ne
+   puisse pas se faire couper et désarmer le filtre. */
+const TITLE_MAX=300,TAGS_MAX=600;
 /* rss2json : service dédié qui parse le flux côté serveur et renvoie du JSON (CORS ok) */
 async function fetchFeedRss2Json(feed){
   const api="https://api.rss2json.com/v1/api.json?count=60&rss_url="+encodeURIComponent(feed.url);
@@ -1491,10 +1547,10 @@ async function fetchFeedRss2Json(feed){
   const data=await res.json();
   if(!data||data.status!=="ok"||!Array.isArray(data.items))throw new Error("bad");
   return data.items.map(it=>({
-    source:feed.name,title:(it.title||"").trim(),
-    desc:stripHtml(it.description||it.content||""),link:it.link||"",
+    source:feed.name,title:clampText((it.title||"").trim(),TITLE_MAX),
+    desc:clampText(stripHtml(it.description||it.content||"")),link:it.link||"",
     img:it.thumbnail||(it.enclosure&&it.enclosure.link)||imgFromHtml(it.content||it.description||""),
-    date:it.pubDate||"",tags:Array.isArray(it.categories)?it.categories.join(" "):""
+    date:it.pubDate||"",tags:clampText(Array.isArray(it.categories)?it.categories.join(" "):"",TAGS_MAX)
   })).filter(i=>i.title);
 }
 /* Récupération robuste d'un flux : backend/proxys + XML d'abord, puis repli rss2json.
@@ -1520,8 +1576,12 @@ async function fetchFeed(feed){
     // éditeurs y posent « Sponsorisé » ou « Bons plans » plutôt que dans le
     // titre/résumé.
     const tags=[...n.querySelectorAll("category")].map(c=>c.textContent.trim()).filter(Boolean).join(" ");
-    return {source:feed.name,title:get("title"),desc:stripHtml(raw),link,
-      img:fi.url,imgFrom:fi.from,imgW:fi.w,tags,
+    // clampText : un flux n'a aucune obligation de résumer. Beaucoup publient
+    // l'ARTICLE ENTIER en <description>/<content:encoded> — voir clampText
+    // (src/lib.js) pour ce que du texte non borné coûte ici (DOM, cache disque,
+    // instantané). Le titre est borné pour la même raison, plus court.
+    return {source:feed.name,title:clampText(get("title"),TITLE_MAX),desc:clampText(stripHtml(raw)),link,
+      img:fi.url,imgFrom:fi.from,imgW:fi.w,tags:clampText(tags,TAGS_MAX),
       date:get("pubDate")||get("published")||get("updated")};
   }).filter(i=>i.title);
 }
@@ -1621,7 +1681,11 @@ async function fetchLearn(count=CONFIG.BATCH_SIZE,keys=catKeysForBatch()){
     }catch(e){warn("learn backend",e);/* repli client */}
   }
   if(!batch)batch=await fetchLearnClient(keys,count);
-  return dropSeen(batch,seen).slice(0,count);
+  // usableItem : le lot vient du réseau (backend, ou Wikipédia via un proxy
+  // public quand le direct échoue). Un seul élément qui n'est pas un article —
+  // `null`, une chaîne — faisait échouer dropSeen (seenKey lit `.link`), donc
+  // tout le lot, alors que les autres étaient parfaitement lisibles.
+  return dropSeen(batch.filter(usableItem),seen).slice(0,count);
 }
 
 /* ---------- Cache local : affichage instantané au lancement ----------
@@ -1629,11 +1693,41 @@ async function fetchLearn(count=CONFIG.BATCH_SIZE,keys=catKeysForBatch()){
    une variable en mémoire repartirait à zéro à chaque lancement, et chaque
    réouverture rappellerait toutes les sources. Voir AUTO_RELOAD_MS. */
 const LS_CACHE="fluxswipe.cache.v1";
+/* Un article repris du cache est-il exploitable ? Tout le reste du fil suppose
+   qu'un item est un OBJET portant au moins un titre : `adoptItems` lit `i.kind`,
+   `dedupNews` lit `i.link`, `cardHTML` lit `it.source`.
+   Sans cette vérification, un cache abîmé (même cause que pour les sources, voir
+   sanitizeFeeds) faisait échouer `loadFeeds` AVANT le lancement de ses deux
+   moitiés : plus aucune requête, écran de chargement pour toujours, et comme le
+   cache fautif est sur disque, à CHAQUE lancement suivant. Mesuré :
+   `items:[null,null,null]` → « Cannot read properties of null (reading 'kind') »,
+   `items:["a","b","c"]` → « (url || "").trim is not a function ». La panne la
+   plus grave trouvée pendant l'audit : totale, silencieuse et permanente. */
+const usableItem=it=>!!it&&typeof it==="object"&&typeof it.title==="string"&&!!it.title;
 function cacheEntry(key){try{const e=(JSON.parse(localStorage.getItem(LS_CACHE)||"{}"))[key];
-  if(e&&Array.isArray(e.items)&&e.items.length>=3)return e;}catch(e){}return null;} // ignore un cache minuscule
+  if(!e||!Array.isArray(e.items))return null;
+  const items=e.items.filter(usableItem);
+  if(items.length>=3)return {t:e.t,items};                  // ignore un cache minuscule
+  }catch(e){warn("cache read",e);}return null;}
+/* Fils gardés sur disque. La clé de cache est COMBINATOIRE (langue × sélection
+   de sources × thème × filtre sponsorisé, voir feedKey) : sans éviction, chaque
+   combinaison jamais revue garde ses 140 articles pour toujours, et le fichier
+   grossit jusqu'au quota localStorage (~5 Mo). Passé ce point, `setItem` lève
+   pour de bon : plus AUCUN cache n'est écrit, donc plus de peinture instantanée
+   au lancement, et l'app repart du réseau à chaque fois — une dégradation
+   silencieuse, jamais réparée, que rien n'annonce.
+   Cinq fils couvrent largement l'aller-retour entre filtres (l'instantané en
+   mémoire, feedSnap, sert déjà les allers-retours immédiats) ; au-delà, ce sont
+   les plus anciennement écrits qui partent. */
+const CACHE_KEYS_MAX=5;
 function cacheSave(key){try{if(!items||items.length<3)return; // on ne met pas en cache un lot trop maigre
   const all=JSON.parse(localStorage.getItem(LS_CACHE)||"{}");
   all[key]={t:Date.now(),items:items.slice(0,CONFIG.CACHE_ITEMS)};
+  const keys=Object.keys(all);
+  if(keys.length>CACHE_KEYS_MAX){
+    keys.sort((a,b)=>((all[b]&&all[b].t)||0)-((all[a]&&all[a].t)||0))
+        .slice(CACHE_KEYS_MAX).forEach(k=>delete all[k]);
+  }
   localStorage.setItem(LS_CACHE,JSON.stringify(all));}catch(e){warn("cache save",e);}}
 function cacheLoad(key){const e=cacheEntry(key);return e?e.items:null;}
 // Date du dernier lot RÉELLEMENT récupéré pour ce fil, 0 si aucun cache utilisable.
@@ -1649,8 +1743,13 @@ let newsSettled=false;   // les actus ont fini leur tour (ou n'avaient rien à f
    l'autre. Une source RSS lente ne doit pas retenir les articles Wikipédia, et
    réciproquement ; chacune se rend de son côté, remix() recompose. */
 async function loadFeeds(force){
-  const my=++loadSeq;feedLoadStarted=true;feedsDirty=false;
+  // Tout premier chargement de la session : c'est le seul où la reprise de
+  // lecture a quelque chose à dire, donc le seul qui ne remonte pas en tête du
+  // fil (voir flushRender). Lu AVANT que feedLoadStarted ne passe à vrai.
+  const premier=!feedLoadStarted;
+  const my=++loadSeq;feedLoadStarted=true;
   demobadge(false);syncReset();newsSettled=false;
+  learnMoreVide=0;   // nouveau fil : la réserve Wikipédia repart avec ses chances (voir learnMoreVide)
   const key=feedKey();                            // cache distinct par source et par thème filtrés
   // « Même fil » = le contenu affiché appartient à la MÊME clé que celle qu'on
   // charge (un filtre a pu changer entre-temps).
@@ -1659,15 +1758,27 @@ async function loadFeeds(force){
   // simple rafraîchissement du fil courant : il ne contient que CACHE_ITEMS
   // articles et tronquerait un fil plus complet, faisant disparaître la carte
   // en cours de lecture.
-  const cached=sameFeed?null:cacheLoad(key);
-  if(cached){adoptItems(cached);render();hideStates();feedKeyShown=key;}
-  else if(!sameFeed){
+  let cached=sameFeed?null:cacheLoad(key);
+  /* Le cache ne peint que VITE : il n'a pas à décider si le fil se charge. Tout
+     ce qui échoue ici est donc rattrapé, et le chargement réseau suit quand
+     même — c'est la seule chose qui garantit qu'aucune donnée locale, quelle
+     qu'elle soit, ne puisse laisser l'app sur un écran de chargement définitif
+     (voir usableItem pour le cas mesuré). */
+  if(cached){
+    // `cached=null` suffit : le bloc juste en dessous remet alors le fil à zéro
+    // et affiche l'écran de chargement, exactement comme s'il n'y avait pas eu
+    // de cache — et loadNewsPart le recevra à null, donc sans seuil de
+    // fraîcheur hérité d'un cache qu'on vient d'écarter.
+    try{adoptItems(cached);render();hideStates();feedKeyShown=key;}
+    catch(e){warn("cache paint",e);cached=null;}
+  }
+  if(!cached&&!sameFeed){
     // On change de fil sans cache : vider explicitement. L'écran de chargement
     // est transparent, il ne masquerait pas les cartes du fil précédent.
     newsItems=[];learnItems=[];items=[];render();show("loading");
   }
   loadLearnPart(my,key,force);
-  loadNewsPart(my,key,force,cached,sameFeed);
+  loadNewsPart(my,key,force,cached,sameFeed,0,premier);
 }
 
 /* Délais des tentatives automatiques après un premier échec (news ET learn) :
@@ -1744,7 +1855,11 @@ async function loadLearnPart(my,key,force,attempt=0){
       // compteur retomberait à zéro entre les deux.
       garde=false;
       setTimeout(()=>{
-        if(my===loadSeq)loadLearnPart(my,key,true,attempt+1);
+        // Jeton rendu SEULEMENT si le chargement est encore le nôtre : un
+        // chargement plus récent a remis le compteur à zéro (syncReset), et
+        // décrémenter par-dessus éteindrait SA barre pendant qu'il travaille.
+        if(my!==loadSeq)return;
+        loadLearnPart(my,key,true,attempt+1);
         syncing(false);
       },RETRY_DELAYS_MS[attempt]);
       return;
@@ -1779,7 +1894,7 @@ async function loadLearnPart(my,key,force,attempt=0){
    l'article affiché. */
 const AUTO_RELOAD_MS=30*60*1000;
 let lastNewsLoad=cacheTime(feedKey());   // repris du cache : survit à la fermeture de l'app
-async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
+async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0,premier=false){
   // Dose « Wikipédia seul » : aucun flux n'est interrogé. Le fil ne contient
   // aucune actu, aller les chercher serait du réseau pour rien.
   if(!mixLevel().news){newsSettled=true;return;}
@@ -1802,6 +1917,18 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
     resumePending=false;      // aucun rendu ne suivra : inutile de guetter la reprise
     return;
   }
+
+  /* Les sources vont RÉELLEMENT être interrogées : c'est ici, et pas au début de
+     loadFeeds, que « les sources ont bougé » cesse d'être vrai.
+     C'était un bug reproductible : le filet périodique (setInterval, 60 s) et le
+     retour au premier plan appellent loadFeeds() en permanence, y compris
+     pendant qu'on règle ses sources — et l'appel repartait aussitôt par le seuil
+     de fraîcheur ci-dessus, SANS rien recharger, après avoir remis feedsDirty à
+     faux. Passer plus d'une minute dans le panneau (le temps ordinaire pour
+     cocher des centres d'intérêt et ajouter une source) suffisait donc à ce que
+     « Appliquer » ne recharge plus rien : la source ajoutée n'entrait jamais
+     dans le fil, et rien ne le disait. Mesuré au navigateur. */
+  feedsDirty=false;
 
   // Une seule source quand la barre de filtres en désigne une : elle occupe
   // alors toute la part des actus (perFeed vaut MAX_NEWS, plus bas), au lieu de
@@ -1864,21 +1991,22 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
      cartes bougeaient sans arrêt. On accumule et on repeint au plus une fois
      par fenêtre, ce qui correspond en pratique à un lot de MAX_PARALLEL. */
   let renderT=null,painted=false;
-  function paint(top){
+  /* DEUX drapeaux, et non un seul : « c'est la repeinture FINALE » (`final` —
+     elle rend le jeton de chargement et enregistre le cache) et « remonter en
+     tête du fil » (`top`). Ils étaient confondus, ce qui rendait impossible de
+     conclure un chargement SANS déplacer l'utilisateur — voir flushRender. */
+  function paint(final,top){
     renderT=null;painted=true;
     if(my!==loadSeq)return;
-    // `top` : uniquement passé `true` par flushRender (rendu final, voir plus
-    // bas). Les repeintures progressives (via scheduleRender→setTimeout(paint))
-    // n'en reçoivent aucun : elles gardent l'ancrage sur l'article lu.
     whenFeedIdle(()=>{
-      if(top)rendreJeton();                         // repeinture finale : le chargement s'achève ICI
+      if(final)rendreJeton();                       // repeinture finale : le chargement s'achève ICI
       if(my!==loadSeq)return;                       // périmé pendant l'attente du contact
       rebuild(top);render(top);hideStates();feedKeyShown=key;
-      // `top` seul (rendu final) : cacheSave() lit `items`, que rebuild()
+      // Repeinture finale seule : cacheSave() lit `items`, que rebuild()
       // vient tout juste de recalculer ci-dessus — l'appeler depuis finish()
       // AVANT que ce bloc ne s'exécute (un doigt posé sur le fil le reporte)
       // enregistrerait encore l'ancien `items` sous la nouvelle clé.
-      if(top&&collected.size)cacheSave(key);
+      if(final&&collected.size)cacheSave(key);
     });
   }
   /* Fenêtre progressive : courte pour le tout premier rendu (le contenu doit
@@ -1892,14 +2020,32 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
   function scheduleRender(){
     if(cached)return;
     if(renderT)return;
-    renderT=setTimeout(paint,painted?CONFIG.RENDER_COALESCE_MS:CONFIG.FIRST_PAINT_MS);
+    // Repeintures progressives : ni finales, ni en tête — elles gardent
+    // l'ancrage sur l'article lu.
+    renderT=setTimeout(()=>paint(false,false),painted?CONFIG.RENDER_COALESCE_MS:CONFIG.FIRST_PAINT_MS);
   }
   function flushRender(){
     if(renderT){clearTimeout(renderT);renderT=null;}
-    // Rafraîchissement RÉEL terminé (nouvelles données arrivées) : on remonte
-    // en tête. Couvre aussi bien l'automatique (seuil 30 min, filet, natif)
-    // que le bouton ↻ — les deux passent par ce même chemin.
-    paint(true);
+    /* Rafraîchissement RÉEL terminé : on remonte en tête — automatique (seuil
+       30 min, filet, natif) comme bouton ↻, les deux passent par ici.
+       SAUF pour le tout premier chargement de la session, où la reprise de
+       lecture doit gagner. C'était un vrai conflit entre deux intentions du
+       projet, tranché du mauvais côté : dès que le cache dépassait
+       AUTO_RELOAD_MS — donc à presque toutes les ouvertures réelles, 30 minutes
+       étant court à l'échelle d'une journée — le lancement restaurait bien
+       l'article quitté (posMap, resolveResume) puis le rafraîchissement le
+       jetait aussitôt en tête. Mesuré au navigateur : l'article revenait à
+       l'écran quelques centaines de millisecondes, puis le fil sautait en haut.
+       La reprise de lecture, annoncée comme une fonction du projet, ne marchait
+       donc que dans la fenêtre de 30 minutes où l'on se souvient encore de où
+       l'on en était.
+       Le contenu neuf n'est pas perdu pour autant : ce rendu gèle la tête du fil
+       (comme toute repeinture progressive, voir remix) et le reste est retrié par
+       date — les articles frais se rangent donc JUSTE APRÈS la carte reprise, on
+       les atteint en continuant à swiper. Et ↻ remonte en tête d'un tap, lui.
+       Les rafraîchissements SUIVANTS gardent le saut en tête : c'est là qu'il
+       sert (des heures de lecture continue sans jamais revoir le haut du fil). */
+    paint(true,!premier);
   }
 
   // Récupération par lots bornés plutôt que tout en parallèle.
@@ -1950,7 +2096,10 @@ async function loadNewsPart(my,key,force,cached,sameFeed,attempt=0){
       // entre les deux, et la barre avec.
       jeton=false;
       setTimeout(()=>{
-        if(my===loadSeq)loadNewsPart(my,key,true,cached,sameFeed,attempt+1);
+        // Voir la même garde côté Wikipédia (loadLearnPart) : rendre le jeton
+        // d'un chargement périmé retomberait sur le compteur du suivant.
+        if(my!==loadSeq)return;
+        loadNewsPart(my,key,true,cached,sameFeed,attempt+1,premier);
         syncing(false);
       },RETRY_DELAYS_MS[attempt]);
       return;
@@ -2188,7 +2337,7 @@ const MIN_GOOD_W=800;
    par article. Les ÉCHECS, eux, ne sont pas mémorisés : voir le .catch
    d'articleMetaFor. */
 const LS_OG="fluxswipe.artmeta.v1";
-let ogCache=(()=>{try{return JSON.parse(localStorage.getItem(LS_OG)||"{}");}catch(e){return {};}})();
+let ogCache=readObject(LS_OG);
 let ogSaveT;
 function ogRemember(link,meta){
   ogCache[link]=meta;
@@ -2232,7 +2381,20 @@ function articleMetaFor(link){
   const api="/api/og?url="+encodeURIComponent(link)+(deep?"&deep=1":"");
   const p=(isNativeApp?nativeArticleMeta(link):fetchWithTimeout(api,{},CONFIG.FETCH_TIMEOUT)
       .then(r=>r.ok?r.json():null)
-      .then(d=>({image:(d&&d.image)||"",paywalled:!!(d&&d.paywalled),sponsored:!!(d&&d.sponsored)})))
+      .then(d=>{
+        /* /api/og répond 200 même quand la page de l'éditeur est injoignable ou
+           n'est pas du HTML : le verdict est alors NEUTRE PAR DÉFAUT, pas
+           constaté (voir son catch, api/og.js), et il porte `error`. Sans cette
+           distinction, le .catch juste en dessous — qui existe précisément pour
+           ne jamais mémoriser un échec (voir son commentaire) — était contourné
+           par le chemin le PLUS fréquent : un éditeur lent, et « pas de paywall,
+           pas de sponsor » se figeait à vie dans localStorage pour cet article.
+           La pastille $ et le filtre sponsorisé s'en trouvaient désarmés sans
+           que rien ne le signale. Mesuré au navigateur. */
+        if(!d)throw new Error("og http");
+        if(d.error)throw new Error("og amont : "+d.error);
+        return {image:d.image||"",paywalled:!!d.paywalled,sponsored:!!d.sponsored};
+      }))
     // safeImg ICI, sur le chemin COMMUN : le poser dans la seule branche web
     // laissait le natif hors de l'invariant « toute URL d'image passe par
     // safeImg », sans que le prochain appelant ait de quoi le deviner.
@@ -2428,6 +2590,24 @@ function observeMissingImages(scope){
     else checkMissingImage(el);
   });
 }
+/* Une carte qui quitte le fil doit quitter les quatre observateurs avec lui.
+   Un IntersectionObserver garde une référence FORTE sur ses cibles : une carte
+   retirée du DOM sans avoir jamais croisé l'écran (le cas de tout ce qu'un
+   changement de dose ou de filtre écarte au-delà de l'horizon de 150 %) restait
+   donc vivante, avec son article et son image, pour toute la session — un
+   `unobserve` n'ayant lieu qu'à l'intersection. Fuite lente et invisible, sans
+   plafond : elle ne coûtait rien à la frame mais grignotait la mémoire à chaque
+   remélange. */
+function unobserveCard(card){
+  try{
+    if(pwObserver)pwObserver.unobserve(card);
+    if(sponsorObserver)sponsorObserver.unobserve(card);
+    card.querySelectorAll(".card__bg,.card__noimg").forEach(el=>{
+      if(bgObserver)bgObserver.unobserve(el);
+      if(noImgObserver)noImgObserver.unobserve(el);
+    });
+  }catch(e){/* déjà retirée : sans conséquence */}
+}
 /* Plus de carte de fin : le fil ne finit plus. Quand les actus sont épuisées,
    les articles Wikipédia prennent le relais et le défilement reste infini. */
 /* Reconstruit le fil en gardant l'utilisateur SUR SON ARTICLE.
@@ -2492,6 +2672,7 @@ function render(forceTop,altAnchor){
   while(cursor){
     const next=cursor.nextElementSibling;
     cardReg.delete(+cursor.dataset.id);
+    unobserveCard(cursor);
     cursor.remove();
     cursor=next;
   }
@@ -2729,9 +2910,18 @@ function openShareMenu(it){
   </div>`;
   document.body.appendChild(back);
   requestAnimationFrame(()=>back.classList.add("open"));
-  const close=()=>{back.classList.remove("open");setTimeout(()=>back.remove(),200);};
+  // Comme les panneaux : le retour système referme le menu au lieu de quitter
+  // l'app (voir pushDialogState).
+  pushDialogState();
+  const close=fromHistory=>{
+    if(!back.classList.contains("open"))return;   // déjà en cours de fermeture
+    back.classList.remove("open");
+    if(!fromHistory)popDialogState();
+    setTimeout(()=>back.remove(),200);
+  };
+  back.__snClose=close;
   back.onclick=e=>{if(e.target===back)close();};
-  back.querySelectorAll("a.sharedest").forEach(a=>a.addEventListener("click",close));
+  back.querySelectorAll("a.sharedest").forEach(a=>a.addEventListener("click",()=>close()));
   back.querySelector("#copyLink").onclick=async()=>{
     try{await navigator.clipboard.writeText(full);toast(T("toast.copied"));}catch(_){toast(T("toast.copyFailed"));}
     close();
@@ -2869,9 +3059,43 @@ const sheet=document.getElementById("sheet");
    l'élément déclencheur pour lui rendre le focus à la fermeture. */
 let lastFocused=null;
 const bgLayers=()=>[document.querySelector(".top"),feedEl,document.getElementById("rail")];
+/* ---------- Retour arrière et panneaux ----------
+   Le geste/bouton « retour » d'Android est la sortie naturelle d'un panneau
+   plein écran. Rien ne l'interceptait : dans l'APK comme dans la PWA installée,
+   un retour panneau ouvert QUITTAIT l'app (la WebView n'a pas d'historique à
+   remonter, Capacitor referme donc l'activité) — on perdait le panneau, sa
+   sélection en cours, et le fil avec.
+   Solution sans pont natif ni écouteur Capacitor : chaque panneau ouvert pose
+   une entrée d'historique. Le retour système la consomme, `popstate` referme le
+   panneau, et l'app reste où elle était ; panneau fermé, l'entrée n'existe pas
+   et le retour retrouve son sens habituel (quitter). Marche à l'identique dans
+   un navigateur, où c'est en plus le comportement attendu sur mobile.
+   Une seule couche à la fois : les panneaux sont exclusifs (le fond passe en
+   `inert`, donc rien d'autre n'est cliquable), il n'y a jamais deux entrées
+   empilées. */
+let navDepth=0;
+function pushDialogState(){
+  try{history.pushState({snSheet:++navDepth},"");}catch(e){warn("history push",e);}
+}
+/* Consomme l'entrée posée à l'ouverture — sauf quand c'est justement le retour
+   système qui vient de la consommer (`fromHistory`), sinon on remonterait d'un
+   cran de trop et on quitterait l'app. */
+function popDialogState(){
+  try{if(history.state&&history.state.snSheet)history.back();}catch(e){warn("history back",e);}
+}
+/* Un rechargement peut laisser le marqueur sans panneau ouvert : on le nettoie,
+   pour que popDialogState ne croie jamais avoir une entrée à consommer. */
+try{if(history.state&&history.state.snSheet)history.replaceState(null,"");}catch(e){}
+addEventListener("popstate",()=>{
+  const s=document.querySelector(".sheet.open");
+  if(s){if(s===pickSheet)closePicker(true);else closeDialog(s,true);return;}
+  const menu=document.querySelector(".sharemenu.open");
+  if(menu&&menu.__snClose)menu.__snClose(true);
+});
 function openDialog(el){
   lastFocused=document.activeElement;
   el.classList.add("open");
+  pushDialogState();
   bgLayers().forEach(n=>{if(n)n.inert=true;});
   // Le focus initial va sur le panneau lui-même (tabindex=-1), pas sur le
   // 1er bouton/input : sinon le halo de focus par défaut du navigateur se
@@ -2880,8 +3104,9 @@ function openDialog(el){
   const f=el.querySelector(".sheet__panel");
   if(f){try{f.focus();}catch(_){}}
 }
-function closeDialog(el){
+function closeDialog(el,fromHistory){
   el.classList.remove("open");
+  if(!fromHistory)popDialogState();
   bgLayers().forEach(n=>{if(n)n.inert=false;});
   if(lastFocused){try{lastFocused.focus();}catch(_){}lastFocused=null;}
   // Panneau refermé sans valider au 1er lancement : le fil n'a encore rien
@@ -3068,7 +3293,7 @@ document.addEventListener("keydown",e=>{
   // cours, pour qu'Échap ne la fasse pas disparaître en silence.
   if(s){if(s===pickSheet)closePicker();else closeDialog(s);return;}
   const menu=document.querySelector(".sharemenu.open");
-  if(menu){menu.classList.remove("open");setTimeout(()=>menu.remove(),200);}
+  if(menu&&menu.__snClose)menu.__snClose();   // même sortie que le fond et le retour système
 });
 
 /* ---------- Identité et mémorisation du fil ----------
@@ -3095,12 +3320,29 @@ function feedKey(){
    recharger. Un fetch réel ne se fait qu'au 1er affichage, via ↻, ou quand le
    fil demandé n'a jamais été vu. */
 const feedSnap={};
+/* Instantanés gardés EN MÉMOIRE. Chacun retient le HTML complet du fil (jusqu'à
+   MAX_ITEMS cartes plein écran, résumés compris), sa liste d'articles et une
+   copie du registre : de l'ordre du mégaoctet par fil sur des sources réelles.
+   Les clés étant combinatoires comme celles du cache disque (voir feedKey), une
+   session passée à explorer thèmes et langues les accumulait toutes, sans jamais
+   en libérer une seule — un fil quitté depuis vingt minutes coûtait autant que
+   celui à l'écran. C'est le genre de croissance qui finit en éviction de
+   l'onglet par le système sur un téléphone modeste, très loin de la cause.
+   Trois suffisent à l'usage qu'ils servent (l'aller-retour entre deux ou trois
+   filtres) ; au-delà, le plus anciennement RANGÉ part — et un fil sans
+   instantané n'est pas perdu, il se repeint depuis le cache disque. */
+const SNAP_MAX=3;
+let snapSeq=0;
 function snapshotFeed(){
   if(!feedEl.children.length)return;               // rien à mémoriser
   feedSnap[feedKey()]={
     html:feedEl.innerHTML,scrollTop:feedEl.scrollTop,
-    items:items.slice(),reg:new Map(cardReg),seq:cardSeq,mix:mixScore
+    items:items.slice(),reg:new Map(cardReg),seq:cardSeq,mix:mixScore,n:++snapSeq
   };
+  const keys=Object.keys(feedSnap);
+  if(keys.length>SNAP_MAX){
+    keys.sort((a,b)=>feedSnap[b].n-feedSnap[a].n).slice(SNAP_MAX).forEach(k=>{delete feedSnap[k];});
+  }
 }
 function restoreFeed(){
   const s=feedSnap[feedKey()];
@@ -3118,6 +3360,13 @@ function restoreFeed(){
   // mélanges peuvent avoir la même LONGUEUR sans avoir le même ordre, d'où la
   // comparaison de la dose plutôt que du nombre de cartes.
   if(s.mix!==mixScore)render();
+  /* La carte « chargement d'autres articles » fait partie du HTML mémorisé si
+     l'instantané a été pris pendant un loadMore. Restaurée telle quelle, elle
+     restait en queue de fil À JAMAIS quand aucun render() ne suivait (dose
+     inchangée) : une carte d'attente perpétuelle au bout d'un fil qui, lui,
+     n'attend plus rien. Un appel suffit à la remettre d'accord avec
+     `loadingMore`, dans les deux sens. */
+  renderLoadMoreCard();
   observeBackgrounds();observePaywall();observeMissingImages();observeSponsor();updateRail();
   onCardChange();                                   // recalage du suivi de carte
   return true;
@@ -3320,19 +3569,26 @@ document.getElementById("pickGrid").addEventListener("click",e=>{
 /* Toutes les sorties de la feuille des sources passent par ici — bouton, clic
    sur le fond, Échap : une sélection ne doit pas se perdre parce qu'on a
    refermé autrement qu'avec le bouton. */
-function closePicker(){
+function closePicker(fromHistory){
   const sel=pickKind==="src"&&pickSel?[...pickSel]:null;
   pickSel=null;
-  closeDialog(pickSheet);
+  closeDialog(pickSheet,fromHistory);
   if(sel)setNewsSrc(sel);
 }
-pickApply.onclick=closePicker;
+// Enveloppé : passer le handler directement donnerait l'ÉVÉNEMENT en premier
+// argument, donc un `fromHistory` toujours vrai — l'entrée d'historique du
+// panneau ne serait jamais consommée.
+pickApply.onclick=()=>closePicker();
 pickSheet.onclick=e=>{if(e.target===pickSheet)closePicker();};
 srcBtn.onclick=()=>openPicker("src");
 catBtn.onclick=()=>openPicker("cat");
 /* Les deux filtres se comportent pareil : instantané du fil qu'on quitte, puis
    restauration de celui qu'on ouvre s'il a déjà été vu — sinon chargement. */
-function switchFeed(){if(!restoreFeed())loadFeeds();}
+/* learnMoreVide : le compteur d'épuisement appartient au fil qu'on QUITTE. Un
+   thème étroit dont on a tout vu éteignait sinon le réapprovisionnement
+   anticipé pour toute la session, thème suivant compris — y compris quand
+   celui-ci est vaste (voir learnMoreVide). */
+function switchFeed(){learnMoreVide=0;if(!restoreFeed())loadFeeds();}
 function setCat(k){
   if(k===cat)return;
   snapshotFeed();                      // AVANT le changement de clé (voir setNewsSrc)
@@ -3493,9 +3749,15 @@ function renderSuggest(){
 function toggleFeed(i){feeds[i].on=!feeds[i].on;save();}
 function delFeed(i){feeds.splice(i,1);save();renderList();renderSuggest();}
 function addFeed(){const inp=document.getElementById("newUrl");const url=inp.value.trim();
-  if(!/^https?:\/\//.test(url)){toast(T("toast.invalidUrl"));return;}
-  let name=url;try{name=new URL(url).hostname.replace("www.","");}catch(_){}
-  feeds.push({name,url,on:true});save();inp.value="";renderList();renderSuggest();}
+  if(!isFeedUrl(url)){toast(T("toast.invalidUrl"));return;}
+  /* Deux fois la même URL n'était refusé nulle part ici (le tap sur une
+     suggestion et l'import OPML, eux, vérifient déjà). Ce doublon coûte une
+     requête par chargement pour rien : `collected` est indexé PAR URL
+     (loadNewsPart), donc la seconde ligne écrase la première au lieu d'ajouter
+     quoi que ce soit — et le filtre de sources, qui désigne lui aussi une URL,
+     ne peut pas distinguer deux lignes identiques. */
+  if(feeds.some(f=>f.url===url)){toast(T("toast.feedsAlreadyPresent"));inp.value="";return;}
+  feeds.push({name:hostOf(url),url,on:true});save();inp.value="";renderList();renderSuggest();}
 
 /* ---------- Import / Export des sources ---------- */
 /* Rend true quand le fichier est parti, false sinon — l'appelant n'annonce
@@ -3561,6 +3823,12 @@ function importFromFile(ev){
     }catch(e){toast(T("toast.unreadableFile"));}
     finally{ev.target.value="";}
   };
+  /* Lecture qui échoue (fichier retiré entre-temps, dossier distant hors ligne,
+     permission refusée) : sans onerror, RIEN ne se passait — pas de message, et
+     surtout la valeur de l'<input> restait posée, si bien que rechoisir LE MÊME
+     fichier n'émettait plus d'événement `change`. L'import semblait mort
+     jusqu'au rechargement de l'app. */
+  reader.onerror=()=>{warn("import",reader.error);toast(T("toast.unreadableFile"));ev.target.value="";};
   reader.readAsText(file);
 }
 // parseJsonFeeds / parseOpmlFeeds / hostOf : voir src/lib.js

@@ -615,3 +615,55 @@ test("feedLabels encaisse les entrées dégradées", () => {
   ]);
   assert.deepEqual(out, ["Presse · une", "presse · monde"]);
 });
+
+/* ---------- Bornes sur du contenu de flux ---------- */
+
+test("clampText laisse un résumé normal intact et borne un article entier", () => {
+  const court = "Un résumé de taille ordinaire.";
+  assert.equal(lib.clampText(court), court);
+  // Pile à la borne : rien à couper.
+  const pile = "a".repeat(1000);
+  assert.equal(lib.clampText(pile), pile);
+  // Au-delà : coupé, avec un signe que le texte continue.
+  const long = lib.clampText("mot ".repeat(20000));
+  assert.ok(long.length <= 1001, "borné à 1000 caractères + …");
+  assert.ok(long.endsWith("…"));
+  // Coupe sur une frontière de mot, jamais au milieu.
+  assert.ok(!/mo…$/.test(long));
+  // Un mot unique plus long que la borne ne doit pas rendre une chaîne vide.
+  assert.equal(lib.clampText("x".repeat(50), 10).length, 11);
+  // Entrées dégradées.
+  assert.equal(lib.clampText(null), "");
+  assert.equal(lib.clampText(undefined), "");
+});
+
+test("isFeedUrl n'accepte que http(s)", () => {
+  assert.equal(lib.isFeedUrl("https://ex.fr/rss.xml"), true);
+  assert.equal(lib.isFeedUrl("http://ex.fr/rss.xml"), true);
+  assert.equal(lib.isFeedUrl("file:///etc/passwd"), false);
+  assert.equal(lib.isFeedUrl("javascript:alert(1)"), false);
+  assert.equal(lib.isFeedUrl("content://media/external"), false);
+  assert.equal(lib.isFeedUrl("//ex.fr/rss.xml"), false); // pas de base : non parsable
+  assert.equal(lib.isFeedUrl(""), false);
+  assert.equal(lib.isFeedUrl(null), false);
+  assert.equal(lib.isFeedUrl(42), false);
+});
+
+test("les imports écartent les URL non http(s)", () => {
+  const json = lib.parseJsonFeeds(
+    '[{"name":"ok","url":"https://ok.fr/rss"},{"name":"local","url":"file:///etc/passwd"},' +
+      '{"name":"js","url":"javascript:alert(1)"}]'
+  );
+  assert.deepEqual(
+    json.map((f) => f.url),
+    ["https://ok.fr/rss"]
+  );
+  const opml = lib.parseOpmlFeeds(`<?xml version="1.0"?><opml><body>
+    <outline text="ok" xmlUrl="https://ok.fr/rss"/>
+    <outline text="local" xmlUrl="file:///etc/passwd"/>
+  </body></opml>`);
+  assert.deepEqual(
+    opml.map((f) => f.url),
+    ["https://ok.fr/rss"]
+  );
+});
