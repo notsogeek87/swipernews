@@ -34,6 +34,8 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewFeature;
 
+import org.json.JSONObject;
+
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
@@ -136,6 +138,17 @@ public class InAppBrowserActivity extends AppCompatActivity {
      * verdict sur la suivante.
      */
     private int readGen;
+
+    /**
+     * Génération pour laquelle une chaîne de tentatives est DÉJÀ partie.
+     *
+     * <p>Deux déclencheurs visent le même but — le guet d'ouverture (voir
+     * {@link #watchDomReady}) et {@code onPageFinished} — et le premier arrive
+     * toujours avant le second. Sans ce garde, la page recevrait deux chaînes en
+     * parallèle : deux échelles de retentatives entremêlées, deux verdicts, et
+     * l'un des deux prononcé sur un état que l'autre venait de changer.
+     */
+    private int readChainGen = -1;
 
     /** Filet : une page qui ne finit jamais de charger ne doit pas rester noire. */
     private static final long REVEAL_TIMEOUT_MS = 6000;
@@ -423,6 +436,11 @@ public class InAppBrowserActivity extends AppCompatActivity {
         }
     }
 
+    /** Littéral de chaîne JS : rien de ce qu'une URL contient n'en sort. */
+    private static String jsString(String s) {
+        return JSONObject.quote(s == null ? "" : s);
+    }
+
     /** Première valeur admise, sinon le repli : rien d'inconnu n'atteint le script. */
     private static String oneOf(String value, String fallback, String... allowed) {
         if (value != null) {
@@ -472,8 +490,15 @@ public class InAppBrowserActivity extends AppCompatActivity {
      * <p>Le voile, lui, ne suit PAS jusqu'au bout (voir READ_VEILED_TRIES) :
      * tenir l'écran noir cinq secondes pour une page qui n'est de toute façon
      * pas un article serait pire que le défaut corrigé.
+     *
+     * <p>Un palier de plus depuis que la chaîne part du DOM parsé et non plus de
+     * la fin du chargement (voir {@link #watchDomReady}) : l'échelle a reculé
+     * d'une à trois secondes avec son point de départ, et sans ce palier c'est
+     * la PORTÉE de la dernière tentative qui aurait reculé d'autant — juste ce
+     * qu'il faut pour manquer les gabarits les plus lents, ceux-là mêmes pour
+     * qui l'échelle existe.
      */
-    private static final long[] READ_RETRY_MS = {700, 1500, 2500};
+    private static final long[] READ_RETRY_MS = {700, 1500, 2500, 3000};
 
     /**
      * Tentatives faites SOUS le voile. Au-delà, la page du site est révélée et
@@ -484,7 +509,113 @@ public class InAppBrowserActivity extends AppCompatActivity {
      */
     private static final int READ_VEILED_TRIES = 2;
 
+    /* ---------- Guet d'ouverture ----------
+       Le mode lecture n'a besoin que du HTML de l'article ; le reste du
+       chargement — scripts tiers, images, cadres publicitaires, mesures
+       d'audience — ne lui apporte rien. Or `onPageFinished` répond à l'événement
+       `load`, qui attend TOUT cela : sur un site de presse, une à trois secondes
+       après que l'article était déjà dans le DOM, à regarder un écran voilé.
+
+       On part donc du moment où le HTML est parsé (DOMContentLoaded), pas de la
+       fin du chargement. La WebView n'a pas de rappel pour ce moment-là : on le
+       demande à la page, à intervalle court, jusqu'à ce qu'elle réponde oui. */
+
+    /**
+     * Cadence du guet. Un {@code evaluateJavascript} qui ne fait que lire
+     * {@code document.readyState} coûte quelques dixièmes de milliseconde, et le
+     * guet s'arrête au premier oui — une dizaine de tours en pratique.
+     */
+    private static final long DOM_POLL_MS = 80;
+
+    /**
+     * Au-delà, on rend la main : {@code onPageFinished} lancera la chaîne comme
+     * avant. Cas visé : une page dont une feuille de style n'arrive jamais (le
+     * guet l'attend, voir la sonde) ou qui n'a pas quatre paragraphes.
+     */
+    private static final long DOM_POLL_MAX_MS = 15000;
+
+    /**
+     * Point de départ du guet : {@code onPageCommitVisible}, et non
+     * {@code onPageStarted}.
+     *
+     * <p>Au démarrage d'une navigation, le document affiché est encore le
+     * PRÉCÉDENT — et un rechargement ({@code web.reload()}, bouton « réessayer »)
+     * le sert sous la MÊME URL, donc la comparaison d'URL de la sonde ne le
+     * distinguerait pas : on simplifierait une page sur le point d'être jetée,
+     * et la vraie n'y aurait plus droit (la chaîne aurait déjà eu lieu pour cette
+     * génération). {@code onPageCommitVisible} n'arrive qu'une fois le nouveau
+     * document validé et peint : à partir de là, tout ce que la sonde interroge
+     * est bien la page qu'on ouvre.
+     */
+    private void watchDomReady(String committedUrl) {
+        watchDomReady(readGen, committedUrl, 0);
+    }
+
+    /**
+     * Demande à la page si son DOM est prêt, et lance la chaîne dès que oui.
+     *
+     * <p>La sonde vérifie quatre choses, et les quatre comptent :
+     * <ul>
+     *   <li><b>l'URL</b> — le guet part d'un document validé, mais une
+     *       redirection ou un lien suivi en amène un autre pendant qu'il tourne :
+     *       une réponse arrivée après ce changement porterait sur une page qui
+     *       n'est plus la sienne. La génération ({@code readGen}) couvre déjà ce
+     *       cas ; l'URL le couvre une seconde fois, pour rien de plus qu'une
+     *       comparaison de chaînes ;</li>
+     *   <li><b>{@code readyState}</b> — « loading » veut dire que l'analyseur
+     *       n'a pas fini : extraire là donnerait l'article coupé en deux ;</li>
+     *   <li><b>des paragraphes</b> — un squelette servi avant hydratation passe
+     *       les deux premiers critères sans porter d'article. Compter les
+     *       {@code <p>} est grossier mais honnête et sans coût ; la longueur du
+     *       texte, elle, a été essayée et ne mesure RIEN : {@code textContent}
+     *       inclut le contenu des {@code <script>}, et un gabarit moderne y
+     *       embarque des dizaines de kilooctets de JSON (JSON-LD,
+     *       {@code __NEXT_DATA__}) — le seuil était franchi par un squelette
+     *       vide. Et {@code innerText}, qui dirait vrai, impose un calcul de
+     *       mise en page à chaque tour de guet ;</li>
+     *   <li><b>les feuilles de style</b> — l'élagage décide de ce qu'il garde au
+     *       rendu RÉEL ({@code getClientRects}, voir reader_read.js) ; mesuré
+     *       avant que le CSS soit là, tout paraît visible, y compris la variante
+     *       mobile ou desktop que le site masque.</li>
+     * </ul>
+     *
+     * <p>Aucun de ces quatre critères n'est un pari sur le temps : ils décrivent
+     * l'état de la page. Quand l'un manque, on attend le tour suivant, et à
+     * défaut {@code onPageFinished} reprend la main — le comportement d'avant.
+     */
+    private void watchDomReady(final int gen, final String url, final long waited) {
+        if (web == null || gen != readGen || !readerOn) return;
+        if (readChainGen == gen) return;             // la chaîne est déjà partie
+        if (waited > DOM_POLL_MAX_MS) return;        // onPageFinished prendra le relais
+        String probe =
+            "(function(){try{"
+          + "if(location.href!==" + jsString(url) + ")return '';"
+          + "if(document.readyState==='loading')return '';"
+          + "if(!document.body)return '';"
+          + "if(document.getElementsByTagName('p').length<4)return '';"
+          + "var l=document.querySelectorAll('link[rel~=\"stylesheet\"]');"
+          + "for(var i=0;i<l.length;i++)if(!l[i].sheet)return '';"
+          + "return '1';}catch(e){return ''}})()";
+        web.evaluateJavascript(probe, value -> {
+            if (web == null || gen != readGen || !readerOn) return;
+            if (readChainGen == gen) return;
+            // evaluateJavascript rend du JSON : la chaîne arrive entre guillemets.
+            if (value != null && "1".equals(value.replace("\"", ""))) {
+                startReadChain();
+                return;
+            }
+            web.postDelayed(() -> watchDomReady(gen, url, waited + DOM_POLL_MS), DOM_POLL_MS);
+        });
+    }
+
+    /** Chaîne de tentatives, une seule par page — voir {@link #readChainGen}. */
+    private void startReadChain() {
+        if (readChainGen == readGen) return;
+        injectReadScript();
+    }
+
     private void injectReadScript() {
+        readChainGen = readGen;
         injectReadScript(0);
     }
 
@@ -670,9 +801,19 @@ public class InAppBrowserActivity extends AppCompatActivity {
                 applyWebPadding();
                 showBar();          // nouvelle page : on se resitue avant de replonger
                 // En mode lecture, on masque dès le départ : la page du site ne
-                // doit pas apparaître le temps que l'extraction ait lieu.
+                // doit pas apparaître le temps que l'extraction ait lieu. Le
+                // guet, lui, attend que le document soit validé (voir
+                // onPageCommitVisible juste en dessous).
                 if (readerOn) coverContent();
                 injectCmpScript();  // au plus tôt : le bandeau ne doit pas clignoter
+            }
+
+            @Override
+            public void onPageCommitVisible(WebView v, String url) {
+                // Le nouveau document est en place : on guette son DOM pour
+                // extraire dès qu'il est parsé, au lieu d'attendre la fin du
+                // chargement (voir watchDomReady).
+                if (readerOn) watchDomReady(url);
             }
 
             @Override
@@ -682,8 +823,10 @@ public class InAppBrowserActivity extends AppCompatActivity {
                 progress.setVisibility(View.GONE);
                 injectCmpScript();
                 // En dernier : le mode lecture remplace la page entière, il n'y
-                // aurait plus rien à nettoyer après lui.
-                injectReadScript();
+                // aurait plus rien à nettoyer après lui. Le plus souvent le guet
+                // a déjà lancé la chaîne, et il n'y a rien à faire ici : ce
+                // chemin reste pour les pages qu'il n'a pas su reconnaître.
+                startReadChain();
             }
 
             @Override
@@ -717,6 +860,9 @@ public class InAppBrowserActivity extends AppCompatActivity {
     }
 
     private void showError() {
+        // Rien à extraire d'une page qui n'est pas arrivée : le guet s'arrête là
+        // (un rechargement repart d'un onPageStarted, donc d'une génération neuve).
+        readChainGen = readGen;
         errorView.setVisibility(View.VISIBLE);
         web.setVisibility(View.GONE);
         progress.setVisibility(View.GONE);

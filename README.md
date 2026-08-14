@@ -830,6 +830,15 @@ Les choix qui comptent :
   visible : l'attente se lit comme un chargement, pas comme un écran figé. Un
   filet de 6 s révèle la page quoi qu'il arrive, pour qu'un site qui ne finit
   jamais de charger ne laisse pas un écran noir ;
+- **« DOM complet » veut dire HTML parsé, pas page chargée** : l'article est
+  dans le document bien avant que les scripts tiers, les images et les cadres
+  publicitaires aient fini d'arriver — attendre la fin du chargement pour
+  extraire, c'était garder l'écran voilé une à trois secondes de plus pour rien.
+  Le lecteur interroge donc la page toutes les 80 ms et bascule au premier
+  moment où elle est vraiment prête (analyse terminée, feuilles de style
+  arrivées, des paragraphes à lire) ; la fin du chargement ne sert plus que de
+  repli. Sur un site de presse ordinaire, c'est autant de gagné entre le doigt
+  et l'article ;
 - **aucun attribut ne survit** à l'élagage (classes, id, styles en ligne) : la
   feuille du site étant supprimée, une classe résiduelle ne servirait qu'à
   réintroduire du hasard. Deux exceptions, `colspan` et `rowspan` : elles ne

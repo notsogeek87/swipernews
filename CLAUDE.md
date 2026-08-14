@@ -590,13 +590,28 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   Écrire un fichier depuis l'app passe donc par `InAppBrowserPlugin.saveFile`,
   qui l'écrit dans le cache, l'expose via le `FileProvider` du manifeste et
   ouvre `ACTION_SEND`. Le chemin navigateur reste celui du web.
-- **Le mode lecture ne peut pas s'appliquer avant `onPageFinished`** (DOM
-  incomplet ⇒ article tronqué). D'où le voile : on masque la WebView, on
-  transforme, on révèle en fondu. Et `onPageFinished` lui-même n'est qu'un
-  DÉBUT : un gabarit de presse moderne pose son texte plusieurs secondes plus
-  tard, d'où l'échelle de tentatives (`READ_RETRY_MS`). Le voile, lui, ne tient
-  que les deux premières (`READ_VEILED_TRIES`) — au-delà, mieux vaut une
-  bascule tardive qu'un écran noir de cinq secondes.
+- **Le mode lecture s'applique dès que le DOM est PARSÉ, pas quand la page a
+  fini de CHARGER.** Il ne peut pas s'appliquer plus tôt (analyseur en cours ⇒
+  article tronqué), mais attendre `onPageFinished`, qui répond à l'événement
+  `load`, c'est attendre en plus les scripts tiers, les images et les cadres
+  publicitaires — une à trois secondes de plus, à regarder un écran voilé alors
+  que l'article était déjà là. D'où le guet (`watchDomReady`), qui interroge la
+  page toutes les 80 ms depuis `onPageCommitVisible` et lance l'extraction au
+  premier oui ; `onPageFinished` reste le repli pour les pages qu'il ne
+  reconnaît pas, et `readChainGen` empêche les deux de lancer chacun leur
+  chaîne. Le départ du guet est `onPageCommitVisible`, JAMAIS `onPageStarted` :
+  au démarrage d'une navigation le document affiché est encore le précédent, et
+  un rechargement le sert sous la même URL — on simplifierait une page sur le
+  point d'être jetée. Ce que la sonde exige (URL, `readyState`, quatre `<p>`,
+  feuilles de style chargées) est écrit dans son commentaire ; retenir surtout
+  que `document.body.textContent.length` a été essayé et ne mesure RIEN (il
+  compte le JSON des `<script>`, donc un squelette le franchit).
+  Le voile, lui, ne change pas : on masque la WebView, on transforme, on révèle
+  en fondu. Et le DOM parsé n'est qu'un DÉBUT : un gabarit de presse moderne
+  pose son texte plusieurs secondes plus tard, d'où l'échelle de tentatives
+  (`READ_RETRY_MS`), qui a gagné un palier en reculant son point de départ. Le
+  voile ne tient que les deux premières (`READ_VEILED_TRIES`) — au-delà, mieux
+  vaut une bascule tardive qu'un écran noir de cinq secondes.
 - **Jeter la feuille du site RÉVÈLE ce qu'elle masquait.** Un site cache par
   CSS (pas par balisage) des légendes d'icônes, des métadonnées de citation,
   des intitulés d'accessibilité, des onglets repliés, une variante mobile de
