@@ -666,7 +666,13 @@ public class InAppBrowserActivity extends AppCompatActivity {
                 // lâche la sienne, sinon les deux s'ajoutent.
                 readerApplied = "1".equals(s);
                 applyWebPadding();
-                if (readerApplied) return;                       // article simplifié
+                if (readerApplied) {
+                    // Sans attendre la prochaine annonce de progression : l'article
+                    // est là, la jauge n'a plus rien à annoncer (voir
+                    // onProgressChanged).
+                    progress.setVisibility(View.GONE);
+                    return;                                      // article simplifié
+                }
                 if ("auth".equals(s)) {
                     // Page de connexion laissée intacte : ce n'est pas un échec, le
                     // mode reste actif pour l'article qui suit. On le dit quand même,
@@ -841,7 +847,14 @@ public class InAppBrowserActivity extends AppCompatActivity {
             @Override
             public void onProgressChanged(WebView v, int newProgress) {
                 progress.setProgress(newProgress, true);
-                progress.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
+                // L'article simplifié est là : ce que le site continue de charger
+                // ne le concerne plus (sa page a été remplacée), et une jauge qui
+                // avance encore au-dessus d'un texte lisible se lit comme un
+                // écran pas fini. Depuis que l'extraction a lieu dès le DOM parsé,
+                // ce chevauchement dure le reste du chargement — plusieurs
+                // secondes sur un site de presse.
+                progress.setVisibility(newProgress >= 100 || readerApplied
+                    ? View.GONE : View.VISIBLE);
                 // Les CMP se greffent en cours de chargement : une passe au milieu
                 // du parcours les attrape avant qu'ils ne s'affichent.
                 if (newProgress >= 35 && newProgress < 100) injectCmpScript();
