@@ -813,7 +813,7 @@ et par sa signature de classe/id. Le meilleur bloc est élagué, puis la page es
 disparaître d'un coup habillage, colonnes, encarts et bandeaux, sans avoir à les
 nommer un par un.
 
-Trois choix qui comptent :
+Les choix qui comptent :
 
 - **jamais de force** : sous un certain seuil de texte (galerie, page d'accueil,
   application web), la page est laissée intacte et le bouton le dit, plutôt que
@@ -832,7 +832,18 @@ Trois choix qui comptent :
   jamais de charger ne laisse pas un écran noir ;
 - **aucun attribut ne survit** à l'élagage (classes, id, styles en ligne) : la
   feuille du site étant supprimée, une classe résiduelle ne servirait qu'à
-  réintroduire du hasard.
+  réintroduire du hasard. Deux exceptions, `colspan` et `rowspan` : elles ne
+  décrivent pas une apparence mais la structure d'une grille — sans elles,
+  toute cellule fusionnée retombe dans la première colonne, et une infobox
+  Wikipédia se lit en colonne étroite avec la moitié droite vide ;
+- **ce que la page ne montre pas ne réapparaît pas** : les sites laissent dans
+  leur HTML quantité de texte que seule leur feuille de style masque (légendes
+  d'icônes, métadonnées de citation, intitulés d'accessibilité, onglets
+  repliés, variante mobile de l'article). Cette feuille étant jetée, tout cela
+  redeviendrait visible — d'où une mesure du rendu RÉEL de chaque élément,
+  faite sur la page d'origine avant l'élagage. Sans elle, un article Wikipédia
+  s'ouvrait sur « Si ce bandeau n'est plus pertinent, retirez-le… », légende
+  d'une icône de 12 px que personne n'avait jamais vue.
 
 #### La typographie, réglable
 

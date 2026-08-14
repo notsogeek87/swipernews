@@ -579,6 +579,25 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   tard, d'où l'échelle de tentatives (`READ_RETRY_MS`). Le voile, lui, ne tient
   que les deux premières (`READ_VEILED_TRIES`) — au-delà, mieux vaut une
   bascule tardive qu'un écran noir de cinq secondes.
+- **Jeter la feuille du site RÉVÈLE ce qu'elle masquait.** Un site cache par
+  CSS (pas par balisage) des légendes d'icônes, des métadonnées de citation,
+  des intitulés d'accessibilité, des onglets repliés, une variante mobile de
+  l'article entier — tout cela réapparaît en mode lecture. Le seul critère qui
+  tienne est le rendu RÉEL (`getClientRects().length`), mesuré sur la page
+  d'origine AVANT le clone : `style.display` en ligne ne voit presque rien, une
+  classe ne se devine pas. La correspondance clone/original se fait par INDICE
+  dans `getElementsByTagName("*")` — marquer les nœuds vivants invaliderait le
+  style à chaque écriture, et chaque mesure suivante repaierait une mise en
+  page. Garde-fou obligatoire : si le bloc lui-même n'a aucun rectangle (page
+  pas encore mise en page, conteneur en attente d'hydratation), ne rien
+  supprimer — tout serait supprimé.
+- **`display:block` sur un `<table>` coûte la mise en page de tableau.** Les
+  lignes passent alors dans une table ANONYME dimensionnée sur son contenu :
+  colonnes serrées à gauche, moitié droite vide, quelle que soit la largeur
+  disponible (symptôme vu sur une infobox Wikipédia). Pour faire défiler un
+  tableau trop large sans élargir la page, c'est une vraie ENVELOPPE
+  (`div.sn-scroll` posée à l'élagage) qui porte l'`overflow-x`, jamais le
+  tableau lui-même.
 - **Un bloc rejeté ne doit pas emporter l'extraction entière.** Les garde-fous
   d'après élagage (trop peu de texte survivant, bloc hors sujet) s'appliquent au
   bloc le MIEUX NOTÉ — qui n'est pas toujours l'article : un bandeau de

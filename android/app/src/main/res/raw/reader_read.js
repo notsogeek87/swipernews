@@ -231,6 +231,17 @@
        porte sur le texte ENTIER du bloc, pas sur une occurrence. Définie ici
        (avant l'étape 2) pour servir aussi à startsWithLabel() ci-dessous. */
     var LABELS = /^(publicité|pub|sponsorisé|contenu sponsorisé|partager|partagez|partager l'article|à lire aussi|lire aussi|voir aussi|sur le même sujet|à voir également|commentaires|voir les commentaires|newsletter|abonnez-vous|s'abonner|suivez-nous|temps de lecture|article réservé aux abonnés|réservé aux abonnés|mis à jour|sommaire)\s*[:.]?$/i;
+    /* Commandes de l'interface du site, entre crochets : les liens d'édition
+       d'un wiki (« [modifier | modifier le code] » après chaque titre de
+       section) ne mènent nulle part d'utile en lecture, et l'app rend un
+       article, pas un formulaire. Ils ne sont pas masqués dans la page
+       d'origine — c'est le contexte de lecture qui les rend incongrus, d'où
+       une liste à part de LABELS.
+       Les crochets (ou la forme complète avec barre verticale) sont EXIGÉS :
+       « modifier » est un verbe trop courant pour être supprimé sur son seul
+       nom — un <strong>modifier</strong> au milieu d'une phrase perdrait un
+       mot au passage. */
+    var UI_LABELS = /^(\[\s*modifier(\s*\|\s*modifier le code)?\s*\]|modifier\s*\|\s*modifier le code|\[\s*edit\s*\])$/i;
     /* Un widget « Sur le même sujet »/« À lire aussi » peut vivre dans un
        conteneur au nom de classe propre au gabarit du site (ici « Midi
        Libre » / groupe La Dépêche : article-full__childs) — aucun mot-clé de
@@ -278,11 +289,59 @@
     }
     var refWords = keywords(title + " " + description);
 
+    /* Ce que la page NE MONTRE PAS ne doit pas réapparaître à la lecture.
+       Beaucoup de sites laissent dans le DOM du texte que leur feuille de style
+       masque : légendes de fichiers non-vignettes (MediaWiki masque
+       `figure[typeof~="mw:File"] > figcaption`), métadonnées de citation,
+       intitulés d'accessibilité, onglets repliés, variantes mobiles. Comme le
+       mode lecture JETTE la feuille du site, tout cela redevient visible — cas
+       réel rencontré (Wikipédia) : « Si ce bandeau n'est plus pertinent,
+       retirez-le… », légende d'une icône de 12 px, s'affichait en tête
+       d'article alors qu'elle n'existe nulle part dans la page d'origine.
+       Le critère est le RENDU, pas le balisage : `display:none` vient plus
+       souvent d'une classe que d'un style en ligne, et une classe ne se devine
+       pas. Un élément sans aucun rectangle client n'est pas rendu ; la
+       visibilité (visibility, opacity) ne compte pas — elle réserve la place,
+       donc l'élément fait bien partie de la page.
+       On travaille par INDICES et non par marquage : écrire dans le DOM vivant
+       invaliderait le style à chaque élément, et la mesure suivante repaierait
+       une mise en page complète. Le clone étant une copie fidèle, le n-ième
+       élément de l'un est le n-ième élément de l'autre. */
+    var MAX_MEASURE = 6000;
+    function hiddenIndexes(root) {
+      // Bloc lui-même pas rendu (page pas encore mise en page, conteneur
+      // masqué en attendant l'hydratation) : rien n'est mesurable, on ne
+      // supprime rien plutôt que de tout supprimer.
+      if (!root.getClientRects().length) return null;
+      var all = root.getElementsByTagName("*"), off = [];
+      if (all.length > MAX_MEASURE) return null;
+      for (var i = 0; i < all.length; i++) {
+        var t = all[i].tagName;
+        // Éléments sans boîte par nature : ils ne prouvent rien, et <br> compte.
+        if (t === "BR" || t === "SCRIPT" || t === "STYLE" || t === "NOSCRIPT" ||
+            t === "TEMPLATE" || t === "LINK" || t === "META" || t === "SOURCE" || t === "TRACK") continue;
+        if (!all[i].getClientRects().length) off.push(i);
+      }
+      return off;
+    }
+
     /* Élagage d'un candidat : rend l'article prêt à afficher, ou null si ce
        bloc-là ne tient pas ses promesses. Tout se passe sur un CLONE, donc la
        page reste intacte — c'est ce qui permet d'essayer le suivant. */
     function prepare(pick) {
+      var off = hiddenIndexes(pick);
       var art = pick.cloneNode(true), k;
+
+      /* 0. Ce que la page ne montrait pas (voir hiddenIndexes ci-dessus).
+         En premier, avant toute autre suppression : les indices ne
+         correspondent qu'à un clone encore intact. */
+      if (off && off.length) {
+        var mirror = Array.prototype.slice.call(art.getElementsByTagName("*"));
+        for (k = 0; k < off.length; k++) {
+          var gone = mirror[off[k]];
+          if (gone && gone.parentNode) gone.parentNode.removeChild(gone);
+        }
+      }
 
       // 1. Tout ce qui n'est ni texte ni image s'en va (voir DROP ci-dessus).
       var junk = art.querySelectorAll(DROP);
@@ -307,7 +366,7 @@
         var lb = labelled[k];
         if (!lb.parentNode) continue;
         var txt = (lb.textContent || "").replace(/\s+/g, " ").trim();
-        if (txt.length <= 40 && LABELS.test(txt) && !lb.querySelector("img")) {
+        if (txt.length <= 40 && (LABELS.test(txt) || UI_LABELS.test(txt)) && !lb.querySelector("img")) {
           lb.parentNode.removeChild(lb);
         }
       }
@@ -333,20 +392,66 @@
         img.setAttribute("src", src);
       }
 
+      /* 4 bis. Légendes devenues orphelines. L'étape ci-dessus écarte les
+         images minuscules (icônes, pixels, vignettes) — leur <figcaption>, lui,
+         restait, et s'affichait en gris centré au milieu du texte sans plus
+         rien décrire. On ne garde une légende que si sa figure porte encore
+         quelque chose à légender (image, tableau, code, citation).
+         La FIGURE entière est l'unité de décision, pas le parent immédiat de la
+         légende : beaucoup de gabarits glissent un ou deux emballages entre les
+         deux, et l'image se trouve alors dans le frère de ce parent-là. */
+      var caps = art.querySelectorAll("figcaption");
+      for (k = 0; k < caps.length; k++) {
+        if (!caps[k].parentNode) continue;
+        var fig = caps[k];
+        while (fig.parentNode && fig.parentNode !== art && fig.tagName !== "FIGURE") fig = fig.parentNode;
+        if (fig.tagName !== "FIGURE") fig = caps[k].parentNode;
+        if (fig && fig.nodeType === 1 && !fig.querySelector("img,table,pre,blockquote")) {
+          caps[k].parentNode.removeChild(caps[k]);
+        }
+      }
+
       /* 5. Aucun attribut de style ne survit : la feuille du site étant jetée,
-         une classe résiduelle ne servirait qu'à réintroduire du hasard. */
+         une classe résiduelle ne servirait qu'à réintroduire du hasard.
+         Deux exceptions, dans les tableaux : `colspan`/`rowspan` ne décrivent
+         pas une apparence mais la STRUCTURE de la grille. Les jeter mettait
+         chaque cellule fusionnée dans la seule première colonne — cas réel
+         rencontré (infobox Wikipédia) : titre, image et légendes, tous en
+         colspan=2, se retrouvaient serrés à gauche avec une colonne vide en
+         face, et l'image réduite à la largeur d'une demi-colonne. */
       function strip(node) {
-        var keep = node.tagName === "A" ? "href" : (node.tagName === "IMG" ? "src" : null);
+        var tag = node.tagName;
+        var keep = tag === "A" ? "href" : (tag === "IMG" ? "src" : null);
+        var grid = tag === "TD" || tag === "TH";
         var attrs = node.attributes;
         for (var a = attrs.length - 1; a >= 0; a--) {
           var name = attrs[a].name;
           if (name === keep || name === "alt") continue;
+          if (grid && (name === "colspan" || name === "rowspan")) continue;
           node.removeAttribute(name);
         }
       }
       strip(art);   // la racine aussi : getElementsByTagName ne rend que les descendants
       var all = art.getElementsByTagName("*");
       for (k = 0; k < all.length; k++) strip(all[k]);
+
+      /* 5 bis. Chaque tableau part dans sa propre boîte à défilement. Le faire
+         en CSS (`table{display:block;overflow:auto}`) coûtait la mise en page
+         de tableau elle-même : les lignes passaient dans une table ANONYME
+         dimensionnée sur son contenu, donc calée à gauche, colonnes serrées et
+         moitié droite vide, quelle que soit la largeur disponible. Une vraie
+         enveloppe rend au tableau son `display:table` — et à la page sa
+         largeur : c'est la boîte qui défile, jamais l'article.
+         Après l'étape 5, sans quoi la classe serait retirée aussitôt. */
+      var tables = art.querySelectorAll("table");
+      for (k = 0; k < tables.length; k++) {
+        var tb = tables[k];
+        if (!tb.parentNode) continue;
+        var box = art.ownerDocument.createElement("div");
+        box.className = "sn-scroll";
+        tb.parentNode.insertBefore(box, tb);
+        box.appendChild(tb);
+      }
 
       /* 6. Les trous laissés par tout ce qui précède. Un conteneur vidé de son
          encart garde sa boîte : à l'écran, ce sont des blancs de plusieurs lignes
@@ -444,14 +549,39 @@
     function norm(t) {
       return (t || "").replace(/\s+/g, " ").trim().toLowerCase().replace(/[«»"'’.,:;!?—–-]/g, "");
     }
+    /* L'enseigne que le <title> ajoute au bout : « — Wikipédia », « | Le
+       Monde », « - 20 Minutes ». Le seuil de 20 caractères ci-dessous protège
+       d'un <h1> générique (« Actualités », « Accueil ») qui remplacerait un
+       vrai titre ; mais il écartait aussi les titres COURTS et parfaitement
+       légitimes — cas réel rencontré (Wikipédia) : « Fomalhaut b » (11
+       caractères) laissait afficher « Fomalhaut b — Wikipédia », alors que la
+       ligne juste en dessous annonce déjà fr.wikipedia.org.
+       Le séparateur seul ne suffirait pas à trancher : « Fomalhaut b : la
+       planète fantôme » a la même forme, et c'est un vrai titre à ne pas
+       amputer. Ce qui décide, c'est que la queue soit le NOM DU SITE, mesuré
+       sur le domaine — la seule enseigne dont on dispose à coup sûr, et déjà
+       affichée sous le titre. Un site dont le nom ne se lit pas dans son
+       domaine (francetvinfo.fr pour « France Info ») garde simplement le titre
+       long : on ne coupe que ce qu'on a reconnu. */
+    function slug(s) {
+      return (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    }
+    var hostSlug = slug(host);
+    function isEnseigne(tail) {
+      if (!/^\s*[—–|·:>»/-]\s*\S/.test(tail) || tail.length > 32) return false;
+      var s = slug(tail);
+      return s.length >= 2 && hostSlug.indexOf(s) >= 0;
+    }
     var firstHead = art.querySelector("h1,h2,h3");
     var headText = firstHead ? (firstHead.textContent || "").replace(/\s+/g, " ").trim() : "";
     // 200 caractères : au-delà ce n'est plus un titre mais un paragraphe balisé.
     if (headText && headText.length <= 200) {
       var nh = norm(headText), nt = norm(title);
+      var tail = title.indexOf(headText) === 0 ? title.slice(headText.length) : null;
       if (!nt                                                        // aucun titre de page
           || (nh.indexOf(nt) >= 0 && headText.length > title.length) // le <h1> englobe et complète
-          || (nt.indexOf(nh) === 0 && headText.length >= 20)) {      // la page ajoute l'enseigne
+          || (nt.indexOf(nh) === 0                                   // la page ajoute l'enseigne
+              && (headText.length >= 20 || (tail && isEnseigne(tail))))) {
         title = headText;
       }
     }
@@ -461,9 +591,21 @@
 
     /* 8. Le chapô : premier vrai paragraphe de l'article, souvent écrit pour
        être lu en gras dans la page d'origine. Le distinguer un peu redonne
-       l'attaque que la remise à plat lui avait ôtée. */
-    var firstP = art.querySelector("p");
-    if (firstP && len(firstP) > 90 && len(firstP) < 500) firstP.className = "sn-lead";
+       l'attaque que la remise à plat lui avait ôtée.
+       On enjambe les lignes trop courtes pour être de la prose (bandeau
+       d'avertissement, mention d'édition, date) : le chapô attend souvent
+       derrière l'une d'elles, et s'en tenir au tout premier <p> ne le
+       distinguait alors plus du tout. Le premier VRAI paragraphe tranche, lui,
+       dans les deux sens : trop long, il n'y a pas de chapô à mettre en avant,
+       et on n'ira pas le chercher plus bas — ce serait souligner le milieu de
+       l'article. */
+    var leads = art.querySelectorAll("p");
+    for (var lp = 0; lp < leads.length && lp < 3; lp++) {
+      var lpLen = len(leads[lp]);
+      if (lpLen <= 90) continue;
+      if (lpLen < 500) leads[lp].className = "sn-lead";
+      break;
+    }
 
     /* Temps de lecture : 220 mots/minute, la moyenne admise en lecture d'écran.
        Il ne sert pas à mesurer mais à décider — « j'ai le temps, ou pas ». */
@@ -542,11 +684,17 @@
         'font-size:.82em;line-height:1.5;hyphens:none;-webkit-hyphens:none}' +
       '.sn-read code{background:' + T.shade + ';padding:.1em .3em;border-radius:4px;font-size:.86em}' +
       '.sn-read pre code{background:none;padding:0;font-size:1em}' +
-      /* Un tableau plus large que l'écran ne doit pas élargir la PAGE : il défile
-         dans sa propre boîte, sinon tout l'article se lit de biais. */
-      '.sn-read table{display:block;overflow-x:auto;width:100%;border-collapse:collapse;' +
-        'font:14px/1.45 system-ui,sans-serif;margin:0 0 1.4em}' +
-      '.sn-read th,.sn-read td{border:1px solid ' + T.rule + ';padding:6px 9px;text-align:left}' +
+      /* Un tableau plus large que l'écran ne doit pas élargir la PAGE : c'est
+         sa BOÎTE qui défile (voir l'étape 5 bis), pas l'article — et le tableau
+         y garde sa mise en page de tableau, donc ses colonnes et ses fusions. */
+      '.sn-read .sn-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 0 1.4em}' +
+      '.sn-read table{width:100%;border-collapse:collapse;font:14px/1.45 system-ui,sans-serif;margin:0}' +
+      '.sn-read th,.sn-read td{border:1px solid ' + T.rule + ';padding:6px 9px;text-align:left;' +
+        'vertical-align:top}' +
+      '.sn-read th{color:' + T.strong + '}' +
+      /* Dans une cellule, l'image partage la place avec du texte : ni la marge
+         d'une illustration pleine largeur, ni ses angles arrondis. */
+      '.sn-read td img,.sn-read th img{margin:.4em 0;border-radius:4px}' +
       '.sn-read hr{border:none;border-top:1px solid ' + T.rule + ';margin:2.2em 0}' +
       /* Jauge de lecture, en bas : la barre du haut s'escamote pendant la lecture,
          et c'est justement là qu'on veut savoir où l'on en est. 2 px, la couleur
