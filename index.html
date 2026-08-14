@@ -885,9 +885,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=118"></script>
-<script src="src/learn-core.js?v=118"></script>
-<script src="src/i18n.js?v=118"></script>
+<script src="src/lib.js?v=119"></script>
+<script src="src/learn-core.js?v=119"></script>
+<script src="src/i18n.js?v=119"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1417,7 +1417,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="118";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="119";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1909,8 +1909,11 @@ async function fetchLearnClient(keys,count){
    On écarte les articles déjà vus (dropSeen), avec repli si tout a été vu.
    `keys` : catégories à interroger, par défaut celles de catKeysForBatch() —
    surchargeable (voir loadLearnPart) pour retenter en aléatoire pur quand une
-   recherche par catégorie ne rend rien dans la langue courante. */
-async function fetchLearn(count=CONFIG.BATCH_SIZE,keys=catKeysForBatch()){
+   recherche par catégorie ne rend rien dans la langue courante.
+   `frais` : l'utilisateur RÉCLAME du neuf (↻, réglages appliqués, repli « tout
+   est déjà vu »). Voir le seau ci-dessous — un lot mutualisé n'est alors plus
+   acceptable. */
+async function fetchLearn(count=CONFIG.BATCH_SIZE,keys=catKeysForBatch(),frais){
   let batch=null;
   // App native : pas de backend Vercel, on agrège directement sur l'appareil
   // (Wikipédia en CORS direct). Cet appel reste rapide individuellement ;
@@ -1918,12 +1921,27 @@ async function fetchLearn(count=CONFIG.BATCH_SIZE,keys=catKeysForBatch()){
   // ralentissait tout, pas l'agrégation client en elle-même.
   if(!isNativeApp){
     try{
-      // « seau » aléatoire plutôt qu'un nonce : l'URL reste l'une des BUCKETS
-      // variantes, donc cacheable par le CDN et mutualisée entre utilisateurs,
-      // tout en restant variée à l'échelle d'une session. Avec un nonce, chaque
-      // lot manquait le cache et payait l'aller-retour à Wikipédia.
-      const qs=new URLSearchParams({cats:keys.join(","),count:String(count),b:String(LEARN.randomBucket()),lang:LANG});
-      const res=await fetchWithTimeout("/api/learn?"+qs,{},CONFIG.FETCH_TIMEOUT);
+      /* Chargement ORDINAIRE : « seau » aléatoire plutôt qu'un nonce. L'URL
+         reste l'une des BUCKETS variantes, donc cacheable par le CDN et
+         mutualisée entre utilisateurs, tout en restant variée à l'échelle d'une
+         session. Avec un nonce partout, chaque lot manquait le cache et payait
+         l'aller-retour à Wikipédia.
+         Demande EXPLICITE (`frais`) : nonce, ET `no-store` — les deux, parce
+         qu'il y a DEUX caches sur le chemin et que le seau ne suffit à en
+         déjouer aucun. Côté CDN, les BUCKETS variantes sont un vivier fixe
+         pendant cinq minutes (s-maxage) : appuyer trois fois sur ↻ y repioche
+         souvent le lot qu'on vient de lire. Côté navigateur, c'est pire — la
+         réponse ne porte que `s-maxage` (ignoré par un cache privé) et
+         `stale-while-revalidate=3600`, donc Chrome sert sa copie disque, telle
+         quelle, pendant une heure : le lot Wikipédia « rechargé » n'était même
+         pas allé sur le réseau. TOUT le reste de l'app passe déjà `no-store`
+         (flux RSS, Wikipédia en direct) — c'est cet appel-ci, et lui seul, qui
+         l'oubliait, d'où des actus qui se renouvelaient et une moitié Wikipédia
+         figée à côté. */
+      const qs=new URLSearchParams({cats:keys.join(","),count:String(count),lang:LANG});
+      if(frais)qs.set("n",Date.now()+"."+Math.random().toString(36).slice(2));
+      else qs.set("b",String(LEARN.randomBucket()));
+      const res=await fetchWithTimeout("/api/learn?"+qs,frais?{cache:"no-store"}:{},CONFIG.FETCH_TIMEOUT);
       if(res.ok){
         const data=await res.json();
         if(data&&Array.isArray(data.items)&&data.items.length)batch=data.items;
@@ -2053,7 +2071,12 @@ async function loadFeeds(force){
      sinon on repositionnait sur l'ancien article pour le quitter d'un saut une
      seconde plus tard, à l'écran comme un sursaut au lancement. */
   if(perime)resumePending=false;
-  loadLearnPart(my,key,perime);
+  /* `force` et non `perime` : les caches HTTP du lot Wikipédia ne se
+     court-circuitent que sur une demande EXPLICITE (voir fetchLearn). Un
+     chargement seulement dû — réouverture au-delà du seuil, filet des 30 min —
+     reste mutualisé : c'est le cas le plus fréquent (chaque lancement d'app),
+     et lui faire manquer le cache CDN ralentirait tout le monde pour rien. */
+  loadLearnPart(my,key,perime,0,!!force);
   loadNewsPart(my,key,perime,cached,sameFeed);
 }
 
@@ -2077,7 +2100,11 @@ const RETRY_DELAYS_MS=[1500,3000,5000];
    Ce que coûtait l'exception, en revanche, était réel : la moitié Wikipédia
    restait celle du premier chargement, rejouée depuis le cache disque à chaque
    ouverture, et ramenait des articles déjà lus. */
-async function loadLearnPart(my,key,perime,attempt=0){
+/* `frais` : le rafraîchissement est DEMANDÉ (↻, réessai, réglages appliqués),
+   pas simplement dû. Il court-circuite alors les caches HTTP du lot Wikipédia
+   (voir fetchLearn) : sans lui, ↻ pouvait ne rien envoyer sur le réseau et
+   resservir le lot déjà lu, pendant que les actus, elles, se renouvelaient. */
+async function loadLearnPart(my,key,perime,attempt=0,frais=false){
   if(!mixLevel().learn)return;      // dose « actus seules » : Wikipédia n'est pas appelé
   if(!perime&&learnItems.length)return;
   // Même signal que côté actus (voir loadNewsPart) : sans lui, un rechargement
@@ -2091,7 +2118,7 @@ async function loadLearnPart(my,key,perime,attempt=0){
   let garde=true;
   syncing(true);
   try{
-    let arr=await fetchLearn(CONFIG.BATCH_SIZE);
+    let arr=await fetchLearn(CONFIG.BATCH_SIZE,catKeysForBatch(),frais);
     if(my!==loadSeq)return;                        // chargement obsolète → on abandonne
     // Une recherche par catégorie peut légitimement ne rien rendre de NEUF :
     // traduction imparfaite d'un `insource` (catégorie plus pauvre dans cette
@@ -2104,9 +2131,14 @@ async function loadLearnPart(my,key,perime,attempt=0){
     // lus dès qu'une catégorie était épuisée. Avant d'abandonner, un tirage
     // aléatoire PUR, qui ne dépend d'aucune traduction ni d'aucun filtre et
     // n'est donc jamais vide côté serveur.
+    // Ce repli est TOUJOURS `frais`, quelle que soit l'origine du chargement :
+    // on vient précisément de constater que tout ce qu'on a reçu était déjà vu,
+    // et un lot mutualisé (l'un des BUCKETS seaux, ou la copie disque du
+    // navigateur) a toutes les chances d'être celui-là même. Aller le chercher
+    // en cache serait recommencer pour rien.
     const fresh=arr.filter(it=>!seen.has(seenKey(it)));
     if(!fresh.length){
-      arr=await fetchLearn(CONFIG.BATCH_SIZE,["random"]);
+      arr=await fetchLearn(CONFIG.BATCH_SIZE,["random"],true);
       if(my!==loadSeq)return;
     }
     if(!arr.length)throw new Error("empty");
@@ -2143,7 +2175,7 @@ async function loadLearnPart(my,key,perime,attempt=0){
         // chargement plus récent a remis le compteur à zéro (syncReset), et
         // décrémenter par-dessus éteindrait SA barre pendant qu'il travaille.
         if(my!==loadSeq)return;
-        loadLearnPart(my,key,true,attempt+1);
+        loadLearnPart(my,key,true,attempt+1,frais);
         syncing(false);
       },RETRY_DELAYS_MS[attempt]);
       return;
@@ -3027,7 +3059,10 @@ async function loadMore(){
     // tout point à un lot normal — sans ce test, le défilement infini se figeait
     // en silence dès que la catégorie ne rendait plus rien de neuf.
     if(!fresh.length){
-      more=await fetchLearn(CONFIG.BATCH_SIZE,["random"]);
+      // `frais` : même raison qu'au chargement (voir loadLearnPart) — le lot
+      // qu'on vient de recevoir est déjà tout entier à l'écran, en redemander
+      // une copie de cache ne peut rien donner d'autre.
+      more=await fetchLearn(CONFIG.BATCH_SIZE,["random"],true);
       fresh=more.filter(m=>!have.has(m.title));
     }
     fresh=fresh.map(markKind("learn"));

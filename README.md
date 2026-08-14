@@ -417,6 +417,12 @@ ce ne sont pas des actualités récentes, et ils monopolisaient sinon la tête d
   une source RSS lente ne retient pas les articles Wikipédia, et réciproquement.
 - `/api/learn` répond sur l'une de quelques variantes tirées au sort, donc **cacheables
   par le CDN** et mutualisées entre utilisateurs (un nonce par requête empêchait tout cache).
+  **Sauf quand l'utilisateur réclame du neuf** (bouton ↻, ou repli « tout ce lot est
+  déjà vu ») : le lot part alors avec un nonce et en `no-store`, et la réponse n'est
+  pas mise en cache. Sans cette exception, ↻ repiochait dans les quelques variantes
+  déjà servies — souvent le lot qu'on venait de lire — et la copie disque du navigateur
+  pouvait même le resservir *sans aucun appel réseau* pendant une heure : les actus se
+  renouvelaient, la moitié Wikipédia non.
 
 ### Quand les actus se rechargent-elles ?
 

@@ -88,7 +88,14 @@ module.exports = async function handler(req, res) {
   // est donc cacheable par le CDN, tout en restant variée à l'échelle d'une
   // session. C'est ce qui rend le backend réellement plus rapide que
   // l'agrégation client, au lieu de payer l'aller-retour à chaque lot.
-  res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=3600");
+  //
+  // Sauf demande EXPLICITE de l'utilisateur (bouton ↻, repli « tout est déjà
+  // vu ») : le client remplace alors le seau par un nonce (paramètre n) et
+  // veut un tirage qui n'a encore été servi à personne. On ne met pas cette
+  // réponse en cache — l'URL étant unique, elle n'y serait de toute façon
+  // jamais relue, et une entrée par appui sur ↻ ne ferait qu'encombrer.
+  if (q.n) res.setHeader("Cache-Control", "no-store");
+  else res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=3600");
   res.status(200).json({ items });
 };
 

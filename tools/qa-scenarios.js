@@ -1109,6 +1109,78 @@ const scenarios = {
     console.log("erreurs :", errors);
     await browser.close();
   },
+
+  // 24. ↻ : la moitié Wikipédia doit VRAIMENT changer
+  //
+  // Le faux /api/learn imite les deux caches du chemin réel : une URL à
+  // « seau » (b=…) rend toujours le MÊME lot pour ce seau (CDN s-maxage, et
+  // surtout la copie disque du navigateur, que la réponse laisse resservir une
+  // heure durant) ; une URL à nonce (n=…) rend un tirage neuf. Un ↻ qui repart
+  // sur un seau se voit donc resservir ce qu'on vient de lire — c'était le
+  // symptôme : les actus se renouvelaient, la moitié Wikipédia non.
+  async forcewiki() {
+    const lots = new Map(); // seau → lot figé, comme le ferait un cache
+    let neufs = 0;
+    const url = (u) => new URL(u, "http://x/");
+    const lot = (n) =>
+      JSON.stringify({
+        items: Array.from({ length: 20 }, (_, i) => ({
+          source: "Wikipédia",
+          title: `Wiki L${n}-${i}`,
+          desc: "x".repeat(200),
+          link: `https://fr.wikipedia.org/wiki/W${n}_${i}`,
+          img: "https://img.test/w.jpg",
+        })),
+      });
+    const { browser, page, errors } = await boot({ storage: READY });
+    const vus = [];
+    await page.route(/\/api\/learn/, (r) => {
+      const q = url(r.request().url()).searchParams;
+      vus.push(q.get("n") ? "nonce" : "seau " + q.get("b"));
+      let corps;
+      if (q.get("n")) corps = lot("N" + ++neufs);
+      else {
+        const b = q.get("b");
+        if (!lots.has(b)) lots.set(b, lot("B" + b));
+        corps = lots.get(b);
+      }
+      return r.fulfill({ status: 200, contentType: "application/json", body: corps });
+    });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    const wikis = () =>
+      page.evaluate(() =>
+        items
+          .filter((i) => i.kind === "learn")
+          .slice(0, 4)
+          .map((i) => i.title)
+      );
+    // On compare à TOUS les lots déjà servis, pas seulement au précédent : le
+    // symptôme n'est pas « deux ↻ de suite identiques » mais « ↻ repioche dans
+    // les quelques lots du vivier », donc rend au bout de trois appuis un lot
+    // déjà lu.
+    const dejaVus = [];
+    const rendreCompte = async (quoi) => {
+      const l = await wikis();
+      const cle = l.join("|");
+      const redite = dejaVus.includes(cle);
+      dejaVus.push(cle);
+      console.log(
+        `${quoi} :`,
+        l.join(", "),
+        redite ? "→ DÉJÀ SERVI (régression)" : "→ neuf"
+      );
+    };
+    await rendreCompte("au lancement");
+    for (let k = 1; k <= 5; k++) {
+      await page.click("#reloadBtn");
+      await page.waitForTimeout(2500);
+      await rendreCompte(`↻ n°${k}`);
+    }
+    console.log("appels /api/learn :", vus.join(", "));
+    console.log("erreurs :", errors);
+    await browser.close();
+  },
 };
 
 const which = process.argv[2];

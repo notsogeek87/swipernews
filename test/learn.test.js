@@ -41,3 +41,50 @@ test("dedupAndRank déduplique et place les cartes avec image d'abord", () => {
   assert.deepEqual(titles, ["A", "B", "C"]); // A une seule fois
   assert.equal(out[out.length - 1].title, "B"); // sans image en dernier
 });
+
+/* Le handler lui-même, sans réseau : `fetch` est remplacé le temps de l'appel.
+   Ce qui compte ici n'est pas le contenu (déjà couvert plus haut) mais l'en-tête
+   de cache — c'est lui qui décide si un lot Wikipédia peut être resservi. */
+async function appeler(query) {
+  const pages = [
+    {
+      title: "Sujet",
+      extract: "x".repeat(150),
+      canonicalurl: "https://fr.wikipedia.org/wiki/Sujet",
+      thumbnail: { source: "https://img/s.jpg" },
+    },
+  ];
+  const vrai = global.fetch;
+  global.fetch = async () => ({ ok: true, json: async () => ({ query: { pages } }) });
+  const entetes = {};
+  const res = {
+    setHeader: (k, v) => (entetes[k] = v),
+    status() {
+      return this;
+    },
+    json() {
+      return this;
+    },
+    end() {
+      return this;
+    },
+  };
+  try {
+    await learn({ method: "GET", query }, res);
+  } finally {
+    global.fetch = vrai;
+  }
+  return entetes;
+}
+
+test("un lot ordinaire (seau) est cacheable par le CDN", async () => {
+  const e = await appeler({ cats: "sciences", count: "20", b: "3", lang: "fr" });
+  assert.match(e["Cache-Control"], /s-maxage=300/);
+});
+
+test("un lot explicitement demandé (nonce) n'est jamais mis en cache", async () => {
+  // Sans cela, ↻ repioche dans les quelques seaux déjà servis — souvent le lot
+  // qu'on vient de lire.
+  const e = await appeler({ cats: "sciences", count: "20", n: "42.abc", lang: "fr" });
+  assert.equal(e["Cache-Control"], "no-store");
+});

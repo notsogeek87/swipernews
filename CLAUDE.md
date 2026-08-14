@@ -216,7 +216,7 @@ ne change côté web.
 ## Commandes
 
 ```bash
-npm test            # node --test — 59 tests, aucune dépendance à installer
+npm test            # node --test — 81 tests, aucune dépendance à installer
 npm run lint        # eslint api src test eslint.config.js  (PAS index.html)
 npm run format:check
 npm run cap:sync    # régénère www/ puis cap sync android
@@ -536,6 +536,19 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   Contrepartie : la marge ne peut pas suivre l'animation de la barre (voir le
   point précédent), donc la zone qu'elle occupe reste vide quand la barre
   s'efface, plutôt que de laisser le site en profiter.
+- **Un lot Wikipédia RÉCLAMÉ ne doit passer par aucun cache HTTP.** Le chemin
+  ordinaire de `/api/learn` porte un « seau » (`b=`) exprès cacheable et
+  mutualisé — mais il y a DEUX caches dessus, et le bouton ↻ les traversait tous
+  les deux : le CDN (`s-maxage=300`) repiochait dans les douze variantes déjà
+  servies, et le navigateur, lui, resservait sa copie disque une heure durant
+  (la réponse ne porte que `s-maxage`, ignoré d'un cache privé, plus
+  `stale-while-revalidate=3600`) — donc ↻ pouvait ne rien envoyer sur le réseau.
+  Symptôme : les actus se renouvelaient, la moitié Wikipédia restait la même,
+  plusieurs ↻ de suite. Une demande explicite passe donc `frais` à `fetchLearn`,
+  qui remplace le seau par un nonce ET pose `cache:"no-store"` ; `api/learn.js`
+  répond alors `no-store`. Tous les autres appels de l'app le faisaient déjà
+  (flux RSS, Wikipédia en direct) — celui-là seul l'oubliait. Scénario de QA :
+  `forcewiki`.
 - **`\b` juste après une lettre accentuée échoue TOUJOURS en JS**, y compris
   en fin de chaîne : sans indicateur Unicode, `\w` ne couvre que
   `[A-Za-z0-9_]`, donc `é`/`è`/… ne comptent jamais comme un caractère de mot
@@ -604,11 +617,12 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 
 `npm test` ne voit que `src/` et `api/` : **tout le JS en ligne d'`index.html`
 — le fil, l'état, le stockage local — n'est couvert par aucun test**. Ce banc
-comble le trou en jouant 23 scénarios réels dans Chromium, réseau entièrement
+comble le trou en jouant 24 scénarios réels dans Chromium, réseau entièrement
 simulé (rien ne part vers une vraie source) : hors-ligne, réseau lent, coupure en
 cours de requête, API en 500, RSS vide/tronqué/HTML, contenu démesuré, doublons,
 120 sources, stockage et cache abîmés, quota saturé, actions enchaînées, retour
-arrière, arrière-plan, relancement à froid, articles en mémoire.
+arrière, arrière-plan, relancement à froid, articles en mémoire, ↻ sur la moitié
+Wikipédia.
 
 ```bash
 npm i playwright-core --prefix /tmp/qa       # hors package.json, à dessein
