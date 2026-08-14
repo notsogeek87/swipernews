@@ -843,7 +843,12 @@ Les choix qui comptent :
   redeviendrait visible — d'où une mesure du rendu RÉEL de chaque élément,
   faite sur la page d'origine avant l'élagage. Sans elle, un article Wikipédia
   s'ouvrait sur « Si ce bandeau n'est plus pertinent, retirez-le… », légende
-  d'une icône de 12 px que personne n'avait jamais vue.
+  d'une icône de 12 px que personne n'avait jamais vue. Masqué ne veut pas dire
+  absent, cependant : une section **repliée** l'est aussi, et c'est du texte
+  qu'un toucher suffirait à ouvrir. Seul l'habillage part — ce qui porte moins
+  de 200 caractères ; au-delà, on garde. Wikipédia sur téléphone ouvre toutes
+  ses sections repliées : sans ce seuil, l'article se lirait en table des
+  matières.
 
 #### La typographie, réglable
 

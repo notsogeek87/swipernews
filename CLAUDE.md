@@ -588,9 +588,14 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   classe ne se devine pas. La correspondance clone/original se fait par INDICE
   dans `getElementsByTagName("*")` — marquer les nœuds vivants invaliderait le
   style à chaque écriture, et chaque mesure suivante repaierait une mise en
-  page. Garde-fou obligatoire : si le bloc lui-même n'a aucun rectangle (page
-  pas encore mise en page, conteneur en attente d'hydratation), ne rien
-  supprimer — tout serait supprimé.
+  page. Deux garde-fous obligatoires : si le bloc lui-même n'a aucun rectangle
+  (page pas encore mise en page, conteneur en attente d'hydratation), ne rien
+  supprimer — tout serait supprimé ; et ne retirer que les racines masquées de
+  MOINS de 200 caractères. **Masqué ne veut pas dire absent** : l'habillage
+  mobile de MediaWiki (Minerva) ouvre TOUTES ses sections repliées, donc en
+  `display:none` — sans ce seuil, l'article Wikipédia lu sur téléphone se
+  réduit à ses titres. Perdre une section coûte infiniment plus cher que
+  laisser passer un doublon masqué.
 - **`display:block` sur un `<table>` coûte la mise en page de tableau.** Les
   lignes passent alors dans une table ANONYME dimensionnée sur son contenu :
   colonnes serrées à gauche, moitié droite vide, quelle que soit la largeur

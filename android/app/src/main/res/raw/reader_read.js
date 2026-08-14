@@ -306,21 +306,41 @@
        On travaille par INDICES et non par marquage : écrire dans le DOM vivant
        invaliderait le style à chaque élément, et la mesure suivante repaierait
        une mise en page complète. Le clone étant une copie fidèle, le n-ième
-       élément de l'un est le n-ième élément de l'autre. */
+       élément de l'un est le n-ième élément de l'autre.
+
+       MASQUÉ NE VEUT PAS DIRE ABSENT : une section REPLIÉE est masquée elle
+       aussi, et c'est du texte que le lecteur pourrait déplier d'un toucher.
+       Cas réel rencontré (Wikipédia mobile, habillage Minerva) : toutes les
+       sections d'un article s'ouvrent repliées, donc en `display:none` — le
+       mode lecture ne rendait plus que les titres, « Préparation »,
+       « Consommation », et pas une ligne dessous. On ne retire donc que ce qui
+       porte MOINS de MIN_HIDDEN caractères : c'est la bande de l'habillage
+       (légende d'icône, intitulé d'accessibilité, métadonnée, étiquette), pas
+       celle d'un paragraphe. Perdre une section coûte infiniment plus cher que
+       laisser passer un doublon masqué.
+       La mesure porte sur les RACINES masquées, jamais sur chaque élément :
+       à l'intérieur d'une section repliée que l'on garde, tel <p> court serait
+       sinon retiré isolément — un trou au milieu du texte rendu. */
     var MAX_MEASURE = 6000;
+    var MIN_HIDDEN = 200;
     function hiddenIndexes(root) {
       // Bloc lui-même pas rendu (page pas encore mise en page, conteneur
       // masqué en attendant l'hydratation) : rien n'est mesurable, on ne
       // supprime rien plutôt que de tout supprimer.
       if (!root.getClientRects().length) return null;
-      var all = root.getElementsByTagName("*"), off = [];
+      var all = root.getElementsByTagName("*"), off = [], skip = null;
       if (all.length > MAX_MEASURE) return null;
       for (var i = 0; i < all.length; i++) {
-        var t = all[i].tagName;
+        var n = all[i], t = n.tagName;
+        // Descendant d'une racine déjà masquée : son sort est déjà scellé,
+        // dans un sens comme dans l'autre. (`all` est en ordre de document.)
+        if (skip && skip.contains(n)) continue;
         // Éléments sans boîte par nature : ils ne prouvent rien, et <br> compte.
         if (t === "BR" || t === "SCRIPT" || t === "STYLE" || t === "NOSCRIPT" ||
             t === "TEMPLATE" || t === "LINK" || t === "META" || t === "SOURCE" || t === "TRACK") continue;
-        if (!all[i].getClientRects().length) off.push(i);
+        if (n.getClientRects().length) continue;
+        skip = n;
+        if (len(n) < MIN_HIDDEN) off.push(i);
       }
       return off;
     }
@@ -369,6 +389,25 @@
         if (txt.length <= 40 && (LABELS.test(txt) || UI_LABELS.test(txt)) && !lb.querySelector("img")) {
           lb.parentNode.removeChild(lb);
         }
+      }
+
+      /* 3 bis. Le crayon d'édition d'un wiki, quand il n'a pas ses crochets.
+         L'habillage mobile de MediaWiki (Minerva) pose un simple lien
+         « modifier » sous chaque titre de section, dessiné en icône par sa
+         feuille de style : celle-ci jetée, il reste le MOT, en clair, sous
+         chaque titre.
+         Ce qui autorise à viser un verbe aussi banal, c'est le VOISINAGE et
+         non le mot : on ne retire ce lien que si le bloc qui le porte ne dit
+         rien d'autre (un titre, une puce d'action). Dans une phrase, le même
+         mot est intouchable — le bloc dépasse alors largement les 40
+         caractères. */
+      var EDIT_LINK = /^(modifier|modifier le code|modifier le wikicode|edit|edit source)$/i;
+      var anchors = art.getElementsByTagName("a");
+      for (k = anchors.length - 1; k >= 0; k--) {
+        var an = anchors[k], holder = an.parentNode;
+        if (!holder || holder.nodeType !== 1) continue;
+        if (!EDIT_LINK.test((an.textContent || "").replace(/\s+/g, " ").trim())) continue;
+        if (len(holder) <= 40) holder.removeChild(an);
       }
 
       /* 4. Images : rétablir les sources différées, écarter pixels et vignettes. */
@@ -469,6 +508,37 @@
         }
       }
       prune(); prune();
+
+      /* 6 bis. Titres restés seuls. La section qu'ils annonçaient est partie à
+         l'élagage — « Notes et références », « Liens externes » ou « Voir
+         aussi » ne sont plus qu'une liste de liens, retirée à l'étape 2 —, et
+         il reste un titre qui ne titre plus rien, en bas de l'article.
+         Le titre est jugé avec son EMBALLAGE : beaucoup de gabarits (MediaWiki
+         le premier) enferment le titre et son crayon d'édition dans un <div>,
+         et c'est ce div, pas le <h2>, qui précède la section. Sans quoi on
+         chercherait le contenu parmi les frères du titre, où il n'est jamais,
+         et tous les titres de l'article y passeraient. */
+      function headingLike(el) {
+        if (/^H[1-6]$/.test(el.tagName)) return true;
+        var inner = el.querySelector("h1,h2,h3,h4,h5,h6");
+        return !!inner && len(inner) === len(el);
+      }
+      var heads = art.querySelectorAll("h1,h2,h3,h4,h5,h6");
+      for (k = heads.length - 1; k >= 0; k--) {
+        var hd = heads[k];
+        if (!hd.parentNode) continue;
+        var node = hd;
+        while (node.parentNode && node.parentNode !== art && len(node.parentNode) === len(node)) {
+          node = node.parentNode;
+        }
+        var filled = false;
+        for (var sib = node.nextElementSibling; sib; sib = sib.nextElementSibling) {
+          if (headingLike(sib)) break;   // section suivante : la nôtre est vide
+          if (len(sib) || sib.querySelector("img")) { filled = true; break; }
+        }
+        if (!filled && node.parentNode) node.parentNode.removeChild(node);
+      }
+
       var brs = art.querySelectorAll("br");
       for (k = brs.length - 1; k >= 0; k--) {
         var run = 0, prev = brs[k].previousSibling;
