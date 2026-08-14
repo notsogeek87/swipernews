@@ -269,22 +269,62 @@
     return fresh.length ? fresh : list;
   }
 
-  /** Dédoublonne plusieurs listes, met les cartes avec image d'abord, mélange, tronque. */
-  function dedupAndRank(lists, count) {
-    const seen = new Set();
-    const out = [];
-    for (const list of lists) {
-      for (const it of list) {
-        const k = seenKey(it);
-        if (it.title && !seen.has(k)) {
-          seen.add(k);
-          out.push(it);
-        }
+  /** Vide des files à TOUR DE RÔLE dans `out` : un élément de chacune, puis on
+   *  recommence, jusqu'à `count` ou épuisement. Une file vide est simplement
+   *  sautée — les autres continuent d'alterner entre elles. */
+  function roundRobin(queues, out, count) {
+    const pos = queues.map(() => 0);
+    let servi = true;
+    while (servi && out.length < count) {
+      servi = false;
+      for (let q = 0; q < queues.length && out.length < count; q++) {
+        if (pos[q] >= queues[q].length) continue;
+        out.push(queues[q][pos[q]++]);
+        servi = true;
       }
     }
-    const withImg = shuffle(out.filter((i) => i.img));
-    const noImg = shuffle(out.filter((i) => !i.img));
-    return withImg.concat(noImg).slice(0, count);
+    return out;
+  }
+
+  /** Dédoublonne plusieurs listes (une par catégorie), mélange, et les sert à
+   *  TOUR DE RÔLE — une carte par catégorie, puis on recommence — en plaçant les
+   *  articles illustrés d'abord À L'INTÉRIEUR de chaque catégorie.
+   *
+   *  L'alternance est garantie, elle n'est plus laissée au hasard. Le mélange
+   *  global d'avant en produisait bien une en moyenne, mais par paquets — et le
+   *  tri « avec image d'abord », lui, les rendait carrément systématiques : la
+   *  proportion d'articles illustrés varie énormément d'une catégorie à l'autre
+   *  (un plat est presque toujours photographié ; un jeu vidéo presque jamais
+   *  sur fr.wikipedia, où la jaquette n'est pas libre). Les plats occupaient
+   *  donc tout le début du lot et les jeux vidéo toute la fin. C'est ce
+   *  symptôme-là qu'on corrige.
+   *
+   *  Contrepartie ASSUMÉE : l'image ne prime plus sur la catégorie. Une carte
+   *  sans image peut désormais passer avant une carte illustrée d'une autre
+   *  catégorie — sinon toute catégorie peu illustrée se retrouverait reléguée en
+   *  bloc à la fin, ce qui est précisément le bug. Le tri par image garde tout
+   *  son effet là où il compte : la troncature à `count` prend les articles
+   *  illustrés de CHAQUE catégorie avant ses articles nus.
+   *
+   *  L'ordre des catégories est lui aussi tiré au sort, sinon la première liste
+   *  ouvrirait tous les lots. */
+  function dedupAndRank(lists, count) {
+    const seen = new Set();
+    const files = [];
+    for (const list of lists) {
+      const avecImg = [];
+      const sansImg = [];
+      for (const it of list) {
+        const k = seenKey(it);
+        if (it && it.title && !seen.has(k)) {
+          seen.add(k);
+          (it.img ? avecImg : sansImg).push(it);
+        }
+      }
+      const file = shuffle(avecImg).concat(shuffle(sansImg));
+      if (file.length) files.push(file);
+    }
+    return roundRobin(shuffle(files), [], count);
   }
 
   /** Entrelace deux listes à cadence fixe : `every` éléments de `a`, puis un de

@@ -885,9 +885,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=119"></script>
-<script src="src/learn-core.js?v=119"></script>
-<script src="src/i18n.js?v=119"></script>
+<script src="src/lib.js?v=120"></script>
+<script src="src/learn-core.js?v=120"></script>
+<script src="src/i18n.js?v=120"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1417,7 +1417,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="119";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="120";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1891,11 +1891,35 @@ async function srcWikipedia(catKey){
 }
 
 /* Catégories à interroger pour un lot : une seule si filtre précis ;
-   plusieurs intérêts (jusqu'à 3) en "Tous" pour un fil toujours fourni et varié. */
+   plusieurs intérêts (jusqu'à CATS_PAR_LOT) en "Tous" pour un fil toujours
+   fourni et varié.
+   Le tirage n'est PAS indépendant d'un lot à l'autre : on tire parmi les MOINS
+   RÉCEMMENT interrogées (catUsage tient l'ordre d'ancienneté). Un tirage
+   indépendant laissait couramment la même catégorie sortir deux ou trois lots
+   de suite pendant que d'autres n'étaient jamais interrogées — et un lot durant
+   ~80 cartes à la dose par défaut, la lassitude arrive bien avant le rattrapage
+   statistique.
+   Le vivier garde volontairement UNE catégorie de marge (CATS_PAR_LOT+1 au
+   minimum) : forcer deux lots consécutifs à être disjoints reviendrait, avec six
+   intérêts cochés, à figer deux trios qui ne se croiseraient jamais. Avec la
+   marge, une seule catégorie du lot précédent peut revenir — la plus ancienne
+   des trois — et les attelages changent.
+   Une catégorie décochée entre-temps disparaît d'elle-même : tout part de
+   `interests`, jamais de la mémoire d'usage. */
+const CATS_PAR_LOT=3;
+let catUsage=[];   // clés dans l'ordre où elles ont servi, la plus ancienne en tête
 function catKeysForBatch(){
   if(cat!=="all")return [cat];
-  if(interests.length)return shuffle(interests.slice()).slice(0,3);
-  return ["random"];
+  if(!interests.length)return ["random"];
+  if(interests.length<=CATS_PAR_LOT)return shuffle(interests.slice());
+  // jamais interrogée (-1) = la plus ancienne de toutes ; à égalité, l'ordre
+  // reste celui du mélange préalable (le tri de JS est stable).
+  const anciennete=k=>catUsage.indexOf(k);
+  const vivier=shuffle(interests.slice()).sort((a,b)=>anciennete(a)-anciennete(b))
+    .slice(0,Math.max(CATS_PAR_LOT+1,interests.length-CATS_PAR_LOT));
+  const out=shuffle(vivier).slice(0,CATS_PAR_LOT);
+  catUsage=catUsage.filter(k=>!out.includes(k)).concat(out);
+  return out;
 }
 /* Agrégation côté client (repli si le backend /api/learn n'est pas disponible). */
 async function fetchLearnClient(keys,count){

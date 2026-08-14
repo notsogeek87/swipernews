@@ -216,7 +216,7 @@ ne change côté web.
 ## Commandes
 
 ```bash
-npm test            # node --test — 81 tests, aucune dépendance à installer
+npm test            # node --test — 82 tests, aucune dépendance à installer
 npm run lint        # eslint api src test eslint.config.js  (PAS index.html)
 npm run format:check
 npm run cap:sync    # régénère www/ puis cap sync android
@@ -488,6 +488,24 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 - **Tout texte venu d'un flux est borné** (`clampText`) : un `<description>` n'a
   aucune obligation d'être un résumé, et beaucoup de flux y publient l'article
   entier — mesuré à 400 Ko de cache pour cinq articles, contre ~5 Mo de quota.
+- **Dans un lot Wikipédia, la catégorie prime sur l'image.** `dedupAndRank`
+  (`src/lib.js`) sert les catégories À TOUR DE RÔLE, une carte chacune ; le tri
+  « avec image d'abord » ne joue plus qu'À L'INTÉRIEUR d'une catégorie. Le
+  mélange global d'avant produisait des paquets, et le tri par image les rendait
+  systématiques : la proportion d'articles illustrés varie énormément d'une
+  catégorie à l'autre (un plat est presque toujours photographié, un jeu vidéo
+  presque jamais sur fr.wikipedia, où la jaquette n'est pas libre), donc on
+  lisait tous les plats PUIS tous les jeux vidéo. Remettre l'image en priorité
+  globale relèguerait de nouveau en bloc toute catégorie peu illustrée. Le tri
+  par image garde son effet là où il compte : la troncature à `count` prend les
+  articles illustrés de CHAQUE catégorie avant ses articles nus.
+- **Les catégories interrogées tournent d'un lot à l'autre** (`catKeysForBatch`,
+  `catUsage`) : le tirage se fait parmi les MOINS RÉCEMMENT interrogées, pas au
+  hasard. Un lot dure ~80 cartes à la dose par défaut ; avec un tirage
+  indépendant, la même catégorie sortait deux ou trois lots de suite pendant que
+  d'autres n'étaient jamais interrogées. Le vivier garde UNE catégorie de marge
+  (`CATS_PAR_LOT + 1` au minimum) exprès : exiger des lots consécutifs disjoints
+  figerait, à six intérêts cochés, deux trios qui ne se croiseraient jamais.
 
 ---
 

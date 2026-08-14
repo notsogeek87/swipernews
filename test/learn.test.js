@@ -42,6 +42,36 @@ test("dedupAndRank déduplique et place les cartes avec image d'abord", () => {
   assert.equal(out[out.length - 1].title, "B"); // sans image en dernier
 });
 
+/* Le cas réel qui a motivé le tour de rôle : deux catégories dont l'une est
+   presque toujours illustrée (les plats) et l'autre presque jamais (les jeux
+   vidéo sur fr.wikipedia). Avec un mélange global « avec image d'abord », le lot
+   sortait tous les plats puis tous les jeux — exactement ce que l'utilisateur
+   voyait. On vérifie donc l'ALTERNANCE, pas un ordre précis (le tirage est
+   aléatoire) : aucune catégorie ne doit occuper trois cartes de suite. */
+test("dedupAndRank alterne les catégories au lieu de les servir par paquets", () => {
+  const plats = Array.from({ length: 10 }, (_, i) => ({
+    title: "Plat " + i,
+    link: "p" + i,
+    img: "i",
+    cat: "cuisine",
+  }));
+  const jeux = Array.from({ length: 10 }, (_, i) => ({
+    title: "Jeu " + i,
+    link: "j" + i,
+    img: "", // aucune jaquette libre : la catégorie entière est sans image
+    cat: "jeuxvideo",
+  }));
+  for (let essai = 0; essai < 50; essai++) {
+    const out = learn.dedupAndRank([plats, jeux], 20);
+    assert.equal(out.length, 20);
+    let suite = 1;
+    for (let i = 1; i < out.length; i++) {
+      suite = out[i].cat === out[i - 1].cat ? suite + 1 : 1;
+      assert.ok(suite <= 2, `paquet de ${suite} cartes « ${out[i].cat} » d'affilée`);
+    }
+  }
+});
+
 /* Le handler lui-même, sans réseau : `fetch` est remplacé le temps de l'appel.
    Ce qui compte ici n'est pas le contenu (déjà couvert plus haut) mais l'en-tête
    de cache — c'est lui qui décide si un lot Wikipédia peut être resservi. */
