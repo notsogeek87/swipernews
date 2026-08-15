@@ -1233,6 +1233,93 @@ const scenarios = {
     console.log("erreurs :", errors);
     await browser.close();
   },
+
+  // 26. Le lot Wikipédia d'AVANCE. Un ↻ ne peut pas être rapide en allant
+  // chercher son lot au moment de l'appui : il court-circuite les deux caches
+  // HTTP par construction, donc il paie le chemin complet à chaque fois. La
+  // réserve le rend instantané sans rien céder — le lot est réclamé d'avance,
+  // avec le même nonce, simplement plus tôt.
+  // Ce qu'on vérifie, et qui ne se lit pas dans le code : que le 2e ↻ ne
+  // produise AUCUNE requête au moment de l'appui, et que le contenu soit tout
+  // de même neuf à chaque tour (une réserve servie deux fois, ou servie après
+  // un changement de fil, se verrait ici).
+  async avancewiki() {
+    let n = 0;
+    const lot = () => {
+      const k = ++n;
+      return JSON.stringify({
+        items: Array.from({ length: 20 }, (_, i) => ({
+          source: "Wikipédia",
+          title: `Wiki L${k}-${i}`,
+          desc: "x".repeat(200),
+          link: `https://fr.wikipedia.org/wiki/W${k}_${i}`,
+          img: "https://img.test/w.jpg",
+        })),
+      });
+    };
+    const LAT = 900; // latence simulée : sans elle, « instantané » ne veut rien dire
+    const { browser, page, errors } = await boot({
+      storage: { ...READY, "fluxswipe.mix.v1": "5" }, // 5 = Wikipédia seul
+    });
+    let appels = [];
+    await page.route(/wikipedia\.org\/w\/api\.php|\/api\/learn/, async (r) => {
+      appels.push(Date.now());
+      await new Promise((z) => setTimeout(z, LAT));
+      r.fulfill({ status: 200, contentType: "application/json", body: lot() });
+    });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500 + LAT);
+    const tete = () => page.evaluate(() => (items[0] || {}).title || "—");
+    let avant = await tete();
+    for (let k = 1; k <= 3; k++) {
+      // On laisse le temps à la réserve de se constituer (LEARN_SPARE_DELAY_MS
+      // + la latence), comme le ferait quelqu'un qui lit entre deux appuis.
+      await page.waitForTimeout(2500 + LAT + 600);
+      appels = [];
+      const t0 = Date.now();
+      await page.click("#reloadBtn");
+      let vu = -1;
+      for (let i = 0; i < 100; i++) {
+        await page.waitForTimeout(40);
+        if ((await tete()) !== avant) {
+          vu = Date.now() - t0;
+          break;
+        }
+      }
+      // Requêtes parties dans les 300 ms suivant l'appui : c'est ce que la
+      // réserve doit éviter. Celle qui la RECHARGE part bien plus tard.
+      const pendant = appels.filter((t) => t - t0 < 300).length;
+      const apres = await tete();
+      console.log(
+        `↻ n°${k} : tête ${apres} après ${vu < 0 ? "JAMAIS" : vu + " ms"}` +
+          `  — requêtes à l'appui : ${pendant}` +
+          (k === 1
+            ? "  (le 1er arme la réserve, il paie le réseau : normal)"
+            : pendant === 0
+              ? "  → servi par la réserve ✓"
+              : "  → RÉSEAU au lieu de la réserve (régression)") +
+          (apres === avant ? "  ← tête INCHANGÉE (régression)" : "")
+      );
+      avant = apres;
+    }
+    // Le garde-fou qui coûterait le plus cher s'il lâchait : une réserve
+    // constituée pour un fil ne doit JAMAIS être servie à un autre (langue,
+    // source ou centre d'intérêt changés entre-temps), et une réserve
+    // inspectée doit être consommée dans tous les cas — sinon elle reviendrait
+    // servir le même lot deux fois.
+    await page.waitForTimeout(2500 + LAT + 600);
+    const garde = await page.evaluate(() => {
+      const avait = !!learnSpare;
+      const mauvais = takeLearnSpare("un|autre|fil");
+      return { avait, servi: !!mauvais, videeQuandMeme: !learnSpare };
+    });
+    console.log(
+      `réserve présente : ${garde.avait} | servie à un AUTRE fil : ${garde.servi}` +
+        ` (doit être false) | vidée quand même : ${garde.videeQuandMeme} (doit être true)`
+    );
+    console.log("erreurs :", errors);
+    await browser.close();
+  },
 };
 
 const which = process.argv[2];

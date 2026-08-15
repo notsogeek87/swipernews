@@ -216,7 +216,7 @@ ne change côté web.
 ## Commandes
 
 ```bash
-npm test            # node --test — 82 tests, aucune dépendance à installer
+npm test            # node --test — 88 tests, aucune dépendance à installer
 npm run lint        # eslint api src test eslint.config.js  (PAS index.html)
 npm run format:check
 npm run cap:sync    # régénère www/ puis cap sync android
@@ -379,6 +379,29 @@ genre de script dérape.
   que de préfiltre). `checkMissingImage` comble une image totalement absente du
   flux (contrairement à `applyBg`, qui ne s'occupe que d'une image trop
   petite).
+  **AUCUNE de ces sondes ne vaut pour une carte Wikipédia** : jamais payante,
+  jamais sponsorisée, et son image vient de l'API, pas d'une page HTML tierce.
+  `cardHTML` l'écarte des trois marqueurs (`data-pw`, `data-sponsor`,
+  `data-noimg-link`) ; `applyBg`, longtemps la dernière à l'oublier, le fait
+  maintenant aussi — et son test « rien à interroger » passe AVANT la mesure de
+  largeur, qui ne servait qu'à décider de cet appel. Le motif vaut d'être
+  retenu, il n'est pas évident : MediaWiki n'AGRANDIT jamais un raster, donc une
+  vignette rendue sous `pithumbsize` dit que le fichier source est lui-même plus
+  petit — l'`og:image` de l'article, plafonné à cette même source, ne peut pas
+  faire mieux. Mesuré avant correction : 20 appels `/api/og` pour 20 cartes
+  parcourues, soit une invocation serverless par carte en dose « Wikipédia
+  seul ».
+- `learnSpare` / `prefetchLearnSpare()` / `takeLearnSpare()` — le lot Wikipédia
+  d'AVANCE, seul moyen de rendre le ↻ rapide sans toucher à la règle de cache
+  ci-dessous (le lot reste réclamé au nonce, il est simplement demandé plus
+  tôt). Réserve d'UN lot, ARMÉE seulement par un premier ↻ (qui n'utilise pas le
+  bouton ne paie aucune requête de plus), à USAGE UNIQUE — `takeLearnSpare` la
+  vide même quand elle ne convient pas, sinon elle reviendrait servir deux fois
+  le même lot — et liée au fil qui l'a demandée (`key` = `feedKey()`), sinon un
+  changement de langue ou de filtre se verrait servir le lot du fil précédent.
+  Elle n'est PAS garantie encore neuve à l'usage (l'utilisateur a pu lire ses
+  articles entre-temps) : c'est le filet « tout est déjà vu » de
+  `loadLearnPart` qui rattrape, il suffit. Scénario `avancewiki`.
 - `ICON_*` / `setIcons()` — UNE famille de tracés pour toute l'app (2 px,
   boîte de 24, `currentColor`), posée aussi dans la barre du haut. Ne pas y
   remettre d'emoji ni de glyphe de police : ils ne s'alignent pas entre eux.
@@ -580,6 +603,18 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   répond alors `no-store`. Tous les autres appels de l'app le faisaient déjà
   (flux RSS, Wikipédia en direct) — celui-là seul l'oubliait. Scénario de QA :
   `forcewiki`.
+  **Corollaire, et la seule bonne façon d'accélérer le ↻ :** puisqu'il paie le
+  chemin complet par construction, on ne le rend pas rapide en lui rendant un
+  cache, mais en ayant le lot DÉJÀ EN MAIN quand le doigt se pose — voir
+  `learnSpare` dans la carte du code. Mesuré : 1 000 ms au premier appui (qui
+  arme la réserve), ~80 ms aux suivants, sans aucune requête à l'appui.
+  Ce qui a été envisagé puis ÉCARTÉ, pour ne pas y revenir : faire tirer au ↻
+  un « seau » que la session n'a pas encore utilisé, au lieu du nonce. Le gain
+  serait nul là où le besoin est — `catKeysForBatch` change le trio de
+  catégories à CHAQUE appui, donc l'URL change avec lui, et la rotation sans
+  remise évite justement les variantes que la session a déjà réchauffées. Il ne
+  resterait que la mutualisation entre utilisateurs, invérifiable à ce trafic,
+  et la garantie de fraîcheur serait perdue au passage.
 - **`\b` juste après une lettre accentuée échoue TOUJOURS en JS**, y compris
   en fin de chaîne : sans indicateur Unicode, `\w` ne couvre que
   `[A-Za-z0-9_]`, donc `é`/`è`/… ne comptent jamais comme un caractère de mot
@@ -687,14 +722,22 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 
 `npm test` ne voit que `src/` et `api/` : **tout le JS en ligne d'`index.html`
 — le fil, l'état, le stockage local — n'est couvert par aucun test**. Ce banc
-comble le trou en jouant 25 scénarios réels dans Chromium, réseau entièrement
+comble le trou en jouant 26 scénarios réels dans Chromium, réseau entièrement
 simulé (rien ne part vers une vraie source) : hors-ligne, réseau lent, coupure en
 cours de requête, API en 500, RSS vide/tronqué/HTML, contenu démesuré, doublons,
 120 sources, stockage et cache abîmés, quota saturé, actions enchaînées, retour
 arrière, arrière-plan, relancement à froid, articles en mémoire, ↻ sur la moitié
 Wikipédia (`forcewiki` pour le contenu du lot, `tetewiki` pour la TÊTE du fil —
 les deux, parce que le premier ne voyait pas que les deux premières cartes, elles,
-ne bougeaient jamais).
+ne bougeaient jamais — et `avancewiki` pour la VITESSE du ↻, qui compte les
+requêtes parties à l'appui et doit en trouver zéro dès le second).
+
+Deux d'entre eux signalent des lignes qui ne sont PAS des régressions, et qu'il
+ne faut pas partir corriger : `offline` fait remonter des
+`net::ERR_INTERNET_DISCONNECTED` (c'est son sujet) et `back` un
+`PAGEERROR: Failed to read the 'localStorage' property` (il navigue exprès vers
+`about:blank`, qui n'y a pas accès). Les deux sont présents à l'identique sur
+`main` — les comparer à un checkout propre avant d'y voir autre chose.
 
 ```bash
 npm i playwright-core --prefix /tmp/qa       # hors package.json, à dessein
