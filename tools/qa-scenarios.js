@@ -769,6 +769,66 @@ const scenarios = {
       "idx =",
       await page.evaluate(() => currentIndex())
     );
+
+    /* Et l'envers de la même règle : on remonte en tête UNE fois, pas deux.
+       Les deux moitiés du fil se rendent chacune de leur côté ; quand elles ne
+       répondent pas en même temps — ici Wikipédia délibérément plus lent que
+       l'échéance des actus — chacune remontait en tête pour son compte. Vécu
+       par l'utilisateur : le fil se rafraîchit, on remonte en tête, on glisse
+       quelques cartes, puis le fil remonte tout seul une seconde fois sur la
+       MÊME carte au moment où la barre de chargement s'éteint. */
+    let numLot = 0;
+    await page.route(/api\/learn|wikipedia\.org\/w\/api\.php/, async (r) => {
+      const n = ++numLot;
+      await new Promise((z) => setTimeout(z, 6000)); // > NEWS_DEADLINE_MS
+      // Un lot RECONNAISSABLE : sans quoi on ne saurait pas si le rendu de
+      // cette moitié a seulement eu lieu.
+      return r.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: Array.from({ length: 20 }, (_, i) => ({
+            source: "Wikipédia",
+            title: `Wiki lot${n}-${i}`,
+            desc: "x".repeat(200),
+            link: `https://fr.wikipedia.org/wiki/L${n}_${i}`,
+            img: "https://img.test/w.jpg",
+          })),
+        }),
+      });
+    });
+    // La réserve d'avance court-circuiterait le réseau, donc le RETARD qu'on
+    // veut simuler (voir learnSpare) : on la vide juste avant l'appui.
+    await page.evaluate(() => {
+      learnSpare = null;
+      document.getElementById("reloadBtn").click();
+    });
+    // On attend l'échéance des actus (remontée n°1), puis on glisse.
+    await page.waitForTimeout(3200);
+    const apresEcheance = await page.evaluate(() => currentIndex());
+    await page.evaluate(() => {
+      feedEl.scrollTop = feedEl.children[5].offsetTop;
+      onCardChange();
+    });
+    await page.waitForTimeout(200);
+    const lu = await page.evaluate(() => (currentItem() || {}).title || "—");
+    // Puis le lot Wikipédia arrive, bien après.
+    await page.waitForTimeout(6000);
+    const apresWiki = await page.evaluate(() => ({
+      idx: currentIndex(),
+      titre: (currentItem() || {}).title || "—",
+      enTete: feedEl.scrollTop < 5,
+      lotRendu: items.some((i) => /^Wiki lot/.test(i.title || "")),
+    }));
+    console.log(
+      `Wikipédia en retard → remontée n°1 idx=${apresEcheance}, lu « ${lu} »,` +
+        ` après le lot : idx=${apresWiki.idx} « ${apresWiki.titre} »` +
+        (!apresWiki.lotRendu
+          ? "  ← le lot tardif n'a pas été rendu, le scénario ne prouve RIEN"
+          : apresWiki.enTete
+            ? "  ← REMONTÉE une 2e fois (régression)"
+            : "  → position conservée ✓")
+    );
     console.log(
       "erreurs :",
       errors.filter((e) => /PAGEERROR/.test(e))

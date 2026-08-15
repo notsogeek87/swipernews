@@ -527,11 +527,29 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   seule vraie fin. Ne pas les rattacher à l'échéance : elle peut être suivie de
   plusieurs autres lots.
   Corollaire indissociable : **on ne remonte en tête qu'UNE fois par
-  chargement** (`enTeteFait`). La règle produit « l'article le plus récent sous
-  les yeux » est tenue par l'échéance ; la repeinture finale, vingt secondes plus
-  tard, garde donc l'ancrage — la refaire arracherait à sa lecture quelqu'un qui a
-  déjà commencé à glisser dans le fil neuf. Vérifié par `forcetop`, qui doit
-  continuer à trouver l'index 0 après ↻ ET après un rafraîchissement automatique.
+  chargement**. La règle produit « l'article le plus récent sous les yeux » est
+  tenue par la première repeinture ; les suivantes gardent l'ancrage — les
+  refaire arracherait à sa lecture quelqu'un qui a déjà commencé à glisser dans
+  le fil neuf. Vérifié par `forcetop`, qui doit continuer à trouver l'index 0
+  après ↻ ET après un rafraîchissement automatique.
+- **La remontée en tête est un jeton PARTAGÉ par les deux moitiés**
+  (`teteAPrendre(my)`), jamais un compteur par moitié. Chacune se rend de son
+  côté sans consulter l'autre : `loadNewsPart` comptait ses propres repeintures
+  et `loadLearnPart` remontait en tête à CHAQUE renouvellement, donc DEUX
+  remontées par rafraîchissement dès que les deux moitiés ne répondaient pas
+  ensemble — cas ordinaire, `/api/learn` étant souvent plus lent que les
+  premières sources RSS. Vécu par l'utilisateur : le fil se rafraîchit, on
+  remonte en tête, on glisse quelques cartes, puis le fil remonte tout seul une
+  seconde fois sur la MÊME carte au moment où la barre de chargement s'éteint.
+  Le jeton est ESTAMPILLÉ par la génération de chargement, jamais un booléen —
+  un `my` neuf à chaque `loadFeeds` donne un jeton neuf sans rien à
+  réinitialiser, et une génération abandonnée ne peut pas bloquer la suivante.
+  Il se prend au moment du rendu RÉEL (après `whenFeedIdle`), pas à la
+  programmation : c'est la moitié qui repeint la première qui l'obtient. Ce qui
+  reste strictement local, c'est le GEL (`remix`) : un renouvellement ne gèle
+  pas, qu'il ait obtenu la tête ou non — les deux notions se ressemblent mais ne
+  se recouvrent pas. Troisième acte de `forcetop`, avec Wikipédia délibérément
+  plus lent que l'échéance.
 - **Une source a UN budget, pas un délai d'expiration par étape**
   (`FEED_BUDGET_MS`, voir `fetchFeedRobust`). Les trois transports — backend
   same-origin, proxys publics en parallèle, rss2json — avaient chacun leur 7 s,

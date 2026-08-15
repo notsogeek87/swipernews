@@ -411,9 +411,13 @@ et 2 mortes), le fil affiché restait celui d'il y a une demi-heure pendant **24
 secondes**, alors que 38 sources sur 40 avaient répondu en moins de deux. Avec
 l'échéance : **2,6 s**, pour le même contenu final (120 articles dans les deux cas).
 
-Le fil ne remonte en tête **qu'une fois** par chargement : si l'échéance l'a déjà fait,
-la repeinture finale garde l'ancrage sur l'article en train d'être lu, plutôt que
-d'arracher à sa lecture quelqu'un qui a déjà commencé à glisser dans le fil neuf.
+Le fil ne remonte en tête **qu'une fois** par chargement, et cette fois-là vaut pour
+les **deux** moitiés du fil. Les repeintures suivantes — actus en retard comme lot
+Wikipédia arrivé après coup — gardent l'ancrage sur l'article en train d'être lu,
+plutôt que d'arracher à sa lecture quelqu'un qui a déjà commencé à glisser dans le fil
+neuf. Chaque moitié comptant auparavant pour elle seule, un rafraîchissement où
+Wikipédia répondait plus lentement que les sources RSS remontait en tête **deux** fois,
+la seconde au moment où la barre de chargement s'éteignait.
 
 Pendant qu'un chargement se poursuit en arrière-plan, une fine barre en haut de
 l'écran l'indique. Elle ne bloque rien : le fil déjà affiché reste lisible — et depuis
