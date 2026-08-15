@@ -1181,6 +1181,58 @@ const scenarios = {
     console.log("erreurs :", errors);
     await browser.close();
   },
+
+  // 25. La TÊTE du fil doit se renouveler aussi. `forcewiki` (ci-dessus) ne
+  // regardait que le contenu du lot : il ne pouvait pas voir que les deux
+  // premières cartes, elles, ne bougeaient jamais. Le rendu de la moitié
+  // Wikipédia gelait la tête (la carte affichée et son aperçu) à CHAQUE fois,
+  // y compris sur un renouvellement — les deux premiers articles de l'ancien
+  // fil étaient donc reportés en tête du neuf, ↻ après ↻.
+  // Dose « Wikipédia seul » exprès : c'est là que rien ne rattrapait le défaut,
+  // les actus (dont la repeinture finale, elle, ne gèle pas) n'étant jamais
+  // chargées.
+  async tetewiki() {
+    let n = 0;
+    const lot = () => {
+      const k = ++n;
+      return JSON.stringify({
+        items: Array.from({ length: 20 }, (_, i) => ({
+          source: "Wikipédia",
+          title: `Wiki L${k}-${i}`,
+          desc: "x".repeat(200),
+          link: `https://fr.wikipedia.org/wiki/W${k}_${i}`,
+          img: "https://img.test/w.jpg",
+        })),
+      });
+    };
+    const { browser, page, errors } = await boot({
+      storage: { ...READY, "fluxswipe.mix.v1": "5" }, // 5 = Wikipédia seul
+    });
+    await page.route(/wikipedia\.org|\/api\/learn/, (r) =>
+      r.fulfill({ status: 200, contentType: "application/json", body: lot() })
+    );
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    const tetes = () => page.evaluate(() => items.slice(0, 3).map((i) => i.title));
+    let avant = await tetes();
+    console.log("au lancement :", avant.join(" | "));
+    for (let k = 1; k <= 3; k++) {
+      await page.click("#reloadBtn");
+      await page.waitForTimeout(2500);
+      const apres = await tetes();
+      const revenues = apres.filter((t) => avant.includes(t));
+      console.log(
+        `↻ n°${k} :`,
+        apres.join(" | "),
+        revenues.length
+          ? `→ ${revenues.length} carte(s) REVENUE(S) : ${revenues.join(", ")} (régression)`
+          : "→ tête neuve"
+      );
+      avant = apres;
+    }
+    console.log("erreurs :", errors);
+    await browser.close();
+  },
 };
 
 const which = process.argv[2];

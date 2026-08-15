@@ -885,9 +885,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=120"></script>
-<script src="src/learn-core.js?v=120"></script>
-<script src="src/i18n.js?v=120"></script>
+<script src="src/lib.js?v=121"></script>
+<script src="src/learn-core.js?v=121"></script>
+<script src="src/i18n.js?v=121"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1417,7 +1417,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="120";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="121";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2128,7 +2128,13 @@ const RETRY_DELAYS_MS=[1500,3000,5000];
    pas simplement dû. Il court-circuite alors les caches HTTP du lot Wikipédia
    (voir fetchLearn) : sans lui, ↻ pouvait ne rien envoyer sur le réseau et
    resservir le lot déjà lu, pendant que les actus, elles, se renouvelaient. */
-async function loadLearnPart(my,key,perime,attempt=0,frais=false){
+/* `renouv` : ce chargement RENOUVELLE le fil (↻, filet des 30 min, réouverture
+   au-delà du seuil), par opposition à un appoint d'arrière-plan (dose montée,
+   réserve qui se tarit, moitié Wikipédia restée vide). Il commande le rendu :
+   voir remix/render plus bas. Séparé de `perime` parce qu'une retentative doit
+   passer outre la garde de la ligne suivante SANS pour autant se transformer en
+   renouvellement — sinon un appoint qui a d'abord échoué remonterait en tête. */
+async function loadLearnPart(my,key,perime,attempt=0,frais=false,renouv=perime){
   if(!mixLevel().learn)return;      // dose « actus seules » : Wikipédia n'est pas appelé
   if(!perime&&learnItems.length)return;
   // Même signal que côté actus (voir loadNewsPart) : sans lui, un rechargement
@@ -2173,7 +2179,20 @@ async function loadLearnPart(my,key,perime,attempt=0,frais=false){
     whenFeedIdle(()=>{
       syncing(false);
       if(my!==loadSeq)return;                       // périmé pendant l'attente du contact
-      remix(true);render();hideStates();feedKeyShown=key;
+      /* Le GEL de la tête (remix(true)) ne vaut que pour un appoint : il
+         protège la carte sous le doigt et son aperçu d'un lot qui arrive en
+         arrière-plan. Sur un renouvellement il faisait l'inverse de ce qu'on
+         demande — il REPORTAIT dans le fil neuf les deux premières cartes de
+         l'ancien, indéfiniment : à chaque ↻ les mêmes deux articles Wikipédia
+         en tête, alors que la suite se renouvelait. Les actus avaient déjà
+         appris la leçon (voir rebuild(top)/flushRender dans loadNewsPart) ;
+         cette moitié-ci ne l'avait pas. Un renouvellement remonte donc aussi en
+         tête (render(true)), comme la repeinture finale des actus : c'est la
+         même règle produit, l'article le plus neuf sous les yeux. La moitié
+         Wikipédia n'y échappait que parce qu'elle ne la connaissait pas — et en
+         dose « Wikipédia seul », où les actus ne se chargent jamais, personne ne
+         venait plus la rattraper. */
+      remix(!renouv);render(renouv);hideStates();feedKeyShown=key;
       if(newsSettled)cacheSave(key);                // sinon les actus l'enregistreront
     });
     garde=false;
@@ -2199,7 +2218,7 @@ async function loadLearnPart(my,key,perime,attempt=0,frais=false){
         // chargement plus récent a remis le compteur à zéro (syncReset), et
         // décrémenter par-dessus éteindrait SA barre pendant qu'il travaille.
         if(my!==loadSeq)return;
-        loadLearnPart(my,key,true,attempt+1,frais);
+        loadLearnPart(my,key,true,attempt+1,frais,renouv);
         syncing(false);
       },RETRY_DELAYS_MS[attempt]);
       return;

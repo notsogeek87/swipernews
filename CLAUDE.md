@@ -474,8 +474,21 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   Wikipédia restait celle du premier chargement, rejouée depuis le cache disque à
   chaque ouverture, et ramenait des articles déjà lus. Le motif de l'exception
   (« remplacer ferait disparaître la carte en cours de lecture ») ne tient pas :
-  le rendu qui suit gèle la tête du fil (`remix(true)`), donc la carte affichée
-  survit — vérifié par le scénario `reprisewiki`.
+  passé le seuil, le fil est NEUF et remonte en tête de toute façon — la carte
+  qu'on lisait n'a plus à être préservée (vérifié par `reprisewiki`).
+- **Le GEL de la tête (`remix(true)`) est réservé aux APPOINTS**, jamais à un
+  renouvellement. Il protège la carte sous le doigt et son aperçu d'un lot qui
+  arrive en arrière-plan (dose montée, réserve qui se tarit, une source d'actu
+  qui répond en retard). Appliqué à un renouvellement, il fait l'inverse de ce
+  qu'on demande : il REPORTE dans le fil neuf les deux premières cartes de
+  l'ancien. Les actus le savaient déjà (`rebuild(top)`/`flushRender` dans
+  `loadNewsPart` : la repeinture finale ne gèle pas et remonte en tête) ; la
+  moitié Wikipédia, elle, gelait TOUJOURS — donc à chaque ↻ les deux mêmes
+  articles Wikipédia en tête, pendant que la suite se renouvelait. En dose
+  « Wikipédia seul » rien ne rattrapait le défaut, les actus n'étant jamais
+  chargées. D'où `renouv` dans `loadLearnPart`, distinct de `perime` (une
+  retentative doit passer la garde de rechargement sans pour autant devenir un
+  renouvellement) — scénario `tetewiki`.
 - **Les trois déclencheurs automatiques de fraîcheur passent par
   `refreshIfStale()`**, qui refuse d'en lancer un quand un chargement d'actus est
   déjà en vol : le filet tourne toutes les 60 s, un chargement de 40 sources dure
@@ -674,12 +687,14 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 
 `npm test` ne voit que `src/` et `api/` : **tout le JS en ligne d'`index.html`
 — le fil, l'état, le stockage local — n'est couvert par aucun test**. Ce banc
-comble le trou en jouant 24 scénarios réels dans Chromium, réseau entièrement
+comble le trou en jouant 25 scénarios réels dans Chromium, réseau entièrement
 simulé (rien ne part vers une vraie source) : hors-ligne, réseau lent, coupure en
 cours de requête, API en 500, RSS vide/tronqué/HTML, contenu démesuré, doublons,
 120 sources, stockage et cache abîmés, quota saturé, actions enchaînées, retour
 arrière, arrière-plan, relancement à froid, articles en mémoire, ↻ sur la moitié
-Wikipédia.
+Wikipédia (`forcewiki` pour le contenu du lot, `tetewiki` pour la TÊTE du fil —
+les deux, parce que le premier ne voyait pas que les deux premières cartes, elles,
+ne bougeaient jamais).
 
 ```bash
 npm i playwright-core --prefix /tmp/qa       # hors package.json, à dessein
