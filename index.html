@@ -885,9 +885,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=121"></script>
-<script src="src/learn-core.js?v=121"></script>
-<script src="src/i18n.js?v=121"></script>
+<script src="src/lib.js?v=123"></script>
+<script src="src/learn-core.js?v=123"></script>
+<script src="src/i18n.js?v=123"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -896,7 +896,7 @@
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
   const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","interleave","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain"],
-              SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket"],
+              SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket","perCatLimit"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
   for(const ns in need){
@@ -1417,7 +1417,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="121";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="123";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1880,9 +1880,13 @@ function findImage(node,raw){
    partagée avec /api/learn (elles avaient divergé). Ici on ne garde que la
    politique de récupération propre au navigateur (direct si CORS, sinon proxy). */
 
-/* --- Wikipédia (extrait d'intro + image, tri aléatoire par catégorie) --- */
-async function srcWikipedia(catKey){
-  const url=LEARN.wikiUrl(catKey,LANG);
+/* --- Wikipédia (extrait d'intro + image, tri aléatoire par catégorie) ---
+   `limit` : pages demandées à CETTE catégorie, calculé par l'appelant (voir
+   fetchLearnClient et LEARN.perCatLimit). Omis, on retombe sur le plafond de
+   l'API — c'est le comportement d'avant, et il reste juste pour un appel
+   isolé. */
+async function srcWikipedia(catKey,limit){
+  const url=LEARN.wikiUrl(catKey,LANG,limit);
   let data;
   try{const res=await fetchWithTimeout(url,{cache:"no-store"},CONFIG.FETCH_TIMEOUT);
     if(!res.ok)throw new Error("http");data=await res.json();}
@@ -1923,8 +1927,13 @@ function catKeysForBatch(){
 }
 /* Agrégation côté client (repli si le backend /api/learn n'est pas disponible). */
 async function fetchLearnClient(keys,count){
+  // Même calcul que côté backend (api/learn.js) : on ne demande à chaque
+  // catégorie que ce que le tour de rôle de dedupAndRank va consommer, marge
+  // comprise. C'est le chemin de l'APK, qui agrège sur l'appareil — l'économie
+  // d'extraits d'intro s'y paie en réseau mobile et en batterie.
+  const perCat=LEARN.perCatLimit(count,keys.length);
   const tag=(p,catKey)=>p.then(list=>list.map(it=>({...it,cat:catKey}))); // marque la catégorie
-  const tasks=keys.map(catKey=>tag(srcWikipedia(catKey),catKey));
+  const tasks=keys.map(catKey=>tag(srcWikipedia(catKey,perCat),catKey));
   const results=await Promise.allSettled(tasks);
   const lists=results.filter(r=>r.status==="fulfilled").map(r=>r.value);
   return LEARN.dedupAndRank(lists,count);               // articles avec image d'abord, sources mélangées
@@ -1962,7 +1971,23 @@ async function fetchLearn(count=CONFIG.BATCH_SIZE,keys=catKeysForBatch(),frais){
          (flux RSS, Wikipédia en direct) — c'est cet appel-ci, et lui seul, qui
          l'oubliait, d'où des actus qui se renouvelaient et une moitié Wikipédia
          figée à côté. */
-      const qs=new URLSearchParams({cats:keys.join(","),count:String(count),lang:LANG});
+      /* `cats` TRIÉ, jamais dans l'ordre du tirage. C'est l'URL qui sert de clé
+         de cache, et `keys` arrive mélangé (shuffle dans catKeysForBatch) : le
+         même trio de catégories produisait donc jusqu'à 3! = 6 URL distinctes,
+         multipliant d'autant l'espace de clés que le « seau » ci-dessous
+         cherche précisément à garder petit. À six centres d'intérêt, cela
+         faisait 20 trios × 6 ordres × 12 seaux = 1440 variantes pour un cache
+         de cinq minutes : le CDN ne pouvait quasiment jamais servir deux fois
+         la même, ni la mutualiser entre deux utilisateurs aux mêmes réglages —
+         c'est-à-dire tout le contraire de ce pour quoi le seau existe. Trié,
+         il en reste 240, et deux sessions aux mêmes intérêts retombent enfin
+         sur les mêmes URL.
+         Sans effet sur le CONTENU : /api/learn traite `cats` comme un
+         ENSEMBLE (il interroge les trois en parallèle) et dedupAndRank
+         remélange les listes côté serveur (shuffle(files)) avant de servir les
+         catégories à tour de rôle. L'ordre de l'URL n'a donc jamais rien
+         décidé. */
+      const qs=new URLSearchParams({cats:keys.slice().sort().join(","),count:String(count),lang:LANG});
       if(frais)qs.set("n",Date.now()+"."+Math.random().toString(36).slice(2));
       else qs.set("b",String(LEARN.randomBucket()));
       const res=await fetchWithTimeout("/api/learn?"+qs,frais?{cache:"no-store"}:{},CONFIG.FETCH_TIMEOUT);
@@ -2786,7 +2811,21 @@ function probeWidth(url){
 function applyBg(el,src){
   const card=el.closest(".card");
   const it=card?cardReg.get(+card.dataset.id):null;
-  const link=(it&&it.link)||"";
+  /* Wikipédia : AUCUNE page tierce à interroger pour faire mieux, donc pas de
+     lien à sonder. L'image vient de l'API (piprop=thumbnail, pithumbsize =
+     WIKI_THUMB_PX), et MediaWiki n'AGRANDIT jamais un raster : une vignette
+     rendue SOUS la taille demandée dit précisément que le fichier source est
+     lui-même plus petit — et l'og:image de l'article, plafonné à cette même
+     source, ne peut alors pas faire mieux. La sonde était donc perdue
+     d'avance, et elle n'était pas gratuite : un /api/og par carte dès que la
+     vignette passait sous MIN_GOOD_W (cas courant, Wikipédia servant beaucoup
+     d'illustrations de moins de 800 px), soit — en dose « Wikipédia seul » —
+     une invocation serverless PAR CARTE défilée, qui lit une page d'article
+     entière et se dispute les connexions du navigateur avec le lot suivant.
+     cardHTML écarte déjà Wikipédia des trois autres sondes (data-pw,
+     data-sponsor, data-noimg-link) pour exactement cette raison ; applyBg
+     était la dernière à l'oublier. */
+  const link=(it&&it.kind!=="learn"&&it.link)||"";
   const set=(u,tag)=>{
     el.style.backgroundImage='url("'+cssString(u)+'")';
     el.dataset.bgUsed=u;el.dataset.bgKind=tag;
@@ -2813,8 +2852,13 @@ function applyBg(el,src){
       else el.dataset.bgKind="origine (agrandissement refusé)";
       // 2) l'image est-elle vraiment trop petite ? (mesurée seulement si l'URL
       //    ne le dit pas — elle est déjà dans le cache du navigateur)
+      //    Rien à interroger ensuite ⇒ on ne mesure même pas : cette mesure ne
+      //    sert QU'À décider de l'appel /api/og juste en dessous. Le test
+      //    venait après, et faisait donc décoder une image de plus par carte
+      //    Wikipédia pour un verdict dont personne ne se servait.
+      if(!link)return;
       const known=hintW||await probeWidth(src);
-      if(known>=MIN_GOOD_W||!link)return;
+      if(known>=MIN_GOOD_W)return;
       // 3) image de partage de l'article, souvent la version pleine taille
       const meta=await articleMetaFor(link);
       if(meta.image)await trySwap(meta.image,"og:image",known);

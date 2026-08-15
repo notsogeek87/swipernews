@@ -24,6 +24,59 @@ test("wikiUrl demande un thumbnail borné et jamais l'image originale", () => {
   assert.ok(url.includes("gsrsort=random"));
 });
 
+test("perCatLimit ne demande à chaque catégorie que ce que le lot consomme", () => {
+  // Trois catégories pour un lot de 20 : ~7 par catégorie sont réellement
+  // servies par le tour de rôle, on en demande le double de marge, pas le
+  // plafond de l'API à chacune (ce qui faisait 60 extraits pour 20 gardés).
+  assert.equal(core.perCatLimit(20, 3), 14);
+  assert.ok(core.perCatLimit(20, 3) * 3 > 20, "la marge doit couvrir le besoin");
+});
+
+test("perCatLimit retombe sur le plafond quand la catégorie fournit tout le lot", () => {
+  // Filtre précis (une seule catégorie) ou deux catégories : rien ne change,
+  // chacune doit pouvoir remplir le lot à elle seule ou presque.
+  assert.equal(core.perCatLimit(20, 1), core.PAGES_MAX);
+  assert.equal(core.perCatLimit(20, 2), core.PAGES_MAX);
+});
+
+test("perCatLimit reste dans les bornes de l'API, quelles que soient les entrées", () => {
+  for (const [count, n] of [
+    [40, 1],
+    [1, 1],
+    [20, 12],
+    [0, 0],
+    [-5, -5],
+    [NaN, NaN],
+    ["20", "3"],
+  ]) {
+    const v = core.perCatLimit(count, n);
+    assert.ok(Number.isInteger(v) && v >= 1 && v <= core.PAGES_MAX, `hors bornes : ${v}`);
+  }
+});
+
+test("wikiUrl fait suivre la limite aux TROIS compteurs du générateur", () => {
+  const url = core.wikiUrl("sciences", "fr", 14);
+  assert.ok(url.includes("exlimit=14"), "les extraits sont la partie chère");
+  assert.ok(url.includes("pilimit=14"));
+  assert.ok(url.includes("gsrlimit=14"));
+  // Tirage aléatoire : c'est grnlimit qui porte la limite du générateur.
+  assert.ok(core.wikiUrl("random", "fr", 14).includes("grnlimit=14"));
+});
+
+test("wikiUrl sans limite garde le plafond de l'API (compat des appels isolés)", () => {
+  const url = core.wikiUrl("sciences");
+  assert.ok(url.includes(`exlimit=${core.PAGES_MAX}`));
+  assert.ok(url.includes(`gsrlimit=${core.PAGES_MAX}`));
+});
+
+test("wikiUrl n'envoie jamais une limite hors bornes dans l'URL", () => {
+  for (const bad of [0, -3, 999, NaN, "abc"]) {
+    const url = core.wikiUrl("sciences", "fr", bad);
+    const n = Number(/exlimit=(\d+)/.exec(url)[1]);
+    assert.ok(n >= 1 && n <= core.PAGES_MAX, `exlimit=${n} pour ${bad}`);
+  }
+});
+
 test("wikiUrl bascule en tirage aléatoire pour la catégorie random", () => {
   const url = core.wikiUrl("random");
   assert.ok(url.includes("generator=random"));

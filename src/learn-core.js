@@ -162,6 +162,37 @@
   const WIKI_THUMB_PX = 1000; // suffisant pour un fond plein écran, même en DPR 3
 
   /**
+   * Pages demandées à CHAQUE catégorie d'un lot.
+   *
+   * Plafond dur de l'API : `exlimit` ne dépasse pas 20 (prop=extracts), et
+   * c'est lui qui borne tout le reste, les trois limites étant servies par le
+   * même générateur.
+   *
+   * Il était appliqué tel quel, quel que soit le nombre de catégories : un lot
+   * de `count`=20 réparti sur trois catégories demandait 20 pages À CHACUNE,
+   * donc 60 extraits de texte calculés en amont pour n'en garder que 20 —
+   * `dedupAndRank` sert les catégories à tour de rôle puis tronque à `count`.
+   * Or l'extraction d'intro (explaintext + exintro) est la partie chère de la
+   * requête, et elle est facturée par PAGE rendue.
+   *
+   * On demande donc ce dont le tour de rôle a besoin, avec une marge de 2 :
+   * elle couvre le filtre de normalizeWiki (les intros de moins de 120
+   * caractères sont jetées) et laisse au tri « avec image d'abord » un vivier
+   * plus grand que le besoin À L'INTÉRIEUR de chaque catégorie — c'est là, et
+   * seulement là, que ce tri joue encore (voir dedupAndRank).
+   *
+   * À une ou deux catégories, le calcul retombe de lui-même sur le plafond :
+   * rien ne change pour un filtre précis, où la catégorie unique doit fournir
+   * le lot entier.
+   */
+  const PAGES_MAX = 20;
+  function perCatLimit(count, nCats) {
+    const n = Math.max(1, Number(nCats) || 1);
+    const c = Math.max(1, Number(count) || 1);
+    return Math.max(8, Math.min(PAGES_MAX, Math.ceil((c / n) * 2)));
+  }
+
+  /**
    * @param {string} catKey
    * @param {string} [lang]  Langue de Wikipédia à interroger (LANGS). Repli
    *   silencieux sur WIKI_LANG (français) si absente ou non reconnue — c'est
@@ -170,11 +201,17 @@
    *   catégorie (qByLang incomplet), on bascule sur le tirage aléatoire de
    *   cette langue plutôt que d'envoyer une requête française à un Wikipédia
    *   qui ne la comprendra pas — dégradé, mais jamais silencieusement faux.
+   * @param {number} [limit]  Pages demandées, voir perCatLimit. Par défaut le
+   *   plafond de l'API (PAGES_MAX) : un appelant qui ne dit rien garde le
+   *   comportement d'avant.
    */
-  function wikiUrl(catKey, lang) {
+  function wikiUrl(catKey, lang, limit) {
     const c = catByKey(catKey);
     const l = LANGS.includes(lang) ? lang : WIKI_LANG;
     const q = l === WIKI_LANG ? c.q : c.qByLang && c.qByLang[l];
+    // Une valeur hors bornes ne doit jamais partir dans l'URL : l'API refuse
+    // au-delà de PAGES_MAX, et 0 rendrait un lot vide.
+    const n = String(Math.max(1, Math.min(PAGES_MAX, Number(limit) || PAGES_MAX)));
     const params = new URLSearchParams({
       action: "query",
       format: "json",
@@ -183,10 +220,10 @@
       prop: "extracts|pageimages|info",
       explaintext: "1",
       exintro: "1",
-      exlimit: "20",
+      exlimit: n,
       piprop: "thumbnail",
       pithumbsize: String(WIKI_THUMB_PX),
-      pilimit: "20",
+      pilimit: n,
       inprop: "url",
     });
     if (q) {
@@ -194,11 +231,11 @@
       params.set("gsrsearch", q);
       params.set("gsrsort", "random");
       params.set("gsrnamespace", "0");
-      params.set("gsrlimit", "20");
+      params.set("gsrlimit", n);
     } else {
       params.set("generator", "random");
       params.set("grnnamespace", "0");
-      params.set("grnlimit", "20");
+      params.set("grnlimit", n);
     }
     return `https://${l}.wikipedia.org/w/api.php?${params}`;
   }
@@ -238,6 +275,8 @@
     WIKI_LANG,
     LANGS,
     WIKI_THUMB_PX,
+    PAGES_MAX,
+    perCatLimit,
     CATEGORIES,
     catByKey,
     catLabel,

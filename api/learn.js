@@ -68,9 +68,15 @@ module.exports = async function handler(req, res) {
   // Wikipédia interrogé. Repli sur le français géré par wikiUrl lui-même.
   const lang = core.LANGS.includes(q.lang) ? q.lang : core.WIKI_LANG;
 
+  // Pages demandées à chaque catégorie : ce que le tour de rôle de
+  // dedupAndRank va réellement consommer, marge comprise (voir perCatLimit).
+  // Demander le plafond de l'API à CHACUNE faisait calculer en amont trois
+  // fois plus d'extraits d'intro qu'il n'en revenait dans le lot.
+  const perCat = core.perCatLimit(count, catList.length);
+
   const tag = (p, catKey) => p.then((list) => list.map((it) => ({ ...it, cat: catKey })));
   const tasks = catList.map((catKey) =>
-    tag(fetchJson(core.wikiUrl(catKey, lang)).then(core.normalizeWiki), catKey)
+    tag(fetchJson(core.wikiUrl(catKey, lang, perCat)).then(core.normalizeWiki), catKey)
   );
 
   const results = await Promise.allSettled(tasks);
