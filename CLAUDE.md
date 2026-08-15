@@ -512,6 +512,37 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   chargées. D'où `renouv` dans `loadLearnPart`, distinct de `perime` (une
   retentative doit passer la garde de rechargement sans pour autant devenir un
   renouvellement) — scénario `tetewiki`.
+- **« Le fil est lisible » et « le chargement est fini » sont DEUX moments
+  distincts, et l'affichage ne doit attendre que le premier.** La repeinture qui
+  montre les articles neufs quand un cache est déjà à l'écran — le cas de TOUTE
+  réouverture au-delà des 30 min, `scheduleRender` se taisant tant qu'un cache
+  est affiché — était celle de `finish()`, donc celle d'après la DERNIÈRE
+  source. Une source morte tenant son emplacement jusqu'au bout de son budget,
+  le fil affiché restait vieux de trente minutes pendant 24 s alors que 38
+  sources sur 40 avaient répondu en moins de deux (mesuré, scénario `lentnews`).
+  D'où `armerEcheance()` dans `loadNewsPart` : à `NEWS_DEADLINE_MS`, on peint ce
+  qu'on a, en tête, et les retardataires s'insèrent ensuite par les repeintures
+  progressives ordinaires. L'indicateur de chargement, lui, reste ALLUMÉ — le
+  jeton et le `cacheSave` restent attachés à la repeinture finale (`cloture`),
+  seule vraie fin. Ne pas les rattacher à l'échéance : elle peut être suivie de
+  plusieurs autres lots.
+  Corollaire indissociable : **on ne remonte en tête qu'UNE fois par
+  chargement** (`enTeteFait`). La règle produit « l'article le plus récent sous
+  les yeux » est tenue par l'échéance ; la repeinture finale, vingt secondes plus
+  tard, garde donc l'ancrage — la refaire arracherait à sa lecture quelqu'un qui a
+  déjà commencé à glisser dans le fil neuf. Vérifié par `forcetop`, qui doit
+  continuer à trouver l'index 0 après ↻ ET après un rafraîchissement automatique.
+- **Une source a UN budget, pas un délai d'expiration par étape**
+  (`FEED_BUDGET_MS`, voir `fetchFeedRobust`). Les trois transports — backend
+  same-origin, proxys publics en parallèle, rss2json — avaient chacun leur 7 s,
+  et ils s'ADDITIONNAIENT : 21 s d'emplacement de parallélisme immobilisé par
+  source morte. `fetchText` reçoit donc une fonction rendant le temps restant, et
+  le repli rss2json n'est plus tenté quand il ne reste rien. Ce n'est pas une
+  perte : rss2json vise les flux qu'on n'arrive pas à PARSER (échec rapide,
+  budget quasi intact), pas ceux qu'aucun des six transports précédents n'a su
+  joindre. `MAX_PARALLEL` est passé de 6 à 10 dans le même mouvement — le danger
+  d'origine était de tout lancer d'un coup, or `MAX_FEEDS_PER_LOAD` borne déjà le
+  lot à 40.
 - **Les trois déclencheurs automatiques de fraîcheur passent par
   `refreshIfStale()`**, qui refuse d'en lancer un quand un chargement d'actus est
   déjà en vol : le filet tourne toutes les 60 s, un chargement de 40 sources dure
@@ -727,7 +758,7 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 
 `npm test` ne voit que `src/` et `api/` : **tout le JS en ligne d'`index.html`
 — le fil, l'état, le stockage local — n'est couvert par aucun test**. Ce banc
-comble le trou en jouant 26 scénarios réels dans Chromium, réseau entièrement
+comble le trou en jouant 27 scénarios réels dans Chromium, réseau entièrement
 simulé (rien ne part vers une vraie source) : hors-ligne, réseau lent, coupure en
 cours de requête, API en 500, RSS vide/tronqué/HTML, contenu démesuré, doublons,
 120 sources, stockage et cache abîmés, quota saturé, actions enchaînées, retour
@@ -736,6 +767,14 @@ Wikipédia (`forcewiki` pour le contenu du lot, `tetewiki` pour la TÊTE du fil 
 les deux, parce que le premier ne voyait pas que les deux premières cartes, elles,
 ne bougeaient jamais — et `avancewiki` pour la VITESSE du ↻, qui compte les
 requêtes parties à l'appui et doit en trouver zéro dès le second).
+
+`lentnews` est le pendant côté ACTUS de ces trois-là : il mesure une réouverture
+au-delà des 30 min avec 40 sources dont 3 lentes et 2 mortes, et distingue deux
+jalons que rien ne séparait avant — le moment où le fil AFFICHÉ devient neuf
+(échéance) et celui où le chargement se termine VRAIMENT (budget par source).
+Il vérifie aussi que le budget ne coûte RIEN en contenu : 120 actus retenues,
+comme sans lui. Repères actuels : 2,6 s / 13,8 s, contre 24,6 s pour les deux
+avant l'échéance.
 
 Deux d'entre eux signalent des lignes qui ne sont PAS des régressions, et qu'il
 ne faut pas partir corriger : `offline` fait remonter des

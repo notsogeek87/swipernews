@@ -884,9 +884,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=125"></script>
-<script src="src/learn-core.js?v=125"></script>
-<script src="src/i18n.js?v=125"></script>
+<script src="src/lib.js?v=126"></script>
+<script src="src/learn-core.js?v=126"></script>
+<script src="src/i18n.js?v=126"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -949,11 +949,26 @@ const CONFIG = {
   MIN_PER_FEED: 10,      // part MINIMALE garantie à chaque source ; la part
                          // réelle vaut MAX_NEWS / nombre de sources, donc aucune
                          // limite artificielle quand elles sont peu nombreuses
-  MAX_PARALLEL: 6,       // flux récupérés simultanément (322 d'un coup = échec massif)
+  MAX_PARALLEL: 10,      // flux récupérés simultanément. Le danger était de tout
+                         // lancer d'un coup (322 sources importées = échec
+                         // massif) ; MAX_FEEDS_PER_LOAD borne désormais le lot à
+                         // 40, et une source morte immobilise son emplacement
+                         // jusqu'à FEED_BUDGET_MS — à 6 emplacements, deux
+                         // sources mortes retardaient TOUT le reste du lot.
   MAX_FEEDS_PER_LOAD: 40,// sources interrogées par chargement, en rotation
   FIRST_PAINT_MS: 220,   // 1re repeinture : courte, pour afficher vite
   RENDER_COALESCE_MS: 750,// puis fenêtre large : sans cela, 40 sources = 40
                          // reconstructions du fil en quelques secondes
+  /* Échéance d'affichage des actus : au-delà, on montre ce qu'on a reçu plutôt
+     que d'attendre la dernière source. Voir l'échéance dans loadNewsPart —
+     c'est elle qui rend un rafraîchissement rapide À L'ÉCRAN, indépendamment
+     du temps qu'il met à se terminer VRAIMENT. */
+  NEWS_DEADLINE_MS: 2500,
+  /* Budget total accordé à UNE source, tous replis compris (backend, proxys
+     publics, rss2json). Sans lui, une source morte cumulait les délais de
+     chacun — 7 s + 7 s + 7 s — en gardant son emplacement de parallélisme
+     pendant vingt et une secondes. Voir fetchFeedRobust. */
+  FEED_BUDGET_MS: 12000,
   // Borne du fil infini. Le fil mêlé est rendu ENTIÈREMENT dans le DOM (il est
   // recomposé à chaque arrivée de données, on ne peut donc pas y garder des
   // cartes que le mélange ne contient plus) : cette borne est aussi celle du
@@ -1416,7 +1431,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="125";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="126";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1766,19 +1781,33 @@ async function nativeGet(url,timeoutMs){
   if(txt&&txt.length>200)return txt;
   throw new Error("empty");
 }
-async function fetchText(url){
+/* `reste` : fonction rendant le temps ENCORE disponible pour cette source (voir
+   FEED_BUDGET_MS et fetchFeedRobust). Chaque étape prend le plus petit du délai
+   d'expiration ordinaire et de ce qu'il reste — sans quoi les étapes
+   s'additionnent, et une source morte occupe un emplacement de parallélisme
+   pendant la somme de tous les replis. Omise, on retrouve le comportement
+   d'avant : 7 s par étape, sans plafond global (c'est le cas de srcWikipedia,
+   qui n'a qu'un appel à couvrir). */
+async function fetchText(url,reste){
+  const delai=()=>reste?Math.min(7000,reste()):7000;
   if(isNativeApp){
     // Direct via le pont natif (aucun CORS) ; en cas d'échec, proxys publics —
     // jamais le backend Vercel (PROXIES[0]), qui ne résoudrait à rien depuis
     // l'origine locale de l'app packagée.
-    try{return await nativeGet(url,7000);}catch(e){}
-    try{return await Promise.any(PROXIES.slice(1).map(m=>fetchViaProxy(m,url,7000)));}catch(e){}
+    try{return await nativeGet(url,delai());}catch(e){}
+    if(delai()>0){
+      const t=delai();
+      try{return await Promise.any(PROXIES.slice(1).map(m=>fetchViaProxy(m,url,t)));}catch(e){}
+    }
     throw new Error("no-proxy");
   }
   // 1) backend same-origin d'abord (rapide et fiable sur Vercel)
-  try{return await fetchViaProxy(PROXIES[0],url,7000);}catch(e){}
+  try{return await fetchViaProxy(PROXIES[0],url,delai());}catch(e){}
   // 2) sinon on lance TOUS les proxys en parallèle et on garde le premier qui répond
-  try{return await Promise.any(PROXIES.slice(1).map(m=>fetchViaProxy(m,url,7000)));}catch(e){}
+  if(delai()>0){
+    const t=delai();
+    try{return await Promise.any(PROXIES.slice(1).map(m=>fetchViaProxy(m,url,t)));}catch(e){}
+  }
   throw new Error("no-proxy");
 }
 /* Bornes du texte repris d'un flux (voir clampText, src/lib.js). Le résumé garde
@@ -1790,9 +1819,9 @@ async function fetchText(url){
    puisse pas se faire couper et désarmer le filtre. */
 const TITLE_MAX=300,TAGS_MAX=600;
 /* rss2json : service dédié qui parse le flux côté serveur et renvoie du JSON (CORS ok) */
-async function fetchFeedRss2Json(feed){
+async function fetchFeedRss2Json(feed,timeout=7000){
   const api="https://api.rss2json.com/v1/api.json?count=60&rss_url="+encodeURIComponent(feed.url);
-  const res=await fetchWithTimeout(api,{cache:"no-store"},7000);
+  const res=await fetchWithTimeout(api,{cache:"no-store"},timeout);
   if(!res.ok)throw new Error("http");
   const data=await res.json();
   if(!data||data.status!=="ok"||!Array.isArray(data.items))throw new Error("bad");
@@ -1806,15 +1835,31 @@ async function fetchFeedRss2Json(feed){
 /* Récupération robuste d'un flux : backend/proxys + XML d'abord, puis repli rss2json.
    Filtre sponsorisé/bons plans appliqué ICI, après le repli : un flux
    entièrement composé de ce genre d'articles ne doit pas déclencher le repli
-   rss2json, réservé aux échecs/réponses vides réels. */
+   rss2json, réservé aux échecs/réponses vides réels.
+
+   UN SEUL BUDGET pour toute la chaîne (FEED_BUDGET_MS). Les trois étapes —
+   backend same-origin, proxys publics en parallèle, rss2json — avaient chacune
+   leur délai d'expiration de 7 s, qui s'ADDITIONNAIENT : une source morte
+   gardait son emplacement de parallélisme pendant vingt et une secondes, et
+   comme le fil n'était repeint qu'une fois la DERNIÈRE source close, deux
+   sources mortes suffisaient à retarder l'affichage de tout le lot d'autant
+   (mesuré : 24 s pour 40 sources dont 2 mortes).
+   Le repli rss2json n'est donc plus tenté quand il ne reste rien : il vise les
+   flux qu'on n'arrive pas à PARSER (échec rapide, budget quasi intact), pas les
+   sources qu'aucun des six transports précédents n'a su joindre. */
 async function fetchFeedRobust(feed){
+  const fin=Date.now()+CONFIG.FEED_BUDGET_MS;
+  const reste=()=>Math.max(0,fin-Date.now());
   let a;
-  try{a=await fetchFeed(feed);}catch(e){/* repli rss2json */}
-  if(!a||!a.length)a=await fetchFeedRss2Json(feed);
+  try{a=await fetchFeed(feed,reste);}catch(e){/* repli rss2json */}
+  if(!a||!a.length){
+    if(!reste())throw new Error("budget");
+    a=await fetchFeedRss2Json(feed,Math.min(7000,reste()));
+  }
   return filterSponsored?a.filter(i=>!isPromotionalItem(i)):a;
 }
-async function fetchFeed(feed){
-  const text=await fetchText(feed.url);
+async function fetchFeed(feed,reste){
+  const text=await fetchText(feed.url,reste);
   const doc=new DOMParser().parseFromString(text,"text/xml");
   const nodes=[...doc.querySelectorAll("item, entry")];
   return nodes.map(n=>{
@@ -2438,19 +2483,30 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
      rebuild() retrie par date, les nouveaux articles s'insèrent au milieu : les
      cartes bougeaient sans arrêt. On accumule et on repeint au plus une fois
      par fenêtre, ce qui correspond en pratique à un lot de MAX_PARALLEL. */
-  let renderT=null,painted=false;
-  function paint(top){
+  /* `enTeteFait` : le fil a DÉJÀ été remonté en tête pour ce chargement (par
+     l'échéance ci-dessous, ou par la repeinture finale). Une seule remontée par
+     chargement — la seconde arracherait l'utilisateur à sa lecture.
+     `echeancePassee` : l'échéance d'affichage est écoulée, plus rien ne doit
+     retenir une repeinture. */
+  let renderT=null,painted=false,enTeteFait=false,echeanceT=null,echeancePassee=false;
+  /* `top` : remonter en tête. `cloture` : c'est la DERNIÈRE repeinture de ce
+     chargement — elle seule rend le jeton de l'indicateur et enregistre le
+     cache. Les deux allaient ensemble tant que la remontée en tête ne pouvait
+     venir que de finish() ; l'échéance remonte en tête AVANT la fin, et le
+     chargement, lui, continue. */
+  function paint(top,cloture){
     renderT=null;painted=true;
+    if(top)enTeteFait=true;
     if(my!==loadSeq)return;
     whenFeedIdle(()=>{
-      if(top)rendreJeton();                         // repeinture finale : le chargement s'achève ICI
+      if(cloture)rendreJeton();                     // repeinture finale : le chargement s'achève ICI
       if(my!==loadSeq)return;                       // périmé pendant l'attente du contact
       rebuild(top);render(top);hideStates();feedKeyShown=key;
-      // Repeinture finale seule (`top`) : cacheSave() lit `items`, que rebuild()
-      // vient tout juste de recalculer ci-dessus — l'appeler depuis finish()
-      // AVANT que ce bloc ne s'exécute (un doigt posé sur le fil le reporte)
-      // enregistrerait encore l'ancien `items` sous la nouvelle clé.
-      if(top&&collected.size)cacheSave(key);
+      // Repeinture finale seule (`cloture`) : cacheSave() lit `items`, que
+      // rebuild() vient tout juste de recalculer ci-dessus — l'appeler depuis
+      // finish() AVANT que ce bloc ne s'exécute (un doigt posé sur le fil le
+      // reporte) enregistrerait encore l'ancien `items` sous la nouvelle clé.
+      if(cloture&&collected.size)cacheSave(key);
     });
   }
   /* Fenêtre progressive : courte pour le tout premier rendu (le contenu doit
@@ -2462,11 +2518,19 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
      (la barre de sync du haut signale le chargement en cours) jusqu'à
      l'unique repeinture finale de finish(). */
   function scheduleRender(){
-    if(cached)return;
+    // Le silence imposé par un cache affiché ne vaut que TANT QUE le fil neuf
+    // n'est pas encore apparu : une fois l'échéance passée (ou la tête déjà
+    // renouvelée), le cache n'est plus à l'écran et il n'y a plus rien à
+    // protéger du scintillement — les retardataires se voient au fil de l'eau
+    // comme dans le cas sans cache.
+    if(cached&&!enTeteFait&&!echeancePassee)return;
     if(renderT)return;
-    // Repeintures progressives : ni finales, ni en tête — elles gardent
-    // l'ancrage sur l'article lu.
-    renderT=setTimeout(()=>paint(false),painted?CONFIG.RENDER_COALESCE_MS:CONFIG.FIRST_PAINT_MS);
+    // Repeintures progressives : elles gardent l'ancrage sur l'article lu. Sauf
+    // la première d'après l'échéance quand celle-ci n'a rien eu à peindre
+    // (aucune source n'avait encore répondu) : c'est alors elle qui remonte en
+    // tête, à la place de l'échéance.
+    const top=echeancePassee&&!enTeteFait;
+    renderT=setTimeout(()=>paint(top,false),painted?CONFIG.RENDER_COALESCE_MS:CONFIG.FIRST_PAINT_MS);
   }
   function flushRender(){
     if(renderT){clearTimeout(renderT);renderT=null;}
@@ -2479,8 +2543,32 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
        minutes ne rafraîchit rien, donc ne passe jamais ici, donc reprend
        exactement où l'on en était (voir `perime` et resumePending dans
        loadFeeds). Les deux fonctions ne se marchent plus dessus : chacune a sa
-       fenêtre, au lieu de se disputer le même rendu. */
-    paint(true);
+       fenêtre, au lieu de se disputer le même rendu.
+       `!enTeteFait` : la règle est tenue UNE fois par chargement, et l'échéance
+       a pu la tenir avant nous — vingt secondes plus tôt. La retenir une
+       seconde fois arracherait à sa lecture quelqu'un qui a déjà commencé à
+       glisser dans le fil neuf, pour lui remontrer la même carte de tête. */
+    paint(!enTeteFait,true);
+  }
+  /* Échéance d'affichage : le fil neuf apparaît au plus tard à NEWS_DEADLINE_MS,
+     avec les sources qui ont répondu, et les retardataires s'y insèrent ensuite
+     par les repeintures progressives ordinaires.
+     Sans elle, la SEULE repeinture qui montre les articles neufs quand un cache
+     est déjà à l'écran — le cas de toute réouverture au-delà des 30 min — est
+     celle de finish(), donc après la DERNIÈRE source. Une source morte tenant
+     son emplacement jusqu'à FEED_BUDGET_MS, le fil affiché restait celui d'il y
+     a une demi-heure pendant vingt-quatre secondes alors que trente-huit
+     sources sur quarante avaient répondu en moins de deux (mesuré au
+     navigateur, banc `lentnews`).
+     L'indicateur de chargement, lui, reste allumé : le chargement n'est pas
+     terminé, il est seulement devenu lisible. */
+  function armerEcheance(){
+    echeanceT=setTimeout(()=>{
+      echeanceT=null;echeancePassee=true;
+      if(my!==loadSeq||enTeteFait||!collected.size)return;   // rien reçu : scheduleRender s'en chargera
+      if(renderT){clearTimeout(renderT);renderT=null;}
+      paint(true,false);
+    },CONFIG.NEWS_DEADLINE_MS);
   }
 
   // Récupération par lots bornés plutôt que tout en parallèle.
@@ -2514,6 +2602,10 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
     }
   }
   function finish(){
+    // Plus rien n'arrivera : l'échéance n'a plus lieu d'être, quelle que soit
+    // la sortie prise ci-dessous (retentative comprise — celle-ci arme la
+    // sienne).
+    if(echeanceT){clearTimeout(echeanceT);echeanceT=null;}
     // Fil neuf (changement de langue ou de filtre) sans la moindre actu
     // affichée : `items.length` peut être non nul rien que par la moitié
     // Wikipédia, ce qui déclencherait sinon un simple toast — facile à
@@ -2587,6 +2679,7 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
   // automatiques doivent respecter ce chargement plutôt que le relancer (voir
   // refreshIfStale). Levé dans finish(), une fois l'affaire close.
   newsLoadingSeq=my;
+  armerEcheance();
   pump();
 }
 

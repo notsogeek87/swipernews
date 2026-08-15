@@ -1320,6 +1320,139 @@ const scenarios = {
     console.log("erreurs :", errors);
     await browser.close();
   },
+
+  // 27. VITESSE d'un rafraîchissement d'actus au-delà des 30 min, avec des
+  // sources lentes et mortes dans le lot. Le scénario que l'utilisateur vit à
+  // chaque réouverture : un cache périmé est peint tout de suite, mais le fil
+  // NEUF n'apparaissait qu'une fois la DERNIÈRE source close — donc après le
+  // délai d'expiration des sources mortes, replis compris.
+  // Ce qu'on mesure, et qui n'est pas la même chose : quand le fil AFFICHÉ
+  // devient neuf (échéance NEWS_DEADLINE_MS), et quand le chargement se termine
+  // VRAIMENT (budget FEED_BUDGET_MS par source). Mesuré avant correctif :
+  // 24,6 s pour les deux.
+  async lentnews() {
+    const N = 40;
+    const feeds = Array.from({ length: N }, (_, i) => ({
+      url: `https://src${i}.test/rss`,
+      name: "Source " + i,
+      on: true,
+    }));
+    // 25 rapides, 10 moyennes, 3 lentes, 2 MORTES (aucune réponse, jamais).
+    const latence = (i) => (i >= 38 ? null : i >= 35 ? 5000 : i >= 25 ? 1200 : 250);
+    const rss = (i) =>
+      `<?xml version="1.0"?><rss version="2.0"><channel><title>S${i}</title>${Array.from(
+        { length: 12 },
+        (_, k) =>
+          `<item><title>NEUF s${i} a${k}</title><link>https://src${i}.test/n/${k}</link>` +
+          `<description>${"texte ".repeat(20)}</description>` +
+          `<pubDate>${new Date(Date.now() - (i * 12 + k) * 60e3).toUTCString()}</pubDate></item>`
+      ).join("")}</channel></rss>`;
+    const lot = () =>
+      JSON.stringify({
+        items: Array.from({ length: 20 }, (_, i) => ({
+          source: "Wikipédia",
+          title: "NEUF Wiki " + i,
+          desc: "x".repeat(200),
+          link: "https://fr.wikipedia.org/wiki/N" + i,
+          img: "https://img.test/w.jpg",
+        })),
+      });
+    // Cache disque vieux de 35 min : au-delà d'AUTO_RELOAD_MS, donc les deux
+    // moitiés repartent — mais il y a bien quelque chose à l'écran d'ici là.
+    const KEY = "mix|fr|all|all:sciences,histoire|s";
+    const vieux = Array.from({ length: 40 }, (_, i) => ({
+      kind: "news",
+      source: "Source " + i,
+      title: "VIEUX s" + i,
+      desc: "texte ancien",
+      link: `https://src${i}.test/v/${i}`,
+      img: "",
+      date: new Date(Date.now() - 40 * 60e3).toUTCString(),
+    }));
+    const { browser, page, errors } = await boot({
+      storage: {
+        ...READY,
+        "fluxswipe.feeds.v1": JSON.stringify(feeds),
+        "fluxswipe.cache.v1": JSON.stringify({
+          [KEY]: { t: Date.now() - 35 * 60e3, items: vieux },
+        }),
+      },
+    });
+    await page.route(/src\d+\.test|rss2json|api\/learn|wikipedia\.org/, async (r) => {
+      const u = r.request().url();
+      // /api/og?url=https://src0.test/… porte le nom d'une source dans SON
+      // paramètre : c'est une sonde de métadonnées, pas un flux. On la rend au
+      // gestionnaire général, qui sait y répondre.
+      if (/\/api\/og/.test(u)) return r.fallback();
+      const m = u.match(/src(\d+)\.test/);
+      if (m) {
+        const lat = latence(+m[1]);
+        if (lat === null) return; // morte : on ne répond JAMAIS
+        await new Promise((z) => setTimeout(z, lat));
+        return r
+          .fulfill({ status: 200, contentType: "application/xml", body: rss(+m[1]) })
+          .catch(() => {});
+      }
+      if (/rss2json/.test(u)) {
+        await new Promise((z) => setTimeout(z, 7000));
+        return r.fulfill({ status: 502, body: "{}" }).catch(() => {});
+      }
+      await new Promise((z) => setTimeout(z, 1500)); // deepcategory : lent
+      return r
+        .fulfill({ status: 200, contentType: "application/json", body: lot() })
+        .catch(() => {});
+    });
+    const t0 = Date.now();
+    await page.goto(URL_APP);
+    const jalons = {};
+    const jalon = (k) => {
+      if (!jalons[k]) jalons[k] = Date.now() - t0;
+    };
+    for (let i = 0; i < 500; i++) {
+      const st = await page
+        .evaluate(() => {
+          const t = [...document.querySelectorAll("#feed .card h2")].map(
+            (h) => h.textContent
+          );
+          return {
+            n: t.length,
+            neuves: t.filter((x) => /^NEUF s/.test(x)).length,
+            wiki: t.some((x) => /^NEUF Wiki/.test(x)),
+            teteNeuve: /^NEUF/.test(t[0] || ""),
+            sync: document.getElementById("syncbar").classList.contains("on"),
+          };
+        })
+        .catch(() => null);
+      if (!st) break;
+      if (st.n) jalon("cartes du cache");
+      if (st.wiki) jalon("Wikipédia neuf");
+      if (st.neuves) jalon("actus neuves À L'ÉCRAN");
+      if (st.teteNeuve) jalon("carte du haut neuve");
+      if (st.neuves && !st.sync) {
+        jalon("chargement TERMINÉ");
+        jalons.__n = st.neuves;
+        break;
+      }
+      await page.waitForTimeout(60);
+    }
+    const total = jalons.__n;
+    delete jalons.__n;
+    for (const k of [
+      "cartes du cache",
+      "Wikipédia neuf",
+      "actus neuves À L'ÉCRAN",
+      "carte du haut neuve",
+      "chargement TERMINÉ",
+    ])
+      console.log(
+        "  " + k.padEnd(24) + (jalons[k] ? jalons[k] + " ms" : "JAMAIS (>30 s)")
+      );
+    // Le budget ne doit RIEN coûter en contenu : les 38 sources vivantes
+    // rapportent de quoi remplir MAX_NEWS, comme avant.
+    console.log("  actus neuves retenues   " + total + " (doit valoir MAX_NEWS = 120)");
+    console.log("erreurs :", errors);
+    await browser.close();
+  },
 };
 
 const which = process.argv[2];

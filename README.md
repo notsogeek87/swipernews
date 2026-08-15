@@ -371,15 +371,24 @@ essaie donc, dans l'ordre :
    avec parsing XML dans le navigateur ;
 3. **rss2json** (`api.rss2json.com`) en dernier repli.
 
+Ces trois étapes partagent **un seul budget de temps** (12 s par source, tous replis
+compris). Chacune avait auparavant son propre délai d'expiration de 7 s, et ils
+s'additionnaient : une source morte immobilisait son emplacement de parallélisme
+pendant vingt et une secondes. Le repli rss2json n'est donc plus tenté quand le budget
+est épuisé — il vise les flux qu'on n'arrive pas à **parser** (échec rapide), pas les
+sources qu'aucun des six transports précédents n'a su joindre.
+
 ### Beaucoup de sources (OPML importé)
 
 Un export Feedly peut contenir plusieurs centaines de flux. Trois garde-fous :
 
 - **au plus 40 sources interrogées par chargement**, en rotation d'un chargement
   à l'autre pour que toutes finissent par passer ;
-- **6 flux récupérés à la fois** : sans cela, 300 sources lançaient 300 chaînes
-  de requêtes simultanées (chacune essayant le backend puis cinq proxys) et la
-  quasi-totalité échouait ;
+- **10 flux récupérés à la fois** : sans plafond du tout, 300 sources lançaient 300
+  chaînes de requêtes simultanées (chacune essayant le backend puis cinq proxys) et la
+  quasi-totalité échouait. Le plafond était de 6, ce qui, à 40 sources par lot, faisait
+  payer très cher la moindre source morte : elle gardait son emplacement jusqu'au bout
+  de son budget, et retardait d'autant tout ce qui attendait derrière ;
 - **part maximale par source** = `MAX_NEWS / nombre de sources`, avec un minimum
   de 10. Avec peu de sources il n'y a donc aucune limite pratique ; avec des
   centaines, aucune ne peut occuper tout le fil ;
@@ -390,9 +399,25 @@ Un export Feedly peut contenir plusieurs centaines de flux. Trois garde-fous :
   plus une fois par fenêtre : 40 repeintures tombent à 5, sans rien perdre.
   La première fenêtre est courte (le contenu doit apparaître vite), les suivantes
   plus larges (le fil doit cesser de bouger).
+- **échéance d'affichage (2,5 s)** : passé ce délai, le fil neuf est affiché avec
+  les sources qui ont répondu, sans attendre les autres. C'est ce qui sépare
+  « le fil est lisible » de « le chargement est fini ».
+
+Cette dernière est ce qui rend une réouverture rapide. La repeinture qui montre les
+articles neufs quand un cache est déjà à l'écran — le cas de **toute** réouverture
+au-delà des 30 minutes — était celle de la fin du chargement, donc celle d'après la
+**dernière** source. Mesuré au navigateur (banc `lentnews` : 40 sources, dont 3 lentes
+et 2 mortes), le fil affiché restait celui d'il y a une demi-heure pendant **24
+secondes**, alors que 38 sources sur 40 avaient répondu en moins de deux. Avec
+l'échéance : **2,6 s**, pour le même contenu final (120 articles dans les deux cas).
+
+Le fil ne remonte en tête **qu'une fois** par chargement : si l'échéance l'a déjà fait,
+la repeinture finale garde l'ancrage sur l'article en train d'être lu, plutôt que
+d'arracher à sa lecture quelqu'un qui a déjà commencé à glisser dans le fil neuf.
 
 Pendant qu'un chargement se poursuit en arrière-plan, une fine barre en haut de
-l'écran l'indique. Elle ne bloque rien : le fil déjà affiché reste lisible.
+l'écran l'indique. Elle ne bloque rien : le fil déjà affiché reste lisible — et depuis
+l'échéance, ce fil est déjà le fil neuf.
 
 Les articles datés **dans le futur** de plus de deux jours (agendas de concerts,
 annonces de festivals) sont classés en fin de fil comme les articles sans date :
