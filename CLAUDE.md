@@ -568,10 +568,15 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   aucun contenu. La mesure native est un
   CHEVAUCHEMENT avec la WebView, jamais l'inset brut : si une couche quelconque
   a déjà décalé la WebView, elle rend 0 et rien n'est réservé deux fois.
-  Le pied du panneau de réglages (`renderAbout`) affiche la marge réellement
-  appliquée, lue sur le style CALCULÉ de `.top` : sans elle, un « ça rogne
-  encore » n'est pas débogable — ni l'APK ni une PWA installée n'ont de barre
-  d'URL où ajouter `?debug=1`.
+  Le pied du panneau de réglages (`renderAbout`) a affiché un temps la marge
+  réellement appliquée et la géométrie de la fenêtre, faute de barre d'URL où
+  ajouter `?debug=1` dans l'APK ou une PWA installée. **Il ne dit plus que la
+  version** : ces chiffres ne parlaient qu'à qui connaît `majPleinEcran`, et ils
+  occupaient le pied de panneau pour tout le monde. Déboguer un « ça rogne
+  encore » demande donc maintenant la console
+  (`getComputedStyle(document.querySelector(".top")).paddingTop`,
+  `window.screenY`) — c'est le coût assumé, ne pas remettre ces valeurs à
+  l'écran sans en reparler.
 - **Commentaires XML** : `--` y est interdit. Écrire `« accent »` plutôt que
   `--accent` en citant une variable CSS.
 - **`setPadding()` écrase le padding du XML**, insets compris : ajouter la
