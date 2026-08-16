@@ -36,8 +36,8 @@ android {
         // rétrogradation, et un APK de main refusait de s'installer par-dessus
         // une version publiée. Le prix de la correction est une inflation
         // irréversible du versionCode, qui ne redescend jamais.
-        versionCode 104000000
-        versionName "1.4.0"
+        versionCode 104010000
+        versionName "1.4.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
