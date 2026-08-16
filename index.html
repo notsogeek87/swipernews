@@ -3819,12 +3819,19 @@ function cardHTML(it,id){
    `playsinline=1` : sans lui, certains moteurs mobiles basculent d'office en
    plein écran système, ce qui sort de la carte — donc du fil. */
 let playingCard=null;
+function pushVideoState(){
+  try{history.pushState({snVideo:true},"");}catch(e){warn("history push",e);}
+}
+function popVideoState(){
+  try{if(history.state&&history.state.snVideo)history.back();}catch(e){warn("history back",e);}
+}
 function stopVideo(){
   if(!playingCard)return;
   const f=playingCard.querySelector(".card__video");
   if(f)f.remove();               // retirer l'iframe suffit à couper l'image ET le son
   playingCard.classList.remove("card--playing");
   playingCard=null;
+  popVideoState();                // consomme l'entrée posée par pushVideoState
 }
 function startVideo(card){
   const id=card&&card.dataset.vid;
@@ -3843,6 +3850,10 @@ function startVideo(card){
   card.insertBefore(f,card.firstChild);
   card.classList.add("card--playing");
   playingCard=card;
+  /* Intercepte le bouton retour pour quitter la vidéo (comme pour les panneaux).
+     Sans cela, le retour quitte l'app ; ici, il rend la carte vidéo avec son
+     titre et son bouton play. */
+  pushVideoState();
   /* C'EST ICI qu'une vidéo devient « vue » — pas à l'affichage de sa carte, qui
      ne montre qu'une miniature (voir markVisibleSeen). Au lancement et non à la
      fin : on ne sait pas quand une vidéo est « finie » depuis l'extérieur de
@@ -4136,6 +4147,8 @@ function popDialogState(){
    pour que popDialogState ne croie jamais avoir une entrée à consommer. */
 try{if(history.state&&history.state.snSheet)history.replaceState(null,"");}catch(e){}
 addEventListener("popstate",()=>{
+  // Vidéo en lecture : le retour la ferme et revient à la carte
+  if(playingCard){stopVideo();return;}
   const s=document.querySelector(".sheet.open");
   if(s){if(s===pickSheet)closePicker(true);else closeDialog(s,true);return;}
   const menu=document.querySelector(".sharemenu.open");
