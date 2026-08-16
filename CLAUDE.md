@@ -399,9 +399,15 @@ genre de script dérape.
   vide même quand elle ne convient pas, sinon elle reviendrait servir deux fois
   le même lot — et liée au fil qui l'a demandée (`key` = `feedKey()`), sinon un
   changement de langue ou de filtre se verrait servir le lot du fil précédent.
-  Elle n'est PAS garantie encore neuve à l'usage (l'utilisateur a pu lire ses
-  articles entre-temps) : c'est le filet « tout est déjà vu » de
-  `loadLearnPart` qui rattrape, il suffit. Scénario `avancewiki`.
+  Elle est REFILTRÉE au moment de l'usage, et pas seulement à sa constitution :
+  `fetchLearn` applique bien `dropSeen`, mais AVANT que l'utilisateur ne lise,
+  et entre les deux il a précisément passé son temps à lire. Le filet « tout est
+  déjà vu » de `loadLearnPart` ne rattrapait pas ce cas — il ne se déclenche que
+  si le lot est INTÉGRALEMENT vu, alors que le défaut ordinaire est partiel
+  (mesuré : 5 cartes déjà lues sur 20 resservies au ↻ suivant). Sous
+  `LEARN_SPARE_MIN` articles encore neufs (la moitié du lot), la réserve est
+  jetée plutôt que servie maigre : autant payer le réseau et servir un lot
+  entier. Scénario `avancewiki`.
 - `ICON_*` / `setIcons()` — UNE famille de tracés pour toute l'app (2 px,
   boîte de 24, `currentColor`), posée aussi dans la barre du haut. Ne pas y
   remettre d'emoji ni de glyphe de police : ils ne s'alignent pas entre eux.

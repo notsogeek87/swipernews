@@ -1385,6 +1385,40 @@ const scenarios = {
       );
       avant = apres;
     }
+
+    /* La réserve est constituée AVANT que l'utilisateur ne lise, et servie
+       plusieurs minutes plus tard : entre les deux, il a rendu « déjà vus » des
+       articles qu'elle contient. `fetchLearn` ne peut pas le prévoir (son
+       dropSeen est appliqué à la constitution), et le filet « tout est déjà
+       vu » de loadLearnPart ne se déclenche que si le lot est INTÉGRALEMENT vu
+       — jamais dans le cas ordinaire, qui est partiel. Mesuré avant correctif :
+       5 cartes déjà lues sur 20 resservies au ↻ suivant.
+       On reproduit exactement ça : on marque comme vus quelques articles que la
+       réserve contient, puis on appuie. */
+    await page.waitForTimeout(2500 + LAT + 600);
+    const marques = await page.evaluate(() => {
+      if (!learnSpare) return null;
+      const lus = learnSpare.items.slice(0, 5);
+      lus.forEach(addSeen);
+      return { titres: lus.map((i) => i.title), taille: learnSpare.items.length };
+    });
+    if (!marques) console.log("réserve absente : impossible de tester le refiltrage");
+    else {
+      await page.click("#reloadBtn");
+      await page.waitForTimeout(1200);
+      const revenus = await page.evaluate(
+        (t) => items.filter((i) => t.includes(i.title)).map((i) => i.title),
+        marques.titres
+      );
+      console.log(
+        `réserve de ${marques.taille} articles dont 5 lus entre-temps →` +
+          ` ${revenus.length} resservi(s)` +
+          (revenus.length
+            ? `  ← DÉJÀ VUS reservis (${revenus.slice(0, 3).join(", ")})`
+            : "  → refiltrée à l'usage ✓")
+      );
+    }
+
     // Le garde-fou qui coûterait le plus cher s'il lâchait : une réserve
     // constituée pour un fil ne doit JAMAIS être servie à un autre (langue,
     // source ou centre d'intérêt changés entre-temps), et une réserve

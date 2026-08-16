@@ -884,9 +884,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=130"></script>
-<script src="src/learn-core.js?v=130"></script>
-<script src="src/i18n.js?v=130"></script>
+<script src="src/lib.js?v=131"></script>
+<script src="src/learn-core.js?v=131"></script>
+<script src="src/i18n.js?v=131"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1476,7 +1476,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="130";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="131";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2304,20 +2304,35 @@ const RETRY_DELAYS_MS=[1500,3000,5000];
    - liée au FIL qui l'a demandée (`key` = feedKey()) : changer de langue, de
      source ou de centre d'intérêt change le fil, et le lot d'avance ne lui
      correspond plus. Il est alors jeté, pas servi.
-   Ce qui n'est PAS garanti ici : que la réserve soit encore neuve à l'usage.
-   L'utilisateur a pu lire entre-temps des articles qu'elle contient. Rien à
-   ajouter pour autant — le filet « tout est déjà vu » de loadLearnPart, en
-   dessous, le voit et repart chercher un lot aléatoire. */
+   - REFILTRÉE au moment de l'usage, et pas seulement à sa constitution. C'est
+     la seule garantie que `fetchLearn` ne peut pas donner : elle applique bien
+     `dropSeen`, mais AVANT que l'utilisateur ne lise. Entre le moment où la
+     réserve est constituée (2,5 s après une repeinture) et celui où elle est
+     servie (le ↻ suivant, souvent plusieurs minutes plus tard), il a
+     précisément passé son temps à lire — donc à rendre « déjà vus » des
+     articles qu'elle contient. Le filet « tout est déjà vu » de loadLearnPart
+     ne rattrapait pas ce cas : il ne se déclenche que si le lot est
+     INTÉGRALEMENT vu, alors que le défaut ordinaire est partiel (mesuré : 5
+     cartes déjà lues sur 20 resservies au ↻ suivant). */
 const LEARN_SPARE_DELAY_MS=2500;   // laisse la repeinture et ses images passer devant
+/* Sous ce seuil d'articles encore neufs, la réserve ne vaut plus d'être servie :
+   un lot trop maigre assécherait la moitié Wikipédia et ferait appeler loadMore
+   dans la foulée. Autant payer le réseau (~1 s) et servir un lot entier. */
+const LEARN_SPARE_MIN=Math.ceil(CONFIG.BATCH_SIZE/2);
 let learnSpare=null;      // {key, items} — lot chargé d'avance, jamais affiché
 let learnSpareArme=false; // la session a-t-elle vu au moins un ↻ ?
 let learnSpareVol=false;  // un lot d'avance est-il déjà en route ?
-/* Rend la réserve si elle vaut pour CE fil, et la vide dans tous les cas :
-   une réserve inspectée est une réserve consommée, valide ou non. */
+/* Rend la réserve si elle vaut pour CE fil ET si elle est encore assez neuve,
+   et la vide dans tous les cas : une réserve inspectée est une réserve
+   consommée, valide ou non. */
 function takeLearnSpare(key){
   const s=learnSpare;
   learnSpare=null;
-  return s&&s.key===key&&s.items.length?s.items:null;
+  if(!(s&&s.key===key&&s.items.length))return null;
+  // Ce que l'utilisateur a lu DEPUIS la constitution de la réserve : sans ce
+  // second passage, le ↻ « rapide » reposait des cartes déjà vues.
+  const frais=s.items.filter(it=>!seen.has(seenKey(it)));
+  return frais.length>=LEARN_SPARE_MIN?frais:null;
 }
 /* Charge la réserve. Silencieux À DESSEIN : pas de syncing(), donc pas de barre
    de progression — l'utilisateur n'a rien demandé, et voir l'app « travailler »
