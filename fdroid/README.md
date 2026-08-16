@@ -105,14 +105,33 @@ La demande d'inclusion est **ouverte et en cours de revue** :
 GitLab est hors de portée de ce dépôt (aucun accès configuré ici) — ce qui suit
 se fait donc à la main, sur `fdroiddata` :
 
+> **La MR porte le libellé `waiting-for-upstream`** : pour F-Droid, la balle est
+> dans notre camp, et aucun relecteur ne la reprendra tant qu'il y sera. Ce
+> n'est donc pas une file d'attente, c'est une action à faire ici.
+
 1. **Reporter le contenu de `fdroid/eu.lielu.news.yml`** dans
    `metadata/eu.lielu.news.yml` sur la branche de la MR, et pousser. Attention,
    ce n'est pas un copier-coller : là-bas le fichier est sous la forme
    canonique de `fdroid rewritemeta` — **aucun commentaire**, `versionName` non
    quoté. Seules les valeurs doivent correspondre.
+   Deux détails de formatage relevés sur de vrais fichiers de `fdroiddata`, et
+   que leur CI vérifie : la ligne `Binaries:` est **repliée** (« `Binaries:` »,
+   une espace, saut de ligne, l'URL indentée de deux espaces) parce que sa
+   valeur dépasse 80 colonnes, alors que `AllowedAPKSigningKeys:` ne l'est pas
+   (64 caractères, sous le seuil). En cas de doute, `fdroid rewritemeta
+   eu.lielu.news` tranche.
 2. **Reprendre la description de la MR avec leur gabarit « App inclusion »** et
    cocher toutes les cases obligatoires — demandé en revue, et cela ne concerne
-   que GitLab, pas ce dépôt.
+   que GitLab, pas ce dépôt. Le gabarit vit dans
+   `.gitlab/merge_request_templates/App inclusion.md` de `fdroiddata`.
+   Il n'y a **aucune issue RFP** pour cette app (vérifié : la recherche ne rend
+   rien) : la ligne `Closes rfp#…` est donc à supprimer, comme le gabarit le
+   demande lui-même.
+3. **Poster un commentaire** après avoir poussé, avec la commande rapide
+   `/unlabel ~"waiting-for-upstream"`. Un libellé ne se retire pas tout seul, et
+   une description modifiée ne notifie personne — sans ce commentaire, la MR
+   reste invisible pour eux. Les commandes rapides ne s'exécutent que dans un
+   commentaire, jamais depuis la description.
 
 ## Ce que la revue de la MR a demandé (et où c'est corrigé)
 
