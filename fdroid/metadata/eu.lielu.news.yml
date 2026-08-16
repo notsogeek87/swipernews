@@ -14,7 +14,6 @@ RepoType: git
 Repo: https://github.com/notsogeek87/swipernews.git
 Binaries: 
   https://github.com/notsogeek87/swipernews/releases/download/v%v/swipernews-%v.apk
-AllowedAPKSigningKeys: cc849a79fc39de5f8b4af5fcda1dbdb4230ad554aef85b484e5c7fd49caa6238
 
 Builds:
   - versionName: 1.3.0
@@ -54,6 +53,8 @@ Builds:
       - node_modules/@capacitor/assets/node_modules/@capacitor/cli/assets/capacitor-cordova-android-plugins.tar.gz
     scandelete:
       - node_modules
+
+AllowedAPKSigningKeys: cc849a79fc39de5f8b4af5fcda1dbdb4230ad554aef85b484e5c7fd49caa6238
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$

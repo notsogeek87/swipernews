@@ -47,12 +47,13 @@ Repo: https://github.com/notsogeek87/swipernews.git
 # colonnes et leur CI refuse tout écart. Ici, le repli n'a pas lieu d'être, ce
 # fichier n'étant pas celui qu'ils lisent (voir fdroid/README.md).
 Binaries: https://github.com/notsogeek87/swipernews/releases/download/v%v/swipernews-%v.apk
-# Empreinte SHA-256 du certificat de signature (celui des secrets ANDROID_* du
-# dépôt). F-Droid refuse tout APK signé d'une autre clé, ce qui protège contre
-# une release GitHub contrefaite. Relevée sur l'APK publié :
-#   apksigner verify --print-certs swipernews-X.Y.Z.apk
-AllowedAPKSigningKeys: cc849a79fc39de5f8b4af5fcda1dbdb4230ad554aef85b484e5c7fd49caa6238
 
+# L'ORDRE DES CHAMPS compte : `Binaries` vient AVANT le bloc Builds,
+# `AllowedAPKSigningKeys` APRÈS (voir plus bas). C'est celui de
+# « fdroid rewritemeta », et leur CI refuse tout fichier qui n'est pas déjà
+# dans l'état qu'elle produirait — les deux champs vont pourtant de pair, et
+# rien ne laisse deviner qu'ils se rangent de part et d'autre. Vérifié sur
+# metadata/org.briarproject.briar.android.yml chez eux.
 Builds:
   - versionName: "1.3.0"
     versionCode: 10300
@@ -153,6 +154,15 @@ Builds:
       - node_modules/@capacitor/assets/node_modules/@capacitor/cli/assets/capacitor-cordova-android-plugins.tar.gz
     scandelete:
       - node_modules
+
+# Empreinte SHA-256 du certificat de signature (celui des secrets ANDROID_* du
+# dépôt). F-Droid refuse tout APK signé d'une autre clé, ce qui protège contre
+# une release GitHub contrefaite. Relevée sur l'APK publié :
+#   apksigner verify --print-certs swipernews-X.Y.Z.apk
+#
+# Sa place est ICI, après Builds, et non à côté de `Binaries` — voir le
+# commentaire sur l'ordre des champs plus haut.
+AllowedAPKSigningKeys: cc849a79fc39de5f8b4af5fcda1dbdb4230ad554aef85b484e5c7fd49caa6238
 
 # versionName et versionCode sont écrits en clair dans android/app/build.gradle,
 # donc F-Droid sait les lire : une nouvelle entrée Builds s'ajoute toute seule à
