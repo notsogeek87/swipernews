@@ -1,0 +1,61 @@
+Categories:
+  - News
+  - Reading
+License: MIT
+AuthorName: lielu.eu
+WebSite: https://news.lielu.eu
+SourceCode: https://github.com/notsogeek87/swipernews
+IssueTracker: https://github.com/notsogeek87/swipernews/issues
+Changelog: https://github.com/notsogeek87/swipernews/releases
+
+AutoName: SwiperNews
+
+RepoType: git
+Repo: https://github.com/notsogeek87/swipernews.git
+Binaries: 
+  https://github.com/notsogeek87/swipernews/releases/download/v%v/swipernews-%v.apk
+AllowedAPKSigningKeys: cc849a79fc39de5f8b4af5fcda1dbdb4230ad554aef85b484e5c7fd49caa6238
+
+Builds:
+  - versionName: 1.3.0
+    versionCode: 10300
+    commit: 6294b6f4b6904f38a014ebc4b44c3e4e43c028da
+    subdir: android
+    sudo:
+      - echo "deb https://deb.debian.org/debian forky main" > /etc/apt/sources.list.d/forky.list
+      - apt-get update
+      - apt-get install -y -t forky npm
+    gradle:
+      - yes
+    output: app/build/outputs/apk/release/app-release-unsigned.apk
+    prebuild:
+      - npm ci
+      - npm run cap:sync
+    scanignore:
+      - node_modules/@capacitor/assets/node_modules/@capacitor/cli/assets/capacitor-cordova-android-plugins.tar.gz
+    scandelete:
+      - node_modules
+
+  - versionName: 1.4.1
+    versionCode: 104010000
+    commit: 5f54a5c6001c93bcb197f5ba2ed1f6d65c94c499
+    subdir: android
+    sudo:
+      - echo "deb https://deb.debian.org/debian forky main" > /etc/apt/sources.list.d/forky.list
+      - apt-get update
+      - apt-get install -y -t forky npm
+    gradle:
+      - yes
+    output: app/build/outputs/apk/release/app-release-unsigned.apk
+    prebuild:
+      - npm ci
+      - npm run cap:sync
+    scanignore:
+      - node_modules/@capacitor/assets/node_modules/@capacitor/cli/assets/capacitor-cordova-android-plugins.tar.gz
+    scandelete:
+      - node_modules
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$
+CurrentVersion: 1.4.1
+CurrentVersionCode: 104010000

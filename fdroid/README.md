@@ -109,17 +109,31 @@ se fait donc à la main, sur `fdroiddata` :
 > dans notre camp, et aucun relecteur ne la reprendra tant qu'il y sera. Ce
 > n'est donc pas une file d'attente, c'est une action à faire ici.
 
-1. **Reporter le contenu de `fdroid/eu.lielu.news.yml`** dans
-   `metadata/eu.lielu.news.yml` sur la branche de la MR, et pousser. Attention,
-   ce n'est pas un copier-coller : là-bas le fichier est sous la forme
-   canonique de `fdroid rewritemeta` — **aucun commentaire**, `versionName` non
-   quoté. Seules les valeurs doivent correspondre.
-   Deux détails de formatage relevés sur de vrais fichiers de `fdroiddata`, et
-   que leur CI vérifie : la ligne `Binaries:` est **repliée** (« `Binaries:` »,
-   une espace, saut de ligne, l'URL indentée de deux espaces) parce que sa
-   valeur dépasse 80 colonnes, alors que `AllowedAPKSigningKeys:` ne l'est pas
-   (64 caractères, sous le seuil). En cas de doute, `fdroid rewritemeta
-   eu.lielu.news` tranche.
+1. **Copier `fdroid/metadata/eu.lielu.news.yml`** dans
+   `metadata/eu.lielu.news.yml` sur la branche de la MR, et pousser. Celui-là,
+   et pas `fdroid/eu.lielu.news.yml` : c'est un copier-coller direct, sans
+   retouche.
+
+   Les DEUX fichiers portent la même recette, sous deux formes :
+
+   | Fichier | À quoi il sert |
+   | --- | --- |
+   | `fdroid/eu.lielu.news.yml` | la référence **commentée** — le pourquoi de chaque champ, à lire et à modifier |
+   | `fdroid/metadata/eu.lielu.news.yml` | la forme **canonique**, prête à coller chez eux |
+
+   Toute modification se fait dans le fichier commenté PUIS se reporte dans le
+   canonique. Ils doivent dire exactement la même chose ; le seul écart permis
+   est la forme.
+
+   La forme canonique est celle de `fdroid rewritemeta` : **aucun commentaire**,
+   `versionName` et `CurrentVersion` **non quotés**. Deux détails relevés sur de
+   VRAIS fichiers de `fdroiddata`, et que leur CI vérifie : la ligne `Binaries:`
+   est **repliée** — « `Binaries:` », une espace EN FIN DE LIGNE, saut de ligne,
+   l'URL indentée de deux espaces — parce que sa valeur dépasse 80 colonnes
+   (voir `metadata/org.fossify.gallery.yml` chez eux) ; `AllowedAPKSigningKeys:`
+   ne l'est pas, ses 64 caractères restant sous le seuil (voir
+   `metadata/org.briarproject.briar.android.yml`). En cas de doute, `fdroid
+   rewritemeta eu.lielu.news` tranche.
 2. **Reprendre la description de la MR avec leur gabarit « App inclusion »** et
    cocher toutes les cases obligatoires — demandé en revue, et cela ne concerne
    que GitLab, pas ce dépôt. Le gabarit vit dans
