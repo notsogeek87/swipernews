@@ -816,6 +816,7 @@
     <h3 class="secttl" data-i18n="sheet.sources.title">📰 Sources d'actualité</h3>
     <p class="sub" data-i18n="sheet.sources.sub">Coche les flux à afficher, ajoute ceux que tu veux.</p>
     <label class="sponsorrow"><input type="checkbox" id="sponsorFilterChk"><span data-i18n="sheet.sources.filterSponsored">Filtrer les articles sponsorisés et bons plans</span></label>
+    <label class="sponsorrow"><input type="checkbox" id="videoFilterChk"><span data-i18n="sheet.sources.filterVideoOnly">Afficher uniquement les vidéos</span></label>
     <div id="feedList"></div>
     <div class="addbox">
       <input id="newUrl" type="url" data-i18n-attr="placeholder:sheet.sources.placeholder" placeholder="https://exemple.com/rss" inputmode="url">
@@ -916,9 +917,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=138"></script>
-<script src="src/learn-core.js?v=138"></script>
-<script src="src/i18n.js?v=138"></script>
+<script src="src/lib.js?v=139"></script>
+<script src="src/learn-core.js?v=139"></script>
+<script src="src/i18n.js?v=139"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1529,7 +1530,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="138";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="139";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1699,6 +1700,12 @@ const LS_SPONSOR="fluxswipe.sponsorfilter.v1";
 let filterSponsored=(()=>{
   try{const v=localStorage.getItem(LS_SPONSOR);return v===null?true:v==="1";}
   catch(e){return true;}
+})();
+
+const LS_VIDEO_ONLY="fluxswipe.videoonlyfilter.v1";
+let filterVideoOnly=(()=>{
+  try{const v=localStorage.getItem(LS_VIDEO_ONLY);return v===null?false:v==="1";}
+  catch(e){return false;}
 })();
 
 /* ---------- Mode « Cacher les articles déjà lus » ----------
@@ -2013,7 +2020,9 @@ async function fetchFeedRobust(feed){
     if(!reste())throw new Error("budget");
     a=await fetchFeedRss2Json(feed,Math.min(7000,reste()));
   }
-  return filterSponsored?a.filter(i=>!isPromotionalItem(i)):a;
+  let result=filterSponsored?a.filter(i=>!isPromotionalItem(i)):a;
+  if(filterVideoOnly)result=result.filter(i=>videoIdOf(i));
+  return result;
 }
 /* Nom que le flux se donne lui-même : <feed><title> en Atom, <channel><title>
    en RSS. Le sélecteur d'ENFANT DIRECT est indispensable — un simple "title"
@@ -4378,7 +4387,7 @@ function feedKey(){
   // actif était repeint au lancement suivant après l'avoir décoché, et les
   // articles sponsorisés n'apparaissaient qu'à la seconde peinture.
   return "mix|"+LANG+"|"+newsSrcKey()+"|"+cat+(cat==="all"?":"+interests.join(","):"")+
-    (filterSponsored?"|s":"");
+    (filterSponsored?"|s":"")+(filterVideoOnly?"|v":"");
 }
 /* Instantané du fil, pour revenir d'un filtre à l'autre sans réseau : on
    restaure l'état exact (cartes affichées + position de scroll) au lieu de tout
@@ -4826,6 +4835,7 @@ function openSettings(){
   pendingInt=new Set(interests);
   renderMix();renderIntGrid();renderList();renderSuggest();renderReadPref();renderLangPref();
   document.getElementById("sponsorFilterChk").checked=filterSponsored;
+  document.getElementById("videoFilterChk").checked=filterVideoOnly;
   const premier=!interestsChosen();
   document.getElementById("introWelcome").classList.toggle("hidden",!premier); // intro visible seulement la 1ère fois
   // Accueil du 1er lancement : on ne demande qu'une chose à la fois. Les
@@ -4872,6 +4882,11 @@ document.getElementById("sponsorFilterChk").onchange=e=>{
   filterSponsored=e.target.checked;
   try{localStorage.setItem(LS_SPONSOR,filterSponsored?"1":"0");}catch(_){}
   feedsDirty=true;   // même flag que save() : signale un rechargement dû à applySettings()
+};
+document.getElementById("videoFilterChk").onchange=e=>{
+  filterVideoOnly=e.target.checked;
+  try{localStorage.setItem(LS_VIDEO_ONLY,filterVideoOnly?"1":"0");}catch(_){}
+  feedsDirty=true;
 };
 document.getElementById("applySettings").onclick=applySettings;
 renderMixUI();
