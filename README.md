@@ -502,6 +502,15 @@ Effet de bord voulu : le fil sert les sources **à tour de rôle** en les
 regroupant par nom. Cinq chaînes suivies ont donc maintenant cinq parts, au lieu
 d'une seule part partagée sous « youtube.com ».
 
+Enfin, **une vidéo n'est « vue » que lorsqu'elle est lancée**, là où un article
+l'est dès que sa carte est passée à l'écran (voir *Les actus déjà vues*
+ci-dessus). La différence est celle du contenu : une carte d'article porte le
+titre, le résumé et l'image — l'avoir eue sous les yeux, c'est en avoir tiré ce
+qu'il y avait à en tirer. Une carte vidéo ne montre qu'une miniature. Passer
+devant sans appuyer sur ▶ ne compte donc pas, et la vidéo garde sa place : elle
+reviendra au rafraîchissement suivant, parce que vous ne l'avez pas encore
+regardée. « Ouvrir sur YouTube » compte aussi comme un lancement.
+
 Quand le lien d'un article désigne une vidéo qu'on sait intégrer, la carte **se
 regarde sur place** : un ▶ au centre de la miniature, un appui, et le lecteur
 prend toute la carte. Le bloc titre/source s'efface pendant la lecture, le bouton

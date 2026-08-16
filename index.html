@@ -906,9 +906,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=133"></script>
-<script src="src/learn-core.js?v=133"></script>
-<script src="src/i18n.js?v=133"></script>
+<script src="src/lib.js?v=134"></script>
+<script src="src/learn-core.js?v=134"></script>
+<script src="src/i18n.js?v=134"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1519,7 +1519,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="133";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="134";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -3098,11 +3098,22 @@ function scrollToCard(i){
    les vieux hors de la fenêtre. Ça ne l'est plus du tour de rôle, où la file
    d'une source, ce sont SES plus récents quel que soit leur âge.
    « Vu » veut dire passé à l'écran, pas ouvert : c'est la question à laquelle
-   on répond — l'ai-je déjà eu sous les yeux ? */
+   on répond — l'ai-je déjà eu sous les yeux ?
+
+   UNE EXCEPTION, et une seule : la carte VIDÉO. Pour un article, la carte porte
+   le titre, le résumé et l'image — l'avoir eue sous les yeux, c'est en avoir
+   tiré ce qu'il y avait à en tirer, et la revoir n'apprendrait rien. D'une
+   vidéo, la carte ne montre qu'une miniature : passer devant ne l'a pas
+   regardée. Elle est donc marquée au LANCEMENT (voir startVideo), pas à
+   l'affichage.
+   Conséquence assumée : une vidéo qu'on ne lance jamais garde sa place en tête
+   de la file de sa chaîne et revient à chaque rafraîchissement — c'est
+   précisément ce qu'on veut dire par « pas encore regardée », et c'est le
+   contraire du défaut corrigé pour les actus (voir seenNews). */
 function markVisibleSeen(it=currentItem()){
   if(!it)return;
   if(it.kind==="learn")addSeen(it);
-  else addSeenNews(it);
+  else if(!videoIdOf(it))addSeenNews(it);
 }
 
 /* ---------- Images de fond paresseuses ----------
@@ -3739,6 +3750,13 @@ function startVideo(card){
   card.insertBefore(f,card.firstChild);
   card.classList.add("card--playing");
   playingCard=card;
+  /* C'EST ICI qu'une vidéo devient « vue » — pas à l'affichage de sa carte, qui
+     ne montre qu'une miniature (voir markVisibleSeen). Au lancement et non à la
+     fin : on ne sait pas quand une vidéo est « finie » depuis l'extérieur de
+     l'iframe, et relancer soi-même ce qu'on a commencé reste possible — c'est
+     seulement le fil qui cesse de le reproposer. */
+  const it=cardReg.get(+card.dataset.id);
+  if(it)addSeenNews(it);
   // Le repère « Swipe » ne s'efface qu'au premier défilement — or c'est
   // précisément sur la PREMIÈRE carte d'une session qu'on appuie sur ▶, et il
   // resterait posé par-dessus le lecteur.
@@ -3766,6 +3784,15 @@ feedEl.addEventListener("click",e=>{
   const openLink=e.target.closest("a[data-open]");
   if(openLink&&openLink.href){
     const card=openLink.closest(".card"),t=card&&card.querySelector(".card__title");
+    /* « Ouvrir sur YouTube » compte aussi comme un lancement : on part la
+       regarder, ailleurs mais on la regarde. La reproposer en tête de la file
+       de sa chaîne au prochain rafraîchissement serait le même défaut que si on
+       l'avait lue sur la carte. Rien de tel pour un ARTICLE : là, « vu » est
+       déjà acquis à l'affichage (voir markVisibleSeen). */
+    if("video" in openLink.dataset&&card){
+      const it=cardReg.get(+card.dataset.id);
+      if(it)addSeenNews(it);
+    }
     if(openArticle(openLink.href,t?t.textContent:"",{noReader:"video" in openLink.dataset}))e.preventDefault();
   }
 });

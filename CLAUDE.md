@@ -676,6 +676,18 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   n'apprend rien. Au premier chargement d'une session neuve, les deux
   définitions coïncident. « Vu » veut dire AFFICHÉ, pas ouvert : c'est la
   question à laquelle on répond.
+- **« Vu » ne veut pas dire la même chose pour une VIDÉO.** Une carte d'article
+  porte le titre, le résumé et l'image : l'avoir eue sous les yeux, c'est en
+  avoir tiré ce qu'il y avait à en tirer. Une carte vidéo ne montre qu'une
+  miniature — défiler devant ne l'a pas regardée. Elle est donc marquée au
+  LANCEMENT (`startVideo`, et aussi « Ouvrir sur YouTube » : on part la regarder
+  ailleurs, mais on la regarde), jamais par `markVisibleSeen`, qui l'écarte
+  explicitement. Au lancement et non à la fin : on ne sait pas, depuis
+  l'extérieur de l'iframe, quand une vidéo est finie.
+  Contrepartie assumée et voulue : une vidéo qu'on ne lance jamais garde sa
+  place en tête de la file de sa chaîne et revient à chaque rafraîchissement —
+  c'est précisément le sens de « pas encore regardée », et c'est l'inverse du
+  défaut corrigé juste au-dessus pour les actus. Scénario `video`.
 - **Une carte vidéo est une FAÇADE tant qu'on n'a pas appuyé sur ▶.** Miniature du
   flux + bouton ; l'iframe n'est créée qu'au toucher, et rien n'est demandé à
   Google pour une carte simplement croisée. Passer en lecture automatique (à la

@@ -1998,9 +1998,31 @@ const scenarios = {
     console.log("/api/og partis (attendu : 0) :", calls.og);
     console.log("lecteurs chargés AVANT tout appui (attendu : 0) :", calls.player);
 
+    /* « Vu » ne veut PAS dire la même chose pour une vidéo que pour un article.
+       Une carte d'article porte titre, résumé et image : l'avoir eue sous les
+       yeux suffit. D'une vidéo, la carte ne montre qu'une miniature — défiler
+       devant ne l'a pas regardée, et elle doit garder sa place dans la file de
+       sa chaîne. On parcourt donc quatre cartes SANS rien lancer.
+       (Le pendant côté actus, lui, est vérifié par `redites`.) */
+    await page.evaluate(() =>
+      feedEl.scrollTo({ top: feedEl.clientHeight * 3, behavior: "instant" })
+    );
+    await page.waitForTimeout(500);
+    const vuSansLancer = await page.evaluate(() => seenNews.size);
+    await page.evaluate(() => feedEl.scrollTo({ top: 0, behavior: "instant" }));
+    await page.waitForTimeout(400);
+    console.log(
+      "cartes vidéo défilées SANS lancer — mémorisées vues (attendu : 0) :",
+      vuSansLancer
+    );
+
     // Appui sur ▶ : le lecteur se monte, et lui seul.
     await page.click(".card[data-vid] .card__play");
     await page.waitForTimeout(600);
+    console.log(
+      "après ▶ — vidéos mémorisées vues (attendu : 1) :",
+      await page.evaluate(() => seenNews.size)
+    );
     console.log(
       "après ▶ — iframes :",
       await page.evaluate(() => document.querySelectorAll(".card__video").length),
