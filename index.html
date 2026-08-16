@@ -918,9 +918,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=141"></script>
-<script src="src/learn-core.js?v=141"></script>
-<script src="src/i18n.js?v=141"></script>
+<script src="src/lib.js?v=142"></script>
+<script src="src/learn-core.js?v=142"></script>
+<script src="src/i18n.js?v=142"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1531,7 +1531,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="141";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="142";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -4684,6 +4684,8 @@ let pickKind="src";
    aussitôt. Nulle pour le filtre des thèmes, qui reste un choix UNIQUE — un
    article Wikipédia est tiré dans un thème, pas dans plusieurs. */
 let pickSel=null;
+// État du filtre vidéo EN DÉBUT d'ouverture : détecte si l'utilisateur l'a changé
+let pickVideoFilterBefore=null;
 /* Vrai quand la puce `k` doit paraître cochée. « Toutes » n'est pas une valeur
    parmi les autres : elle s'allume quand RIEN n'est retenu. */
 function pickOn(k){
@@ -4719,7 +4721,10 @@ function openPicker(kind){
   document.getElementById("pickSub").textContent=T(src?"filter.src.sub":"filter.cat.sub");
   pickApply.classList.toggle("hidden",!src);   // le choix unique s'applique au tap, sans bouton
   document.getElementById("videoFilterRow").classList.toggle("hidden",!src);
-  if(src)document.getElementById("videoFilterChk").checked=filterVideoOnly;
+  if(src){
+    pickVideoFilterBefore=filterVideoOnly;
+    document.getElementById("videoFilterChk").checked=filterVideoOnly;
+  }
   renderPickGrid();
   openDialog(pickSheet);
 }
@@ -4743,9 +4748,13 @@ document.getElementById("pickGrid").addEventListener("click",e=>{
    refermé autrement qu'avec le bouton. */
 function closePicker(fromHistory){
   const sel=pickKind==="src"&&pickSel?[...pickSel]:null;
+  const videoFilterChanged=pickVideoFilterBefore!==null&&pickVideoFilterBefore!==filterVideoOnly;
   pickSel=null;
+  pickVideoFilterBefore=null;
   closeDialog(pickSheet,fromHistory);
   if(sel)setNewsSrc(sel);
+  // Force refresh si le filtre vidéo a changé, même si les sources n'ont pas bougé
+  if(videoFilterChanged&&!fromHistory)loadFeeds(true);
 }
 // Enveloppé : passer le handler directement donnerait l'ÉVÉNEMENT en premier
 // argument, donc un `fromHistory` toujours vrai — l'entrée d'historique du
