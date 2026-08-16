@@ -15,21 +15,27 @@ public class MainActivity extends BridgeActivity {
      * système à chaque retour au premier plan, backgrounded ou non — c'est
      * le signal le plus fiable disponible.
      *
-     * <p>Aucun coût réseau ajouté : loadFeeds() (index.html) revérifie
-     * lui-même l'âge du dernier chargement et ne fait rien si le seuil n'est
-     * pas atteint — l'appeler à chaque retour au premier plan est donc sans
-     * effet la plupart du temps. Les appels concurrents avec les deux autres
-     * déclencheurs JS sont sans risque : loadFeeds() s'auto-annule via
-     * loadSeq (voir index.html).
+     * <p>On appelle refreshIfStale(), JAMAIS loadFeeds() directement : c'est le
+     * point de passage unique des trois déclencheurs automatiques, et lui seul
+     * porte la garde « un chargement d'actus est déjà en vol » (voir
+     * newsLoadingSeq dans index.html). Sans elle, le tout premier onResume()
+     * — qui survient à l'ouverture de l'app, pendant que le chargement de
+     * lancement dure encore — repartait de zéro : une seconde génération, donc
+     * un second « remonter en tête » quelques secondes après le premier, sur
+     * un fil que l'utilisateur avait déjà commencé à parcourir.
+     *
+     * <p>Aucun coût réseau ajouté : refreshIfStale() ne relaie à loadFeeds()
+     * que hors chargement, et loadFeeds() revérifie lui-même l'âge du dernier
+     * lot — l'appeler à chaque retour au premier plan est donc sans effet la
+     * plupart du temps.
      *
      * <p>try/catch côté JS : le tout premier onResume() peut survenir avant
-     * que la WebView n'ait fini de charger index.html, où feedLoadStarted
-     * n'existe pas encore.
+     * que la WebView n'ait fini de charger index.html, où refreshIfStale
+     * n'existe pas encore. La fonction vérifie elle-même feedLoadStarted.
      */
     private static final String RESUME_JS =
         "(function(){try{"
-            + "if(typeof feedLoadStarted!==\"undefined\"&&feedLoadStarted"
-            + "&&typeof loadFeeds===\"function\")loadFeeds();"
+            + "if(typeof refreshIfStale===\"function\")refreshIfStale();"
             + "}catch(e){}})();";
 
     @Override

@@ -434,7 +434,7 @@ genre de script dérape.
 
 | Fichier | Rôle |
 | --- | --- |
-| `MainActivity` | `registerPlugin(InAppBrowserPlugin)` **avant** `super.onCreate` ; `onResume()` évalue directement `loadFeeds()` dans la WebView — signal de reprise le plus fiable, sans passer par le pont `@capacitor/app` |
+| `MainActivity` | `registerPlugin(InAppBrowserPlugin)` **avant** `super.onCreate` ; `onResume()` évalue `refreshIfStale()` dans la WebView — signal de reprise le plus fiable, sans passer par le pont `@capacitor/app`. **Jamais `loadFeeds()` en direct** : voir la garde ci-dessous |
 | `InAppBrowserPlugin` | Pont JS→natif : `open`, `share`, `saveFile`, `syncBlocklist`, `clearBlocklist`, `systemInsets` |
 | `InAppBrowserActivity` | Le lecteur : barre escamotable, insets, injections. `applyWebPadding()` pose une **marge de vue** (`topMargin`), jamais un padding, sur `reader_web` — un padding ne pousse jamais un élément `position:fixed`/`sticky` (l'en-tête de la plupart des sites de presse), qui resterait donc caché sous la barre |
 | `ReaderWebView` | Sous-classe minimale, seulement pour exposer `onScrollChanged` |
@@ -545,11 +545,31 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   un `my` neuf à chaque `loadFeeds` donne un jeton neuf sans rien à
   réinitialiser, et une génération abandonnée ne peut pas bloquer la suivante.
   Il se prend au moment du rendu RÉEL (après `whenFeedIdle`), pas à la
-  programmation : c'est la moitié qui repeint la première qui l'obtient. Ce qui
-  reste strictement local, c'est le GEL (`remix`) : un renouvellement ne gèle
-  pas, qu'il ait obtenu la tête ou non — les deux notions se ressemblent mais ne
-  se recouvrent pas. Troisième acte de `forcetop`, avec Wikipédia délibérément
-  plus lent que l'échéance.
+  programmation. Ce qui reste strictement local, c'est le GEL (`remix`) : un
+  renouvellement ne gèle pas, qu'il ait obtenu la tête ou non — les deux notions
+  se ressemblent mais ne se recouvrent pas. Troisième acte de `forcetop`, avec
+  Wikipédia délibérément plus lent que l'échéance.
+  **« Premier arrivé, premier servi » ne suffit PAS** : quand les actus vont se
+  charger, la tête leur appartient, et `loadNewsPart` la RÉSERVE
+  (`teteReservee=my`) dès qu'il sait qu'il va interroger ses sources, avant tout
+  aller-retour. Wikipédia répond souvent avant elles (une requête contre
+  quarante) et remontait alors en tête sur un fil dont les actus étaient encore
+  celles du cache — donc rien de neuf en haut. Pire, cela DÉPOSSÉDAIT la
+  repeinture des actus, la seule qui renouvelle vraiment le fil : privée du
+  jeton, elle tentait de garder l'ancre — un article du cache qu'elle venait de
+  retirer —, ne le trouvait pas (`i<0`), et retombait sur le `setScrollTopInstant(0)`
+  de fin de `render()`. D'où DEUX remontées à l'ouverture, la seconde sans raison
+  visible (mesuré : 1732 ms puis 2754 ms). Scénario `teteouverture`.
+  Contrepartie ASSUMÉE de la réservation : si les actus se la réservent puis
+  échouent toutes, personne ne remonte en tête pour ce chargement — ce qui est
+  le bon comportement, rien de neuf n'étant arrivé côté actus.
+- **`onResume()` natif appelle `refreshIfStale()`, JAMAIS `loadFeeds()`.**
+  Le point de passage unique porte la garde « un chargement d'actus est déjà en
+  vol » (`newsLoadingSeq`) ; en la contournant, le tout premier `onResume` — qui
+  survient à l'OUVERTURE de l'app, pendant que le chargement de lancement dure
+  encore — repartait de zéro. Une seconde génération, donc un second jeton de
+  tête, donc une seconde remontée quelques secondes après la première, sur un
+  fil que l'utilisateur avait déjà commencé à parcourir. Voir `MainActivity`.
 - **Une source a UN budget, pas un délai d'expiration par étape**
   (`FEED_BUDGET_MS`, voir `fetchFeedRobust`). Les trois transports — backend
   same-origin, proxys publics en parallèle, rss2json — avaient chacun leur 7 s,
@@ -776,7 +796,7 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 
 `npm test` ne voit que `src/` et `api/` : **tout le JS en ligne d'`index.html`
 — le fil, l'état, le stockage local — n'est couvert par aucun test**. Ce banc
-comble le trou en jouant 27 scénarios réels dans Chromium, réseau entièrement
+comble le trou en jouant 28 scénarios réels dans Chromium, réseau entièrement
 simulé (rien ne part vers une vraie source) : hors-ligne, réseau lent, coupure en
 cours de requête, API en 500, RSS vide/tronqué/HTML, contenu démesuré, doublons,
 120 sources, stockage et cache abîmés, quota saturé, actions enchaînées, retour
@@ -793,6 +813,12 @@ jalons que rien ne séparait avant — le moment où le fil AFFICHÉ devient neu
 Il vérifie aussi que le budget ne coûte RIEN en contenu : 120 actus retenues,
 comme sans lui. Repères actuels : 2,6 s / 13,8 s, contre 24,6 s pour les deux
 avant l'échéance.
+
+`teteouverture` est le pendant de `forcetop` pour l'OUVERTURE à froid : cache
+périmé peint tout de suite, les deux moitiés qui repartent, et l'utilisateur qui
+glisse dès la première carte. Il compte les remontées en tête SUBIES — il en faut
+exactement UNE — et journalise chaque `render()` avec son ancre, pour dire
+laquelle des deux moitiés a provoqué le saut.
 
 Deux d'entre eux signalent des lignes qui ne sont PAS des régressions, et qu'il
 ne faut pas partir corriger : `offline` fait remonter des

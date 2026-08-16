@@ -1381,6 +1381,140 @@ const scenarios = {
     await browser.close();
   },
 
+  /* 28. OUVERTURE de l'app au-delà des 30 min, en glissant pendant que ça
+     charge. Le pendant de `forcetop` (qui, lui, part d'une session déjà en
+     cours) : ici le cache périmé est peint tout de suite, les DEUX moitiés
+     repartent, et l'utilisateur glisse dès la première carte affichée.
+     Une seule remontée en tête est due — celle de la repeinture qui renouvelle
+     vraiment le fil. On en comptait deux : la moitié Wikipédia, plus rapide
+     (une requête contre quarante), prenait la tête sur un fil dont les actus
+     étaient encore celles du cache ; la repeinture des actus, dépossédée,
+     tentait ensuite de garder l'ancre — un article du cache qu'elle venait de
+     retirer —, ne le trouvait pas, et retombait sur un saut sec en haut. */
+  async teteouverture() {
+    const N = 40;
+    const feeds = Array.from({ length: N }, (_, i) => ({
+      url: `https://src${i}.test/rss`,
+      name: "S" + i,
+      on: true,
+    }));
+    const latence = (i) => (i >= 38 ? null : i >= 35 ? 5000 : i >= 25 ? 1200 : 250);
+    const rss = (i) =>
+      `<?xml version="1.0"?><rss version="2.0"><channel><title>S${i}</title>${Array.from(
+        { length: 12 },
+        (_, k) =>
+          `<item><title>NEUF s${i} a${k}</title><link>https://src${i}.test/n/${k}</link>` +
+          `<description>${"texte ".repeat(20)}</description>` +
+          `<pubDate>${new Date(Date.now() - (i * 12 + k) * 60e3).toUTCString()}</pubDate></item>`
+      ).join("")}</channel></rss>`;
+    let nl = 0;
+    const lot = () => {
+      const n = ++nl;
+      return JSON.stringify({
+        items: Array.from({ length: 20 }, (_, i) => ({
+          source: "Wikipédia",
+          title: `Wiki L${n}-${i}`,
+          desc: "x".repeat(200),
+          link: `https://fr.wikipedia.org/wiki/L${n}_${i}`,
+          img: "https://img.test/w.jpg",
+        })),
+      });
+    };
+    const KEY = "mix|fr|all|all:sciences,histoire|s";
+    const vieux = Array.from({ length: 40 }, (_, i) => ({
+      kind: "news",
+      source: "S" + i,
+      title: "VIEUX s" + i,
+      desc: "ancien",
+      link: `https://src${i}.test/v/${i}`,
+      img: "",
+      date: new Date(Date.now() - 40 * 60e3).toUTCString(),
+    }));
+    const { browser, page, errors } = await boot({
+      storage: {
+        ...READY,
+        "fluxswipe.feeds.v1": JSON.stringify(feeds),
+        "fluxswipe.cache.v1": JSON.stringify({
+          [KEY]: { t: Date.now() - 35 * 60e3, items: vieux },
+        }),
+      },
+    });
+    await page.route(/src\d+\.test|rss2json|api\/learn|wikipedia\.org/, async (r) => {
+      const u = r.request().url();
+      if (/\/api\/og/.test(u)) return r.fallback();
+      const m = u.match(/src(\d+)\.test/);
+      if (m) {
+        const l = latence(+m[1]);
+        if (l === null) return; // morte : jamais de réponse
+        await new Promise((z) => setTimeout(z, l));
+        return r
+          .fulfill({ status: 200, contentType: "application/xml", body: rss(+m[1]) })
+          .catch(() => {});
+      }
+      if (/rss2json/.test(u)) {
+        await new Promise((z) => setTimeout(z, 7000));
+        return r.fulfill({ status: 502, body: "{}" }).catch(() => {});
+      }
+      // Wikipédia répond AVANT l'échéance des actus : c'est tout l'enjeu.
+      await new Promise((z) => setTimeout(z, 1500));
+      return r
+        .fulfill({ status: 200, contentType: "application/json", body: lot() })
+        .catch(() => {});
+    });
+    // Journal des rendus : on veut savoir non seulement COMBIEN de remontées,
+    // mais laquelle les a provoquées.
+    await page.addInitScript(() => {
+      window.__J = [];
+      const t0 = Date.now();
+      addEventListener("DOMContentLoaded", () => {
+        const r = window.render;
+        window.render = function (top) {
+          const anc = anchorLink();
+          const av = feedEl.scrollTop;
+          const out = r.apply(this, arguments);
+          window.__J.push(
+            `${Date.now() - t0}ms render(top=${!!top}) ancre=${(anc || "—").slice(-12)}` +
+              ` i=${anc ? items.findIndex((x) => x.link === anc) : "n/a"}` +
+              ` scroll ${Math.round(av)}→${Math.round(feedEl.scrollTop)}`
+          );
+          return out;
+        };
+      });
+    });
+    await page.goto(URL_APP);
+    // L'utilisateur glisse d'une carte dès qu'il se retrouve en haut.
+    const remontees = [];
+    let precedent = 0;
+    for (let i = 0; i < 200; i++) {
+      const s = await page.evaluate(() => ({
+        sc: Math.round(feedEl.scrollTop),
+        n: feedEl.children.length,
+        sync: document.getElementById("syncbar").classList.contains("on"),
+      }));
+      if (s.sc === 0 && precedent > 0) remontees.push(`${i * 100} ms : ${precedent} → 0`);
+      if (s.sc === 0 && s.n > 2) {
+        await page.evaluate(() => {
+          feedEl.scrollTop = feedEl.children[1].offsetTop;
+          onCardChange();
+        });
+        precedent = await page.evaluate(() => Math.round(feedEl.scrollTop));
+      } else precedent = s.sc;
+      if (!s.sync && i > 30) break;
+      await page.waitForTimeout(100);
+    }
+    console.log(
+      `remontées en tête SUBIES : ${remontees.length}` +
+        (remontees.length === 1
+          ? "  → une seule, comme prévu ✓"
+          : "  ← il en faut UNE (régression)")
+    );
+    remontees.forEach((r) => console.log("   " + r));
+    console.log("--- journal des rendus");
+    console.log((await page.evaluate(() => window.__J)).join("\n"));
+    console.log("erreurs :", errors);
+    await browser.close();
+  },
+
   // 27. VITESSE d'un rafraîchissement d'actus au-delà des 30 min, avec des
   // sources lentes et mortes dans le lot. Le scénario que l'utilisateur vit à
   // chaque réouverture : un cache périmé est peint tout de suite, mais le fil

@@ -884,9 +884,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=127"></script>
-<script src="src/learn-core.js?v=127"></script>
-<script src="src/i18n.js?v=127"></script>
+<script src="src/lib.js?v=128"></script>
+<script src="src/learn-core.js?v=128"></script>
+<script src="src/i18n.js?v=128"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1431,7 +1431,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="127";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="128";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2112,14 +2112,35 @@ let loadSeq=0,feedLoadStarted=false;
    les premières sources RSS. Symptôme mesuré : échéance des actus à 2,6 s
    (remontée n°1), l'utilisateur glisse six cartes, lot Wikipédia à 6,1 s
    (remontée n°2), retour sur la MÊME carte de tête.
-   Le jeton est pris par la première moitié qui rend RÉELLEMENT (donc après
-   `whenFeedIdle`, pas à la programmation), et il est estampillé par la
-   génération de chargement : un nouveau `loadFeeds` a un `my` neuf, donc un
-   jeton neuf, sans rien à réinitialiser — et une génération abandonnée ne peut
-   pas bloquer la suivante. */
-let teteSeq=0;
-function teteAPrendre(my){
-  if(teteSeq===my)return false;   // l'autre moitié l'a déjà fait pour ce chargement
+   Le jeton est pris au moment du rendu RÉEL (donc après `whenFeedIdle`, pas à
+   la programmation), et il est estampillé par la génération de chargement : un
+   nouveau `loadFeeds` a un `my` neuf, donc un jeton neuf, sans rien à
+   réinitialiser — et une génération abandonnée ne peut pas bloquer la suivante.
+
+   « Premier arrivé, premier servi » ne suffit PAS, et c'est le piège : quand
+   les actus vont se charger, la tête leur appartient. Wikipédia répond souvent
+   avant elles (une seule requête contre quarante), et sa repeinture arrive
+   alors que les actus affichées sont encore celles du cache, vieilles d'une
+   demi-heure — remonter en tête à ce moment-là ne montre RIEN de neuf en haut
+   du fil. Pire, cela dépossède la repeinture des actus, la seule qui renouvelle
+   vraiment le fil : privée du jeton, elle tente de garder l'ancre — un article
+   du cache qu'elle vient justement de retirer —, ne le trouve pas, et retombe
+   sur un saut sec en haut. L'utilisateur voit alors DEUX remontées, la seconde
+   sans raison visible (mesuré : 1732 ms puis 2754 ms à l'ouverture).
+   D'où la RÉSERVATION : `loadNewsPart` se réserve la tête dès qu'il sait qu'il
+   va réellement interroger ses sources, avant tout aller-retour réseau. La
+   moitié Wikipédia ne prend le jeton que si personne ne l'a réservé — c'est-à-
+   dire en dose « Wikipédia seul », sans source cochée, ou en deçà du seuil de
+   fraîcheur des actus.
+   Contrepartie ASSUMÉE : si les actus se réservent la tête puis échouent
+   toutes (aucune source joignable), personne ne remonte en tête pour ce
+   chargement. C'est le bon comportement — rien de neuf n'est arrivé côté
+   actus — et la moitié Wikipédia, elle, a déjà repeint en gardant la position. */
+let teteSeq=0;        // génération qui a DÉJÀ remonté en tête
+let teteReservee=0;   // génération dont la moitié actus s'est réservé la tête
+function teteAPrendre(my,prioritaire){
+  if(teteSeq===my)return false;                      // déjà fait pour ce chargement
+  if(!prioritaire&&teteReservee===my)return false;   // réservée par les actus
   teteSeq=my;
   return true;
 }
@@ -2468,6 +2489,15 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
     return;
   }
 
+  /* La tête du fil appartient aux actus : elles vont réellement interroger
+     leurs sources, donc leur repeinture sera la seule à renouveler vraiment le
+     fil. On la réserve MAINTENANT, avant le moindre aller-retour réseau — la
+     moitié Wikipédia répond souvent bien avant, et sans cette réservation c'est
+     elle qui remonterait en tête, sur un fil dont les actus sont encore celles
+     du cache (voir teteAPrendre). Toutes les sorties au-dessus rendent la main
+     sans réserver : Wikipédia garde alors le jeton pour lui, à juste titre. */
+  teteReservee=my;
+
   /* Beaucoup de sources (un OPML importé peut en compter des centaines) : on
      n'en interroge qu'un lot par chargement, en tournant d'un chargement à
      l'autre pour que toutes finissent par passer. Sans cela, 322 sources
@@ -2535,7 +2565,7 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
          Wikipédia (voir teteAPrendre) — et se demande ICI, au moment du rendu
          réel, pas à la programmation : c'est la moitié qui repeint la première
          qui l'obtient. */
-      const enTete=top&&teteAPrendre(my);
+      const enTete=top&&teteAPrendre(my,true);   // prioritaire : la tête est réservée aux actus
       rebuild(top);render(enTete);hideStates();feedKeyShown=key;
       // Repeinture finale seule (`cloture`) : cacheSave() lit `items`, que
       // rebuild() vient tout juste de recalculer ci-dessus — l'appeler depuis
