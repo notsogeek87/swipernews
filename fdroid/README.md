@@ -141,11 +141,21 @@ se fait donc à la main, sur `fdroiddata` :
    Il n'y a **aucune issue RFP** pour cette app (vérifié : la recherche ne rend
    rien) : la ligne `Closes rfp#…` est donc à supprimer, comme le gabarit le
    demande lui-même.
-3. **Poster un commentaire** après avoir poussé, avec la commande rapide
-   `/unlabel ~"waiting-for-upstream"`. Un libellé ne se retire pas tout seul, et
-   une description modifiée ne notifie personne — sans ce commentaire, la MR
-   reste invisible pour eux. Les commandes rapides ne s'exécutent que dans un
-   commentaire, jamais depuis la description.
+3. **Poster un commentaire** après avoir poussé. Une description modifiée ne
+   notifie PERSONNE : sans commentaire, la MR reste invisible pour eux, quoi
+   qu'on ait poussé.
+
+   **Ne pas compter sur `/unlabel ~"waiting-for-upstream"`** : gérer les
+   libellés demande le rôle Reporter sur `fdroiddata`, qu'un contributeur
+   externe n'a pas. La commande rapide échoue silencieusement. Il faut donc
+   DEMANDER le retrait du libellé dans le commentaire — c'est un membre qui
+   l'ôtera.
+
+   Mentionner un relecteur par son identifiant lui pose une tâche GitLab, ce
+   qui est le signal le plus efficace. `@licaon-kter` est vérifié ; en revanche
+   `duckniii`, cité plus bas dans ce fichier, n'est PAS un identifiant GitLab
+   valide (l'API ne le connaît pas) — le reprendre tel quel donnerait une
+   mention inerte. Copier l'identifiant exact depuis le fil de la MR.
 
 ## Ce que la revue de la MR a demandé (et où c'est corrigé)
 
