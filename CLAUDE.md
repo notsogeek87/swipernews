@@ -452,16 +452,24 @@ genre de script dérape.
   `LEARN_SPARE_MIN` articles encore neufs (la moitié du lot), la réserve est
   jetée plutôt que servie maigre : autant payer le réseau et servir un lot
   entier. Scénario `avancewiki`.
-- `hideSeen` — mode « Cacher les articles déjà lus », UNE case (feuille
-  « Articles en mémoire », `openHistory`) qui commande DEUX choses, pas une
-  seule : la VUE de cette feuille ET la RÉCUPÉRATION (`fetchLearn`,
-  `loadLearnPart`, `takeLearnSpare`, le tri des files d'actus dans `rebuild`).
-  Une case qui n'aurait joué que sur la vue n'aurait rien réglé : décochée,
-  la feuille aurait bien montré les articles déjà lus encore sous la main,
-  mais `dropSeen` les aurait déjà écartés AVANT qu'ils n'y arrivent — un
-  rafraîchissement les aurait donc quand même fait disparaître. Défaut
-  ACTIVÉ : c'est le comportement historique de l'app (voir `seenNews`
-  ci-dessous), personne ne le voit changer tant qu'il ne touche pas la case.
+- `hideSeen` — mode « Cacher les articles déjà lus du fil », une case posée
+  dans la feuille « Articles en mémoire » (`openHistory`) mais qui ne
+  commande QUE la RÉCUPÉRATION (`fetchLearn`, `loadLearnPart`,
+  `takeLearnSpare`, le tri des files d'actus dans `rebuild`) — jamais la VUE
+  de cette feuille elle-même. Défaut ACTIVÉ : c'est le comportement
+  historique de l'app (voir `seenNews` ci-dessous), personne ne le voit
+  changer tant qu'il ne touche pas la case.
+  Une première version la faisait AUSSI filtrer la vue — cohérent en
+  apparence (la case vit dans cette feuille), mais deux défauts opposés s'y
+  sont succédé : d'abord la vue seule filtrait, donc la case décochée
+  laissait quand même `dropSeen` écarter les articles déjà lus AVANT qu'ils
+  n'atteignent la feuille (« je perds ceux que j'avais déjà vus au refresh ») ;
+  corrigé en la faisant jouer sur les deux, retour explicite de l'utilisateur
+  ensuite : la feuille « Articles en mémoire » doit rester un INVENTAIRE
+  complet en toute circonstance, cochée ou non — c'est justement à ça qu'elle
+  sert, retrouver un article même déjà lu. Elle distingue donc les articles
+  déjà lus par un badge (`itemSeen`, dans `histRowHTML`), calculé sur l'état
+  réel et totalement INDÉPENDANT de `hideSeen`.
 - `ICON_*` / `setIcons()` — UNE famille de tracés pour toute l'app (2 px,
   boîte de 24, `currentColor`), posée aussi dans la barre du haut. Ne pas y
   remettre d'emoji ni de glyphe de police : ils ne s'alignent pas entre eux.
