@@ -684,6 +684,56 @@
     return "YT · " + clampText(t, 80);
   }
 
+  /* ---------- L'Équipe ----------
+     Les flux RSS de L'Équipe (dwh.lequipe.fr) n'ont pas de titre pertinent :
+     ils sont tous généré par une même API avec le même titre de base. La
+     rubrique réelle se trouve dans le paramètre `path` de l'URL. */
+
+  /**
+   * Détecte si une URL est un flux RSS de L'Équipe.
+   */
+  function isLequipeFeedUrl(url) {
+    try {
+      const u = new URL(String(url || ""));
+      if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+      const host = u.hostname.replace(/^www\./, "").toLowerCase();
+      return host === "dwh.lequipe.fr" && u.pathname === "/api/edito/rss";
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /**
+   * Extrait la rubrique du paramètre `path` d'une URL de L'Équipe.
+   * Exemples: "/Football/" → "Football", "/" → "".
+   */
+  function lequipeRubrique(url) {
+    try {
+      const u = new URL(String(url || ""));
+      const path = u.searchParams.get("path") || "/";
+      // Nettoyer les slashes et formater : "/Football/" → "Football"
+      return path
+        .replace(/^\/+|\/+$/g, "") // Retirer les slashes en début/fin
+        .split("/")[0]; // Prendre le premier segment
+    } catch (_) {
+      return "";
+    }
+  }
+
+  /**
+   * Étiquette d'une source L'Équipe : « L'Équipe — Rubrique » ou « L'Équipe ».
+   * Exemple: "Football" → "L'Équipe — Football".
+   */
+  function lequipeFeedName(rubrique) {
+    const r = String(rubrique == null ? "" : rubrique)
+      .replace(/\s+/g, " ")
+      .trim();
+    // Déjà préfixé (source relue, OPML réimporté) ne doit pas doubler le préfixe.
+    if (/^L'Équipe/.test(r)) return r;
+    if (!r) return "L'Équipe";
+    return "L'Équipe — " + clampText(r, 50);
+  }
+
   /** Titre réduit à ce qui le distingue : sans accents, sans casse, sans
    *  ponctuation. « Guerre en Ukraine : le point » et « Guerre en Ukraine - Le
    *  point » sont le même titre, écrit par deux gabarits de flux différents. */
@@ -1044,6 +1094,9 @@
     youtubeShortsFeedUrl,
     isYoutubeShortsFeedUrl,
     youtubeFeedName,
+    isLequipeFeedUrl,
+    lequipeRubrique,
+    lequipeFeedName,
     feedDiscriminator,
     feedLabels,
     interleave,
