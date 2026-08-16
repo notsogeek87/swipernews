@@ -906,9 +906,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=132"></script>
-<script src="src/learn-core.js?v=132"></script>
-<script src="src/i18n.js?v=132"></script>
+<script src="src/lib.js?v=133"></script>
+<script src="src/learn-core.js?v=133"></script>
+<script src="src/i18n.js?v=133"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -916,7 +916,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","interleave","roundRobin","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId"],
+  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","interleave","roundRobin","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeFeedName"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket","perCatLimit"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -1015,7 +1015,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,interleave,roundRobin,dedupNews,canonicalLink,youtubeId,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,interleave,roundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1303,12 +1303,30 @@ function load(){
    panneau est aussi celui des centres d'intérêt, on l'ouvre donc pour un oui ou
    pour un non, et un rechargement inutile ramènerait en haut du fil. */
 let feedsDirty=false;
-function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(feeds));}catch(e){warn("save feeds",e);}
+/* Écrit les sources sur disque, SANS rien signaler. Séparé de save() parce que
+   RENOMMER une source (voir adopteNomDeSource) ne change pas la liste de ce
+   qu'on interroge : poser feedsDirty ferait recharger tout le fil au prochain
+   « Voir mon fil », pour un simple libellé. */
+function persistFeeds(){try{localStorage.setItem(LS_KEY,JSON.stringify(feeds));}catch(e){warn("save feeds",e);}}
+function save(){persistFeeds();
   feedsDirty=true;
   // Point de passage unique de TOUTE modification des sources (case cochée,
   // ajout, suppression, import OPML) : la barre de filtres des sources s'y
   // remet à jour d'un seul endroit.
   renderFilters();}
+/* Adopte le nom qu'une source annonce, quand il vaut mieux que celui qu'on a.
+   Ne concerne aujourd'hui que les chaînes YouTube : leur URL ne contient qu'un
+   `channel_id` opaque, donc `addFeed` ne peut les nommer que « youtube.com » —
+   trois chaînes suivies donnaient trois lignes identiques dans le panneau
+   Sources et trois puces identiques dans le filtre. Le vrai nom n'existe que
+   DANS le flux, on l'apprend donc au premier chargement.
+   `f` vient de `feeds.filter(...)` : c'est le MÊME objet, l'écrire suffit. */
+function adopteNomDeSource(f,nom){
+  if(!f||!nom||f.name===nom||!isYoutubeFeedUrl(f.url))return;
+  f.name=nom;
+  persistFeeds();
+  renderFilters();      // les puces portent le nom : elles doivent suivre
+}
 
 /* ---------- Helpers partagés ---------- */
 // Journalise sans casser le flux (remplace les catch silencieux, pour un debug possible)
@@ -1501,7 +1519,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="132";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="133";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1907,8 +1925,12 @@ async function fetchFeedRss2Json(feed,timeout=7000){
   if(!res.ok)throw new Error("http");
   const data=await res.json();
   if(!data||data.status!=="ok"||!Array.isArray(data.items))throw new Error("bad");
+  // Même règle que le chemin XML : une chaîne YouTube prend le nom qu'elle
+  // annonce, sinon les deux transports afficheraient deux noms différents pour
+  // la MÊME source selon lequel a répondu.
+  const source=nomDeSource(feed,(data.feed&&data.feed.title)||"");
   return data.items.map(it=>({
-    source:feed.name,title:clampText((it.title||"").trim(),TITLE_MAX),
+    source,title:clampText((it.title||"").trim(),TITLE_MAX),
     desc:clampText(stripHtml(it.description||it.content||"")),link:it.link||"",
     img:it.thumbnail||(it.enclosure&&it.enclosure.link)||imgFromHtml(it.content||it.description||""),
     date:it.pubDate||"",tags:clampText(Array.isArray(it.categories)?it.categories.join(" "):"",TAGS_MAX)
@@ -1940,9 +1962,27 @@ async function fetchFeedRobust(feed){
   }
   return filterSponsored?a.filter(i=>!isPromotionalItem(i)):a;
 }
+/* Nom que le flux se donne lui-même : <feed><title> en Atom, <channel><title>
+   en RSS. Le sélecteur d'ENFANT DIRECT est indispensable — un simple "title"
+   attraperait le titre du premier article (et, sur un flux YouTube, le
+   <media:title> de son <media:group>).
+   Utilisé UNIQUEMENT pour les chaînes YouTube (voir nomDeSource) : partout
+   ailleurs, le nom affiché reste celui que l'utilisateur a enregistré, qu'il
+   l'ait choisi, importé d'un OPML ou laissé au nom d'hôte. */
+function titreDuFlux(doc){
+  const t=doc&&doc.querySelector("feed > title, channel > title");
+  return (t&&t.textContent||"").trim();
+}
+/* Nom à porter par les articles de CETTE source. Pour une chaîne YouTube, le
+   nom enregistré est « youtube.com » (l'URL d'un flux YouTube ne contient qu'un
+   channel_id opaque) : on lui préfère le nom que le flux annonce. */
+function nomDeSource(feed,titre){
+  return (isYoutubeFeedUrl(feed.url)&&youtubeFeedName(titre))||feed.name;
+}
 async function fetchFeed(feed,reste){
   const text=await fetchText(feed.url,reste);
   const doc=new DOMParser().parseFromString(text,"text/xml");
+  const source=nomDeSource(feed,titreDuFlux(doc));
   const nodes=[...doc.querySelectorAll("item, entry")];
   return nodes.map(n=>{
     const get=sel=>n.querySelector(sel)?.textContent?.trim()||"";
@@ -1957,7 +1997,7 @@ async function fetchFeed(feed,reste){
     // l'ARTICLE ENTIER en <description>/<content:encoded> — voir clampText
     // (src/lib.js) pour ce que du texte non borné coûte ici (DOM, cache disque,
     // instantané). Le titre est borné pour la même raison, plus court.
-    return {source:feed.name,title:clampText(get("title"),TITLE_MAX),desc:clampText(stripHtml(raw)),link,
+    return {source,title:clampText(get("title"),TITLE_MAX),desc:clampText(stripHtml(raw)),link,
       img:fi.url,imgFrom:fi.from,imgW:fi.w,tags:clampText(tags,TAGS_MAX),
       date:get("pubDate")||get("published")||get("updated")};
   }).filter(i=>i.title);
@@ -2803,6 +2843,9 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
       fetchFeedRobust(f).then(res=>{
         if(my!==loadSeq)return;
         if(res&&res.length){
+          // Le nom que la source annonce voyage sur ses articles : c'est le seul
+          // endroit où l'on tient à la fois le flux et sa réponse.
+          adopteNomDeSource(f,res[0].source);
           // Plafond par source : on garde ses articles les plus récents.
           const own=res.slice().sort((a,b)=>itemTime(b)-itemTime(a)).slice(0,perFeed);
           collected.set(f.url,own.map(markKind("news")));
@@ -4720,7 +4763,20 @@ function addFeed(){const inp=document.getElementById("newUrl");const url=inp.val
      quoi que ce soit — et le filtre de sources, qui désigne lui aussi une URL,
      ne peut pas distinguer deux lignes identiques. */
   if(feeds.some(f=>f.url===url)){toast(T("toast.feedsAlreadyPresent"));inp.value="";return;}
-  feeds.push({name:hostOf(url),url,on:true});save();inp.value="";renderList();renderSuggest();}
+  feeds.push({name:hostOf(url),url,on:true});save();inp.value="";renderList();renderSuggest();
+  // Chaîne YouTube : le nom n'est nulle part dans l'URL, il faut le demander au
+  // flux. En arrière-plan — l'ajout reste instantané, et un échec ne coûte que
+  // le nom d'hôte, exactement comme avant.
+  if(isYoutubeFeedUrl(url))nommerChaine(url);}
+async function nommerChaine(url){
+  try{
+    const doc=new DOMParser().parseFromString(await fetchText(url,()=>8000),"text/xml");
+    const f=feeds.find(x=>x.url===url);
+    if(!f)return;                      // supprimée entre-temps
+    adopteNomDeSource(f,youtubeFeedName(titreDuFlux(doc)));
+    renderList();                      // le panneau est ouvert : la ligne se corrige sous les yeux
+  }catch(e){warn("nom de chaîne",e);}
+}
 
 /* ---------- Import / Export des sources ---------- */
 /* Rend true quand le fichier est parti, false sinon — l'appelant n'annonce

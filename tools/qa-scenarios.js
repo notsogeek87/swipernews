@@ -1964,6 +1964,12 @@ const scenarios = {
         // Le titre lance la vidéo au lieu d'ouvrir un lien.
         titreJoue: !!(c && c.querySelector(".card__title [data-play]")),
         pastille: c && c.querySelector(".card__open span")?.textContent,
+        // Le nom de la source : « youtube.com » (le nom d'hôte, seul nom que
+        // l'URL permet) doit avoir cédé la place au nom annoncé par le flux —
+        // sur la carte, dans le panneau Sources ET dans la puce de filtre.
+        surCarte: c && c.querySelector(".card__source .txt")?.textContent,
+        enregistre: feeds[0] && feeds[0].name,
+        pucesFiltre: filterChips("src").map((x) => x.label),
       };
     });
     console.log("cartes vidéo :", carte.cartes, "/", carte.total, "cartes");
@@ -1980,6 +1986,14 @@ const scenarios = {
       carte.titreJoue,
       "  pastille :",
       JSON.stringify(carte.pastille)
+    );
+    console.log(
+      "nom de la source — carte :",
+      JSON.stringify(carte.surCarte),
+      " enregistré :",
+      JSON.stringify(carte.enregistre),
+      " puces :",
+      JSON.stringify(carte.pucesFiltre)
     );
     console.log("/api/og partis (attendu : 0) :", calls.og);
     console.log("lecteurs chargés AVANT tout appui (attendu : 0) :", calls.player);

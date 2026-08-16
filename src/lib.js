@@ -576,6 +576,46 @@
     return m ? ok(m[1]) : "";
   }
 
+  /** Vrai pour l'URL d'un flux de chaîne ou de playlist YouTube
+   *  (`youtube.com/feeds/videos.xml?channel_id=…`). */
+  function isYoutubeFeedUrl(url) {
+    try {
+      const u = new URL(String(url || ""));
+      if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+      const host = u.hostname.replace(/^www\./, "").toLowerCase();
+      return YT_HOSTS.includes(host) && u.pathname === "/feeds/videos.xml";
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /**
+   * Étiquette d'une source YouTube : « YT · <nom de la chaîne> ».
+   *
+   * Sans elle, TOUTES les chaînes s'appellent « youtube.com » — c'est le nom
+   * d'hôte, et l'URL d'un flux YouTube ne contient qu'un identifiant opaque
+   * (`channel_id=UC…`), donc rien de lisible à en tirer. Trois chaînes suivies
+   * donnaient trois lignes identiques dans le panneau Sources et trois puces
+   * identiques dans le filtre, impossibles à distinguer.
+   *
+   * Le vrai nom n'existe que DANS le flux (`<feed><title>`), d'où l'adoption au
+   * premier chargement plutôt qu'un calcul sur l'URL.
+   *
+   * Le préfixe « YT · » est gardé volontairement : dans une liste où toutes les
+   * autres lignes sont des sites de presse, il dit d'un coup d'œil qu'on est
+   * devant une chaîne — et il survit à la troncature d'une puce de filtre, qui
+   * coupe par la droite.
+   */
+  function youtubeFeedName(title) {
+    const t = String(title == null ? "" : title)
+      .replace(/\s+/g, " ")
+      .trim();
+    // Un nom déjà préfixé (source relue, import d'un OPML exporté par l'app) ne
+    // doit pas devenir « YT · YT · … ».
+    if (!t || /^YT · /.test(t)) return t;
+    return "YT · " + clampText(t, 80);
+  }
+
   /** Titre réduit à ce qui le distingue : sans accents, sans casse, sans
    *  ponctuation. « Guerre en Ukraine : le point » et « Guerre en Ukraine - Le
    *  point » sont le même titre, écrit par deux gabarits de flux différents. */
@@ -932,6 +972,8 @@
     dedupNews,
     canonicalLink,
     youtubeId,
+    isYoutubeFeedUrl,
+    youtubeFeedName,
     feedDiscriminator,
     feedLabels,
     interleave,

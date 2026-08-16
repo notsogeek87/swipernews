@@ -216,7 +216,7 @@ ne change côté web.
 ## Commandes
 
 ```bash
-npm test            # node --test — 93 tests, aucune dépendance à installer
+npm test            # node --test — 95 tests, aucune dépendance à installer
 npm run lint        # eslint api src test eslint.config.js  (PAS index.html)
 npm run format:check
 npm run cap:sync    # régénère www/ puis cap sync android
@@ -382,6 +382,23 @@ genre de script dérape.
   est concaténé dans l'`src` sans échappement, ce qui n'est légitime QUE parce
   que `youtubeId` ne rend rien d'autre que `[A-Za-z0-9_-]{11}` — même rôle que
   `oneOf()` côté natif. Scénario `video`.
+- `titreDuFlux()` / `nomDeSource()` / `adopteNomDeSource()` — le nom d'une chaîne
+  YouTube. Son URL ne contient qu'un `channel_id` OPAQUE, donc `addFeed` ne
+  savait la nommer que `hostOf()` — « youtube.com », pour toutes : trois lignes
+  identiques dans le panneau Sources et trois puces identiques dans le filtre.
+  Le vrai nom n'existe que DANS le flux, on l'apprend donc au premier
+  chargement (`pump()`, seul endroit qui tient à la fois le flux et sa réponse)
+  et, à l'ajout manuel, par une requête EN ARRIÈRE-PLAN (`nommerChaine`) pour ne
+  pas laisser « youtube.com » à l'écran jusqu'au chargement suivant. Le
+  sélecteur est `feed > title, channel > title` — ENFANT DIRECT, sinon on
+  ramasse le titre du premier article (ou le `<media:title>` de son
+  `<media:group>`). Effet de bord voulu : le tour de rôle des actus regroupe par
+  `it.source`, donc cinq chaînes suivies ont maintenant cinq parts au lieu
+  d'une seule partagée sous « youtube.com ».
+- `persistFeeds()` vs `save()` — `save()` pose `feedsDirty` et re-rend les
+  filtres ; RENOMMER une source ne change pas la liste de ce qu'on interroge, et
+  passer par `save()` ferait recharger tout le fil au prochain « Voir mon fil »
+  pour un simple libellé. D'où la persistance nue.
 - `articleMetaFor()` / `checkPaywall()` / `checkMissingImage()` — deux filets
   asynchrones, tous deux gated par `IntersectionObserver` (jamais pour tout le
   fil) et partageant le MÊME cache par lien (`ogCache`), pour ne jamais
@@ -683,6 +700,14 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   simple INSERTION devant la carte, qui ne touche pas à son nœud : là, la lecture
   doit continuer — c'est le cas courant, et l'interrompre serait un défaut à part
   entière. Le scénario `video` vérifie les deux.
+- **Le nom d'une source n'est JAMAIS écrasé par ce que le flux annonce — sauf
+  pour une chaîne YouTube.** Ailleurs, le nom enregistré est celui que
+  l'utilisateur a choisi, importé d'un OPML ou laissé au nom d'hôte : le
+  remplacer renommerait ses sources dans son dos. La chaîne YouTube est
+  l'exception parce que son nom d'hôte ne distingue RIEN (voir `nomDeSource`).
+  Le préfixe « YT · » est gardé exprès : il dit d'un coup d'œil de quoi il
+  s'agit dans une liste de sites de presse, et il survit à la troncature d'une
+  puce de filtre, qui coupe par la droite.
 - **Le mode lecture n'est JAMAIS tenté sur une vidéo** (`openArticle(…,{noReader:true})`).
   `read` est le réglage par DÉFAUT, `reader_read.js` jette précisément
   `video,iframe,embed`, et une page YouTube n'atteint de toute façon jamais

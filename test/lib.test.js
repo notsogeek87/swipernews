@@ -450,6 +450,33 @@ test("youtubeId refuse tout ce qui n'est pas exactement un identifiant", () => {
   assert.equal(lib.youtubeId("pas une url"), "");
 });
 
+test("isYoutubeFeedUrl reconnaît l'URL d'un flux de chaîne, pas une vidéo", () => {
+  assert.ok(
+    lib.isYoutubeFeedUrl("https://www.youtube.com/feeds/videos.xml?channel_id=UCabc")
+  );
+  assert.ok(lib.isYoutubeFeedUrl("https://youtube.com/feeds/videos.xml?playlist_id=PL1"));
+  // Une vidéo n'est pas un flux, et un autre site non plus.
+  assert.ok(!lib.isYoutubeFeedUrl("https://www.youtube.com/watch?v=" + YT));
+  assert.ok(!lib.isYoutubeFeedUrl("https://lemonde.fr/rss/une.xml"));
+  assert.ok(!lib.isYoutubeFeedUrl("https://youtube.com.pirate.fr/feeds/videos.xml"));
+  assert.ok(!lib.isYoutubeFeedUrl(""));
+});
+
+test("youtubeFeedName préfixe la chaîne, et ne se préfixe jamais deux fois", () => {
+  // Sans ça, toutes les chaînes s'appellent « youtube.com » : l'URL d'un flux
+  // YouTube ne contient qu'un channel_id opaque.
+  assert.equal(lib.youtubeFeedName("ScienceEtonnante"), "YT · ScienceEtonnante");
+  assert.equal(lib.youtubeFeedName("  Arte\n Documentaires "), "YT · Arte Documentaires");
+  // Nom relu depuis le disque, ou importé d'un OPML exporté par l'app.
+  assert.equal(lib.youtubeFeedName("YT · ScienceEtonnante"), "YT · ScienceEtonnante");
+  // Rien à annoncer : l'appelant gardera le nom qu'il avait.
+  assert.equal(lib.youtubeFeedName(""), "");
+  assert.equal(lib.youtubeFeedName("   "), "");
+  assert.equal(lib.youtubeFeedName(null), "");
+  // Un titre délirant ne doit pas déborder d'une puce de filtre.
+  assert.ok(lib.youtubeFeedName("x".repeat(500)).length < 100);
+});
+
 test("les vignettes YouTube déclarent leur taille par leur nom de fichier", () => {
   // Sans ça, imageSizeFromUrl rend 0 sur une URL ytimg, et applyBg part sonder
   // /api/og pour CHAQUE carte vidéo défilée — le défaut déjà corrigé côté

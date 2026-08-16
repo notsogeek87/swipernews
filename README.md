@@ -488,6 +488,20 @@ Une chaîne YouTube publie un flux Atom
 (`https://www.youtube.com/feeds/videos.xml?channel_id=…`) : elle s'ajoute comme
 n'importe quelle source, et ses vidéos s'entrelacent dans le fil comme des actus.
 
+Elle apparaît sous **« YT · nom de la chaîne »**. L'URL d'un flux YouTube ne
+contient qu'un identifiant opaque (`channel_id=UC…`), donc le seul nom qu'on
+pouvait en tirer était le nom d'hôte : toutes les chaînes s'appelaient
+« youtube.com », et suivre trois chaînes donnait trois lignes identiques dans le
+panneau Sources comme dans le filtre. Le vrai nom n'existe que **dans** le flux :
+il est donc lu au premier chargement, et demandé en arrière-plan dès l'ajout pour
+que la liste soit juste tout de suite. Les autres sources gardent le nom que vous
+leur avez donné — seule la chaîne YouTube fait exception, parce que son nom
+d'hôte ne distingue rien.
+
+Effet de bord voulu : le fil sert les sources **à tour de rôle** en les
+regroupant par nom. Cinq chaînes suivies ont donc maintenant cinq parts, au lieu
+d'une seule part partagée sous « youtube.com ».
+
 Quand le lien d'un article désigne une vidéo qu'on sait intégrer, la carte **se
 regarde sur place** : un ▶ au centre de la miniature, un appui, et le lecteur
 prend toute la carte. Le bloc titre/source s'efface pendant la lecture, le bouton
