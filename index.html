@@ -540,6 +540,7 @@
   .histhead{position:sticky;top:0;z-index:1;background:var(--surface);
     margin:0 -20px;padding:10px 20px}
   .histhead p.sub{margin-bottom:0}
+  .histhide{padding:8px 0 0}
   /* Des RANGÉES, pas des cartes : on
      vient y chercher un titre déjà croisé, c'est donc le texte qui prime — la
      vignette n'est qu'un repère, à taille fixe pour que tous les titres
@@ -862,6 +863,7 @@
     <div class="histhead">
       <h2 id="histTitle" data-i18n="hist.title">Articles en mémoire</h2>
       <p class="sub" id="histSub"></p>
+      <label class="sponsorrow histhide"><input type="checkbox" id="histHideSeenChk"><span data-i18n="hist.hideSeen">Cacher les articles déjà lus</span></label>
     </div>
     <div id="histList"></div>
   </div>
@@ -906,9 +908,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=135"></script>
-<script src="src/learn-core.js?v=135"></script>
-<script src="src/i18n.js?v=135"></script>
+<script src="src/lib.js?v=136"></script>
+<script src="src/learn-core.js?v=136"></script>
+<script src="src/i18n.js?v=136"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1519,7 +1521,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="135";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="136";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -3152,6 +3154,13 @@ function markVisibleSeen(it=currentItem()){
   if(it.kind==="learn")addSeen(it);
   else if(!videoIdOf(it))addSeenNews(it);
 }
+/* « Vu » au sens de la case à cocher d'openHistory : Wikipédia via `seen`,
+   actus ET vidéos via `newsSeen` — qui applique déjà, sans rien de plus ici,
+   la règle vidéo ci-dessus (vue au LANCEMENT, pas à l'affichage), puisque
+   `addSeenNews` est l'unique écriture commune aux deux. */
+function itemSeen(it){
+  return it&&it.kind==="learn"?seen.has(seenKey(it)):newsSeen(it);
+}
 
 /* ---------- Images de fond paresseuses ----------
    Deux raisons de ne PAS mettre l'URL dans un style inline :
@@ -4429,6 +4438,9 @@ doseBtn.onclick=()=>{renderMix();openDialog(mixSheet);};
    une liste qui se recompose sous le doigt pendant qu'on la parcourt serait pire
    qu'inutile. */
 const histSheet=document.getElementById("histSheet"),histList=document.getElementById("histList");
+const histHideSeenChk=document.getElementById("histHideSeenChk");
+const LS_HIST_HIDE_SEEN="fluxswipe.histhideseen.v1";
+let histHideSeen=(()=>{try{return localStorage.getItem(LS_HIST_HIDE_SEEN)==="1";}catch(e){return false;}})();
 /* `etat` : "now" (la carte à l'écran), "past" (déjà dépassée), "" (à venir).
    Vignette en chargement paresseux NATIF, sans IntersectionObserver ni variante
    plus grande (voir applyBg) : 58 px de côté n'en réclament aucune, et la liste
@@ -4451,13 +4463,24 @@ function histRowHTML(it,etat){
     </span>
   </button>`;
 }
-function openHistory(){
+/* Case « Cacher les articles déjà lus » : la carte COURANTE reste toujours
+   affichée même si elle vient de passer « vue », sinon cocher la case ferait
+   disparaître le seul repère de position (voir .histrow--now) pendant qu'on
+   regarde la liste. */
+function renderHistList(){
   const cur=currentIndex();
-  histList.innerHTML=items.length
-    ? items.map((it,i)=>histRowHTML(it,i===cur?"now":(i<cur?"past":""))).join("")
+  const rows=items
+    .map((it,i)=>({it,etat:i===cur?"now":(i<cur?"past":"")}))
+    .filter(r=>!histHideSeen||r.etat==="now"||!itemSeen(r.it));
+  histList.innerHTML=rows.length
+    ? rows.map(r=>histRowHTML(r.it,r.etat)).join("")
     : `<p class="histempty">${esc(T("hist.empty"))}</p>`;
   document.getElementById("histSub").textContent=
-    items.length?T("hist.sub",{n:items.length}):T("hist.subEmpty");
+    rows.length?T("hist.sub",{n:rows.length}):T("hist.subEmpty");
+}
+function openHistory(){
+  histHideSeenChk.checked=histHideSeen;
+  renderHistList();
   openDialog(histSheet);
   // La liste s'ouvre SUR la position courante, jamais en haut : ce qu'on vient
   // y chercher est presque toujours juste au-dessus de la carte en cours.
@@ -4471,6 +4494,11 @@ function openHistory(){
   }
 }
 document.getElementById("histBtn").onclick=openHistory;
+histHideSeenChk.onchange=e=>{
+  histHideSeen=e.target.checked;
+  try{localStorage.setItem(LS_HIST_HIDE_SEEN,histHideSeen?"1":"0");}catch(_){}
+  renderHistList();
+};
 histSheet.onclick=e=>{if(e.target===histSheet)closeDialog(histSheet);};
 histList.addEventListener("click",e=>{
   const b=e.target.closest("[data-hk]");

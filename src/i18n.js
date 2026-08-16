@@ -48,6 +48,7 @@
       "hist.empty": "Le fil n'a encore rien chargé.",
       "hist.here": "Ici",
       "hist.gone": "Cet article n'est plus dans le fil",
+      "hist.hideSeen": "Cacher les articles déjà lus",
 
       "about.version": "Version {v}",
 
@@ -253,6 +254,7 @@
       "hist.empty": "The feed hasn't loaded anything yet.",
       "hist.here": "Here",
       "hist.gone": "This article is no longer in the feed",
+      "hist.hideSeen": "Hide already-read articles",
 
       "about.version": "Version {v}",
 
