@@ -70,11 +70,23 @@ async function boot(opts = {}) {
         contentType: "application/json",
         body: '{"image":"","paywalled":false,"sponsored":false}',
       });
-    if (/img\.test|images\.unsplash/.test(u))
+    // ytimg : les vignettes YouTube. Sans cette ligne elles tomberaient sur le
+    // fourre-tout ci-dessous (corps vide), donc `probeWidth` rendrait 0 et le
+    // scénario `video` ne mesurerait pas ce qu'il croit mesurer.
+    if (/img\.test|images\.unsplash|ytimg\.com/.test(u))
       return route.fulfill({
         status: 200,
         contentType: "image/gif",
         body: Buffer.from("R0lGODlhAQABAAAAACw=", "base64"),
+      });
+    // Lecteur YouTube : une page inerte servie sous la même URL. RIEN ne doit
+    // partir vers Google depuis le banc — on vérifie qu'une iframe est montée,
+    // pas que YouTube fonctionne.
+    if (/youtube-nocookie\.com|youtube\.com\/embed/.test(u))
+      return route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: "<!doctype html><title>lecteur simulé</title><body>lecteur",
       });
     return route.fulfill({ status: 200, body: "" });
   });
@@ -97,6 +109,31 @@ const READY = {
   "fluxswipe.interests.v1": JSON.stringify(["sciences", "histoire"]),
   "fluxswipe.lang.v1": "fr",
 };
+
+/* Flux d'une chaîne YouTube, dans la forme RÉELLE que sert
+   youtube.com/feeds/videos.xml?channel_id=… : de l'Atom, où le lien est un
+   attribut `href` (et non du texte), la vignette vit dans un <media:group>, et
+   le <media:content> est une pièce jointe vidéo qu'il ne faut PAS prendre pour
+   une image. Les identifiants font 11 caractères, comme les vrais. */
+const RSS_YT = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015"
+      xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+<title>Une chaîne</title>
+${Array.from({ length: 8 }, (_, i) => {
+  const id = "vIdeO00000" + i; // 11 caractères
+  return `<entry><id>yt:video:${id}</id><yt:videoId>${id}</yt:videoId>
+  <title>Vidéo ${i}</title>
+  <link rel="alternate" href="https://www.youtube.com/watch?v=${id}"/>
+  <published>${new Date(Date.now() - i * 3600e3).toISOString()}</published>
+  <media:group>
+    <media:title>Vidéo ${i}</media:title>
+    <media:content url="https://www.youtube.com/v/${id}?version=3" type="application/x-shockwave-flash" width="640" height="390"/>
+    <media:thumbnail url="https://i.ytimg.com/vi/${id}/hqdefault.jpg" width="480" height="360"/>
+    <media:description>Description de la vidéo ${i}, un peu de texte pour remplir la carte.</media:description>
+  </media:group>
+</entry>`;
+}).join("\n")}
+</feed>`;
 
 const scenarios = {
   // 1. Premier lancement, réseau nominal
@@ -1872,6 +1909,152 @@ const scenarios = {
     // deux cartes qui ne sont plus dans le classement — c'est son rôle, il
     // protège ce qui est sous le doigt — d'où la tolérance.
     console.log("  actus neuves retenues   " + total + " (attendu : 120 à 122)");
+    console.log("erreurs :", errors);
+    await browser.close();
+  },
+
+  // 28. Cartes vidéo : lecture SUR la carte, sans ouvrir le lecteur d'articles.
+  // Quatre choses qui ne se lisent pas dans le code :
+  //   a) le flux YouTube est de l'Atom avec <media:group> — il faut vérifier que
+  //      le lien et la vignette en sortent vraiment, pas le croire ;
+  //   b) une carte vidéo doit être écartée des sondes /api/og, comme Wikipédia.
+  //      C'est le défaut mesuré là-bas : une invocation serverless PAR CARTE ;
+  //   c) il ne doit JAMAIS y avoir deux lecteurs vivants, quoi qu'on fasse ;
+  //   d) déplacer une carte qui joue recharge son iframe (autoplay=1 ⇒ la vidéo
+  //      repartirait de zéro toute seule) — render() doit donc l'arrêter avant.
+  async video() {
+    const feeds = [
+      {
+        name: "Une chaîne",
+        url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC1",
+        on: true,
+      },
+    ];
+    const { browser, page, errors } = await boot({
+      storage: {
+        ...READY,
+        "fluxswipe.feeds.v1": JSON.stringify(feeds),
+        "fluxswipe.mix.v1": "0", // 0 = actus seules : que des cartes vidéo dans le fil
+      },
+      rss: RSS_YT,
+    });
+    // Ce que le banc doit compter lui-même : les requêtes réellement parties.
+    const calls = { og: 0, player: 0 };
+    page.on("request", (r) => {
+      const u = r.url();
+      if (/api\/og/.test(u)) calls.og++;
+      if (/youtube-nocookie\.com|youtube\.com\/embed/.test(u)) calls.player++;
+    });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+
+    const carte = await page.evaluate(() => {
+      const c = document.querySelector(".card");
+      const it = c && cardReg.get(+c.dataset.id);
+      return {
+        cartes: document.querySelectorAll(".card[data-vid]").length,
+        total: document.querySelectorAll(".card").length,
+        vid: c && c.dataset.vid,
+        lien: it && it.link,
+        img: it && it.img,
+        // Les trois marqueurs de sonde doivent être absents.
+        pw: !!(c && c.hasAttribute("data-pw")),
+        sponsor: !!(c && c.hasAttribute("data-sponsor")),
+        noimg: !!document.querySelector(".card[data-vid] [data-noimg-link]"),
+        // Le titre lance la vidéo au lieu d'ouvrir un lien.
+        titreJoue: !!(c && c.querySelector(".card__title [data-play]")),
+        pastille: c && c.querySelector(".card__open span")?.textContent,
+      };
+    });
+    console.log("cartes vidéo :", carte.cartes, "/", carte.total, "cartes");
+    console.log("identifiant  :", carte.vid, "  lien :", carte.lien);
+    console.log("vignette     :", carte.img);
+    console.log(
+      "marqueurs de sonde (tous doivent être false) :",
+      "pw=" + carte.pw,
+      "sponsor=" + carte.sponsor,
+      "noimg=" + carte.noimg
+    );
+    console.log(
+      "titre jouable:",
+      carte.titreJoue,
+      "  pastille :",
+      JSON.stringify(carte.pastille)
+    );
+    console.log("/api/og partis (attendu : 0) :", calls.og);
+    console.log("lecteurs chargés AVANT tout appui (attendu : 0) :", calls.player);
+
+    // Appui sur ▶ : le lecteur se monte, et lui seul.
+    await page.click(".card[data-vid] .card__play");
+    await page.waitForTimeout(600);
+    console.log(
+      "après ▶ — iframes :",
+      await page.evaluate(() => document.querySelectorAll(".card__video").length),
+      " lecteurs chargés :",
+      calls.player
+    );
+    console.log(
+      "après ▶ — barre du haut dépliée (attendu : false) :",
+      await page.evaluate(
+        () => document.querySelector(".top")?.classList.contains("show") ?? "n/a"
+      )
+    );
+
+    // On glisse d'une carte : la lecture doit s'arrêter, et la suivante repartir
+    // de zéro sans laisser la première vivante.
+    await page.evaluate(() =>
+      feedEl.scrollTo({ top: feedEl.clientHeight, behavior: "instant" })
+    );
+    await page.waitForTimeout(400);
+    console.log(
+      "après swipe — iframes (attendu : 0) :",
+      await page.evaluate(() => document.querySelectorAll(".card__video").length)
+    );
+
+    await page.click(".card[data-vid]:nth-child(2) .card__play");
+    await page.waitForTimeout(400);
+    // Un lot arrive en arrière-plan et s'INSÈRE devant la carte qui joue. Insérer
+    // un frère ne touche pas au nœud de la carte : la lecture doit continuer —
+    // c'est le cas courant, et l'interrompre serait un défaut à part entière.
+    const insere = await page.evaluate(() => {
+      const avant = document.querySelectorAll(".card__video").length;
+      items.unshift({ ...items[0], link: "https://ex.test/intrus" });
+      render();
+      return { avant, apres: document.querySelectorAll(".card__video").length };
+    });
+    console.log(
+      "lot inséré DEVANT la carte — iframes avant/après :",
+      insere.avant,
+      "→",
+      insere.apres,
+      "(attendu : 1 → 1, la lecture continue)"
+    );
+    // Le fil se RÉORDONNE et la carte qui joue change de place. Là, `render()`
+    // la passe à insertBefore, ce qui détruit le contexte de navigation de son
+    // iframe et la recharge — avec autoplay=1, la vidéo repartirait de zéro.
+    // L'ancrage garde l'utilisateur sur la MÊME carte, donc seul le déplacement
+    // peut expliquer l'arrêt (ce n'est pas le changement de carte courante).
+    const dep = await page.evaluate(() => {
+      const avant = document.querySelectorAll(".card__video").length;
+      const lien = cardReg.get(+playingCard.dataset.id).link;
+      const i = items.findIndex((it) => it.link === lien);
+      items.splice(i, 1); // on la remonte de deux crans : sa carte DOIT bouger
+      items.splice(Math.max(0, i - 2), 0, cardReg.get(+playingCard.dataset.id));
+      render();
+      return { avant, apres: document.querySelectorAll(".card__video").length };
+    });
+    console.log(
+      "carte DÉPLACÉE par un render — iframes avant/après :",
+      dep.avant,
+      "→",
+      dep.apres,
+      "(attendu : 1 → 0, pas de redémarrage fantôme)"
+    );
+    console.log(
+      "lecteurs chargés au total :",
+      calls.player,
+      "(attendu : 2, un par appui)"
+    );
     console.log("erreurs :", errors);
     await browser.close();
   },

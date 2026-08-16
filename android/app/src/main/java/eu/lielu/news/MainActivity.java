@@ -44,6 +44,20 @@ public class MainActivity extends BridgeActivity {
         // des plugins exposés à la WebView.
         registerPlugin(InAppBrowserPlugin.class);
         super.onCreate(savedInstanceState);
+
+        // Cartes vidéo : l'iframe du lecteur est créée PAR SCRIPT au moment de
+        // l'appui sur ▶, et l'URL porte autoplay=1. Le « geste utilisateur »
+        // d'Android est rattaché au document qui l'a reçu, et ne se propage pas
+        // toujours jusqu'à un cadre inséré dans la foulée : la vidéo resterait
+        // alors figée sur son poster, sans rien pour la relancer puisque le
+        // lecteur occupe toute la carte.
+        //
+        // Ce n'est PAS une autorisation de lecture automatique : rien dans
+        // index.html ne crée d'iframe hors d'un appui explicite — la carte reste
+        // une simple miniature tant qu'on ne l'a pas touchée (voir startVideo).
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
+        }
     }
 
     @Override

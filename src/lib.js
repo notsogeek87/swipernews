@@ -153,6 +153,39 @@
       .replace(/[\n\r\f]/g, " ");
   }
 
+  const IMG_TARGET_W = 1200;
+
+  /**
+   * Vignettes YouTube : le NOM DU FICHIER est la taille.
+   *
+   * `https://i.ytimg.com/vi/<id>/hqdefault.jpg` ne contient aucun des motifs que
+   * lisent les deux fonctions ci-dessous (`/640x360/`, `?width=`, `_640x360.jpg`)
+   * — elles rendaient donc 0 et "". Conséquence mesurable : `hqdefault` fait
+   * 480 px, sous MIN_GOOD_W, donc `applyBg` partait sonder /api/og sur la page
+   * `watch?v=…` pour CHAQUE carte vidéo défilée. C'est exactement le défaut
+   * corrigé côté Wikipédia (une invocation serverless par carte), et il se règle
+   * ici sans un seul appel : le fichier `maxresdefault.jpg` existe presque
+   * toujours, et il suffit de savoir le demander.
+   *
+   * Renseigner `imageSizeFromUrl` n'est PAS accessoire, c'est le garde-fou :
+   * YouTube répond 200 avec une image grise de 120 px quand `maxresdefault`
+   * n'existe pas, et c'est la largeur déclarée (480) qui la fait rejeter par
+   * `applyBg` (`w > Math.max(hintW, 50)`). Sans elle, `hintW` vaudrait 0 et
+   * l'image grise passerait pour un agrandissement réussi.
+   */
+  const YT_THUMB_W = {
+    default: 120,
+    mqdefault: 320,
+    hqdefault: 480,
+    sddefault: 640,
+    hq720: 1280,
+    maxresdefault: 1280,
+  };
+  // Hôtes réellement servis par YouTube : i.ytimg.com, i1..i9.ytimg.com, et
+  // l'alias historique img.youtube.com. `vi_webp` est la variante WebP.
+  const YT_THUMB_RE =
+    /^(https?:\/\/(?:[a-z0-9-]+\.)?(?:ytimg\.com|youtube\.com)\/vi(?:_webp)?\/[A-Za-z0-9_-]{11}\/)([a-z0-9]+)(\.(?:jpe?g|webp))(\?.*)?$/i;
+
   /**
    * Propose une variante PLUS GRANDE d'une URL d'image, quand la taille est
    * inscrite dedans — cas très répandu chez les CDN de presse
@@ -164,11 +197,18 @@
    * tente alors rien. La variante n'est utilisée que si elle se charge
    * réellement (voir applyBg), donc une URL inventée ne casse jamais l'affichage.
    */
-  const IMG_TARGET_W = 1200;
   function upscaleImageUrl(src, targetW) {
     const url = String(src || "");
     const T = targetW || IMG_TARGET_W;
     if (!url) return "";
+
+    // Vignette YouTube : on demande le plus grand format, pas un calcul de ratio.
+    const yt = url.match(YT_THUMB_RE);
+    if (yt) {
+      const w = YT_THUMB_W[yt[2].toLowerCase()] || 0;
+      if (!w || w >= Math.min(T, YT_THUMB_W.maxresdefault)) return "";
+      return yt[1] + "maxresdefault" + yt[3] + (yt[4] || "");
+    }
     // Garde : une largeur ou une hauteur nulle produirait une division par zéro
     // et une URL contenant "NaN", qui renverrait 404.
     const ok2 = (w, h) => Number(w) > 0 && Number(h) > 0;
@@ -213,6 +253,9 @@
   function imageSizeFromUrl(src) {
     const url = String(src || "");
     if (!url) return 0;
+    // Vignette YouTube : la taille est le nom du fichier (voir YT_THUMB_W).
+    const yt = url.match(YT_THUMB_RE);
+    if (yt) return YT_THUMB_W[yt[2].toLowerCase()] || 0;
     let w = 0;
     const seg = /\/(\d{2,4})x(\d{2,4})\//g;
     let m;
@@ -487,6 +530,52 @@
       return (url || "").trim();
     }
   }
+  /* ---------- Cartes vidéo ----------
+     Un flux YouTube (`youtube.com/feeds/videos.xml?channel_id=…`) est un Atom
+     ordinaire : il est parsé, affiché et entrelacé comme n'importe quelle actu.
+     La seule chose qui le distingue, c'est que son lien désigne une vidéo qu'on
+     sait intégrer — donc lire SUR la carte, sans ouvrir le lecteur d'articles
+     (qui, en mode lecture, jette justement `video,iframe,embed`). */
+
+  /** Hôtes YouTube reconnus. `youtu.be` est traité à part : l'identifiant y est
+   *  le chemin, pas un paramètre. */
+  const YT_HOSTS = [
+    "youtube.com",
+    "m.youtube.com",
+    "music.youtube.com",
+    "youtube-nocookie.com",
+  ];
+  /** Chemins qui portent l'identifiant directement : /shorts/ID, /embed/ID… */
+  const YT_PATH_RE = /^\/(?:shorts|embed|live|v)\/([^/?#]+)/;
+
+  /**
+   * Identifiant de la vidéo YouTube désignée par un lien d'article, "" sinon.
+   *
+   * Le contrôle `[A-Za-z0-9_-]{11}` n'est pas décoratif : c'est LUI qui autorise
+   * l'appelant à concaténer le résultat dans l'URL d'un `<iframe src>` sans
+   * échappement — même principe que `oneOf()` côté natif pour les réglages du
+   * lecteur. Tout ce qui n'a pas exactement cette forme est refusé, y compris
+   * une URL bien formée dont le paramètre `v` serait fantaisiste.
+   */
+  function youtubeId(link) {
+    let u;
+    try {
+      u = new URL(String(link || ""));
+    } catch (_) {
+      return "";
+    }
+    // Un lien de flux ne devrait jamais être autre chose, mais `new URL` accepte
+    // volontiers `javascript:` — et ce résultat finit dans un attribut `src`.
+    if (u.protocol !== "https:" && u.protocol !== "http:") return "";
+    const host = u.hostname.replace(/^www\./, "").toLowerCase();
+    const ok = (id) => (/^[A-Za-z0-9_-]{11}$/.test(id) ? id : "");
+    if (host === "youtu.be") return ok(u.pathname.slice(1).split("/")[0]);
+    if (!YT_HOSTS.includes(host)) return "";
+    if (u.pathname === "/watch") return ok(u.searchParams.get("v") || "");
+    const m = u.pathname.match(YT_PATH_RE);
+    return m ? ok(m[1]) : "";
+  }
+
   /** Titre réduit à ce qui le distingue : sans accents, sans casse, sans
    *  ponctuation. « Guerre en Ukraine : le point » et « Guerre en Ukraine - Le
    *  point » sont le même titre, écrit par deux gabarits de flux différents. */
@@ -842,6 +931,7 @@
     dedupAndRank,
     dedupNews,
     canonicalLink,
+    youtubeId,
     feedDiscriminator,
     feedLabels,
     interleave,

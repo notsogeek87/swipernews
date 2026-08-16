@@ -223,6 +223,11 @@
 
       "card.discover": "Découvrir",
       "card.readArticle": "Lire l'article",
+      // Cartes vidéo : « Lire la vidéo » sert au ▶ (aria-label) ET au titre de
+      // l'iframe ; « Ouvrir sur YouTube » remplace « Lire l'article » sur la
+      // pastille, qui reste le chemin vers les commentaires et la chaîne.
+      "card.playVideo": "Lire la vidéo",
+      "card.openYoutube": "Ouvrir sur YouTube",
       "card.demo": "Article de démo",
       "card.paywall.title": "Accès payant probable",
     },
@@ -421,6 +426,8 @@
 
       "card.discover": "Discover",
       "card.readArticle": "Read article",
+      "card.playVideo": "Play video",
+      "card.openYoutube": "Open on YouTube",
       "card.demo": "Demo article",
       "card.paywall.title": "Likely paywalled",
 

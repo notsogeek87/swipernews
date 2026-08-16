@@ -216,7 +216,7 @@ ne change côté web.
 ## Commandes
 
 ```bash
-npm test            # node --test — 88 tests, aucune dépendance à installer
+npm test            # node --test — 93 tests, aucune dépendance à installer
 npm run lint        # eslint api src test eslint.config.js  (PAS index.html)
 npm run format:check
 npm run cap:sync    # régénère www/ puis cap sync android
@@ -370,6 +370,18 @@ genre de script dérape.
   sponsorisé ; par chemin d'URL (`/bons-plans/`) pour les bons plans — un titre
   de bon plan est en général purement descriptif (prix, produit), sans jamais
   dire « bon plan ».
+- `videoIdOf()` / `startVideo()` / `stopVideo()` — les cartes vidéo. `youtubeId`
+  (`src/lib.js`, testée) reconnaît le lien ; `videoIdOf` est le SEUL point de
+  décision, parce que CINQ endroits en dépendent (la classe et les trois
+  marqueurs de sonde dans `cardHTML`, l'image de secours dans `applyBg`) et que
+  les laisser tester chacun de leur côté garantit qu'ils divergeront. UN lecteur
+  au plus dans tout le fil, comme le rail de partage — et QUATRE points d'arrêt,
+  aucun facultatif : `onCardChange` (on a quitté la carte), `unobserveCard` (elle
+  quitte le fil), `render()` avant `insertBefore` (voir ci-dessous),
+  `visibilitychange`/`openDialog` (sinon le son continue derrière). L'identifiant
+  est concaténé dans l'`src` sans échappement, ce qui n'est légitime QUE parce
+  que `youtubeId` ne rend rien d'autre que `[A-Za-z0-9_-]{11}` — même rôle que
+  `oneOf()` côté natif. Scénario `video`.
 - `articleMetaFor()` / `checkPaywall()` / `checkMissingImage()` — deux filets
   asynchrones, tous deux gated par `IntersectionObserver` (jamais pour tout le
   fil) et partageant le MÊME cache par lien (`ogCache`), pour ne jamais
@@ -647,6 +659,35 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   n'apprend rien. Au premier chargement d'une session neuve, les deux
   définitions coïncident. « Vu » veut dire AFFICHÉ, pas ouvert : c'est la
   question à laquelle on répond.
+- **Une carte vidéo est une FAÇADE tant qu'on n'a pas appuyé sur ▶.** Miniature du
+  flux + bouton ; l'iframe n'est créée qu'au toucher, et rien n'est demandé à
+  Google pour une carte simplement croisée. Passer en lecture automatique (à la
+  TikTok) ferait charger ~1 Mo de lecteur et contacter un tiers à CHAQUE carte
+  du fil, pour une vidéo que personne ne regarde — ni la charge du fil ni
+  « aucun appel à un tiers non choisi » ne le supportent. Le domaine est
+  `youtube-nocookie.com`, jamais `youtube.com`.
+- **Une carte vidéo est écartée des QUATRE sondes**, exactement comme Wikipédia et
+  pour la même raison : la miniature vient du flux, et la page `watch?v=…` n'a
+  rien de mieux. Ce qui la remplace est GRATUIT et vit dans `src/lib.js` :
+  `YT_THUMB_W` apprend à `imageSizeFromUrl` et `upscaleImageUrl` que le NOM DU
+  FICHIER (`hqdefault`, `maxresdefault`…) EST la taille. Renseigner
+  `imageSizeFromUrl` n'est pas accessoire, c'est le garde-fou — YouTube répond
+  **200 avec une image grise de 120 px** quand `maxresdefault` n'existe pas, et
+  seule la largeur déclarée de l'originale (480) la fait rejeter par `applyBg`.
+  Sans elle, `hintW` vaut 0 et l'image grise passe pour un agrandissement réussi.
+- **Déplacer une carte qui joue RECHARGE son iframe.** Réinsérer un nœud qui en
+  contient une détruit son contexte de navigation ; comme l'URL porte
+  `autoplay=1`, la vidéo repartirait de zéro toute seule, au milieu d'une
+  lecture, au moment où un lot d'actus arrive et décale la carte. D'où l'arrêt
+  explicite dans `render()` AVANT `insertBefore`. À ne pas confondre avec une
+  simple INSERTION devant la carte, qui ne touche pas à son nœud : là, la lecture
+  doit continuer — c'est le cas courant, et l'interrompre serait un défaut à part
+  entière. Le scénario `video` vérifie les deux.
+- **Le mode lecture n'est JAMAIS tenté sur une vidéo** (`openArticle(…,{noReader:true})`).
+  `read` est le réglage par DÉFAUT, `reader_read.js` jette précisément
+  `video,iframe,embed`, et une page YouTube n'atteint de toute façon jamais
+  `MIN_SCORE` : « Ouvrir sur YouTube » livrait une page complète PLUS un toast
+  d'échec du lecteur.
 - **Dans un lot Wikipédia, la catégorie prime sur l'image.** `dedupAndRank`
   (`src/lib.js`) sert les catégories À TOUR DE RÔLE, une carte chacune ; le tri
   « avec image d'abord » ne joue plus qu'À L'INTÉRIEUR d'une catégorie. Le
@@ -850,7 +891,7 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 
 `npm test` ne voit que `src/` et `api/` : **tout le JS en ligne d'`index.html`
 — le fil, l'état, le stockage local — n'est couvert par aucun test**. Ce banc
-comble le trou en jouant 30 scénarios réels dans Chromium, réseau entièrement
+comble le trou en jouant 31 scénarios réels dans Chromium, réseau entièrement
 simulé (rien ne part vers une vraie source) : hors-ligne, réseau lent, coupure en
 cours de requête, API en 500, RSS vide/tronqué/HTML, contenu démesuré, doublons,
 120 sources, stockage et cache abîmés, quota saturé, actions enchaînées, retour
@@ -876,6 +917,14 @@ Repères : 1 carte sur 120 (en position 94) avant le tour de rôle, 8 après.
 (c'est l'affichage qui marque « vu ») puis compte ce qui revient après trois ↻.
 Repères : 1 article distinct d'une source lente sur quatre lectures sans la
 mémoire des actus, 4 avec — et zéro redite d'actu.
+
+`video` joue un flux Atom de chaîne YouTube (avec son `<media:group>`, et un
+`media:content` en pièce jointe vidéo qu'il ne faut pas prendre pour une image) et
+vérifie quatre choses qui ne se lisent pas dans le code : que le lien et la
+vignette sortent vraiment du parsing, que ZÉRO `/api/og` part sur ces cartes, qu'il
+n'y a jamais deux lecteurs vivants, et que `render()` distingue une carte
+DÉPLACÉE (arrêt) d'un lot simplement INSÉRÉ devant (la lecture continue). Le banc
+route `youtube-nocookie.com` vers une page inerte : rien ne part vers Google.
 
 `teteouverture` est le pendant de `forcetop` pour l'OUVERTURE à froid : cache
 périmé peint tout de suite, les deux moitiés qui repartent, et l'utilisateur qui

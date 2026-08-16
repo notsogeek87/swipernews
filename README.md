@@ -482,6 +482,37 @@ Les articles datés **dans le futur** de plus de deux jours (agendas de concerts
 annonces de festivals) sont classés en fin de fil comme les articles sans date :
 ce ne sont pas des actualités récentes, et ils monopolisaient sinon la tête du fil.
 
+### Cartes vidéo (YouTube)
+
+Une chaîne YouTube publie un flux Atom
+(`https://www.youtube.com/feeds/videos.xml?channel_id=…`) : elle s'ajoute comme
+n'importe quelle source, et ses vidéos s'entrelacent dans le fil comme des actus.
+
+Quand le lien d'un article désigne une vidéo qu'on sait intégrer, la carte **se
+regarde sur place** : un ▶ au centre de la miniature, un appui, et le lecteur
+prend toute la carte. Le bloc titre/source s'efface pendant la lecture, le bouton
+de partage reste disponible, et **glisser vers la carte suivante arrête la
+vidéo**. La pastille du bas devient « Ouvrir sur YouTube » — pour les
+commentaires, la chaîne, ou une vidéo dont l'auteur refuse l'intégration.
+
+Deux choix qui expliquent le reste :
+
+- **la carte est une façade tant qu'on n'a pas appuyé.** Rien n'est demandé à
+  Google pour une carte simplement croisée : la miniature vient du flux, et le
+  lecteur n'est créé qu'à l'appui. Une lecture automatique à la TikTok ferait
+  charger environ un mégaoctet de lecteur — et contacterait un tiers — à chaque
+  carte du fil, pour une vidéo que personne ne regarde. Le domaine est
+  `youtube-nocookie.com` : même lecteur, sans dépôt de cookies publicitaires
+  avant lecture ;
+- **le mode lecture n'est jamais tenté sur une vidéo.** Il supprime justement les
+  balises `video`/`iframe`, et une page YouTube n'a de toute façon pas assez de
+  texte pour être simplifiée : « Ouvrir sur YouTube » livrait donc, dans l'app
+  Android, une page complète *plus* un message d'échec du lecteur.
+
+Sur le web, la CSP doit autoriser le lecteur : `vercel.json` déclare
+`frame-src https://www.youtube-nocookie.com https://www.youtube.com`. Sans cette
+ligne, `default-src 'self'` bloquerait le cadre.
+
 ### Rapidité
 
 - Les proxys de secours sont interrogés **en parallèle** (le premier qui répond gagne), au lieu d'un par un.

@@ -106,7 +106,22 @@
     -webkit-mask-image:linear-gradient(to top,transparent 0%,#000 50%,transparent 100%);
     mask-image:linear-gradient(to top,transparent 0%,#000 50%,transparent 100%);opacity:.3}
 
-  .card__body{position:relative;z-index:2;padding:28px 22px calc(44px + env(safe-area-inset-bottom))}
+  /* Carte vidéo. Le ▶ couvre TOUTE la carte pour que n'importe où sur l'image
+     lance la lecture, mais il reste en z-index 1 : .card__body est en 2 et plus
+     loin dans le DOM, donc la pastille « Ouvrir sur YouTube » et le titre gardent
+     leur cible par-dessus. Le lecteur prend la même boîte que .card__bg. */
+  .card__video{position:absolute;inset:0;width:100%;height:100%;border:0;z-index:1;background:#000}
+  .card__play{position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;
+    background:none;border:0;padding:0;color:#fff;cursor:pointer;-webkit-tap-highlight-color:transparent;
+    transition:opacity .18s ease}
+  .card__play svg{width:76px;height:76px;filter:drop-shadow(0 2px 12px rgba(0,0,0,.65));transition:transform .12s}
+  .card__play:active svg{transform:scale(.92)}
+  /* Pendant la lecture, la carte EST le lecteur : le bloc de texte s'efface
+     plutôt que de manger le bas de l'image. Le rail de partage, lui, est en
+     position:fixed hors du fil et reste donc disponible. */
+  .card--playing .card__body,.card--playing .card__play{opacity:0;pointer-events:none}
+  .card__body{position:relative;z-index:2;padding:28px 22px calc(44px + env(safe-area-inset-bottom));
+    transition:opacity .18s ease}
   /* Flou LOCAL derrière le texte, solidaire du bloc : il couvre exactement le
      texte quelle que soit sa longueur, et se fond au-dessus (masque) pour ne pas
      laisser d'arête. Volontairement sans `brightness` : l'image garde sa
@@ -133,9 +148,16 @@
      l'élément le plus lourd de la carte, sa couleur et sa graisse font déjà tout
      le travail. Seul le retour au toucher signale qu'il est actionnable. Un
      soulignement, lui, banaliserait le titre en le rapprochant du corps de texte. */
-  .card__title a{display:block;color:inherit;text-decoration:none;cursor:pointer;
+  /* .card__titleplay : le titre d'une carte vidéo, qui LANCE la lecture au lieu
+     d'ouvrir un lien. C'est un vrai <button> (clavier, lecteur d'écran), donc il
+     faut lui retirer tout l'habillage que le navigateur y met par défaut — et
+     `text-align:left`, `font:inherit`, `width:100%` sont ce qui le rend
+     indistinguable du <a> ci-dessus. */
+  .card__title a,.card__title .card__titleplay{display:block;color:inherit;text-decoration:none;cursor:pointer;
     -webkit-tap-highlight-color:transparent;transition:opacity .12s}
-  .card__title a:active{opacity:.65}
+  .card__title .card__titleplay{width:100%;text-align:left;font:inherit;letter-spacing:inherit;
+    background:none;border:0;padding:0;margin:0}
+  .card__title a:active,.card__title .card__titleplay:active{opacity:.65}
   .card--img .card__desc{text-shadow:0 0 3px rgba(0,0,0,.55),0 1px 5px rgba(0,0,0,.4)}
   /* Source et date : halo plus soutenu. Ces lignes sont fines et se placent en
      HAUT du bloc — donc sur la zone la plus claire de l'image. Mesuré à 2,2:1
@@ -884,9 +906,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=131"></script>
-<script src="src/learn-core.js?v=131"></script>
-<script src="src/i18n.js?v=131"></script>
+<script src="src/lib.js?v=132"></script>
+<script src="src/learn-core.js?v=132"></script>
+<script src="src/i18n.js?v=132"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -894,7 +916,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","interleave","roundRobin","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain"],
+  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","interleave","roundRobin","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket","perCatLimit"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -993,7 +1015,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,interleave,roundRobin,dedupNews,canonicalLink,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,interleave,roundRobin,dedupNews,canonicalLink,youtubeId,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1448,6 +1470,9 @@ function currentCardEl(){const i=currentIndex();return i<0?null:feedEl.children[
 function onCardChange(){
   const i=currentIndex();
   const it=itemAt(i);
+  // Arrêt n°1 : on a quitté la carte qui jouait. C'est le geste attendu — swiper
+  // coupe la vidéo, comme sur n'importe quel fil vertical.
+  if(playingCard&&feedEl.children[i]!==playingCard)stopVideo();
   markVisibleSeen(it);
   rememberPos(it);
   updateRail(it);
@@ -1476,7 +1501,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="131";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="132";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1716,14 +1741,20 @@ async function dropBlocklist(){
 /* Rend false quand le lien doit garder son comportement normal (target=_blank) :
    sur le web, si l'utilisateur a choisi son navigateur, ou si le pont natif
    manque à l'appel. L'appelant ne fait alors rien de spécial. */
-function openArticle(url,title){
+/* `opts.noReader` : ne jamais TENTER le mode lecture sur cette page, quel que
+   soit le réglage. Seul cas à ce jour, la page d'une vidéo — et il n'a rien de
+   théorique : `read` est le réglage par DÉFAUT, or reader_read.js jette
+   précisément `video,iframe,embed`, et une page YouTube n'atteint de toute façon
+   jamais MIN_SCORE. Sans cette sortie, « Ouvrir sur YouTube » livrait une page
+   complète PLUS un toast d'échec du lecteur. */
+function openArticle(url,title,opts){
   if(!isNativeApp||readPref==="browser")return false;
   const iab=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
   if(!iab||!iab.open)return false;
   // L'appel est asynchrone : en cas d'échec (URL refusée côté natif), on
   // rattrape en ouvrant le lien comme le ferait le web.
   iab.open({url,title:title||"",hideCmp:cmpPref==="hide",blockAds:adsPref==="block",
-            reader:readPref==="read",readerSize:rSizePref,readerTheme:rThemePref})
+            reader:readPref==="read"&&!(opts&&opts.noReader),readerSize:rSizePref,readerTheme:rThemePref})
     .catch(()=>window.open(url,"_blank","noopener"));
   return true;
 }
@@ -1764,7 +1795,13 @@ function refreshIfStale(){
   loadFeeds();
 }
 document.addEventListener("visibilitychange",()=>{
-  if(document.visibilityState==="hidden"){persistAll();return;}
+  if(document.visibilityState==="hidden"){
+    // Arrêt n°4 : l'app passe en arrière-plan. Une WebView laisse volontiers la
+    // vidéo d'un cadre tiers continuer — donc du son qui sort d'une app qu'on
+    // vient de quitter, et que rien à l'écran ne permet plus d'arrêter.
+    stopVideo();
+    persistAll();return;
+  }
   refreshIfStale();
 });
 /* App natif uniquement (@capacitor/app) : signal de reprise plus fiable que
@@ -3170,7 +3207,12 @@ function applyBg(el,src){
      cardHTML écarte déjà Wikipédia des trois autres sondes (data-pw,
      data-sponsor, data-noimg-link) pour exactement cette raison ; applyBg
      était la dernière à l'oublier. */
-  const link=(it&&it.kind!=="learn"&&it.link)||"";
+  /* Même raison pour une carte VIDÉO, et le même coût si on l'oublie : la
+     miniature vient du flux, et la meilleure image que puisse rendre la page
+     `watch?v=…` est cette miniature. Il y a mieux à faire, et c'est gratuit —
+     `upscaleImageUrl` sait demander `maxresdefault` (voir YT_THUMB_W,
+     src/lib.js), donc l'étape 1 ci-dessous suffit et l'og:image ne sert plus. */
+  const link=(it&&it.kind!=="learn"&&!videoIdOf(it)&&it.link)||"";
   const set=(u,tag)=>{
     el.style.backgroundImage='url("'+cssString(u)+'")';
     el.dataset.bgUsed=u;el.dataset.bgKind=tag;
@@ -3341,6 +3383,10 @@ function observeMissingImages(scope){
    plafond : elle ne coûtait rien à la frame mais grignotait la mémoire à chaque
    remélange. */
 function unobserveCard(card){
+  // Arrêt n°2 : la carte est sur le point d'être retirée du DOM. Sans ça,
+  // l'iframe partirait avec elle mais `playingCard` garderait un nœud orphelin,
+  // et le prochain startVideo croirait avoir déjà arrêté.
+  if(card===playingCard)stopVideo();
   try{
     if(pwObserver)pwObserver.unobserve(card);
     if(sponsorObserver)sponsorObserver.unobserve(card);
@@ -3405,6 +3451,13 @@ function render(forceTop,altAnchor){
       existing.delete(it.link);
       cardReg.set(+el.dataset.id,it);           // rafraîchit l'article associé
       if(el===cursor){cursor=cursor.nextElementSibling;continue;}   // déjà en place
+      /* Arrêt n°3, le moins évident : réinsérer un nœud qui contient une
+         <iframe> DÉTRUIT son contexte de navigation, donc la recharge — et
+         comme l'URL du lecteur porte `autoplay=1`, la vidéo repartirait de zéro
+         toute seule, au milieu d'une lecture, au moment où un lot d'actus arrive
+         en arrière-plan et décale la carte. Rendre la miniature et le ▶ est
+         moins brutal que ce redémarrage fantôme. */
+      if(el===playingCard)stopVideo();
       feedEl.insertBefore(el,cursor);           // simple déplacement, pas de recréation
     }else{
       feedEl.insertBefore(makeCardEl(it),cursor);
@@ -3529,6 +3582,18 @@ const ICON_SETTINGS=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const ICON_CHEV=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
 // Signale un article payant, une fois confirmé par checkPaywall() (voir plus bas).
 const ICON_PAYWALL=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>`;
+// Lecture d'une carte vidéo. Le triangle est PLEIN (fill, stroke:none) alors que
+// le reste de la famille est en tracé : c'est la seule icône posée en grand au
+// milieu d'une image, et un triangle creux de 76 px s'y lit mal.
+const ICON_PLAY=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M10 8.2l6.2 3.8L10 15.8z" fill="currentColor" stroke="none"></path></svg>`;
+/* Identifiant de la vidéo intégrable portée par un article, "" sinon —
+   le SEUL point de décision « cette carte est-elle une carte vidéo ? ».
+   Cinq endroits en dépendent (cardHTML pour la classe, les trois marqueurs de
+   sonde et la pastille ; applyBg pour l'image de secours) : les laisser tester
+   chacun de leur côté, c'est se garantir qu'ils divergeront.
+   Wikipédia est exclu d'emblée — ses liens ne sont jamais des vidéos, et lui
+   poser la question à chaque carte ne ferait que payer un `new URL` pour rien. */
+function videoIdOf(it){return it&&it.kind!=="learn"?youtubeId(it.link):"";}
 function cardHTML(it,id){
   const img=safeImg(it.img,location.href);
   const link=safeLink(it.link,location.href);
@@ -3536,6 +3601,11 @@ function cardHTML(it,id){
   // dans le même fil, et c'est ce qui les distingue d'un coup d'œil (typographie
   // plus dense, badge de thème, verbe d'action différent).
   const learnCard=it.kind==="learn";
+  /* Carte vidéo : la miniature vient du flux (media:thumbnail), la page
+     `watch?v=…` n'a rien de mieux à offrir, et une vidéo n'est ni payante ni
+     sponsorisée. Elle est donc écartée des trois sondes exactement comme
+     Wikipédia — voir applyBg pour la quatrième. */
+  const vid=videoIdOf(it);
   // data-bg (et non un style inline) : chargement paresseux + pas d'URL de flux
   // interprétée comme du CSS. Voir observeBackgrounds().
   // Aucune image dans le flux (WordPress et consorts n'en publient pas
@@ -3545,36 +3615,103 @@ function cardHTML(it,id){
   // une image totalement absente. Sans objet pour Wikipédia (image directe
   // de l'API, pas de page HTML tierce à interroger).
   const bg=img?`<div class="card__bg" data-bg="${escAttr(img)}"></div>`
-    :(!learnCard&&link?`<div class="card__noimg" data-noimg-link="${escAttr(link)}"></div>`:`<div class="card__noimg"></div>`);
-  const openLabel=learnCard?T("card.discover"):T("card.readArticle");
-  const openIcon=learnCard?ICON_DISCOVER:ICON_READ;
+    :(!learnCard&&!vid&&link?`<div class="card__noimg" data-noimg-link="${escAttr(link)}"></div>`:`<div class="card__noimg"></div>`);
+  /* Le ▶ est émis MÊME sans miniature : une vidéo dont le flux n'a pas publié
+     de vignette doit rester jouable, sur le fond rayé de .card__noimg. */
+  const playBtn=vid?`<button type="button" class="card__play" data-play aria-label="${escAttr(T("card.playVideo"))}">${ICON_PLAY}</button>`:"";
+  const openLabel=vid?T("card.openYoutube"):learnCard?T("card.discover"):T("card.readArticle");
+  const openIcon=vid?ICON_PLAY:learnCard?ICON_DISCOVER:ICON_READ;
   const catB=it.cat&&catLabelT(it.cat)?`<span class="card__cat">${esc(catLabelT(it.cat))}</span>`:"";
   // Payant : jamais tranché ici. isPaywallCandidateDomain ne dit que si la
   // vérification (asynchrone, une vraie lecture de la page — voir
   // isPaywalledHtml/checkPaywall) vaut la peine ; data-pw ne marque donc
   // qu'une CANDIDATURE, que checkPaywall confirmera ou non une fois la carte
   // à l'écran. Sans objet pour Wikipédia, jamais payant.
-  const pwCandidate=!learnCard&&link&&isPaywallCandidateDomain(link);
+  const pwCandidate=!learnCard&&!vid&&link&&isPaywallCandidateDomain(link);
   // Sponsorisé par auteur : même principe de candidature, voir checkSponsor.
-  const sponsorCandidate=!learnCard&&link&&isSponsorCandidateDomain(link);
-  return `<article class="card${img?" card--img":""}${learnCard?" card--learn":""}" data-id="${id}"${pwCandidate?" data-pw":""}${sponsorCandidate?" data-sponsor":""}>
-    ${bg}
+  const sponsorCandidate=!learnCard&&!vid&&link&&isSponsorCandidateDomain(link);
+  /* Sur une carte vidéo le titre LANCE la vidéo au lieu d'ouvrir le lecteur
+     d'articles — c'est la cible large qu'atteint le pouce droit (voir le
+     commentaire de la délégation de clic plus bas), et elle vaut ici aussi.
+     Un vrai <button> plutôt qu'un <span data-play> : sans lui, ni le clavier ni
+     un lecteur d'écran n'auraient de quoi déclencher la lecture. */
+  const titleHTML=vid?`<button type="button" class="card__titleplay" data-play>${esc(it.title)}</button>`
+    :link?`<a href="${escAttr(link)}" data-open target="_blank" rel="noopener">${esc(it.title)}</a>`
+    :esc(it.title);
+  return `<article class="card${img?" card--img":""}${learnCard?" card--learn":""}${vid?" card--video":""}" data-id="${id}"${vid?` data-vid="${escAttr(vid)}"`:""}${pwCandidate?" data-pw":""}${sponsorCandidate?" data-sponsor":""}>
+    ${bg}${playBtn}
     <div class="card__body">
       ${catB}
       <span class="card__source"><span class="dot"></span><span class="txt">${esc(it.source)}</span></span>
-      <h2 class="card__title">${link?`<a href="${escAttr(link)}" data-open target="_blank" rel="noopener">${esc(it.title)}</a>`:esc(it.title)}</h2>
+      <h2 class="card__title">${titleHTML}</h2>
       ${it.desc?`<p class="card__desc">${esc(it.desc)}</p>`:""}
       <div class="card__meta">${it.date?`<span>${relTime(it.date)}</span>`:""}</div>
       <div class="card__actions">
-        ${link?`<a class="card__open" data-open href="${escAttr(link)}" target="_blank" rel="noopener">${openIcon}<span>${openLabel}</span></a>`:`<span class="card__open" style="background:transparent;box-shadow:none;border:1px solid var(--redline);color:var(--ash)">${T("card.demo")}</span>`}
+        ${link?`<a class="card__open" data-open${vid?" data-video":""} href="${escAttr(link)}" target="_blank" rel="noopener">${openIcon}<span>${openLabel}</span></a>`:`<span class="card__open" style="background:transparent;box-shadow:none;border:1px solid var(--redline);color:var(--ash)">${T("card.demo")}</span>`}
       </div>
     </div>
   </article>`;
 }
 // esc / escAttr : voir src/lib.js
+
+/* ---------- Lecteur vidéo sur la carte ----------
+   UNE instance au plus dans tout le fil, comme le rail de partage : l'iframe
+   n'existe que sur la carte en cours de lecture, et elle n'est créée qu'à
+   l'appui sur ▶.
+
+   La carte est une FAÇADE tant qu'on n'a pas appuyé : miniature du flux + ▶,
+   donc RIEN n'est demandé à Google pour une carte simplement croisée. C'est ce
+   qui rend l'intégration acceptable ici — une lecture automatique ferait charger
+   ~1 Mo de lecteur et contacter un tiers à chaque carte du fil, pour une vidéo
+   que l'utilisateur ne regarde pas. Le domaine est `youtube-nocookie.com` : même
+   lecteur, sans dépôt de cookies publicitaires avant lecture.
+
+   L'identifiant est concaténé sans échappement, et c'est légitime : `youtubeId`
+   (src/lib.js) ne rend que du `[A-Za-z0-9_-]{11}`.
+
+   `playsinline=1` : sans lui, certains moteurs mobiles basculent d'office en
+   plein écran système, ce qui sort de la carte — donc du fil. */
+let playingCard=null;
+function stopVideo(){
+  if(!playingCard)return;
+  const f=playingCard.querySelector(".card__video");
+  if(f)f.remove();               // retirer l'iframe suffit à couper l'image ET le son
+  playingCard.classList.remove("card--playing");
+  playingCard=null;
+}
+function startVideo(card){
+  const id=card&&card.dataset.vid;
+  if(!id||playingCard===card)return;
+  stopVideo();                   // jamais deux lecteurs vivants à la fois
+  const f=document.createElement("iframe");
+  f.className="card__video";
+  f.title=T("card.playVideo");
+  // `allow` DÉLÈGUE ces permissions à l'iframe : sans lui, la politique par
+  // défaut ('self') les refuse à un cadre d'une autre origine, et le lecteur
+  // reste sur son poster.
+  f.allow="autoplay; encrypted-media; picture-in-picture; fullscreen";
+  f.setAttribute("allowfullscreen","");
+  f.referrerPolicy="strict-origin-when-cross-origin";
+  f.src="https://www.youtube-nocookie.com/embed/"+id+"?autoplay=1&playsinline=1&rel=0&modestbranding=1";
+  card.insertBefore(f,card.firstChild);
+  card.classList.add("card--playing");
+  playingCard=card;
+  // Le repère « Swipe » ne s'efface qu'au premier défilement — or c'est
+  // précisément sur la PREMIÈRE carte d'une session qu'on appuie sur ▶, et il
+  // resterait posé par-dessus le lecteur.
+  document.getElementById("hint").classList.add("hidden");
+}
 // Délégation unique : un seul écouteur pour tout le fil (au lieu de ré-attacher
 // un handler à chaque carte → supprime le coût O(n²) du scroll infini).
 feedEl.addEventListener("click",e=>{
+  // ▶ (le grand bouton central, ou le titre d'une carte vidéo) : la lecture a
+  // lieu SUR la carte, on ne va nulle part.
+  const play=e.target.closest("[data-play]");
+  if(play){
+    const card=play.closest(".card");
+    if(card){startVideo(card);e.preventDefault();}
+    return;
+  }
   // Lien d'un article : dans l'app packagée, il s'ouvre dans le navigateur
   // intégré plutôt que dans Chrome (le lien reste un vrai <a> pour le web et
   // pour l'appui long « ouvrir dans un nouvel onglet / copier le lien »).
@@ -3582,10 +3719,11 @@ feedEl.addEventListener("click",e=>{
   // titre. Le titre est cliquable parce que la pastille, alignée à gauche comme
   // le texte, est hors d'atteinte du pouce quand le téléphone est tenu de la
   // main droite — alors que le titre, lui, barre toute la largeur.
+  // (Sur une carte vidéo, le titre n'est plus un lien : il lance la vidéo.)
   const openLink=e.target.closest("a[data-open]");
   if(openLink&&openLink.href){
     const card=openLink.closest(".card"),t=card&&card.querySelector(".card__title");
-    if(openArticle(openLink.href,t?t.textContent:""))e.preventDefault();
+    if(openArticle(openLink.href,t?t.textContent:"",{noReader:"video" in openLink.dataset}))e.preventDefault();
   }
 });
 /* Rail unique : il agit sur la carte visible (une seule instance pour toute
@@ -3778,8 +3916,10 @@ feedEl.addEventListener("scroll",()=>{
 },{passive:true});
 // scrollend (là où il existe) : moment idéal pour figer la position sur disque
 if("onscrollend" in self)feedEl.addEventListener("scrollend",persistPos);
-// tap → réaffiche, et on empêche le re-masquage pendant que le snap se termine
-feedEl.addEventListener("click",()=>showTop());   // seul déclencheur du retour de la barre
+// tap → réaffiche, et on empêche le re-masquage pendant que le snap se termine.
+// Sauf sur ▶ : déplier la barre du haut par-dessus la vidéo qu'on vient de
+// lancer est exactement le contraire de ce que l'appui demandait.
+feedEl.addEventListener("click",e=>{if(!e.target.closest("[data-play]"))showTop();});   // seul déclencheur du retour de la barre
 
 /* Plus de balayage horizontal : il ne servait qu'à passer d'un mode à l'autre.
    Avec un fil unique il n'y a plus rien à basculer — et un geste sans effet vaut
@@ -3839,6 +3979,9 @@ addEventListener("popstate",()=>{
   if(menu&&menu.__snClose)menu.__snClose(true);
 });
 function openDialog(el){
+  // Un panneau recouvre le fil : la vidéo continuerait à jouer derrière, hors de
+  // vue et hors d'atteinte. Même raison que l'arrêt sur passage en arrière-plan.
+  stopVideo();
   lastFocused=document.activeElement;
   el.classList.add("open");
   pushDialogState();

@@ -415,6 +415,76 @@ test("imageSizeFromUrl lit la taille demandée dans une URL Thumbor", () => {
   assert.equal(lib.imageSizeFromUrl(""), 0);
 });
 
+const YT = "dQw4w9WgXcQ"; // 11 caractères, la forme exacte d'un identifiant
+
+test("youtubeId reconnaît les formes d'URL qu'un flux YouTube publie", () => {
+  // La forme servie par youtube.com/feeds/videos.xml (<link rel="alternate">).
+  assert.equal(lib.youtubeId("https://www.youtube.com/watch?v=" + YT), YT);
+  // Un Short apparaît dans le flux de la chaîne comme les autres vidéos, mais
+  // le lien partagé, lui, prend cette forme.
+  assert.equal(lib.youtubeId("https://www.youtube.com/shorts/" + YT), YT);
+  assert.equal(lib.youtubeId("https://youtu.be/" + YT + "?t=42"), YT);
+  assert.equal(lib.youtubeId("https://www.youtube.com/embed/" + YT), YT);
+  assert.equal(lib.youtubeId("https://www.youtube.com/live/" + YT), YT);
+  // Sans « www. », et sur les hôtes secondaires.
+  assert.equal(lib.youtubeId("https://youtube.com/watch?v=" + YT), YT);
+  assert.equal(lib.youtubeId("https://m.youtube.com/watch?v=" + YT + "&list=PL1"), YT);
+  assert.equal(lib.youtubeId("https://music.youtube.com/watch?v=" + YT), YT);
+});
+
+test("youtubeId refuse tout ce qui n'est pas exactement un identifiant", () => {
+  // C'est ce refus qui autorise l'appelant à concaténer le résultat dans un
+  // attribut src sans échappement : rien d'autre que [A-Za-z0-9_-]{11} n'en sort.
+  assert.equal(lib.youtubeId("https://www.youtube.com/watch?v=trop-court"), "");
+  assert.equal(lib.youtubeId("https://www.youtube.com/watch?v=" + YT + "X"), "");
+  assert.equal(lib.youtubeId("https://www.youtube.com/watch?v=abc/../etc"), "");
+  assert.equal(lib.youtubeId("https://www.youtube.com/@unechaine"), "");
+  assert.equal(lib.youtubeId("https://www.youtube.com/"), "");
+  // Un hôte qui se contente de CONTENIR le nom ne suffit pas.
+  assert.equal(lib.youtubeId("https://youtube.com.pirate.fr/watch?v=" + YT), "");
+  assert.equal(lib.youtubeId("https://lemonde.fr/article"), "");
+  // `new URL` accepte volontiers un schéma exécutable — pas nous.
+  assert.equal(lib.youtubeId("javascript:alert(1)//youtube.com/watch?v=" + YT), "");
+  assert.equal(lib.youtubeId(""), "");
+  assert.equal(lib.youtubeId(null), "");
+  assert.equal(lib.youtubeId("pas une url"), "");
+});
+
+test("les vignettes YouTube déclarent leur taille par leur nom de fichier", () => {
+  // Sans ça, imageSizeFromUrl rend 0 sur une URL ytimg, et applyBg part sonder
+  // /api/og pour CHAQUE carte vidéo défilée — le défaut déjà corrigé côté
+  // Wikipédia (une invocation serverless par carte).
+  const base = "https://i.ytimg.com/vi/" + YT + "/";
+  assert.equal(lib.imageSizeFromUrl(base + "hqdefault.jpg"), 480);
+  assert.equal(lib.imageSizeFromUrl(base + "mqdefault.jpg"), 320);
+  assert.equal(lib.imageSizeFromUrl(base + "maxresdefault.jpg"), 1280);
+  assert.equal(
+    lib.imageSizeFromUrl("https://i9.ytimg.com/vi_webp/" + YT + "/sddefault.webp"),
+    640
+  );
+  // Nom inconnu : on ne devine pas.
+  assert.equal(lib.imageSizeFromUrl(base + "frame0.jpg"), 0);
+});
+
+test("upscaleImageUrl demande maxresdefault à YouTube, et rien de plus", () => {
+  const base = "https://i.ytimg.com/vi/" + YT + "/";
+  assert.equal(lib.upscaleImageUrl(base + "hqdefault.jpg"), base + "maxresdefault.jpg");
+  // La variante WebP et la requête de signature sont conservées telles quelles.
+  assert.equal(
+    lib.upscaleImageUrl("https://i9.ytimg.com/vi_webp/" + YT + "/mqdefault.webp?sqp=abc"),
+    "https://i9.ytimg.com/vi_webp/" + YT + "/maxresdefault.webp?sqp=abc"
+  );
+  // Déjà au maximum, ou nom inconnu : rien à tenter.
+  assert.equal(lib.upscaleImageUrl(base + "maxresdefault.jpg"), "");
+  assert.equal(lib.upscaleImageUrl(base + "hq720.jpg"), "");
+  assert.equal(lib.upscaleImageUrl(base + "frame0.jpg"), "");
+  // Le garde-fou du placeholder : YouTube répond 200 avec une image grise de
+  // 120 px quand maxresdefault n'existe pas. C'est la largeur DÉCLARÉE de
+  // l'originale (480) qui la fait rejeter par applyBg — d'où le test ci-dessus
+  // sur imageSizeFromUrl, dont dépend tout le mécanisme.
+  assert.ok(lib.imageSizeFromUrl(base + "hqdefault.jpg") > 120);
+});
+
 test("interleave tient la cadence puis laisse la liste restante continuer seule", () => {
   const n = ["n1", "n2", "n3", "n4", "n5", "n6", "n7"];
   const w = ["w1", "w2"];
