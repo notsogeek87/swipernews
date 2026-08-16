@@ -1381,6 +1381,88 @@ const scenarios = {
     await browser.close();
   },
 
+  /* 29. ÉQUITÉ ENTRE SOURCES : une source lente ne doit pas être enterrée.
+     Le fil était trié par date décroissante, et un tri par date enterre les
+     sources lentes : une source à 1 article/h a ses dix plus récents étalés sur
+     dix heures, une à 10 articles/h les a sur une heure. Classés ensemble par
+     fraîcheur, les bavardes occupent tout le haut. Mesuré ici avec 15 sources
+     dont une lente : elle obtenait UNE carte sur 120.
+     On vérifie les deux moitiés de la règle : la lente revient régulièrement,
+     ET la carte 1 reste l'actu la plus récente (c'est cette règle-là que
+     forceTop et la reprise de lecture supposent). */
+  async equite() {
+    const LENTE = "Lente";
+    const N = 15; // 1 lente (1 art./h) + 14 bavardes (1 art./6 min)
+    const feeds = Array.from({ length: N }, (_, i) => ({
+      url: `https://src${i}.test/rss`,
+      name: i === 0 ? LENTE : "Bavarde " + i,
+      on: true,
+    }));
+    // La lente n'est délibérément PAS la plus fraîche (37 min de retard) :
+    // sinon elle tiendrait la tête du fil par hasard et le test ne prouverait
+    // rien sur l'invariant « le plus récent d'abord ».
+    const rss = (i) => {
+      const pas = i === 0 ? 60 : 6;
+      const nom = i === 0 ? "L" : "B" + i;
+      return `<?xml version="1.0"?><rss version="2.0"><channel><title>S${i}</title>${Array.from(
+        { length: 15 },
+        (_, k) =>
+          `<item><title>${nom} article ${k}</title><link>https://src${i}.test/n/${k}</link>` +
+          `<description>${"texte ".repeat(20)}</description><pubDate>` +
+          `${new Date(Date.now() - (k * pas + (i === 0 ? 37 : i)) * 60e3).toUTCString()}` +
+          `</pubDate></item>`
+      ).join("")}</channel></rss>`;
+    };
+    const { browser, page, errors } = await boot({
+      storage: { ...READY, "fluxswipe.feeds.v1": JSON.stringify(feeds) },
+    });
+    await page.route(/src\d+\.test/, (r) => {
+      const u = r.request().url();
+      // /api/og?url=https://src0.test/… porte le nom d'une source dans SON
+      // paramètre : c'est une sonde de métadonnées, pas un flux. On la rend au
+      // gestionnaire général, qui sait y répondre.
+      if (/\/api\/og/.test(u)) return r.fallback();
+      const m = u.match(/src(\d+)\.test/);
+      return r
+        .fulfill({ status: 200, contentType: "application/xml", body: rss(+m[1]) })
+        .catch(() => {});
+    });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(6000);
+    const r = await page.evaluate((LENTE) => {
+      const src = items.map((i) => i.source);
+      const pos = [];
+      src.forEach((s, i) => {
+        if (s === LENTE) pos.push(i);
+      });
+      const dates = items
+        .filter((i) => i.kind !== "learn")
+        .map((i) => Date.parse(i.date) || 0);
+      return {
+        total: items.length,
+        cartes: pos.length,
+        premieres: pos.slice(0, 5),
+        tete: (items[0] || {}).title,
+        teteRecente: dates.length ? Math.max(...dates) === dates[0] : true,
+        distinctes: new Set(src.slice(0, 30)).size,
+      };
+    }, LENTE);
+    console.log(
+      `fil : ${r.total} cartes | sources distinctes dans les 30 premières : ${r.distinctes}`
+    );
+    console.log(
+      `« ${LENTE} » : ${r.cartes} cartes` +
+        (r.cartes >= 5 ? "  → plus enterrée ✓" : "  ← ENTERRÉE (régression)") +
+        ` | positions : ${r.premieres.join(", ")}`
+    );
+    console.log(
+      `carte 1 : « ${r.tete} » — l'actu la plus récente est-elle en tête ? ` +
+        (r.teteRecente ? "oui ✓" : "NON (régression)")
+    );
+    console.log("erreurs :", errors);
+    await browser.close();
+  },
+
   /* 28. OUVERTURE de l'app au-delà des 30 min, en glissant pendant que ça
      charge. Le pendant de `forcetop` (qui, lui, part d'une session déjà en
      cours) : ici le cache périmé est peint tout de suite, les DEUX moitiés

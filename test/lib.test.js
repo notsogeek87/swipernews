@@ -99,6 +99,32 @@ test("dropSeen écarte le déjà-vu mais ne tarit jamais le fil", () => {
   assert.equal(lib.dropSeen(list, allSeen).length, 2);
 });
 
+test("roundRobin alterne entre les files et laisse les autres continuer", () => {
+  // Une source bavarde et une source lente : la lente doit revenir à chaque
+  // tour, pas être noyée. C'est tout l'objet de la fonction.
+  const bavarde = ["b1", "b2", "b3", "b4", "b5"];
+  const lente = ["l1"];
+  assert.deepEqual(lib.roundRobin([bavarde, lente], [], 10), [
+    "b1",
+    "l1",
+    "b2",
+    "b3",
+    "b4",
+    "b5",
+  ]);
+  // `count` borne le résultat, et il est atteint au milieu d'un tour
+  assert.deepEqual(lib.roundRobin([bavarde, lente], [], 3), ["b1", "l1", "b2"]);
+  // Une file vide est sautée sans casser l'alternance des autres
+  assert.deepEqual(lib.roundRobin([["a1", "a2"], [], ["c1"]], [], 10), [
+    "a1",
+    "c1",
+    "a2",
+  ]);
+  // Rien à servir : ni exception, ni boucle infinie
+  assert.deepEqual(lib.roundRobin([[], []], [], 5), []);
+  assert.deepEqual(lib.roundRobin([], [], 5), []);
+});
+
 test("isPromotionalItem détecte les libellés éditoriaux standard (sponsorisé)", () => {
   assert.ok(lib.isPromotionalItem({ title: "[Sponsorisé] Une offre incroyable" }));
   assert.ok(lib.isPromotionalItem({ title: "Sponsorisé : ce produit change tout" }));

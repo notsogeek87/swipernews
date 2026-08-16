@@ -884,9 +884,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=128"></script>
-<script src="src/learn-core.js?v=128"></script>
-<script src="src/i18n.js?v=128"></script>
+<script src="src/lib.js?v=129"></script>
+<script src="src/learn-core.js?v=129"></script>
+<script src="src/i18n.js?v=129"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -894,7 +894,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","interleave","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain"],
+  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","interleave","roundRobin","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket","perCatLimit"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -988,7 +988,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,interleave,dedupNews,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,interleave,roundRobin,dedupNews,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1431,7 +1431,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="128";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="129";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2520,20 +2520,63 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
      l'utilisateur en tête EXPRÈS pour lui montrer du contenu neuf (voir
      forceTop, plus bas) : la geler aussi annulait ce but — un rafraîchissement,
      automatique ou ↻, ne changeait alors jamais l'article en tête du fil. */
+  /* ---------- Ordre des actus : à TOUR DE RÔLE entre les sources ----------
+     Le fil était un simple tri par date décroissante, et un tri par date
+     ENTERRE les sources lentes. Une source qui publie un article par heure a
+     ses dix plus récents étalés sur DIX HEURES ; une qui en publie cinquante à
+     l'heure a les siens dans un intervalle de douze minutes. Classés ensemble
+     par fraîcheur, les rapides occupent tout le haut du fil — et comme on ne
+     fait défiler que vingt ou trente cartes, on ne descend jamais jusqu'aux
+     autres. Le plafond par source (`perFeed`) n'y changeait rien : le problème
+     n'est pas COMBIEN une source livre, c'est OÙ ses articles atterrissent.
+     Vécu par l'utilisateur : « j'adore Courrier International, je ne le vois
+     quasiment jamais ».
+     C'est exactement le symptôme que `dedupAndRank` corrige déjà pour les
+     catégories Wikipédia, avec exactement le même outil (`roundRobin`,
+     src/lib.js) : une carte par file, puis on recommence. La date ne classe
+     plus qu'À L'INTÉRIEUR d'une source. À quinze sources cochées, chacune
+     revient donc toutes les quinze cartes, garanti.
+     Contrepartie ASSUMÉE : le fil n'est plus « le plus récent d'abord » de bout
+     en bout. La carte 2 peut avoir six heures pendant que la 25 en a dix
+     minutes. Ce qui est PRÉSERVÉ, parce que beaucoup de code en dépend
+     (forceTop, la reprise de lecture, les scénarios `forcetop` et `resume`) :
+     la PREMIÈRE carte reste l'article globalement le plus récent — les files
+     sont classées par la date de leur tête. */
   function rebuild(top){
+    /* Ordre d'itération STABLE : celui de `active`, jamais celui des réponses.
+       dedupNews garde la PREMIÈRE occurrence et fusionne les suivantes dedans,
+       donc l'ordre d'arrivée décidait à quelle source était attribué un article
+       publié par deux flux — et donc, maintenant, dans quelle file il tombe.
+       Avec l'ordre des réponses, sa position changeait d'une repeinture à
+       l'autre pour une raison purement réseau. */
     let all=[];
-    collected.forEach(list=>{all=all.concat(list);});
+    for(const f of active){const l=collected.get(f.url);if(l)all=all.concat(l);}
     // Sponsoring d'auteur déjà confirmé sur un chargement précédent : `collected`
     // le contient toujours (le flux RSS ne le déclare pas), c'est ici qu'il se
     // retire — sinon chaque repeinture le ramenait. Voir sponsorOut.
     if(filterSponsored&&sponsorOut.size)all=all.filter(i=>!sponsorOut.has(i.link));
     // ICI et pas par flux : c'est justement ENTRE les flux que le même article
     // se répète (le « à la une » d'un site et sa rubrique servent le même
-    // papier). Avant le tri par date, donc avant le plafond MAX_NEWS — sinon
+    // papier). Avant la mise en files, donc avant le plafond MAX_NEWS — sinon
     // les doublons mangeraient des places à des articles distincts.
     all=dedupNews(all);
-    all.sort((a,b)=>itemTime(b)-itemTime(a));
-    newsItems=all.slice(0,CONFIG.MAX_NEWS);
+    /* Une file par SOURCE, au sens du NOM affiché (`it.source`) et non de l'URL.
+       Quelqu'un qui coche cinq rubriques du même journal a coché cinq fois le
+       même nom : lui donner cinq parts reviendrait à recréer, à la main, le
+       déséquilibre qu'on est en train de corriger. Une étiquette, une part. */
+    const files=new Map();
+    for(const it of all){
+      const k=it.source||"";
+      let f=files.get(k);
+      if(!f){f=[];files.set(k,f);}
+      f.push(it);
+    }
+    const queues=[...files.values()];
+    for(const q of queues)q.sort((a,b)=>itemTime(b)-itemTime(a));
+    // Files classées par la date de leur TÊTE : la carte 1 est donc bien
+    // l'article le plus récent du fil, comme avant.
+    queues.sort((a,b)=>itemTime(b[0])-itemTime(a[0]));
+    newsItems=roundRobin(queues,[],CONFIG.MAX_NEWS);
     remix(!top);
   }
 

@@ -271,7 +271,18 @@
 
   /** Vide des files à TOUR DE RÔLE dans `out` : un élément de chacune, puis on
    *  recommence, jusqu'à `count` ou épuisement. Une file vide est simplement
-   *  sautée — les autres continuent d'alterner entre elles. */
+   *  sautée — les autres continuent d'alterner entre elles.
+   *
+   *  DEUX usages, même symptôme corrigé : les catégories d'un lot Wikipédia
+   *  (voir dedupAndRank) et les SOURCES de la moitié actus (voir rebuild dans
+   *  index.html). Dans les deux cas, l'alternative — un classement global, par
+   *  score d'image là-bas, par date ici — laissait une poignée de files
+   *  occuper tout le début et enterrait les autres.
+   *
+   *  Déterministe : le résultat ne dépend que de l'ordre des files et de leur
+   *  contenu. C'est ce qui permet de le recalculer à chaque arrivée de données
+   *  sans rebattre l'ordre déjà lu, à condition de lui passer les files dans un
+   *  ordre stable — les deux appelants s'en chargent. */
   function roundRobin(queues, out, count) {
     const pos = queues.map(() => 0);
     let servi = true;
@@ -827,6 +838,7 @@
     shuffle,
     seenKey,
     dropSeen,
+    roundRobin,
     dedupAndRank,
     dedupNews,
     canonicalLink,

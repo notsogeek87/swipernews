@@ -593,6 +593,27 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 - **Tout texte venu d'un flux est borné** (`clampText`) : un `<description>` n'a
   aucune obligation d'être un résumé, et beaucoup de flux y publient l'article
   entier — mesuré à 400 Ko de cache pour cinq articles, contre ~5 Mo de quota.
+- **L'ordre des actus est un TOUR DE RÔLE entre sources, jamais un tri par
+  date.** C'est le même correctif, avec le même outil (`roundRobin`,
+  `src/lib.js`), que pour les catégories Wikipédia juste en dessous — et contre
+  le même symptôme. Un tri par date ENTERRE les sources lentes : une source à
+  1 article/h a ses dix plus récents étalés sur dix heures, une à 50/h les a sur
+  douze minutes ; classés ensemble par fraîcheur, les bavardes occupent tout le
+  haut du fil, et on ne descend jamais jusqu'aux autres. Le plafond par source
+  (`perFeed`) n'y changeait rien — le problème n'est pas COMBIEN une source
+  livre, c'est OÙ ses articles atterrissent. Mesuré (scénario `equite`) : une
+  source lente parmi quatorze bavardes obtenait UNE carte sur 120, en position
+  94. Elle en obtient huit, la première en position 18.
+  Deux détails à ne pas défaire :
+  - la date ne classe plus qu'À L'INTÉRIEUR d'une file, et les files sont
+    classées par la date de leur TÊTE — c'est ce qui garde la carte 1 sur
+    l'actu la plus récente, règle dont dépendent `forceTop`, la reprise de
+    lecture, `forcetop` et `resume` ;
+  - une file par NOM de source (`it.source`), pas par URL. Cocher cinq
+    rubriques du même journal ne doit pas donner cinq parts : ce serait
+    recréer à la main le déséquilibre qu'on corrige.
+  Contrepartie assumée : le fil n'est plus « le plus récent d'abord » de bout en
+  bout — la carte 2 peut avoir six heures pendant que la 25 en a dix.
 - **Dans un lot Wikipédia, la catégorie prime sur l'image.** `dedupAndRank`
   (`src/lib.js`) sert les catégories À TOUR DE RÔLE, une carte chacune ; le tri
   « avec image d'abord » ne joue plus qu'À L'INTÉRIEUR d'une catégorie. Le
@@ -796,7 +817,7 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 
 `npm test` ne voit que `src/` et `api/` : **tout le JS en ligne d'`index.html`
 — le fil, l'état, le stockage local — n'est couvert par aucun test**. Ce banc
-comble le trou en jouant 28 scénarios réels dans Chromium, réseau entièrement
+comble le trou en jouant 29 scénarios réels dans Chromium, réseau entièrement
 simulé (rien ne part vers une vraie source) : hors-ligne, réseau lent, coupure en
 cours de requête, API en 500, RSS vide/tronqué/HTML, contenu démesuré, doublons,
 120 sources, stockage et cache abîmés, quota saturé, actions enchaînées, retour
@@ -813,6 +834,11 @@ jalons que rien ne séparait avant — le moment où le fil AFFICHÉ devient neu
 Il vérifie aussi que le budget ne coûte RIEN en contenu : 120 actus retenues,
 comme sans lui. Repères actuels : 2,6 s / 13,8 s, contre 24,6 s pour les deux
 avant l'échéance.
+
+`equite` mesure la place laissée à une source LENTE parmi des sources bavardes :
+15 sources dont une à 1 article/h, et il vérifie les deux moitiés de la règle —
+la lente revient régulièrement ET la carte 1 reste l'actu la plus récente.
+Repères : 1 carte sur 120 (en position 94) avant le tour de rôle, 8 après.
 
 `teteouverture` est le pendant de `forcetop` pour l'OUVERTURE à froid : cache
 périmé peint tout de suite, les deux moitiés qui repartent, et l'utilisateur qui

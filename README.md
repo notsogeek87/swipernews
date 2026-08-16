@@ -392,6 +392,8 @@ Un export Feedly peut contenir plusieurs centaines de flux. Trois garde-fous :
 - **part maximale par source** = `MAX_NEWS / nombre de sources`, avec un minimum
   de 10. Avec peu de sources il n'y a donc aucune limite pratique ; avec des
   centaines, aucune ne peut occuper tout le fil ;
+- **tour de rôle entre les sources** : une carte par source, puis on recommence.
+  La date ne classe plus qu'à l'intérieur d'une source (voir ci-dessous) ;
 - **repeinture groupée** : le fil n'est pas reconstruit à chaque source qui répond.
   Avec 40 sources cela faisait 40 reconstructions en quelques secondes, et comme
   le fil est trié par date, chaque source insérait ses articles au milieu — les
@@ -422,6 +424,33 @@ la seconde au moment où la barre de chargement s'éteignait.
 Pendant qu'un chargement se poursuit en arrière-plan, une fine barre en haut de
 l'écran l'indique. Elle ne bloque rien : le fil déjà affiché reste lisible — et depuis
 l'échéance, ce fil est déjà le fil neuf.
+
+### Pourquoi le fil n'est pas simplement trié par date
+
+Parce qu'un tri par date **enterre les sources lentes**. Une source qui publie un
+article par heure a ses dix plus récents étalés sur dix heures ; une qui en publie
+cinquante à l'heure a les siens dans un intervalle de douze minutes. Classés ensemble
+par fraîcheur, les bavardes occupent tout le haut du fil — et comme on ne fait défiler
+que vingt ou trente cartes, on ne descend jamais jusqu'aux autres. Le plafond par
+source n'y change rien : le problème n'est pas *combien* une source livre, c'est *où*
+ses articles atterrissent.
+
+Les sources sont donc servies **à tour de rôle**, une carte chacune, et la date ne
+classe plus qu'**à l'intérieur** d'une source. C'est exactement ce que fait déjà le
+mode Wikipédia pour ses catégories, avec le même code. Mesuré sur 15 sources dont une
+à un article par heure : elle obtenait **une** carte sur 120, en position 94 — elle en
+obtient **huit**, la première en position 18.
+
+Deux garde-fous :
+
+- **la première carte reste l'article le plus récent** du fil : les sources sont
+  départagées par la date de leur article de tête. C'est la règle à laquelle tient
+  tout le comportement de rafraîchissement ;
+- **une part par nom de source**, pas par URL. Cocher cinq rubriques du même journal
+  ne donne pas cinq parts — ce serait recréer à la main le déséquilibre qu'on corrige.
+
+Contrepartie assumée : le fil n'est plus « le plus récent d'abord » de bout en bout.
+La deuxième carte peut avoir six heures pendant que la vingt-cinquième en a dix.
 
 Les articles datés **dans le futur** de plus de deux jours (agendas de concerts,
 annonces de festivals) sont classés en fin de fil comme les articles sans date :
