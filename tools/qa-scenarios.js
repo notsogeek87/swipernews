@@ -110,20 +110,31 @@ const READY = {
   "fluxswipe.lang.v1": "fr",
 };
 
+/* Identifiant de chaîne dans sa forme réelle (UC + 22 caractères) : c'est LUI
+   qui permet de dériver la playlist « Shorts » (UUSH + les 22 caractères). Un
+   identifiant fantaisiste ne serait pas réécrit, et le scénario `video`
+   mesurerait alors le flux de la chaîne entière — exactement ce qu'on ne veut
+   plus servir. */
+const YT_CHAN = "sT0YIqwnpJCM-mx7-gSA4Q";
 /* Flux d'une chaîne YouTube, dans la forme RÉELLE que sert
-   youtube.com/feeds/videos.xml?channel_id=… : de l'Atom, où le lien est un
+   youtube.com/feeds/videos.xml?playlist_id=UUSH… : de l'Atom, où le lien est un
    attribut `href` (et non du texte), la vignette vit dans un <media:group>, et
    le <media:content> est une pièce jointe vidéo qu'il ne faut PAS prendre pour
-   une image. Les identifiants font 11 caractères, comme les vrais. */
+   une image. Les identifiants font 11 caractères, comme les vrais.
+   Le <title> du flux est celui de la PLAYLIST auto-générée, pas celui de la
+   chaîne : le nom de la chaîne n'est porté que par l'auteur des entrées, d'où
+   les deux ici — servir « YT · Shorts » à toutes les chaînes ramènerait le
+   défaut que youtubeFeedName corrige. */
 const RSS_YT = `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns:yt="http://www.youtube.com/xml/schemas/2015"
       xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
-<title>Une chaîne</title>
+<title>Shorts</title>
 ${Array.from({ length: 8 }, (_, i) => {
   const id = "vIdeO00000" + i; // 11 caractères
   return `<entry><id>yt:video:${id}</id><yt:videoId>${id}</yt:videoId>
   <title>Vidéo ${i}</title>
   <link rel="alternate" href="https://www.youtube.com/watch?v=${id}"/>
+  <author><name>Une chaîne</name><uri>https://www.youtube.com/channel/UC${YT_CHAN}</uri></author>
   <published>${new Date(Date.now() - i * 3600e3).toISOString()}</published>
   <media:group>
     <media:title>Vidéo ${i}</media:title>
@@ -873,7 +884,7 @@ const scenarios = {
     await page.waitForTimeout(200);
     const lu = await page.evaluate(() => (currentItem() || {}).title || "—");
     // Puis le lot Wikipédia arrive, bien après.
-    await page.waitForTimeout(6000);
+    await page.waitForTimeout(3500);
     const apresWiki = await page.evaluate(() => ({
       idx: currentIndex(),
       titre: (currentItem() || {}).title || "—",
@@ -1608,7 +1619,7 @@ const scenarios = {
         .catch(() => {});
     });
     await page.goto(URL_APP);
-    await page.waitForTimeout(6000);
+    await page.waitForTimeout(3500);
     const r = await page.evaluate((LENTE) => {
       const src = items.map((i) => i.source);
       const pos = [];
@@ -1921,12 +1932,19 @@ const scenarios = {
   //      C'est le défaut mesuré là-bas : une invocation serverless PAR CARTE ;
   //   c) il ne doit JAMAIS y avoir deux lecteurs vivants, quoi qu'on fasse ;
   //   d) déplacer une carte qui joue recharge son iframe (autoplay=1 ⇒ la vidéo
-  //      repartirait de zéro toute seule) — render() doit donc l'arrêter avant.
+  //      repartirait de zéro toute seule) — render() doit donc l'arrêter avant ;
+  //   e) une chaîne est interrogée sur sa playlist « Shorts » (UUSH…), jamais
+  //      sur channel_id : c'est la SEULE façon de n'avoir que des Shorts, rien
+  //      dans l'Atom ne distinguant un Short d'une vidéo classique. L'URL
+  //      ENREGISTRÉE, elle, ne doit pas bouger.
   async video() {
     const feeds = [
       {
-        name: "Une chaîne",
-        url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC1",
+        // Nom d'hôte, comme après un ajout manuel : le vrai nom doit être
+        // appris DANS le flux (ici sur l'auteur des entrées, le <title> étant
+        // celui de la playlist auto-générée).
+        name: "youtube.com",
+        url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC" + YT_CHAN,
         on: true,
       },
     ];
@@ -1939,11 +1957,14 @@ const scenarios = {
       rss: RSS_YT,
     });
     // Ce que le banc doit compter lui-même : les requêtes réellement parties.
-    const calls = { og: 0, player: 0 };
+    const calls = { og: 0, player: 0, flux: [] };
     page.on("request", (r) => {
       const u = r.url();
       if (/api\/og/.test(u)) calls.og++;
       if (/youtube-nocookie\.com|youtube\.com\/embed/.test(u)) calls.player++;
+      // Le flux passe par le proxy : la vraie cible est dans son paramètre.
+      const m = /api\/feed\?url=([^&]+)/.exec(u);
+      if (m) calls.flux.push(decodeURIComponent(m[1]));
     });
     await page.goto(URL_APP);
     await page.waitForTimeout(2500);
@@ -1994,6 +2015,14 @@ const scenarios = {
       JSON.stringify(carte.enregistre),
       " puces :",
       JSON.stringify(carte.pucesFiltre)
+    );
+    console.log(
+      "flux interrogés (attendu : playlist_id=UUSH…, jamais channel_id) :",
+      JSON.stringify(calls.flux)
+    );
+    console.log(
+      "URL ENREGISTRÉE inchangée (attendu : channel_id=UC…) :",
+      await page.evaluate(() => feeds[0] && feeds[0].url)
     );
     console.log("/api/og partis (attendu : 0) :", calls.og);
     console.log("lecteurs chargés AVANT tout appui (attendu : 0) :", calls.player);
@@ -2090,6 +2119,107 @@ const scenarios = {
       "lecteurs chargés au total :",
       calls.player,
       "(attendu : 2, un par appui)"
+    );
+    console.log("erreurs :", errors);
+    await browser.close();
+  },
+
+  // 29. Chaîne YouTube SANS aucun Short : servir les Shorts seuls rend son flux
+  // légitimement vide, et un flux vide ressemble à une panne. Trois choses à
+  // vérifier, aucune visible en lecture de code :
+  //   a) elle n'est pas annoncée « injoignable » — ce serait désigner à la
+  //      suppression une source qui répond parfaitement ;
+  //   b) elle ne déclenche PAS le repli rss2json (une requête tierce par
+  //      chargement et par chaîne, qui ne trouverait rien de plus) ;
+  //   c) une source vraiment morte, elle, continue d'être signalée.
+  // Les `CONSOLE: net::ERR_CONNECTION_REFUSED` sont le sujet du (c), pas une
+  // régression — la source morte l'est pour de bon, comme dans `offline`.
+  async shortsvide() {
+    const feeds = [
+      {
+        name: "YT · Sans Shorts",
+        url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC" + YT_CHAN,
+        on: true,
+      },
+      { name: "Actus", url: "https://src1.test/rss", on: true },
+      { name: "Morte", url: "https://src9.test/rss", on: true },
+    ];
+    const { browser, page, errors } = await boot({
+      storage: {
+        ...READY,
+        "fluxswipe.feeds.v1": JSON.stringify(feeds),
+        "fluxswipe.mix.v1": "0", // actus seules : le fil ne tient qu'à elles
+      },
+    });
+    const calls = { rss2json: 0, flux: [] };
+    page.on("request", (r) => {
+      const u = r.url();
+      if (/rss2json/.test(u)) calls.rss2json++;
+      const m = /api\/feed\?url=([^&]+)/.exec(u);
+      if (m) calls.flux.push(decodeURIComponent(m[1]));
+    });
+    /* Sur le web, un flux part par le proxy : sa vraie cible est un paramètre
+       ENCODÉ de l'URL demandée (`/api/feed?url=…`). Filtrer sur l'URL brute
+       laisserait donc passer tout ce qui contient un `/` encodé — d'où le
+       fourre-tout, qui décode la cible et rend la main (`fallback`) pour tout
+       ce qui ne le concerne pas. */
+    await page.route("**/*", async (r) => {
+      const brute = r.request().url();
+      const m = /api\/feed\?url=([^&]+)/.exec(brute);
+      const u = m ? decodeURIComponent(m[1]) : brute;
+      // Playlist « Shorts » d'une chaîne qui n'en publie aucun : YouTube répond
+      // 200 avec un Atom parfaitement valide, simplement sans <entry>. L'en-tête
+      // est repris de la vraie réponse — un corps riquiqui serait tenu pour vide
+      // par le proxy (voir fetchViaProxy et son plancher de 200 caractères), et
+      // le scénario mesurerait un échec de transport au lieu d'un flux vide.
+      if (/UUSH/.test(u))
+        return r
+          .fulfill({
+            status: 200,
+            contentType: "application/xml",
+            body: `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015"
+      xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+ <link rel="self" href="http://www.youtube.com/feeds/videos.xml?playlist_id=UUSH${YT_CHAN}"/>
+ <id>yt:playlist:UUSH${YT_CHAN}</id>
+ <yt:playlistId>UUSH${YT_CHAN}</yt:playlistId>
+ <title>Shorts</title>
+ <link rel="alternate" href="https://www.youtube.com/playlist?list=UUSH${YT_CHAN}"/>
+ <author><name>Sans Shorts</name><uri>https://www.youtube.com/channel/UC${YT_CHAN}</uri></author>
+ <published>${new Date(Date.now() - 300 * 24 * 3600e3).toISOString()}</published>
+</feed>`,
+          })
+          .catch(() => {});
+      if (/src9\.test/.test(u)) return r.abort("connectionrefused").catch(() => {});
+      if (/rss2json/.test(u))
+        return r.fulfill({ status: 502, body: "{}" }).catch(() => {});
+      return r.fallback();
+    });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(3500);
+
+    console.log("flux interrogés :", JSON.stringify(calls.flux));
+    console.log(
+      "cartes :",
+      await page.evaluate(() => document.querySelectorAll(".card").length),
+      "— d'où (attendu : les actus seules) :",
+      JSON.stringify(
+        await page.evaluate(() => [
+          ...new Set(items.map((it) => it.kind + ":" + it.source)),
+        ])
+      )
+    );
+    console.log(
+      "appels rss2json (attendu : 1, la source morte — jamais la chaîne) :",
+      calls.rss2json
+    );
+    console.log(
+      "sources marquées injoignables (attendu : la morte seule) :",
+      await page.evaluate(() => [...unreachable])
+    );
+    console.log(
+      "toast :",
+      await page.$eval("#toast", (e) => e.classList.contains("show") && e.textContent)
     );
     console.log("erreurs :", errors);
     await browser.close();

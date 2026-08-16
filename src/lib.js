@@ -589,6 +589,74 @@
     }
   }
 
+  /* ---------- Shorts seuls ----------
+     Le flux d'une chaîne (`channel_id=UC…`) mélange Shorts, vidéos classiques
+     et directs, et RIEN dans l'Atom ne dit ce qu'est une entrée : ni durée, ni
+     catégorie, ni format de vignette (les Shorts ont le même `hqdefault.jpg`
+     en 480×360, la vidéo verticale posée au milieu). Trier après coup
+     demanderait donc d'interroger la page de CHAQUE vidéo — une requête par
+     carte croisée, ce que l'app refuse par principe.
+     YouTube expose heureusement le tri lui-même : toute chaîne a des playlists
+     AUTO-GÉNÉRÉES, une par nature de vidéo, dont l'identifiant est celui de la
+     chaîne privé de son préfixe `UC` — `UU…` tout, `UULF…` les vidéos
+     classiques, `UULV…` les directs, `UUSH…` les Shorts. Elles s'interrogent
+     comme n'importe quelle playlist, sur le même point d'entrée
+     (`videos.xml?playlist_id=…`), donc sans clé d'API ni requête de plus.
+     Ces préfixes ne sont pas documentés par YouTube : s'ils disparaissaient, la
+     source ne rendrait plus rien (flux vide ou 404) — jamais un fil rempli de
+     vidéos classiques, ce qui est le bon côté pour tomber. */
+
+  /** Identifiant de playlist auto-générée d'une chaîne : le préfixe, puis les
+   *  22 caractères de l'identifiant de chaîne. */
+  const YT_AUTO_PLAYLIST_RE = /^UU(?:LF|LV|SH|PS|MS|MF|LP)?([A-Za-z0-9_-]{22})$/;
+  /** Identifiant de chaîne, dans sa forme canonique (`UC` + 22 caractères). */
+  const YT_CHANNEL_RE = /^UC([A-Za-z0-9_-]{22})$/;
+
+  /**
+   * URL à interroger RÉELLEMENT pour une source YouTube : celle de sa playlist
+   * « Shorts », dérivée de l'identifiant de chaîne (ou de n'importe quelle
+   * autre playlist auto-générée de la même chaîne).
+   *
+   * Tout le reste est rendu tel quel — un flux qui n'est pas YouTube, et une
+   * playlist CHOISIE (`PL…`, `OL…`), dont il n'existe aucune variante Shorts :
+   * l'utilisateur a désigné cette playlist-là, on ne la remplace pas par une
+   * autre. L'URL ENREGISTRÉE, elle, ne bouge jamais (voir `urlDuFlux` dans
+   * index.html) : la substitution a lieu au moment de la requête, donc rien à
+   * migrer dans le stockage, et un OPML exporté reste celui qu'on a importé.
+   */
+  function youtubeShortsFeedUrl(url) {
+    const s = String(url == null ? "" : url);
+    if (!isYoutubeFeedUrl(s)) return s;
+    let u;
+    try {
+      u = new URL(s);
+    } catch (_) {
+      return s;
+    }
+    const ch = u.searchParams.get("channel_id") || "";
+    const pl = u.searchParams.get("playlist_id") || "";
+    const m = ch ? ch.match(YT_CHANNEL_RE) : pl.match(YT_AUTO_PLAYLIST_RE);
+    if (!m) return s;
+    u.searchParams.delete("channel_id");
+    u.searchParams.set("playlist_id", "UUSH" + m[1]);
+    return u.toString();
+  }
+
+  /** Vrai pour l'URL d'un flux de playlist « Shorts » (voir
+   *  `youtubeShortsFeedUrl`). Question posée SÉPARÉMENT de la réécriture : un
+   *  lot vide y est un résultat normal (une chaîne peut n'avoir aucun Short),
+   *  jamais une source injoignable. */
+  function isYoutubeShortsFeedUrl(url) {
+    const s = String(url == null ? "" : url);
+    if (!isYoutubeFeedUrl(s)) return false;
+    try {
+      const pl = new URL(s).searchParams.get("playlist_id") || "";
+      return /^UUSH[A-Za-z0-9_-]{22}$/.test(pl);
+    } catch (_) {
+      return false;
+    }
+  }
+
   /**
    * Étiquette d'une source YouTube : « YT · <nom de la chaîne> ».
    *
@@ -973,6 +1041,8 @@
     canonicalLink,
     youtubeId,
     isYoutubeFeedUrl,
+    youtubeShortsFeedUrl,
+    isYoutubeShortsFeedUrl,
     youtubeFeedName,
     feedDiscriminator,
     feedLabels,

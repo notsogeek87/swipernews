@@ -462,6 +462,70 @@ test("isYoutubeFeedUrl reconnaît l'URL d'un flux de chaîne, pas une vidéo", (
   assert.ok(!lib.isYoutubeFeedUrl(""));
 });
 
+test("youtubeShortsFeedUrl vise la playlist « Shorts » de la chaîne", () => {
+  const CH = "sT0YIqwnpJCM-mx7-gSA4Q"; // 22 caractères, comme un vrai identifiant
+  // Le cas ordinaire : un flux de chaîne devient le flux de ses Shorts seuls.
+  assert.equal(
+    lib.youtubeShortsFeedUrl(
+      "https://www.youtube.com/feeds/videos.xml?channel_id=UC" + CH
+    ),
+    "https://www.youtube.com/feeds/videos.xml?playlist_id=UUSH" + CH
+  );
+  // Les autres playlists auto-générées de la MÊME chaîne mènent à la sienne.
+  for (const p of ["UU", "UULF", "UULV", "UUSH"]) {
+    assert.equal(
+      lib.youtubeShortsFeedUrl(
+        "https://www.youtube.com/feeds/videos.xml?playlist_id=" + p + CH
+      ),
+      "https://www.youtube.com/feeds/videos.xml?playlist_id=UUSH" + CH
+    );
+  }
+  // Rendu tel quel : une playlist CHOISIE (aucune variante Shorts n'existe),
+  // un identifiant qui n'a pas la forme d'un vrai, et tout ce qui n'est pas
+  // un flux YouTube.
+  const garder = [
+    "https://www.youtube.com/feeds/videos.xml?playlist_id=PLabcdef",
+    "https://www.youtube.com/feeds/videos.xml?channel_id=UC1",
+    "https://www.youtube.com/feeds/videos.xml",
+    "https://lemonde.fr/rss/une.xml",
+    "https://www.youtube.com/watch?v=" + YT,
+    "pas une url",
+    "",
+  ];
+  for (const u of garder) assert.equal(lib.youtubeShortsFeedUrl(u), u);
+  assert.equal(lib.youtubeShortsFeedUrl(null), "");
+});
+
+test("isYoutubeShortsFeedUrl reconnaît un flux de Shorts, et lui seul", () => {
+  const CH = "sT0YIqwnpJCM-mx7-gSA4Q";
+  assert.ok(
+    lib.isYoutubeShortsFeedUrl(
+      "https://www.youtube.com/feeds/videos.xml?playlist_id=UUSH" + CH
+    )
+  );
+  assert.ok(
+    !lib.isYoutubeShortsFeedUrl(
+      "https://www.youtube.com/feeds/videos.xml?playlist_id=UULF" + CH
+    )
+  );
+  assert.ok(
+    !lib.isYoutubeShortsFeedUrl(
+      "https://www.youtube.com/feeds/videos.xml?channel_id=UC" + CH
+    )
+  );
+  assert.ok(!lib.isYoutubeShortsFeedUrl("https://lemonde.fr/rss/une.xml"));
+  assert.ok(!lib.isYoutubeShortsFeedUrl(""));
+  // Ce que la réécriture produit est toujours reconnu : les deux ne peuvent
+  // pas diverger (nommage de la chaîne, lot vide toléré).
+  assert.ok(
+    lib.isYoutubeShortsFeedUrl(
+      lib.youtubeShortsFeedUrl(
+        "https://www.youtube.com/feeds/videos.xml?channel_id=UC" + CH
+      )
+    )
+  );
+});
+
 test("youtubeFeedName préfixe la chaîne, et ne se préfixe jamais deux fois", () => {
   // Sans ça, toutes les chaînes s'appellent « youtube.com » : l'URL d'un flux
   // YouTube ne contient qu'un channel_id opaque.

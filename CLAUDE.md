@@ -382,6 +382,15 @@ genre de script dérape.
   est concaténé dans l'`src` sans échappement, ce qui n'est légitime QUE parce
   que `youtubeId` ne rend rien d'autre que `[A-Za-z0-9_-]{11}` — même rôle que
   `oneOf()` côté natif. Scénario `video`.
+- `urlDuFlux()` / `fluxShorts()` — l'URL réellement INTERROGÉE pour une source.
+  Elle ne diffère de l'URL enregistrée que pour une chaîne YouTube, dont on
+  interroge la playlist « Shorts » (`youtubeShortsFeedUrl`, `src/lib.js`, testée).
+  Point de substitution UNIQUE, au moment de la requête : `feed.url` reste ce que
+  l'utilisateur a ajouté ou importé, donc rien à migrer et un OPML exporté reste
+  celui qu'on a importé. `fluxShorts()` pose la question séparément, parce que
+  DEUX endroits doivent tolérer un lot vide de la part d'une chaîne sans Short —
+  `fetchFeedRobust` (ne pas payer le repli rss2json) et `pump` (ne pas l'annoncer
+  « injoignable »). Scénarios `video` et `shortsvide`.
 - `titreDuFlux()` / `nomDeSource()` / `adopteNomDeSource()` — le nom d'une chaîne
   YouTube. Son URL ne contient qu'un `channel_id` OPAQUE, donc `addFeed` ne
   savait la nommer que `hostOf()` — « youtube.com », pour toutes : trois lignes
@@ -392,7 +401,13 @@ genre de script dérape.
   pas laisser « youtube.com » à l'écran jusqu'au chargement suivant. Le
   sélecteur est `feed > title, channel > title` — ENFANT DIRECT, sinon on
   ramasse le titre du premier article (ou le `<media:title>` de son
-  `<media:group>`). Effet de bord voulu : le tour de rôle des actus regroupe par
+  `<media:group>`). Depuis les Shorts seuls, ce n'est plus le flux d'une CHAÎNE
+  qu'on interroge mais celui d'une PLAYLIST auto-générée, dont le `<title>` est
+  celui de la playlist (« Shorts », le même pour toutes les chaînes) : d'où le
+  second argument de `titreDuFlux`, qui prend alors `feed > entry > author >
+  name` — le seul endroit du flux où vit le nom de la chaîne. Sans lui, toutes
+  les chaînes s'appelleraient « YT · Shorts », soit exactement le défaut qu'on
+  avait corrigé. Effet de bord voulu : le tour de rôle des actus regroupe par
   `it.source`, donc cinq chaînes suivies ont maintenant cinq parts au lieu
   d'une seule partagée sous « youtube.com ».
 - `persistFeeds()` vs `save()` — `save()` pose `feedsDirty` et re-rend les
@@ -688,6 +703,33 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   place en tête de la file de sa chaîne et revient à chaque rafraîchissement —
   c'est précisément le sens de « pas encore regardée », et c'est l'inverse du
   défaut corrigé juste au-dessus pour les actus. Scénario `video`.
+- **D'une chaîne YouTube, on ne sert QUE les Shorts** — et le tri est fait par
+  YouTube, jamais par nous. Rien dans l'Atom d'une chaîne ne distingue un Short
+  d'une vidéo classique : pas de durée, pas de catégorie, et la même vignette
+  `hqdefault.jpg` en 480×360 (la vidéo verticale posée au milieu). Trier après
+  coup demanderait donc d'interroger la page de CHAQUE vidéo — une requête par
+  carte croisée, ce que « aucun appel à un tiers non choisi » interdit. Toute
+  chaîne a heureusement des playlists AUTO-GÉNÉRÉES, une par nature de vidéo,
+  dont l'identifiant est celui de la chaîne privé de son `UC` : `UUSH…` les
+  Shorts, `UULF…` les vidéos classiques, `UULV…` les directs. Elles s'interrogent
+  sur le MÊME point d'entrée (`videos.xml?playlist_id=…`), donc sans requête de
+  plus ni clé d'API. Trois points à ne pas défaire :
+  - la substitution vit dans `urlDuFlux()`, au moment de la REQUÊTE — jamais
+    dans le stockage. Réécrire `feed.url` demanderait une migration, changerait
+    l'OPML exporté, et rendrait le choix irréversible ;
+  - une playlist CHOISIE (`PL…`) est laissée telle quelle : il n'en existe
+    aucune variante Shorts, et l'utilisateur a désigné celle-là ;
+  - ces préfixes ne sont pas documentés par YouTube. S'ils disparaissaient, la
+    source ne rendrait plus rien — jamais un fil rempli de vidéos classiques,
+    ce qui est le bon côté pour tomber. Un flux VIDE est donc un résultat
+    normal ici (chaîne sans Short) : ni repli rss2json, ni « injoignable »,
+    voir `fluxShorts()`.
+  Limite connue et assumée : si YouTube répond 404 au lieu d'un flux vide pour
+  une chaîne sans aucun Short, elle retombe sur le chemin ordinaire et sera
+  annoncée « injoignable ». Distinguer les deux demanderait de faire remonter
+  le code HTTP à travers les six transports de `fetchText`, ce qui ne vaut pas
+  ce cas — et ne coûte qu'un message inexact sur une source qui, de toute
+  façon, ne servira aucune carte.
 - **Une carte vidéo est une FAÇADE tant qu'on n'a pas appuyé sur ▶.** Miniature du
   flux + bouton ; l'iframe n'est créée qu'au toucher, et rien n'est demandé à
   Google pour une carte simplement croisée. Passer en lecture automatique (à la
@@ -928,7 +970,7 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 
 `npm test` ne voit que `src/` et `api/` : **tout le JS en ligne d'`index.html`
 — le fil, l'état, le stockage local — n'est couvert par aucun test**. Ce banc
-comble le trou en jouant 31 scénarios réels dans Chromium, réseau entièrement
+comble le trou en jouant 32 scénarios réels dans Chromium, réseau entièrement
 simulé (rien ne part vers une vraie source) : hors-ligne, réseau lent, coupure en
 cours de requête, API en 500, RSS vide/tronqué/HTML, contenu démesuré, doublons,
 120 sources, stockage et cache abîmés, quota saturé, actions enchaînées, retour
@@ -957,11 +999,23 @@ mémoire des actus, 4 avec — et zéro redite d'actu.
 
 `video` joue un flux Atom de chaîne YouTube (avec son `<media:group>`, et un
 `media:content` en pièce jointe vidéo qu'il ne faut pas prendre pour une image) et
-vérifie quatre choses qui ne se lisent pas dans le code : que le lien et la
+vérifie cinq choses qui ne se lisent pas dans le code : que le lien et la
 vignette sortent vraiment du parsing, que ZÉRO `/api/og` part sur ces cartes, qu'il
-n'y a jamais deux lecteurs vivants, et que `render()` distingue une carte
-DÉPLACÉE (arrêt) d'un lot simplement INSÉRÉ devant (la lecture continue). Le banc
-route `youtube-nocookie.com` vers une page inerte : rien ne part vers Google.
+n'y a jamais deux lecteurs vivants, que `render()` distingue une carte
+DÉPLACÉE (arrêt) d'un lot simplement INSÉRÉ devant (la lecture continue), et que
+l'URL RÉELLEMENT interrogée est la playlist `UUSH…` (Shorts seuls) pendant que
+l'URL enregistrée garde son `channel_id`. Le banc route `youtube-nocookie.com`
+vers une page inerte : rien ne part vers Google. Son identifiant de chaîne a la
+forme d'un vrai (`UC` + 22 caractères) — un identifiant fantaisiste ne serait pas
+réécrit, et le scénario mesurerait le flux de la chaîne entière.
+
+`shortsvide` en est le pendant : une chaîne qui ne publie AUCUN Short. Son flux
+répond parfaitement, mais vide — et un flux vide ressemble à une panne. Il
+vérifie qu'elle n'est pas annoncée « injoignable », qu'elle ne déclenche pas le
+repli rss2json (une requête tierce par chargement et par chaîne, pour rien),
+pendant qu'une source vraiment morte, elle, continue d'être signalée. Ses
+`net::ERR_CONNECTION_REFUSED` sont le sujet du troisième point, pas une
+régression.
 
 `teteouverture` est le pendant de `forcetop` pour l'OUVERTURE à froid : cache
 périmé peint tout de suite, les deux moitiés qui repartent, et l'utilisateur qui

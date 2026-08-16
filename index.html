@@ -906,9 +906,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=134"></script>
-<script src="src/learn-core.js?v=134"></script>
-<script src="src/i18n.js?v=134"></script>
+<script src="src/lib.js?v=135"></script>
+<script src="src/learn-core.js?v=135"></script>
+<script src="src/i18n.js?v=135"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -916,7 +916,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","interleave","roundRobin","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeFeedName"],
+  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","interleave","roundRobin","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeShortsFeedUrl","isYoutubeShortsFeedUrl","youtubeFeedName"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket","perCatLimit"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -1015,7 +1015,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,interleave,roundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,interleave,roundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1519,7 +1519,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="134";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="135";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1918,9 +1918,24 @@ async function fetchText(url,reste){
    publie moins de dix — pour qu'une étiquette « Sponsorisé » en fin de liste ne
    puisse pas se faire couper et désarmer le filtre. */
 const TITLE_MAX=300,TAGS_MAX=600;
+/* URL réellement interrogée pour une source. Elle ne diffère de l'URL
+   ENREGISTRÉE que pour une chaîne YouTube, dont on interroge la playlist
+   « Shorts » plutôt que la chaîne entière (voir youtubeShortsFeedUrl,
+   src/lib.js) : le fil ne montre que des Shorts, jamais les vidéos classiques.
+   La substitution a lieu ICI, au moment de la requête, et nulle part ailleurs :
+   `feed.url` reste ce que l'utilisateur a ajouté ou importé — donc rien à
+   migrer dans le stockage, l'OPML exporté est celui qu'on a importé, et revenir
+   sur ce choix ne demanderait que de retirer cette ligne. */
+function urlDuFlux(feed){return youtubeShortsFeedUrl(feed&&feed.url||"");}
+/* Vrai quand la source est servie en Shorts seuls. Une chaîne peut n'en publier
+   AUCUN : son flux répond alors normalement, mais vide — un résultat juste, pas
+   une panne. D'où les deux exceptions que porte cette question : ne pas
+   dépenser le repli rss2json (fetchFeedRobust), et ne pas annoncer la source
+   « injoignable » (pump). */
+function fluxShorts(feed){return isYoutubeShortsFeedUrl(urlDuFlux(feed));}
 /* rss2json : service dédié qui parse le flux côté serveur et renvoie du JSON (CORS ok) */
 async function fetchFeedRss2Json(feed,timeout=7000){
-  const api="https://api.rss2json.com/v1/api.json?count=60&rss_url="+encodeURIComponent(feed.url);
+  const api="https://api.rss2json.com/v1/api.json?count=60&rss_url="+encodeURIComponent(urlDuFlux(feed));
   const res=await fetchWithTimeout(api,{cache:"no-store"},timeout);
   if(!res.ok)throw new Error("http");
   const data=await res.json();
@@ -1928,7 +1943,7 @@ async function fetchFeedRss2Json(feed,timeout=7000){
   // Même règle que le chemin XML : une chaîne YouTube prend le nom qu'elle
   // annonce, sinon les deux transports afficheraient deux noms différents pour
   // la MÊME source selon lequel a répondu.
-  const source=nomDeSource(feed,(data.feed&&data.feed.title)||"");
+  const source=nomDeSource(feed,(fluxShorts(feed)&&(data.items[0]&&data.items[0].author||"").trim())||(data.feed&&data.feed.title)||"");
   return data.items.map(it=>({
     source,title:clampText((it.title||"").trim(),TITLE_MAX),
     desc:clampText(stripHtml(it.description||it.content||"")),link:it.link||"",
@@ -1954,9 +1969,13 @@ async function fetchFeedRss2Json(feed,timeout=7000){
 async function fetchFeedRobust(feed){
   const fin=Date.now()+CONFIG.FEED_BUDGET_MS;
   const reste=()=>Math.max(0,fin-Date.now());
-  let a;
-  try{a=await fetchFeed(feed,reste);}catch(e){/* repli rss2json */}
-  if(!a||!a.length){
+  let a,parse=false;
+  try{a=await fetchFeed(feed,reste);parse=true;}catch(e){/* repli rss2json */}
+  /* Un flux de Shorts qui a été PARSÉ et ne rend rien est un résultat juste :
+     la chaîne n'a pas de Short. Le repli rss2json n'y trouverait rien de plus,
+     et le payer à chaque chargement pour chaque chaîne sans Short serait une
+     requête tierce inutile par source et par rafraîchissement. */
+  if((!a||!a.length)&&!(parse&&fluxShorts(feed))){
     if(!reste())throw new Error("budget");
     a=await fetchFeedRss2Json(feed,Math.min(7000,reste()));
   }
@@ -1968,8 +1987,18 @@ async function fetchFeedRobust(feed){
    <media:title> de son <media:group>).
    Utilisé UNIQUEMENT pour les chaînes YouTube (voir nomDeSource) : partout
    ailleurs, le nom affiché reste celui que l'utilisateur a enregistré, qu'il
-   l'ait choisi, importé d'un OPML ou laissé au nom d'hôte. */
-function titreDuFlux(doc){
+   l'ait choisi, importé d'un OPML ou laissé au nom d'hôte.
+   `chaine` : on interroge une playlist « Shorts » (voir urlDuFlux), dont le
+   <title> est celui de la PLAYLIST auto-générée, pas celui de la chaîne — donc
+   le même libellé pour toutes, ce qui ramènerait le défaut qu'on a corrigé
+   (trois chaînes suivies, trois lignes identiques). Le nom de la chaîne est
+   alors porté par l'auteur de chaque entrée, seul endroit du flux où il vit. */
+function titreDuFlux(doc,chaine){
+  if(chaine){
+    const a=doc&&doc.querySelector("feed > entry > author > name");
+    const n=(a&&a.textContent||"").trim();
+    if(n)return n;
+  }
   const t=doc&&doc.querySelector("feed > title, channel > title");
   return (t&&t.textContent||"").trim();
 }
@@ -1980,9 +2009,9 @@ function nomDeSource(feed,titre){
   return (isYoutubeFeedUrl(feed.url)&&youtubeFeedName(titre))||feed.name;
 }
 async function fetchFeed(feed,reste){
-  const text=await fetchText(feed.url,reste);
+  const text=await fetchText(urlDuFlux(feed),reste);
   const doc=new DOMParser().parseFromString(text,"text/xml");
-  const source=nomDeSource(feed,titreDuFlux(doc));
+  const source=nomDeSource(feed,titreDuFlux(doc,fluxShorts(feed)));
   const nodes=[...doc.querySelectorAll("item, entry")];
   return nodes.map(n=>{
     const get=sel=>n.querySelector(sel)?.textContent?.trim()||"";
@@ -2850,7 +2879,12 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
           const own=res.slice().sort((a,b)=>itemTime(b)-itemTime(a)).slice(0,perFeed);
           collected.set(f.url,own.map(markKind("news")));
           scheduleRender();      // groupé : voir RENDER_COALESCE_MS
-        }else failed.push(f);
+        }
+        /* Rien à montrer. C'est une panne pour une source ordinaire — mais pas
+           pour une chaîne servie en Shorts seuls, qui peut n'en publier aucun :
+           l'annoncer « injoignable » désignerait à la suppression une source
+           qui répond parfaitement (voir fluxShorts). */
+        else if(!fluxShorts(f))failed.push(f);
       }).catch(()=>{if(my===loadSeq)failed.push(f);})
         .finally(()=>{
           inFlight--;
@@ -4797,10 +4831,15 @@ function addFeed(){const inp=document.getElementById("newUrl");const url=inp.val
   if(isYoutubeFeedUrl(url))nommerChaine(url);}
 async function nommerChaine(url){
   try{
-    const doc=new DOMParser().parseFromString(await fetchText(url,()=>8000),"text/xml");
+    // Le MÊME flux que celui du fil (Shorts seuls, voir urlDuFlux) : interroger
+    // la chaîne entière ici demanderait une requête que le chargement suivant
+    // ne réutiliserait pas, et pourrait nommer une chaîne qui ne servira
+    // jamais aucune carte.
+    const cible=youtubeShortsFeedUrl(url);
+    const doc=new DOMParser().parseFromString(await fetchText(cible,()=>8000),"text/xml");
     const f=feeds.find(x=>x.url===url);
     if(!f)return;                      // supprimée entre-temps
-    adopteNomDeSource(f,youtubeFeedName(titreDuFlux(doc)));
+    adopteNomDeSource(f,youtubeFeedName(titreDuFlux(doc,isYoutubeShortsFeedUrl(cible))));
     renderList();                      // le panneau est ouvert : la ligne se corrige sous les yeux
   }catch(e){warn("nom de chaîne",e);}
 }

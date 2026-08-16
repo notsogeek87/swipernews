@@ -488,6 +488,22 @@ Une chaîne YouTube publie un flux Atom
 (`https://www.youtube.com/feeds/videos.xml?channel_id=…`) : elle s'ajoute comme
 n'importe quelle source, et ses vidéos s'entrelacent dans le fil comme des actus.
 
+**Seuls les Shorts sont servis** — jamais les vidéos classiques ni les directs.
+Le format court est le seul qui tienne dans une carte qu'on regarde entre deux
+articles : une vidéo de trente minutes n'a pas sa place dans un fil qu'on
+parcourt au pouce. Rien dans le flux d'une chaîne ne distingue pourtant un Short
+d'une vidéo ordinaire (ni durée, ni catégorie, ni format de vignette), et trier
+après coup demanderait d'interroger la page de chaque vidéo — une requête par
+carte croisée, exactement ce que l'app refuse. C'est donc YouTube qui trie :
+toute chaîne a des **playlists auto-générées**, une par nature de vidéo, dont
+l'identifiant est celui de la chaîne privé de son préfixe (`UUSH…` pour les
+Shorts, `UULF…` pour les vidéos classiques). L'app interroge la playlist des
+Shorts au lieu de la chaîne, sur le même point d'entrée : aucune requête de plus,
+aucune clé d'API. **L'URL que vous avez enregistrée ne change pas** — la
+substitution a lieu au moment de la requête, donc l'OPML exporté reste celui que
+vous avez importé. Une chaîne qui ne publie aucun Short ne sert simplement aucune
+carte ; elle n'est pas signalée « injoignable » pour autant.
+
 Elle apparaît sous **« YT · nom de la chaîne »**. L'URL d'un flux YouTube ne
 contient qu'un identifiant opaque (`channel_id=UC…`), donc le seul nom qu'on
 pouvait en tirer était le nom d'hôte : toutes les chaînes s'appelaient
