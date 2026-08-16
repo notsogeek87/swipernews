@@ -443,14 +443,40 @@ obtient **huit**, la première en position 18.
 
 Deux garde-fous :
 
-- **la première carte reste l'article le plus récent** du fil : les sources sont
-  départagées par la date de leur article de tête. C'est la règle à laquelle tient
-  tout le comportement de rafraîchissement ;
+- **la première carte reste l'article le plus récent** du fil — plus exactement le
+  plus récent que vous n'avez pas déjà eu sous les yeux (voir ci-dessous) : les
+  sources sont départagées par la date de leur article de tête. C'est la règle à
+  laquelle tient tout le comportement de rafraîchissement ;
 - **une part par nom de source**, pas par URL. Cocher cinq rubriques du même journal
   ne donne pas cinq parts — ce serait recréer à la main le déséquilibre qu'on corrige.
 
 Contrepartie assumée : le fil n'est plus « le plus récent d'abord » de bout en bout.
 La deuxième carte peut avoir six heures pendant que la vingt-cinquième en a dix.
+
+### Les actus déjà vues
+
+Une carte affichée est mémorisée, et **repoussée en fin de file** au
+rafraîchissement suivant — jamais retirée du fil.
+
+C'est la contrepartie directe du tour de rôle. Une source horaire garde le même
+article en tête de sa file pendant une heure : sans cette mémoire, chaque
+rafraîchissement reposait la même carte à la même place. Mesuré sur quatre lectures
+d'une source à un article par heure : **un** seul article distinct sans la mémoire,
+**quatre** avec — elle puise dans son fond plutôt que de répéter sa dernière parution.
+
+Trois précisions :
+
+- **« vu » veut dire affiché**, pas ouvert. C'est la question à laquelle on répond :
+  l'ai-je déjà eu sous les yeux ?
+- **repoussé, jamais supprimé.** Retirer les articles lus viderait la file d'une
+  source lente entièrement lue, et lui ferait reperdre la part que le tour de rôle
+  vient de lui rendre.
+- **la mémoire est bornée** : 800 liens, soit environ 70 Ko, et elle est distincte de
+  celle de Wikipédia (2000 entrées) pour ne pas l'évincer. Un article sort de son flux
+  RSS au bout de quelques jours — le mémoriser plus longtemps ne servirait à rien.
+
+Conséquence assumée : après un rafraîchissement, la première carte est l'article le
+plus récent **que vous n'avez pas déjà vu**, et non le plus récent dans l'absolu.
 
 Les articles datés **dans le futur** de plus de deux jours (agendas de concerts,
 annonces de festivals) sont classés en fin de fil comme les articles sans date :

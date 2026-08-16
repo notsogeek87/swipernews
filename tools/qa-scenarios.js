@@ -700,7 +700,11 @@ const scenarios = {
         : "→ inattendu"
     );
 
-    // 2) réouverture AU-DELÀ : le fil est neuf, le plus récent en tête
+    // 2) réouverture AU-DELÀ : le fil est neuf, le plus récent NON LU en tête
+    // On capture les actus déjà vues AVANT de recharger : après, la carte
+    // qu'on nous propose est elle-même marquée vue dans la seconde, et le
+    // contrôle se mordrait la queue.
+    const vuesAvant = await page.evaluate(() => [...seenNews]);
     await page.evaluate(() => {
       const c = JSON.parse(localStorage.getItem("fluxswipe.cache.v1") || "{}");
       for (const k in c) c[k].t = Date.now() - 45 * 60 * 1000;
@@ -708,20 +712,39 @@ const scenarios = {
     });
     await page.reload();
     await page.waitForTimeout(3500);
-    const apres = await page.evaluate(() => ({
-      idx: currentIndex(),
-      carte: (currentItem() || {}).title,
-      haut: Math.round(feedEl.scrollTop),
-      plusRecent: newsItems.length
-        ? newsItems.reduce((a, b) => (Date.parse(a.date) >= Date.parse(b.date) ? a : b))
-            .title
-        : null,
-    }));
+    /* La règle de tête est « l'article le plus récent qu'on n'a pas DÉJÀ EU
+       sous les yeux », et non le plus récent dans l'absolu : rouvrir l'app sur
+       la carte qu'on vient de lire n'apprend rien (voir seenNews et le tri des
+       files dans rebuild). Ici la session précédente a affiché la carte de
+       lancement puis celle où l'on s'est arrêté — le plus récent absolu est
+       donc déjà lu, et la bonne réponse est le suivant. */
+    const apres = await page.evaluate((vuesAvant) => {
+      const avant = new Set(vuesAvant);
+      const frais = newsItems.filter((i) => !avant.has(newsKey(i)));
+      const vivier = frais.length ? frais : newsItems;
+      const cible = vivier.reduce(
+        (a, b) => (Date.parse(a.date) >= Date.parse(b.date) ? a : b),
+        vivier[0] || { date: "" }
+      );
+      return {
+        idx: currentIndex(),
+        carte: (currentItem() || {}).title,
+        haut: Math.round(feedEl.scrollTop),
+        attendu: cible && cible.title,
+        plusRecentAbsolu: newsItems.length
+          ? newsItems.reduce((a, b) => (Date.parse(a.date) >= Date.parse(b.date) ? a : b))
+              .title
+          : null,
+      };
+    }, vuesAvant);
     console.log(
       `après 30 min → ${apres.carte} (index ${apres.idx}, scrollTop ${apres.haut})`,
-      apres.idx === 0 && apres.carte === apres.plusRecent
-        ? "→ EN TÊTE, sur l'article le plus récemment publié"
-        : `→ inattendu (le plus récent est ${apres.plusRecent})`
+      apres.idx === 0 && apres.carte === apres.attendu
+        ? `→ EN TÊTE, sur l'article le plus récent NON LU` +
+            (apres.attendu === apres.plusRecentAbsolu
+              ? ""
+              : ` (${apres.plusRecentAbsolu} est plus récent mais déjà vu)`)
+        : `→ inattendu (attendu : ${apres.attendu})`
     );
     console.log(
       "erreurs :",
@@ -1381,6 +1404,92 @@ const scenarios = {
     await browser.close();
   },
 
+  /* 30. REDITES : un rafraîchissement doit apporter du neuf, pas reposer les
+     mêmes cartes. Le pendant indispensable du tour de rôle (voir `equite`) :
+     celui-ci a rendu les sources lentes visibles, mais à l'intérieur d'une
+     file l'ordre restait la date — donc l'article le plus récent d'une source
+     horaire tenait la tête de sa file pendant une heure et revenait à CHAQUE
+     ↻, à la même place. Mesuré avant correctif : un seul article distinct
+     d'une source lente sur quatre lectures.
+     On parcourt vraiment les cartes (c'est l'affichage qui marque « vu »,
+     comme pour Wikipédia), puis on compte ce qui revient. */
+  async redites() {
+    const N = 15;
+    const feeds = Array.from({ length: N }, (_, i) => ({
+      url: `https://src${i}.test/rss`,
+      name: i === 0 ? "Lente" : "Bavarde " + i,
+      on: true,
+    }));
+    // La lente ne publie RIEN entre les rafraîchissements : c'est le cas dur.
+    // Les bavardes, elles, publient cinq articles de plus à chaque tour.
+    let tour = 0;
+    const rss = (i) => {
+      const pas = i === 0 ? 60 : 6;
+      const neufs = i === 0 ? 0 : tour * 5;
+      const nom = i === 0 ? "L" : "B" + i;
+      return `<?xml version="1.0"?><rss version="2.0"><channel><title>S${i}</title>${Array.from(
+        { length: 15 },
+        (_, k) =>
+          `<item><title>${nom} art ${neufs + k}</title>` +
+          `<link>https://src${i}.test/n/${neufs + k}</link>` +
+          `<description>${"texte ".repeat(20)}</description><pubDate>` +
+          `${new Date(Date.now() - (k * pas + (i === 0 ? 37 : i)) * 60e3).toUTCString()}` +
+          `</pubDate></item>`
+      ).join("")}</channel></rss>`;
+    };
+    const { browser, page, errors } = await boot({
+      storage: { ...READY, "fluxswipe.feeds.v1": JSON.stringify(feeds) },
+    });
+    await page.route(/src\d+\.test/, (r) => {
+      const u = r.request().url();
+      if (/\/api\/og/.test(u)) return r.fallback();
+      const m = u.match(/src(\d+)\.test/);
+      return r
+        .fulfill({ status: 200, contentType: "application/xml", body: rss(+m[1]) })
+        .catch(() => {});
+    });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(5000);
+    // Parcourt réellement les 20 premières cartes, comme un doigt : chacune
+    // devient la carte courante, donc chacune est marquée « vue ».
+    const parcourir = () =>
+      page.evaluate(() => {
+        const vus = [];
+        for (let i = 0; i < 20 && i < feedEl.children.length; i++) {
+          feedEl.scrollTop = feedEl.children[i].offsetTop;
+          onCardChange();
+          if (items[i]) vus.push(items[i].title);
+        }
+        return vus;
+      });
+    const lus = new Set(await parcourir());
+    const lente = new Set([...lus].filter((x) => /^L art /.test(x)));
+    for (let t = 1; t <= 3; t++) {
+      tour = t;
+      await page.evaluate(() => document.getElementById("reloadBtn").click());
+      await page.waitForTimeout(5000);
+      const apres = await page.evaluate(() => items.slice(0, 20).map((i) => i.title));
+      const actus = apres.filter((x) => !/^Wiki /.test(x));
+      const red = actus.filter((x) => lus.has(x));
+      console.log(
+        `↻ n°${t} : ${red.length}/${actus.length} actus déjà lues` +
+          (red.length
+            ? `  ← REDITE (${red.slice(0, 2).join(", ")})`
+            : "  → que du neuf ✓")
+      );
+      apres.filter((x) => /^L art /.test(x)).forEach((x) => lente.add(x));
+      (await parcourir()).forEach((x) => lus.add(x));
+    }
+    console.log(
+      `articles DISTINCTS de la source lente vus en 4 lectures : ${lente.size}` +
+        (lente.size >= 3
+          ? "  → elle puise dans son fond ✓"
+          : "  ← TOUJOURS LE MÊME (régression)")
+    );
+    console.log("erreurs :", errors);
+    await browser.close();
+  },
+
   /* 29. ÉQUITÉ ENTRE SOURCES : une source lente ne doit pas être enterrée.
      Le fil était trié par date décroissante, et un tri par date enterre les
      sources lentes : une source à 1 article/h a ses dix plus récents étalés sur
@@ -1725,7 +1834,10 @@ const scenarios = {
       );
     // Le budget ne doit RIEN coûter en contenu : les 38 sources vivantes
     // rapportent de quoi remplir MAX_NEWS, comme avant.
-    console.log("  actus neuves retenues   " + total + " (doit valoir MAX_NEWS = 120)");
+    // MAX_NEWS vaut 120. Le GEL de la tête (remix(true)) peut reporter jusqu'à
+    // deux cartes qui ne sont plus dans le classement — c'est son rôle, il
+    // protège ce qui est sous le doigt — d'où la tolérance.
+    console.log("  actus neuves retenues   " + total + " (attendu : 120 à 122)");
     console.log("erreurs :", errors);
     await browser.close();
   },

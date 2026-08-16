@@ -605,15 +605,42 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   source lente parmi quatorze bavardes obtenait UNE carte sur 120, en position
   94. Elle en obtient huit, la première en position 18.
   Deux détails à ne pas défaire :
-  - la date ne classe plus qu'À L'INTÉRIEUR d'une file, et les files sont
-    classées par la date de leur TÊTE — c'est ce qui garde la carte 1 sur
-    l'actu la plus récente, règle dont dépendent `forceTop`, la reprise de
-    lecture, `forcetop` et `resume` ;
+  - à l'intérieur d'une file, le tri est « NON LU d'abord, puis la date » (voir
+    l'entrée suivante), et les files sont classées par la date de leur TÊTE —
+    c'est ce qui garde la carte 1 sur l'actu la plus récente, règle dont
+    dépendent `forceTop`, la reprise de lecture, `forcetop` et `resume` ;
   - une file par NOM de source (`it.source`), pas par URL. Cocher cinq
     rubriques du même journal ne doit pas donner cinq parts : ce serait
     recréer à la main le déséquilibre qu'on corrige.
   Contrepartie assumée : le fil n'est plus « le plus récent d'abord » de bout en
   bout — la carte 2 peut avoir six heures pendant que la 25 en a dix.
+- **Les actus lues sont MÉMORISÉES, et repoussées en fin de file — jamais
+  retirées.** La mémoire « déjà vu » ne valait que pour Wikipédia, au motif
+  écrit dans `markVisibleSeen` qu'« une actu sort naturellement du fil quand
+  elle vieillit ». C'était vrai du tri par date, où un flot d'articles neufs
+  poussait les vieux hors de la fenêtre. Ça ne l'est plus du tour de rôle : la
+  file d'une source, ce sont SES plus récents quel que soit leur âge, donc
+  l'article de tête d'une source horaire y reste une heure entière et revenait
+  à CHAQUE rafraîchissement, à la même place. Mesuré (scénario `redites`) :
+  UN SEUL article distinct d'une source lente sur quatre lectures ; quatre
+  après correctif, sans qu'elle ait rien publié de neuf.
+  Trois choix à ne pas défaire :
+  - **mémoire SÉPARÉE** (`seenNews`, `fluxswipe.seennews.v1`), pas les 2000
+    places de `seen`. Les actus défilent bien plus vite et évinceraient la
+    mémoire Wikipédia, celle qui garde le fil infini varié ;
+  - **clé = `canonicalLink` seul**, sans le titre. Plus court (2000 entrées
+    `lien|titre` pèseraient ~400 Ko sur ~5 Mo de quota, d'où aussi le plafond
+    plus bas, `SEEN_NEWS_MAX` = 800) et surtout c'est la clé qui reconnaît le
+    MÊME article servi par deux flux avec des paramètres de suivi différents ;
+  - **repoussés, jamais supprimés**. Retirer les lus viderait la file d'une
+    source lente entièrement lue, et lui ferait reperdre la part que le tour de
+    rôle vient de lui rendre.
+  Conséquence sur la règle de tête, assumée et choisie : la carte 1 est
+  l'article le plus récent **qu'on n'a pas déjà eu sous les yeux**, et non le
+  plus récent dans l'absolu — rouvrir l'app sur la carte qu'on vient de lire
+  n'apprend rien. Au premier chargement d'une session neuve, les deux
+  définitions coïncident. « Vu » veut dire AFFICHÉ, pas ouvert : c'est la
+  question à laquelle on répond.
 - **Dans un lot Wikipédia, la catégorie prime sur l'image.** `dedupAndRank`
   (`src/lib.js`) sert les catégories À TOUR DE RÔLE, une carte chacune ; le tri
   « avec image d'abord » ne joue plus qu'À L'INTÉRIEUR d'une catégorie. Le
@@ -817,7 +844,7 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 
 `npm test` ne voit que `src/` et `api/` : **tout le JS en ligne d'`index.html`
 — le fil, l'état, le stockage local — n'est couvert par aucun test**. Ce banc
-comble le trou en jouant 29 scénarios réels dans Chromium, réseau entièrement
+comble le trou en jouant 30 scénarios réels dans Chromium, réseau entièrement
 simulé (rien ne part vers une vraie source) : hors-ligne, réseau lent, coupure en
 cours de requête, API en 500, RSS vide/tronqué/HTML, contenu démesuré, doublons,
 120 sources, stockage et cache abîmés, quota saturé, actions enchaînées, retour
@@ -839,6 +866,10 @@ avant l'échéance.
 15 sources dont une à 1 article/h, et il vérifie les deux moitiés de la règle —
 la lente revient régulièrement ET la carte 1 reste l'actu la plus récente.
 Repères : 1 carte sur 120 (en position 94) avant le tour de rôle, 8 après.
+`redites` en est le pendant indispensable : il parcourt VRAIMENT les cartes
+(c'est l'affichage qui marque « vu ») puis compte ce qui revient après trois ↻.
+Repères : 1 article distinct d'une source lente sur quatre lectures sans la
+mémoire des actus, 4 avec — et zéro redite d'actu.
 
 `teteouverture` est le pendant de `forcetop` pour l'OUVERTURE à froid : cache
 périmé peint tout de suite, les deux moitiés qui repartent, et l'utilisateur qui
