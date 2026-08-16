@@ -452,6 +452,16 @@ genre de script dérape.
   `LEARN_SPARE_MIN` articles encore neufs (la moitié du lot), la réserve est
   jetée plutôt que servie maigre : autant payer le réseau et servir un lot
   entier. Scénario `avancewiki`.
+- `hideSeen` — mode « Cacher les articles déjà lus », UNE case (feuille
+  « Articles en mémoire », `openHistory`) qui commande DEUX choses, pas une
+  seule : la VUE de cette feuille ET la RÉCUPÉRATION (`fetchLearn`,
+  `loadLearnPart`, `takeLearnSpare`, le tri des files d'actus dans `rebuild`).
+  Une case qui n'aurait joué que sur la vue n'aurait rien réglé : décochée,
+  la feuille aurait bien montré les articles déjà lus encore sous la main,
+  mais `dropSeen` les aurait déjà écartés AVANT qu'ils n'y arrivent — un
+  rafraîchissement les aurait donc quand même fait disparaître. Défaut
+  ACTIVÉ : c'est le comportement historique de l'app (voir `seenNews`
+  ci-dessous), personne ne le voit changer tant qu'il ne touche pas la case.
 - `ICON_*` / `setIcons()` — UNE famille de tracés pour toute l'app (2 px,
   boîte de 24, `currentColor`), posée aussi dans la barre du haut. Ne pas y
   remettre d'emoji ni de glyphe de police : ils ne s'alignent pas entre eux.

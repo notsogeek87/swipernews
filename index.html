@@ -908,9 +908,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=136"></script>
-<script src="src/learn-core.js?v=136"></script>
-<script src="src/i18n.js?v=136"></script>
+<script src="src/lib.js?v=137"></script>
+<script src="src/learn-core.js?v=137"></script>
+<script src="src/i18n.js?v=137"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1521,7 +1521,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="136";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="137";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1690,6 +1690,25 @@ let adsPref=(()=>{try{return localStorage.getItem(LS_ADS)==="block"?"block":"all
 const LS_SPONSOR="fluxswipe.sponsorfilter.v1";
 let filterSponsored=(()=>{
   try{const v=localStorage.getItem(LS_SPONSOR);return v===null?true:v==="1";}
+  catch(e){return true;}
+})();
+
+/* ---------- Mode « Cacher les articles déjà lus » ----------
+   Défaut ACTIVÉ : c'est le comportement historique de l'app, déjà en place
+   bien avant que ce réglage existe (dropSeen pour Wikipédia, actus repoussées
+   en fin de file — voir seenNews). Ce réglage ne change donc rien pour qui ne
+   le touche pas.
+   Il commande DEUX choses, pas une seule : la VUE de la feuille « Articles en
+   mémoire » (voir openHistory) ET la RÉCUPÉRATION elle-même (fetchLearn,
+   loadLearnPart, loadMore, rebuild des actus). Une case qui n'aurait joué que
+   sur la vue aurait laissé le symptôme rapporté intact : décochée, la feuille
+   montrait bien les articles déjà lus qu'elle avait sous la main, mais le
+   rafraîchissement suivant les avait déjà écartés AVANT qu'ils n'y arrivent
+   (dropSeen s'applique à la récupération, pas à l'affichage) — « je perds ceux
+   que j'avais déjà vus au refresh ». */
+const LS_HIDE_SEEN="fluxswipe.hideseen.v1";
+let hideSeen=(()=>{
+  try{const v=localStorage.getItem(LS_HIDE_SEEN);return v===null?true:v==="1";}
   catch(e){return true;}
 })();
 /* Liens écartés APRÈS coup par checkSponsor (sponsoring d'auteur : invisible
@@ -2203,7 +2222,12 @@ async function fetchLearn(count=CONFIG.BATCH_SIZE,keys=catKeysForBatch(),frais){
   // public quand le direct échoue). Un seul élément qui n'est pas un article —
   // `null`, une chaîne — faisait échouer dropSeen (seenKey lit `.link`), donc
   // tout le lot, alors que les autres étaient parfaitement lisibles.
-  return dropSeen(batch.filter(usableItem),seen).slice(0,count);
+  const usable=batch.filter(usableItem);
+  // hideSeen désactivé : l'utilisateur veut retrouver au rafraîchissement les
+  // articles déjà lus, pas seulement les voir dans « Articles en mémoire » tant
+  // qu'ils y sont encore — dropSeen les aurait déjà écartés ICI, avant même
+  // d'atteindre cette feuille.
+  return (hideSeen?dropSeen(usable,seen):usable).slice(0,count);
 }
 
 /* ---------- Cache local : affichage instantané au lancement ----------
@@ -2440,6 +2464,9 @@ function takeLearnSpare(key){
   const s=learnSpare;
   learnSpare=null;
   if(!(s&&s.key===key&&s.items.length))return null;
+  // hideSeen désactivé : resservir une carte lue entre-temps n'est plus un
+  // défaut à rattraper, c'est justement ce que l'utilisateur a demandé.
+  if(!hideSeen)return s.items;
   // Ce que l'utilisateur a lu DEPUIS la constitution de la réserve : sans ce
   // second passage, le ↻ « rapide » reposait des cartes déjà vues.
   const frais=s.items.filter(it=>!seen.has(seenKey(it)));
@@ -2510,7 +2537,10 @@ async function loadLearnPart(my,key,perime,attempt=0,frais=false,renouv=perime){
     // et un lot mutualisé (l'un des BUCKETS seaux, ou la copie disque du
     // navigateur) a toutes les chances d'être celui-là même. Aller le chercher
     // en cache serait recommencer pour rien.
-    const fresh=arr.filter(it=>!seen.has(seenKey(it)));
+    // hideSeen désactivé : fetchLearn ne filtre déjà plus par `seen`, donc ce
+    // repli n'a plus lieu d'être — un lot entièrement déjà vu est ici un
+    // résultat normal, pas un signe d'épuisement à contourner.
+    const fresh=hideSeen?arr.filter(it=>!seen.has(seenKey(it))):arr;
     if(!fresh.length){
       arr=await fetchLearn(CONFIG.BATCH_SIZE,["random"],true);
       if(my!==loadSeq)return;
@@ -2748,9 +2778,13 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
        qu'elle n'en publie pas un autre — donc une heure entière pour une source
        horaire, et chaque rafraîchissement reposait la même carte à la même
        place. Les lus ne sont pas retirés, juste repoussés : une source
-       entièrement lue garde sa part du tour de rôle (voir seenNews). */
+       entièrement lue garde sa part du tour de rôle (voir seenNews).
+       hideSeen désactivé : ce premier critère disparaît, la file retombe sur la
+       seule date — sinon les lus, toujours en fin de file, étaient les premiers
+       sacrifiés par le plafond MAX_NEWS du round-robin, et « décocher la case »
+       n'empêchait pas de les reperdre au rafraîchissement suivant. */
     for(const q of queues)q.sort((a,b)=>
-      (newsSeen(a)?1:0)-(newsSeen(b)?1:0)||itemTime(b)-itemTime(a));
+      (hideSeen?(newsSeen(a)?1:0)-(newsSeen(b)?1:0):0)||itemTime(b)-itemTime(a));
     /* Files classées par la date de leur TÊTE — laquelle est maintenant le plus
        récent NON LU de chaque source. La carte 1 du fil est donc l'article le
        plus récent qu'on n'a pas encore eu sous les yeux, et non le plus récent
@@ -4439,8 +4473,6 @@ doseBtn.onclick=()=>{renderMix();openDialog(mixSheet);};
    qu'inutile. */
 const histSheet=document.getElementById("histSheet"),histList=document.getElementById("histList");
 const histHideSeenChk=document.getElementById("histHideSeenChk");
-const LS_HIST_HIDE_SEEN="fluxswipe.histhideseen.v1";
-let histHideSeen=(()=>{try{return localStorage.getItem(LS_HIST_HIDE_SEEN)==="1";}catch(e){return false;}})();
 /* `etat` : "now" (la carte à l'écran), "past" (déjà dépassée), "" (à venir).
    Vignette en chargement paresseux NATIF, sans IntersectionObserver ni variante
    plus grande (voir applyBg) : 58 px de côté n'en réclament aucune, et la liste
@@ -4463,15 +4495,16 @@ function histRowHTML(it,etat){
     </span>
   </button>`;
 }
-/* Case « Cacher les articles déjà lus » : la carte COURANTE reste toujours
-   affichée même si elle vient de passer « vue », sinon cocher la case ferait
-   disparaître le seul repère de position (voir .histrow--now) pendant qu'on
-   regarde la liste. */
+/* Case « Cacher les articles déjà lus » : commande aussi `hideSeen` (voir sa
+   déclaration plus haut), donc la récupération et pas seulement cette vue. La
+   carte COURANTE reste toujours affichée même si elle vient de passer « vue »,
+   sinon cocher la case ferait disparaître le seul repère de position (voir
+   .histrow--now) pendant qu'on regarde la liste. */
 function renderHistList(){
   const cur=currentIndex();
   const rows=items
     .map((it,i)=>({it,etat:i===cur?"now":(i<cur?"past":"")}))
-    .filter(r=>!histHideSeen||r.etat==="now"||!itemSeen(r.it));
+    .filter(r=>!hideSeen||r.etat==="now"||!itemSeen(r.it));
   histList.innerHTML=rows.length
     ? rows.map(r=>histRowHTML(r.it,r.etat)).join("")
     : `<p class="histempty">${esc(T("hist.empty"))}</p>`;
@@ -4479,7 +4512,7 @@ function renderHistList(){
     rows.length?T("hist.sub",{n:rows.length}):T("hist.subEmpty");
 }
 function openHistory(){
-  histHideSeenChk.checked=histHideSeen;
+  histHideSeenChk.checked=hideSeen;
   renderHistList();
   openDialog(histSheet);
   // La liste s'ouvre SUR la position courante, jamais en haut : ce qu'on vient
@@ -4495,8 +4528,8 @@ function openHistory(){
 }
 document.getElementById("histBtn").onclick=openHistory;
 histHideSeenChk.onchange=e=>{
-  histHideSeen=e.target.checked;
-  try{localStorage.setItem(LS_HIST_HIDE_SEEN,histHideSeen?"1":"0");}catch(_){}
+  hideSeen=e.target.checked;
+  try{localStorage.setItem(LS_HIDE_SEEN,hideSeen?"1":"0");}catch(_){}
   renderHistList();
 };
 histSheet.onclick=e=>{if(e.target===histSheet)closeDialog(histSheet);};
