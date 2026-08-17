@@ -209,15 +209,14 @@ async function handler(req, res) {
             // convient au point d'accès XML des flux (déjà en prod, indifférent
             // au user-agent), mais PAS à la page HTML d'une chaîne — un
             // navigateur mobile réel évite les traitements que Google réserve
-            // aux clients qui ne s'annoncent pas comme tel, en plus du cookie
-            // CONSENT qui évite le mur de consentement aux cookies.
+            // aux clients qui ne s'annoncent pas comme tel. CONSENT et SOCS :
+            // les deux cookies du mécanisme de consentement UE chez Google
+            // depuis sa refonte 2024 — CONSENT seul ne suffit plus à éviter le
+            // mur de consentement à la place de la page demandée.
             "user-agent":
               "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36",
             accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "accept-language": "fr-FR,fr;q=0.9,en;q=0.8",
-            // SOCS : second cookie du même mécanisme de consentement UE,
-            // requis EN PLUS de CONSENT depuis la refonte 2024 de Google —
-            // CONSENT seul ne suffisait plus (constaté en réel, voir addFeed).
             cookie: "CONSENT=YES+1; SOCS=CAI",
           }
         : {
