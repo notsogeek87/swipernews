@@ -921,9 +921,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=148"></script>
-<script src="src/learn-core.js?v=148"></script>
-<script src="src/i18n.js?v=148"></script>
+<script src="src/lib.js?v=149"></script>
+<script src="src/learn-core.js?v=149"></script>
+<script src="src/i18n.js?v=149"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1534,7 +1534,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="148";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="149";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -5009,8 +5009,12 @@ async function addFeed(){const inp=document.getElementById("newUrl");const url=i
   // ne jamais rien charger ensuite). Voir resolveYoutubeChannelFeed.
   if(isYoutubeChannelPageUrl(url)){
     toast(T("toast.youtubeResolving"));
-    const rss=await resolveYoutubeChannelFeed(url);
-    if(!rss){toast(T("toast.youtubeChannelNotFound"));return;}
+    const{rss,why}=await resolveYoutubeChannelFeed(url);
+    // TEMPORAIRE (à retirer une fois le mur YouTube identifié en réel) : sur
+    // l'APK il n'y a ni barre d'URL pour ?debug=1 ni console accessible — le
+    // seul canal qui reste pour savoir OÙ ça a échoué est ce toast lui-même.
+    // `why` trace chaque étape tentée (voir resolveYoutubeChannelFeed).
+    if(!rss){toast(T("toast.youtubeChannelNotFound")+(why?" ["+why+"]":""),6000);return;}
     pushFeedUrl(rss,inp);
     return;
   }
@@ -5041,34 +5045,44 @@ async function verifieFluxChaine(rss){
        à une requête sans navigateur, une page réduite ou un mur de
        consentement au lieu de la vraie page (voir isYoutubeHost,
        api/feed.js, et nativeGet, qui posent déjà un cookie CONSENT).
-   Rend "" si rien n'a pu être déterminé ; le toast d'échec est à charge de
-   l'appelant. */
+   Rend {rss} si trouvé, sinon {rss:"",why} — `why` trace chaque étape tentée
+   (voir addFeed : TEMPORAIRE, tant que l'échec en réel n'est pas identifié).
+   Le toast d'échec est à charge de l'appelant. */
 async function resolveYoutubeChannelFeed(pageUrl){
+  const trace=[];
   try{
     const idDirect=youtubeChannelIdFromChannelUrl(pageUrl);
     if(idDirect){
       const rss="https://www.youtube.com/feeds/videos.xml?channel_id="+idDirect;
-      if(await verifieFluxChaine(rss))return rss;
+      if(await verifieFluxChaine(rss))return {rss};
+      trace.push("id:échec-vérif");
     }
     const handle=youtubeChannelHandleFromUrl(pageUrl);
     if(handle){
       const rss="https://www.youtube.com/feeds/videos.xml?user="+encodeURIComponent(handle);
-      if(await verifieFluxChaine(rss))return rss;
+      if(await verifieFluxChaine(rss))return {rss};
+      trace.push("user:échec-vérif");
     }
-    const html=await fetchText(pageUrl,()=>8000);
+    let html;
+    try{html=await fetchText(pageUrl,()=>8000);}
+    catch(e){trace.push("page:"+(e&&e.message||"réseau"));return {rss:"",why:trace.join(" ")};}
     const rss=youtubeFeedUrlFromChannelHtml(html);
     if(!rss){
-      // Diagnostic seulement (rien d'affiché à l'utilisateur, voir addFeed) :
-      // distingue le mur de consentement aux cookies de Google — reçu à la
+      // Distingue le mur de consentement aux cookies de Google — reçu à la
       // place de la page demandée quand aucun cookie CONSENT n'est déjà posé
       // — d'un autre échec, pour ne pas rejouer cette enquête à l'aveugle si
       // le cookie ne suffit pas dans tous les cas.
       const mur=/consent\.youtube\.com|content="cb: consent/i.test(html);
-      warn("résolution chaîne YouTube",mur?"mur de consentement Google":"rien de HTML exploitable");
-      return "";
+      trace.push("page:"+(mur?"mur-consentement":"rien-trouvé")+"("+html.length+"o)");
+      return {rss:"",why:trace.join(" ")};
     }
-    return (await verifieFluxChaine(rss))?rss:"";
-  }catch(e){warn("résolution chaîne YouTube",e);return "";}
+    if(await verifieFluxChaine(rss))return {rss};
+    trace.push("page:échec-vérif");
+    return {rss:"",why:trace.join(" ")};
+  }catch(e){
+    trace.push("exception:"+((e&&e.message)||e));
+    return {rss:"",why:trace.join(" ")};
+  }
 }
 async function nommerChaine(url){
   try{
