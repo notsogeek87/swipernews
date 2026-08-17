@@ -566,6 +566,60 @@ test("isYoutubeChannelPageUrl reconnaît une page de chaîne, pas un flux ni une
   assert.ok(!lib.isYoutubeChannelPageUrl(null));
 });
 
+test("youtubeChannelIdFromChannelUrl lit l'identifiant déjà présent dans /channel/UC…", () => {
+  const id = "UCabcdefghijklmnopqrstuv";
+  assert.equal(
+    lib.youtubeChannelIdFromChannelUrl("https://www.youtube.com/channel/" + id),
+    id
+  );
+  assert.equal(
+    lib.youtubeChannelIdFromChannelUrl(
+      "https://www.youtube.com/channel/" + id + "/videos"
+    ),
+    id
+  );
+  // Pas la bonne forme d'identifiant (pas UC + 22 caractères) : refusé plutôt
+  // que renvoyé tel quel.
+  assert.equal(
+    lib.youtubeChannelIdFromChannelUrl("https://www.youtube.com/channel/x"),
+    ""
+  );
+  // Toute autre forme de page de chaîne : rien à en tirer directement.
+  assert.equal(lib.youtubeChannelIdFromChannelUrl("https://www.youtube.com/@nom"), "");
+  assert.equal(lib.youtubeChannelIdFromChannelUrl(""), "");
+  assert.equal(lib.youtubeChannelIdFromChannelUrl(null), "");
+});
+
+test("youtubeChannelHandleFromUrl tire le nom d'une page /@nom, /c/… ou /user/…", () => {
+  assert.equal(
+    lib.youtubeChannelHandleFromUrl("https://www.youtube.com/@ScienceEtonnante"),
+    "ScienceEtonnante"
+  );
+  // Sous-page, et paramètre de partage : n'en font pas partie du nom.
+  assert.equal(
+    lib.youtubeChannelHandleFromUrl(
+      "https://www.youtube.com/@ScienceEtonnante/videos?si=x"
+    ),
+    "ScienceEtonnante"
+  );
+  assert.equal(
+    lib.youtubeChannelHandleFromUrl("https://www.youtube.com/c/ArteDocumentaires"),
+    "ArteDocumentaires"
+  );
+  assert.equal(
+    lib.youtubeChannelHandleFromUrl("https://www.youtube.com/user/unepersonne"),
+    "unepersonne"
+  );
+  // /channel/UC… porte un identifiant, pas un nom : voir
+  // youtubeChannelIdFromChannelUrl.
+  assert.equal(
+    lib.youtubeChannelHandleFromUrl("https://www.youtube.com/channel/UCabc"),
+    ""
+  );
+  assert.equal(lib.youtubeChannelHandleFromUrl(""), "");
+  assert.equal(lib.youtubeChannelHandleFromUrl(null), "");
+});
+
 test("youtubeRssLinkFromHtml lit le <link rel=alternate> annoncé par la page", () => {
   const url =
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCabcdefghijklmnopqrstuv";

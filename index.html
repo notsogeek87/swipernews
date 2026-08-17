@@ -921,9 +921,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=147"></script>
-<script src="src/learn-core.js?v=147"></script>
-<script src="src/i18n.js?v=147"></script>
+<script src="src/lib.js?v=148"></script>
+<script src="src/learn-core.js?v=148"></script>
+<script src="src/i18n.js?v=148"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1030,7 +1030,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,interleave,roundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeFeedUrlFromChannelHtml,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,interleave,roundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1534,7 +1534,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="147";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="148";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1920,13 +1920,17 @@ async function fetchViaProxy(make,url,timeout){
 async function nativeGet(url,timeoutMs){
   const http=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.CapacitorHttp;
   if(!http)throw new Error("CapacitorHttp indisponible");
-  // Sans cookie CONSENT existant, Google sert une page générique de
-  // consentement aux cookies à la place d'une page YouTube demandée (voir
-  // isYoutubeHost, api/feed.js, pour le même correctif côté web) — ça ne vise
-  // que la page de chaîne (isYoutubeChannelPageUrl) mais le poser aussi pour
-  // le flux XML (isYoutubeFeedUrl) est sans effet, donc pas la peine de
-  // distinguer les deux ici.
-  const headers=(isYoutubeFeedUrl(url)||isYoutubeChannelPageUrl(url))?{Cookie:"CONSENT=YES+1"}:undefined;
+  // YouTube (page de chaîne ou flux XML, voir api/feed.js pour le même
+  // correctif côté web) : sans cookie CONSENT existant, Google sert une page
+  // générique de consentement aux cookies à la place de la page demandée ; le
+  // user-agent par défaut de CapacitorHttp (ni navigateur ni bot identifié)
+  // peut aussi valoir un traitement différent sur la page HTML d'une chaîne,
+  // contrairement au flux XML, indifférent au user-agent. Sans effet sur ce
+  // dernier de toute façon, donc pas la peine de distinguer les deux formes.
+  const headers=(isYoutubeFeedUrl(url)||isYoutubeChannelPageUrl(url))?{
+    Cookie:"CONSENT=YES+1",
+    "User-Agent":"Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36",
+  }:undefined;
   const res=await http.request({url,method:"GET",responseType:"text",connectTimeout:timeoutMs,readTimeout:timeoutMs,headers});
   if(!(res.status>=200&&res.status<300))throw new Error("http "+res.status);
   const txt=typeof res.data==="string"?res.data:JSON.stringify(res.data);
@@ -5013,31 +5017,57 @@ async function addFeed(){const inp=document.getElementById("newUrl");const url=i
   if(!isFeedUrl(url)){toast(T("toast.invalidUrl"));return;}
   pushFeedUrl(url,inp);
 }
-/* Résout l'URL RSS d'une chaîne YouTube depuis l'URL de sa page publique :
-   télécharge la page, cherche le lien RSS qu'elle annonce ou son channelId
-   (youtubeFeedUrlFromChannelHtml, src/lib.js), puis VÉRIFIE que l'URL trouvée
-   répond bien un flux exploitable avant de la rendre — sinon on ajouterait une
-   source qui ne chargera jamais rien. Rend "" si rien n'a pu être déterminé ;
-   le toast d'échec est à charge de l'appelant. */
+/* Vrai quand `rss` répond réellement un flux exploitable — un flux de chaîne
+   valide a toujours un <title> au niveau feed. Sert à VÉRIFIER une URL avant
+   de l'adopter, quelle que soit la façon dont elle a été devinée : jamais
+   ajouter une source qui ne chargera jamais rien. */
+async function verifieFluxChaine(rss){
+  try{
+    const text=await fetchText(rss,()=>8000);
+    const doc=new DOMParser().parseFromString(text,"text/xml");
+    return !!titreDuFlux(doc,false);
+  }catch(e){return false;}
+}
+/* Résout l'URL RSS d'une chaîne YouTube depuis l'URL de sa page publique, du
+   moins coûteux/fragile au plus :
+    1. `/channel/UC…` porte déjà l'identifiant dans l'URL — zéro requête.
+    2. `/@nom`, `/c/nom`, `/user/nom` : le flux accepte un `user=` construit
+       depuis ce nom SANS jamais charger la page — ça marche pour toute
+       chaîne dont le nom actuel correspond à un ancien identifiant
+       "utilisateur", ce qui couvre une bonne partie des chaînes existantes.
+    3. En dernier recours seulement : télécharger la page et y chercher le
+       lien RSS annoncé ou le channelId (youtubeFeedUrlFromChannelHtml,
+       src/lib.js). C'est le chemin le plus fragile — Google peut servir,
+       à une requête sans navigateur, une page réduite ou un mur de
+       consentement au lieu de la vraie page (voir isYoutubeHost,
+       api/feed.js, et nativeGet, qui posent déjà un cookie CONSENT).
+   Rend "" si rien n'a pu être déterminé ; le toast d'échec est à charge de
+   l'appelant. */
 async function resolveYoutubeChannelFeed(pageUrl){
   try{
+    const idDirect=youtubeChannelIdFromChannelUrl(pageUrl);
+    if(idDirect){
+      const rss="https://www.youtube.com/feeds/videos.xml?channel_id="+idDirect;
+      if(await verifieFluxChaine(rss))return rss;
+    }
+    const handle=youtubeChannelHandleFromUrl(pageUrl);
+    if(handle){
+      const rss="https://www.youtube.com/feeds/videos.xml?user="+encodeURIComponent(handle);
+      if(await verifieFluxChaine(rss))return rss;
+    }
     const html=await fetchText(pageUrl,()=>8000);
     const rss=youtubeFeedUrlFromChannelHtml(html);
     if(!rss){
       // Diagnostic seulement (rien d'affiché à l'utilisateur, voir addFeed) :
       // distingue le mur de consentement aux cookies de Google — reçu à la
       // place de la page demandée quand aucun cookie CONSENT n'est déjà posé
-      // (voir isYoutubeHost, api/feed.js, et nativeGet ci-dessus) — d'un
-      // autre échec, pour ne pas rejouer cette enquête à l'aveugle si le
-      // cookie ne suffit pas dans tous les cas.
+      // — d'un autre échec, pour ne pas rejouer cette enquête à l'aveugle si
+      // le cookie ne suffit pas dans tous les cas.
       const mur=/consent\.youtube\.com|content="cb: consent/i.test(html);
       warn("résolution chaîne YouTube",mur?"mur de consentement Google":"rien de HTML exploitable");
       return "";
     }
-    const text=await fetchText(rss,()=>8000);
-    const doc=new DOMParser().parseFromString(text,"text/xml");
-    if(!titreDuFlux(doc,false))return "";      // pas de <title> = rien d'exploitable
-    return rss;
+    return (await verifieFluxChaine(rss))?rss:"";
   }catch(e){warn("résolution chaîne YouTube",e);return "";}
 }
 async function nommerChaine(url){

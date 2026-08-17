@@ -688,9 +688,19 @@
      La plupart des gens ont sous la main l'URL de la page de la chaîne
      (`/@nom`, `/channel/UC…`, `/c/…`, `/user/…`), pas celle du flux. Ajoutée
      telle quelle, elle n'est ni RSS ni Atom : la source ne charge jamais rien.
-     Ces fonctions retrouvent le flux depuis le HTML public de la page — voir
-     `resolveYoutubeChannelFeed` dans index.html pour le téléchargement et la
-     vérification, qui demandent le réseau et ne peuvent donc pas vivre ici. */
+
+     Trois fonctions ici, du moins coûteux/fragile au plus (voir
+     `resolveYoutubeChannelFeed`, index.html, qui les enchaîne et vérifie
+     chaque résultat par une vraie requête — ce qui ne peut donc pas vivre
+     ici) : `youtubeChannelIdFromChannelUrl` lit l'identifiant déjà présent
+     dans une URL `/channel/UC…` (zéro requête) ; `youtubeChannelHandleFromUrl`
+     tire le nom d'une URL `/@nom`, `/c/…` ou `/user/…`, que le flux accepte
+     tel quel en paramètre `user=` pour toute chaîne dont le nom actuel
+     correspond à un ancien identifiant « utilisateur » (une requête vers le
+     flux XML lui-même, jamais la page HTML) ; en dernier recours seulement,
+     `youtubeFeedUrlFromChannelHtml` cherche dans le HTML de la page — le
+     chemin le plus fragile, puisque Google peut servir à une requête sans
+     navigateur une page réduite plutôt que la vraie. */
 
   /** Chemins qui désignent une page de CHAÎNE, pas déjà un flux ni une vidéo. */
   const YT_CHANNEL_PAGE_RE = /^\/(@[^/]+|channel\/[^/]+|c\/[^/]+|user\/[^/]+)\/?/;
@@ -705,6 +715,37 @@
       return YT_HOSTS.includes(host) && YT_CHANNEL_PAGE_RE.test(u.pathname);
     } catch (_) {
       return false;
+    }
+  }
+
+  /** Identifiant DÉJÀ porté par une URL `/channel/UC…` — aucune requête réseau
+   *  nécessaire, contrairement aux autres formes de page de chaîne. "" pour
+   *  toute autre forme, ou un segment qui n'a pas la forme d'un identifiant. */
+  function youtubeChannelIdFromChannelUrl(url) {
+    try {
+      const m = new URL(String(url || "")).pathname.match(/^\/channel\/([^/]+)/);
+      return m && YT_CHANNEL_RE.test(m[1]) ? m[1] : "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  /** Nom porté par une URL `/@nom`, `/c/nom` ou `/user/nom` (décodé, sans le
+   *  `@`). "" pour `/channel/…` (qui porte un identifiant, pas un nom) ou
+   *  toute autre forme. Beaucoup de chaînes gardent, sous ce nom, leur ancien
+   *  identifiant « utilisateur » — le flux l'accepte directement
+   *  (`?user=`, voir resolveYoutubeChannelFeed dans index.html), sans jamais
+   *  charger la page HTML de la chaîne : une chaîne sur deux se résout donc
+   *  sans jamais dépendre de ce que Google sert à une requête sans navigateur. */
+  function youtubeChannelHandleFromUrl(url) {
+    try {
+      const m = new URL(String(url || "")).pathname.match(
+        /^\/(?:@([^/]+)|c\/([^/]+)|user\/([^/]+))/
+      );
+      if (!m) return "";
+      return decodeURIComponent(m[1] || m[2] || m[3] || "");
+    } catch (_) {
+      return "";
     }
   }
 
@@ -1162,6 +1203,8 @@
     isYoutubeShortsFeedUrl,
     youtubeFeedName,
     isYoutubeChannelPageUrl,
+    youtubeChannelIdFromChannelUrl,
+    youtubeChannelHandleFromUrl,
     youtubeRssLinkFromHtml,
     youtubeChannelIdFromHtml,
     youtubeFeedUrlFromChannelHtml,

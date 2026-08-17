@@ -200,17 +200,29 @@ async function handler(req, res) {
   const t = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
   try {
     // safeFetch, jamais fetch : les redirections sont revalidées une à une.
+    const ytHost = isYoutubeHost(url);
     const { res: upstream } = await safeFetch(url, {
       signal: ctl.signal,
-      headers: {
-        "user-agent":
-          "Mozilla/5.0 (compatible; FluxRSS/1.0; +https://swipernews.vercel.app)",
-        accept:
-          "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
-        // Voir isYoutubeHost : évite le mur de consentement aux cookies pour
-        // une chaîne interrogée par sa page (/@nom…) plutôt que par son flux.
-        ...(isYoutubeHost(url) ? { cookie: "CONSENT=YES+1" } : {}),
-      },
+      headers: ytHost
+        ? {
+            // YouTube : voir isYoutubeHost. Le user-agent transparent ci-dessous
+            // convient au point d'accès XML des flux (déjà en prod, indifférent
+            // au user-agent), mais PAS à la page HTML d'une chaîne — un
+            // navigateur mobile réel évite les traitements que Google réserve
+            // aux clients qui ne s'annoncent pas comme tel, en plus du cookie
+            // CONSENT qui évite le mur de consentement aux cookies.
+            "user-agent":
+              "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36",
+            accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "accept-language": "fr-FR,fr;q=0.9,en;q=0.8",
+            cookie: "CONSENT=YES+1",
+          }
+        : {
+            "user-agent":
+              "Mozilla/5.0 (compatible; FluxRSS/1.0; +https://swipernews.vercel.app)",
+            accept:
+              "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+          },
     });
 
     const text = await readCapped(upstream);
