@@ -921,9 +921,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=151"></script>
-<script src="src/learn-core.js?v=151"></script>
-<script src="src/i18n.js?v=151"></script>
+<script src="src/lib.js?v=152"></script>
+<script src="src/learn-core.js?v=152"></script>
+<script src="src/i18n.js?v=152"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1500,13 +1500,24 @@ function currentCardEl(){const i=currentIndex();return i<0?null:feedEl.children[
    binaires sur `offsetTop` par frame de défilement, dont deux APRÈS l'écriture
    de classe d'updateRail(), donc autant de reflows forcés. Une seule lecture,
    partagée. */
+/* Carte à l'écran mais PAS ENCORE marquée « vue » : seul le SWIPE (quitter la
+   carte) la marque, jamais son simple affichage — sinon ouvrir l'app puis la
+   refermer aussitôt, sans même avoir lu le titre, suffisait à la marquer lue.
+   Comparée par LIEN, pas par référence : `render()` rafraîchit l'objet associé
+   à une carte déjà en place (cardReg.set ligne ~3639) même quand c'est le même
+   article, ce qui casserait une comparaison par identité. */
+let pendingSeenItem=null;
 function onCardChange(){
   const i=currentIndex();
   const it=itemAt(i);
   // Arrêt n°1 : on a quitté la carte qui jouait. C'est le geste attendu — swiper
   // coupe la vidéo, comme sur n'importe quel fil vertical.
   if(playingCard&&feedEl.children[i]!==playingCard)stopVideo();
-  markVisibleSeen(it);
+  const samePending=pendingSeenItem===it||(pendingSeenItem&&it&&pendingSeenItem.link&&pendingSeenItem.link===it.link);
+  if(!samePending){
+    markVisibleSeen(pendingSeenItem);   // on quitte cette carte : c'est CE geste qui la marque vue
+    pendingSeenItem=it;
+  }
   rememberPos(it);
   updateRail(it);
   if(DEBUG)dbgImage();
@@ -1534,7 +1545,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="151";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="152";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -3223,8 +3234,10 @@ function scrollToCard(i){
    vieillit ». C'était vrai du tri par date : un flot d'articles neufs poussait
    les vieux hors de la fenêtre. Ça ne l'est plus du tour de rôle, où la file
    d'une source, ce sont SES plus récents quel que soit leur âge.
-   « Vu » veut dire passé à l'écran, pas ouvert : c'est la question à laquelle
-   on répond — l'ai-je déjà eu sous les yeux ?
+   « Vu » veut dire swipée, pas seulement affichée ni ouverte : c'est le SWIPE
+   (quitter la carte, voir pendingSeenItem/onCardChange) qui marque, pas l'arrivée
+   à l'écran — sinon fermer l'app sur la 1ère carte sans en avoir lu le titre
+   suffisait à la compter vue.
 
    UNE EXCEPTION, et une seule : la carte VIDÉO. Pour un article, la carte porte
    le titre, le résumé et l'image — l'avoir eue sous les yeux, c'est en avoir
@@ -3689,7 +3702,7 @@ function render(forceTop,altAnchor){
         `top=${top}  scrollTop=${Math.round(feedEl.scrollTop)}  idx=${currentIndex()}`);}
   // Le hint ne doit pas resurgir en pleine lecture à chaque rendu progressif.
   document.getElementById("hint").classList.toggle("hidden",items.length===0||feedEl.scrollTop>50);
-  onCardChange();                               // la 1ère carte affichée compte comme vue
+  onCardChange();                               // suit la 1ère carte ; vue seulement au swipe
   renderLoadMoreCard();          // toujours en dernier : elle doit rester la DERNIÈRE carte
 }
 /* Carte de fin provisoire : visible tant que loadMore() est en vol, pour que
