@@ -46,6 +46,18 @@ test("assertSafeUrl refuse localhost et les IP privées littérales", async () =
   await assert.rejects(() => feed.assertSafeUrl("http://192.168.0.10/feed"));
 });
 
+test("isYoutubeHost reconnaît les hôtes YouTube, avec ou sans www.", () => {
+  assert.equal(feed.isYoutubeHost("https://www.youtube.com/@nom"), true);
+  assert.equal(feed.isYoutubeHost("https://youtube.com/@nom"), true);
+  assert.equal(feed.isYoutubeHost("https://m.youtube.com/@nom"), true);
+  assert.equal(feed.isYoutubeHost("https://music.youtube.com/@nom"), true);
+  assert.equal(feed.isYoutubeHost("https://youtube-nocookie.com/embed/x"), true);
+  assert.equal(feed.isYoutubeHost("https://lemonde.fr/rss/une.xml"), false);
+  assert.equal(feed.isYoutubeHost("https://youtube.com.pirate.fr/@nom"), false);
+  assert.equal(feed.isYoutubeHost("pas une url"), false);
+  assert.equal(feed.isYoutubeHost(""), false);
+});
+
 test("assertSafeUrl refuse une URL malformée", async () => {
   await assert.rejects(() => feed.assertSafeUrl("pas une url"));
 });

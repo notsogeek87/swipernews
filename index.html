@@ -918,9 +918,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=144"></script>
+<script src="src/lib.js?v=145"></script>
 <script src="src/learn-core.js?v=143"></script>
-<script src="src/i18n.js?v=144"></script>
+<script src="src/i18n.js?v=145"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1531,7 +1531,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="144";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="145";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1917,7 +1917,14 @@ async function fetchViaProxy(make,url,timeout){
 async function nativeGet(url,timeoutMs){
   const http=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.CapacitorHttp;
   if(!http)throw new Error("CapacitorHttp indisponible");
-  const res=await http.request({url,method:"GET",responseType:"text",connectTimeout:timeoutMs,readTimeout:timeoutMs});
+  // Sans cookie CONSENT existant, Google sert une page générique de
+  // consentement aux cookies à la place d'une page YouTube demandée (voir
+  // isYoutubeHost, api/feed.js, pour le même correctif côté web) — ça ne vise
+  // que la page de chaîne (isYoutubeChannelPageUrl) mais le poser aussi pour
+  // le flux XML (isYoutubeFeedUrl) est sans effet, donc pas la peine de
+  // distinguer les deux ici.
+  const headers=(isYoutubeFeedUrl(url)||isYoutubeChannelPageUrl(url))?{Cookie:"CONSENT=YES+1"}:undefined;
+  const res=await http.request({url,method:"GET",responseType:"text",connectTimeout:timeoutMs,readTimeout:timeoutMs,headers});
   if(!(res.status>=200&&res.status<300))throw new Error("http "+res.status);
   const txt=typeof res.data==="string"?res.data:JSON.stringify(res.data);
   if(txt&&txt.length>200)return txt;
@@ -4975,7 +4982,17 @@ async function resolveYoutubeChannelFeed(pageUrl){
   try{
     const html=await fetchText(pageUrl,()=>8000);
     const rss=youtubeFeedUrlFromChannelHtml(html);
-    if(!rss)return "";
+    if(!rss){
+      // Diagnostic seulement (rien d'affiché à l'utilisateur, voir addFeed) :
+      // distingue le mur de consentement aux cookies de Google — reçu à la
+      // place de la page demandée quand aucun cookie CONSENT n'est déjà posé
+      // (voir isYoutubeHost, api/feed.js, et nativeGet ci-dessus) — d'un
+      // autre échec, pour ne pas rejouer cette enquête à l'aveugle si le
+      // cookie ne suffit pas dans tous les cas.
+      const mur=/consent\.youtube\.com|content="cb: consent/i.test(html);
+      warn("résolution chaîne YouTube",mur?"mur de consentement Google":"rien de HTML exploitable");
+      return "";
+    }
     const text=await fetchText(rss,()=>8000);
     const doc=new DOMParser().parseFromString(text,"text/xml");
     if(!titreDuFlux(doc,false))return "";      // pas de <title> = rien d'exploitable

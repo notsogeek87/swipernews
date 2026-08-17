@@ -135,6 +135,32 @@ async function readCapped(upstream) {
   return Buffer.concat(chunks.map((c) => Buffer.from(c))).toString("utf-8");
 }
 
+// Hôtes YouTube reconnus (mêmes que YT_HOSTS, src/lib.js — dupliqué plutôt
+// qu'importé : ce fichier ne dépend de rien d'autre que dns/net).
+const YOUTUBE_HOSTS = new Set([
+  "youtube.com",
+  "m.youtube.com",
+  "music.youtube.com",
+  "youtube-nocookie.com",
+]);
+
+// Vrai quand `url` vise un hôte YouTube. Sert à poser le cookie CONSENT
+// ci-dessous : sans cookie CONSENT existant, Google sert (directement ou via
+// une redirection vers consent.youtube.com) une page générique de
+// consentement aux cookies à la place de la page demandée — comportement
+// documenté (ex. yt-dlp), qui ne touche QUE les pages HTML consommateur.
+// L'API XML (/feeds/videos.xml), déjà utilisée ailleurs dans l'app, en est
+// exemptée — d'où l'absence de ce problème avant la résolution d'une page de
+// chaîne (voir resolveYoutubeChannelFeed, index.html).
+function isYoutubeHost(url) {
+  try {
+    const host = new URL(String(url || "")).hostname.replace(/^www\./, "").toLowerCase();
+    return YOUTUBE_HOSTS.has(host);
+  } catch (_) {
+    return false;
+  }
+}
+
 // Le front est same-origin : il n'a besoin d'aucun CORS. Un "*" ferait de ce
 // point d'accès un proxy ouvert utilisable par n'importe quel site, à nos frais
 // d'exécution et sous notre réputation IP. On n'ouvre donc qu'une origine
@@ -181,6 +207,9 @@ async function handler(req, res) {
           "Mozilla/5.0 (compatible; FluxRSS/1.0; +https://swipernews.vercel.app)",
         accept:
           "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+        // Voir isYoutubeHost : évite le mur de consentement aux cookies pour
+        // une chaîne interrogée par sa page (/@nom…) plutôt que par son flux.
+        ...(isYoutubeHost(url) ? { cookie: "CONSENT=YES+1" } : {}),
       },
     });
 
@@ -212,3 +241,4 @@ module.exports = handler;
 module.exports.assertSafeUrl = assertSafeUrl;
 module.exports.isPrivateIp = isPrivateIp;
 module.exports.safeFetch = safeFetch;
+module.exports.isYoutubeHost = isYoutubeHost;
