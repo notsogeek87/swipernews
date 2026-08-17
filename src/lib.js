@@ -684,6 +684,73 @@
     return "YT · " + clampText(t, 80);
   }
 
+  /* ---------- Résoudre une page de chaîne en flux RSS ----------
+     La plupart des gens ont sous la main l'URL de la page de la chaîne
+     (`/@nom`, `/channel/UC…`, `/c/…`, `/user/…`), pas celle du flux. Ajoutée
+     telle quelle, elle n'est ni RSS ni Atom : la source ne charge jamais rien.
+     Ces fonctions retrouvent le flux depuis le HTML public de la page — voir
+     `resolveYoutubeChannelFeed` dans index.html pour le téléchargement et la
+     vérification, qui demandent le réseau et ne peuvent donc pas vivre ici. */
+
+  /** Chemins qui désignent une page de CHAÎNE, pas déjà un flux ni une vidéo. */
+  const YT_CHANNEL_PAGE_RE = /^\/(@[^/]+|channel\/[^/]+|c\/[^/]+|user\/[^/]+)\/?/;
+
+  /** Vrai pour l'URL d'une page de chaîne YouTube encore à résoudre. Faux pour
+   *  un flux déjà construit (`isYoutubeFeedUrl`) et pour un lien vidéo. */
+  function isYoutubeChannelPageUrl(url) {
+    try {
+      const u = new URL(String(url || ""));
+      if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+      const host = u.hostname.replace(/^www\./, "").toLowerCase();
+      return YT_HOSTS.includes(host) && YT_CHANNEL_PAGE_RE.test(u.pathname);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /** `href` du `<link rel="alternate" type="application/rss+xml">` annoncé par
+   *  la page, ou "". L'ordre des attributs sur la balise n'est pas garanti,
+   *  d'où deux contrôles séparés plutôt qu'une seule regex rigide. */
+  function youtubeRssLinkFromHtml(html) {
+    const tags = String(html || "").match(/<link\b[^>]*>/gi) || [];
+    for (const tag of tags) {
+      if (!/rel=["']alternate["']/i.test(tag)) continue;
+      if (!/type=["']application\/rss\+xml["']/i.test(tag)) continue;
+      const m = tag.match(/href=["']([^"']+)["']/i);
+      if (m) return decodeEntities(m[1]);
+    }
+    return "";
+  }
+
+  /** Identifiant de chaîne (`UC` + 22 caractères) trouvé dans le HTML/les
+   *  métadonnées de la page, par ordre de confiance décroissant : les clés
+   *  JSON que YouTube pose lui-même, puis un `channel_id=` d'URL, puis un
+   *  `UC…` isolé en dernier recours. "" si rien ne correspond. */
+  function youtubeChannelIdFromHtml(html) {
+    const s = String(html || "");
+    const patterns = [
+      /"channelId":"(UC[A-Za-z0-9_-]{22})"/,
+      /"externalId":"(UC[A-Za-z0-9_-]{22})"/,
+      /channel_id=(UC[A-Za-z0-9_-]{22})/,
+      /(UC[A-Za-z0-9_-]{22})/,
+    ];
+    for (const re of patterns) {
+      const m = s.match(re);
+      if (m) return m[1];
+    }
+    return "";
+  }
+
+  /** URL du flux RSS d'une chaîne, déterminée depuis le HTML de sa page :
+   *  le lien RSS qu'elle annonce s'il est exploitable, sinon celle construite
+   *  depuis son channelId, sinon "". */
+  function youtubeFeedUrlFromChannelHtml(html) {
+    const link = youtubeRssLinkFromHtml(html);
+    if (link && isYoutubeFeedUrl(link)) return link;
+    const id = youtubeChannelIdFromHtml(html);
+    return id ? "https://www.youtube.com/feeds/videos.xml?channel_id=" + id : "";
+  }
+
   /* ---------- L'Équipe ----------
      Les flux RSS de L'Équipe (dwh.lequipe.fr) n'ont pas de titre pertinent :
      ils sont tous généré par une même API avec le même titre de base. La
@@ -1094,6 +1161,10 @@
     youtubeShortsFeedUrl,
     isYoutubeShortsFeedUrl,
     youtubeFeedName,
+    isYoutubeChannelPageUrl,
+    youtubeRssLinkFromHtml,
+    youtubeChannelIdFromHtml,
+    youtubeFeedUrlFromChannelHtml,
     isLequipeFeedUrl,
     lequipeRubrique,
     lequipeFeedName,

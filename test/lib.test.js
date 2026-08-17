@@ -541,6 +541,98 @@ test("youtubeFeedName préfixe la chaîne, et ne se préfixe jamais deux fois", 
   assert.ok(lib.youtubeFeedName("x".repeat(500)).length < 100);
 });
 
+test("isYoutubeChannelPageUrl reconnaît une page de chaîne, pas un flux ni une vidéo", () => {
+  assert.ok(lib.isYoutubeChannelPageUrl("https://www.youtube.com/@ScienceEtonnante"));
+  assert.ok(
+    lib.isYoutubeChannelPageUrl("https://youtube.com/channel/UCabcdefghijklmnopqrstuv")
+  );
+  assert.ok(lib.isYoutubeChannelPageUrl("https://www.youtube.com/c/ArteDocumentaires"));
+  assert.ok(lib.isYoutubeChannelPageUrl("https://www.youtube.com/user/unepersonne"));
+  assert.ok(lib.isYoutubeChannelPageUrl("https://m.youtube.com/@ScienceEtonnante"));
+  // Sous-page d'une chaîne : toujours la même chaîne à résoudre.
+  assert.ok(
+    lib.isYoutubeChannelPageUrl("https://www.youtube.com/@ScienceEtonnante/videos")
+  );
+  // Déjà un flux, ou une vidéo : pas une page de chaîne.
+  assert.ok(
+    !lib.isYoutubeChannelPageUrl(
+      "https://www.youtube.com/feeds/videos.xml?channel_id=UCabc"
+    )
+  );
+  assert.ok(!lib.isYoutubeChannelPageUrl("https://www.youtube.com/watch?v=" + YT));
+  assert.ok(!lib.isYoutubeChannelPageUrl("https://www.youtube.com/shorts/" + YT));
+  assert.ok(!lib.isYoutubeChannelPageUrl("https://lemonde.fr/@quelquun"));
+  assert.ok(!lib.isYoutubeChannelPageUrl(""));
+  assert.ok(!lib.isYoutubeChannelPageUrl(null));
+});
+
+test("youtubeRssLinkFromHtml lit le <link rel=alternate> annoncé par la page", () => {
+  const url =
+    "https://www.youtube.com/feeds/videos.xml?channel_id=UCabcdefghijklmnopqrstuv";
+  assert.equal(
+    lib.youtubeRssLinkFromHtml(
+      `<html><head><link rel="alternate" type="application/rss+xml" title="RSS" href="${url}"></head></html>`
+    ),
+    url
+  );
+  // Ordre des attributs différent : ne doit rien changer.
+  assert.equal(
+    lib.youtubeRssLinkFromHtml(
+      `<link href="${url}" type="application/rss+xml" rel="alternate">`
+    ),
+    url
+  );
+  // Entité HTML dans le href (le & d'une URL de flux est échappé en HTML).
+  assert.equal(
+    lib.youtubeRssLinkFromHtml(
+      '<link rel="alternate" type="application/rss+xml" href="https://www.youtube.com/feeds/videos.xml?a=1&amp;channel_id=UCabc">'
+    ),
+    "https://www.youtube.com/feeds/videos.xml?a=1&channel_id=UCabc"
+  );
+  // Pas de balise de ce type : rien à en tirer.
+  assert.equal(
+    lib.youtubeRssLinkFromHtml("<html><head><title>Chaîne</title></head></html>"),
+    ""
+  );
+  assert.equal(lib.youtubeRssLinkFromHtml(""), "");
+});
+
+test("youtubeChannelIdFromHtml cherche le channelId par ordre de confiance", () => {
+  const id = "UCabcdefghijklmnopqrstuv";
+  assert.equal(lib.youtubeChannelIdFromHtml(`{"channelId":"${id}"}`), id);
+  // À défaut de channelId, externalId.
+  assert.equal(lib.youtubeChannelIdFromHtml(`{"externalId":"${id}"}`), id);
+  // À défaut des deux, un paramètre channel_id= dans le HTML (ex. un lien).
+  assert.equal(
+    lib.youtubeChannelIdFromHtml(`<a href="/feeds/videos.xml?channel_id=${id}">`),
+    id
+  );
+  // En tout dernier recours, l'identifiant isolé n'importe où dans le texte.
+  assert.equal(lib.youtubeChannelIdFromHtml(`vu ailleurs : ${id} sur la page`), id);
+  assert.equal(lib.youtubeChannelIdFromHtml("<html>rien ici</html>"), "");
+  assert.equal(lib.youtubeChannelIdFromHtml(""), "");
+});
+
+test("youtubeFeedUrlFromChannelHtml combine lien annoncé et channelId", () => {
+  const id = "UCabcdefghijklmnopqrstuv";
+  const rssUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=" + id;
+  // Le lien annoncé prime quand les deux sont présents.
+  assert.equal(
+    lib.youtubeFeedUrlFromChannelHtml(
+      `<link rel="alternate" type="application/rss+xml" href="${rssUrl}">` +
+        `<script>var d={"channelId":"UCzzzzzzzzzzzzzzzzzzzzzz"};</script>`
+    ),
+    rssUrl
+  );
+  // Pas de lien annoncé : construit depuis le channelId trouvé.
+  assert.equal(
+    lib.youtubeFeedUrlFromChannelHtml(`<script>var d={"channelId":"${id}"};</script>`),
+    rssUrl
+  );
+  // Ni l'un ni l'autre : rien à résoudre.
+  assert.equal(lib.youtubeFeedUrlFromChannelHtml("<html>rien ici</html>"), "");
+});
+
 test("les vignettes YouTube déclarent leur taille par leur nom de fichier", () => {
   // Sans ça, imageSizeFromUrl rend 0 sur une URL ytimg, et applyBg part sonder
   // /api/og pour CHAQUE carte vidéo défilée — le défaut déjà corrigé côté

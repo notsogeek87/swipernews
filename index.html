@@ -918,9 +918,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=143"></script>
+<script src="src/lib.js?v=144"></script>
 <script src="src/learn-core.js?v=143"></script>
-<script src="src/i18n.js?v=143"></script>
+<script src="src/i18n.js?v=144"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1027,7 +1027,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,interleave,roundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,interleave,roundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeFeedUrlFromChannelHtml,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1531,7 +1531,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="143";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="144";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -4935,8 +4935,9 @@ function renderSuggest(){
 }
 function toggleFeed(i){feeds[i].on=!feeds[i].on;save();}
 function delFeed(i){feeds.splice(i,1);save();renderList();renderSuggest();}
-function addFeed(){const inp=document.getElementById("newUrl");const url=inp.value.trim();
-  if(!isFeedUrl(url)){toast(T("toast.invalidUrl"));return;}
+/* Dédoublonnage, stockage, re-rendu : commun à une URL déjà valide, qu'elle
+   ait été saisie telle quelle ou résolue depuis une page de chaîne YouTube. */
+function pushFeedUrl(url,inp){
   /* Deux fois la même URL n'était refusé nulle part ici (le tap sur une
      suggestion et l'import OPML, eux, vérifient déjà). Ce doublon coûte une
      requête par chargement pour rien : `collected` est indexé PAR URL
@@ -4948,7 +4949,39 @@ function addFeed(){const inp=document.getElementById("newUrl");const url=inp.val
   // Chaîne YouTube : le nom n'est nulle part dans l'URL, il faut le demander au
   // flux. En arrière-plan — l'ajout reste instantané, et un échec ne coûte que
   // le nom d'hôte, exactement comme avant.
-  if(isYoutubeFeedUrl(url))nommerChaine(url);}
+  if(isYoutubeFeedUrl(url))nommerChaine(url);
+}
+async function addFeed(){const inp=document.getElementById("newUrl");const url=inp.value.trim();
+  // Page de chaîne (`/@nom`, `/channel/UC…`, `/c/…`, `/user/…`) : pas encore un
+  // flux, à intercepter AVANT isFeedUrl (qui l'accepterait telle quelle, pour
+  // ne jamais rien charger ensuite). Voir resolveYoutubeChannelFeed.
+  if(isYoutubeChannelPageUrl(url)){
+    toast(T("toast.youtubeResolving"));
+    const rss=await resolveYoutubeChannelFeed(url);
+    if(!rss){toast(T("toast.youtubeChannelNotFound"));return;}
+    pushFeedUrl(rss,inp);
+    return;
+  }
+  if(!isFeedUrl(url)){toast(T("toast.invalidUrl"));return;}
+  pushFeedUrl(url,inp);
+}
+/* Résout l'URL RSS d'une chaîne YouTube depuis l'URL de sa page publique :
+   télécharge la page, cherche le lien RSS qu'elle annonce ou son channelId
+   (youtubeFeedUrlFromChannelHtml, src/lib.js), puis VÉRIFIE que l'URL trouvée
+   répond bien un flux exploitable avant de la rendre — sinon on ajouterait une
+   source qui ne chargera jamais rien. Rend "" si rien n'a pu être déterminé ;
+   le toast d'échec est à charge de l'appelant. */
+async function resolveYoutubeChannelFeed(pageUrl){
+  try{
+    const html=await fetchText(pageUrl,()=>8000);
+    const rss=youtubeFeedUrlFromChannelHtml(html);
+    if(!rss)return "";
+    const text=await fetchText(rss,()=>8000);
+    const doc=new DOMParser().parseFromString(text,"text/xml");
+    if(!titreDuFlux(doc,false))return "";      // pas de <title> = rien d'exploitable
+    return rss;
+  }catch(e){warn("résolution chaîne YouTube",e);return "";}
+}
 async function nommerChaine(url){
   try{
     // Le MÊME flux que celui du fil (Shorts seuls, voir urlDuFlux) : interroger
