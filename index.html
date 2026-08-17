@@ -923,9 +923,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=157"></script>
-<script src="src/learn-core.js?v=157"></script>
-<script src="src/i18n.js?v=157"></script>
+<script src="src/lib.js?v=158"></script>
+<script src="src/learn-core.js?v=158"></script>
+<script src="src/i18n.js?v=158"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1024,6 +1024,13 @@ const CONFIG = {
      flux RSS au bout de quelques jours — la mémoriser plus longtemps ne sert
      plus à rien. 800 liens canoniques pèsent ~70 Ko, contre ~5 Mo de quota. */
   SEEN_NEWS_MAX: 800,
+  /* Âge maximal d'une vidéo YouTube (Shorts ou playlist choisie) pour rester
+     dans le fil — 1 mois. Propre à YouTube : une chaîne peut publier depuis
+     des années sans jamais faire sortir ses vieux Shorts du flux « derniers
+     éléments » (contrairement à un flux RSS classique, borné à ses N derniers
+     articles par l'éditeur lui-même), donc rien d'autre ne les évince. Voir
+     fetchFeedRobust. */
+  YT_MAX_AGE_MS: 30*24*3600*1000,
   // https obligatoire : ce lien part dans CHAQUE partage. En http, redirection
   // au mieux, avertissement « site non sécurisé » ou blocage au pire.
   APP_URL: "https://news.lielu.eu",
@@ -1575,7 +1582,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="157";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="158";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2081,6 +2088,13 @@ async function fetchFeedRobust(feed){
   }
   let result=filterSponsored?a.filter(i=>!isPromotionalItem(i)):a;
   if(filterVideoOnly)result=result.filter(i=>videoIdOf(i));
+  /* Filtre d'âge, YouTube seul (voir CONFIG.YT_MAX_AGE_MS) : une date qui ne se
+     parse pas ne fait pas sortir l'article, seule une date CONFIRMÉE trop
+     vieille le fait. */
+  if(isYoutubeFeedUrl(feed.url)){
+    const seuil=Date.now()-CONFIG.YT_MAX_AGE_MS;
+    result=result.filter(i=>{const t=Date.parse(i.date);return isNaN(t)||t>=seuil;});
+  }
   return result;
 }
 /* Nom que le flux se donne lui-même : <feed><title> en Atom, <channel><title>
