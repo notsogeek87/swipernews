@@ -215,7 +215,10 @@ async function handler(req, res) {
               "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36",
             accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "accept-language": "fr-FR,fr;q=0.9,en;q=0.8",
-            cookie: "CONSENT=YES+1",
+            // SOCS : second cookie du même mécanisme de consentement UE,
+            // requis EN PLUS de CONSENT depuis la refonte 2024 de Google —
+            // CONSENT seul ne suffisait plus (constaté en réel, voir addFeed).
+            cookie: "CONSENT=YES+1; SOCS=CAI",
           }
         : {
             "user-agent":

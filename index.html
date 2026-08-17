@@ -921,9 +921,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=149"></script>
-<script src="src/learn-core.js?v=149"></script>
-<script src="src/i18n.js?v=149"></script>
+<script src="src/lib.js?v=150"></script>
+<script src="src/learn-core.js?v=150"></script>
+<script src="src/i18n.js?v=150"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1534,7 +1534,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="149";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="150";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1928,7 +1928,10 @@ async function nativeGet(url,timeoutMs){
   // contrairement au flux XML, indifférent au user-agent. Sans effet sur ce
   // dernier de toute façon, donc pas la peine de distinguer les deux formes.
   const headers=(isYoutubeFeedUrl(url)||isYoutubeChannelPageUrl(url))?{
-    Cookie:"CONSENT=YES+1",
+    // SOCS : second cookie requis EN PLUS de CONSENT depuis la refonte 2024
+    // du consentement UE chez Google (voir api/feed.js) — constaté en réel :
+    // CONSENT seul ne suffisait pas.
+    Cookie:"CONSENT=YES+1; SOCS=CAI",
     "User-Agent":"Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36",
   }:undefined;
   const res=await http.request({url,method:"GET",responseType:"text",connectTimeout:timeoutMs,readTimeout:timeoutMs,headers});
@@ -5073,7 +5076,13 @@ async function resolveYoutubeChannelFeed(pageUrl){
       // — d'un autre échec, pour ne pas rejouer cette enquête à l'aveugle si
       // le cookie ne suffit pas dans tous les cas.
       const mur=/consent\.youtube\.com|content="cb: consent/i.test(html);
-      trace.push("page:"+(mur?"mur-consentement":"rien-trouvé")+"("+html.length+"o)");
+      // Le titre de la page reçue dit, en un coup d'œil, si c'est vraiment un
+      // mur (« Avant d'accéder à YouTube », générique) ou la vraie page
+      // (le nom de la chaîne) dont l'extraction a simplement raté — TEMPORAIRE,
+      // voir addFeed.
+      const t=html.match(/<title[^>]*>([^<]*)<\/title>/i);
+      const titre=t?t[1].trim().replace(/\s+/g," ").slice(0,50):"(sans titre)";
+      trace.push("page:"+(mur?"mur-consentement":"rien-trouvé")+" "+titre+" ("+html.length+"o)");
       return {rss:"",why:trace.join(" ")};
     }
     if(await verifieFluxChaine(rss))return {rss};
