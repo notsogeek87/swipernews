@@ -125,6 +125,70 @@ test("roundRobin alterne entre les files et laisse les autres continuer", () => 
   assert.deepEqual(lib.roundRobin([], [], 5), []);
 });
 
+test("weightedRoundRobin reproduit roundRobin à poids égaux", () => {
+  const bavarde = ["b1", "b2", "b3", "b4", "b5"];
+  const lente = ["l1"];
+  assert.deepEqual(
+    lib.weightedRoundRobin([
+      { items: bavarde, poids: 1 },
+      { items: lente, poids: 1 },
+    ]),
+    lib.roundRobin([bavarde, lente], [], Infinity)
+  );
+});
+
+test("weightedRoundRobin sert la file au poids le plus fort plus souvent, proportionnellement", () => {
+  // Poids 3 contre 1 : la première file doit apparaître trois fois plus
+  // souvent, répartie sur tout le résultat plutôt qu'en un seul bloc.
+  const a = ["a1", "a2", "a3", "a4", "a5", "a6"];
+  const b = ["b1", "b2"];
+  assert.deepEqual(
+    lib.weightedRoundRobin([
+      { items: a, poids: 3 },
+      { items: b, poids: 1 },
+    ]),
+    ["a1", "a2", "a3", "b1", "a4", "a5", "a6", "b2"]
+  );
+});
+
+test("weightedRoundRobin : une file vide, absente ou de poids nul n'est jamais servie", () => {
+  assert.deepEqual(
+    lib.weightedRoundRobin([
+      { items: ["x"], poids: 1 },
+      { items: [], poids: 5 },
+      { items: ["y"], poids: 0 },
+    ]),
+    ["x"]
+  );
+  assert.deepEqual(lib.weightedRoundRobin([]), []);
+});
+
+test("weightedRoundRobin fusionne trois flux en un seul passage", () => {
+  const majoritaire = ["m1", "m2", "m3", "m4", "m5", "m6"];
+  const minoritaire = ["n1", "n2"];
+  const rare = ["r1"];
+  const out = lib.weightedRoundRobin([
+    { items: majoritaire, poids: 3 },
+    { items: minoritaire, poids: 1 },
+    { items: rare, poids: 1 },
+  ]);
+  assert.equal(out.length, 9);
+  // Chaque flux garde son ordre interne, quelle que soit la position où il
+  // est servi.
+  assert.deepEqual(
+    out.filter((x) => x[0] === "m"),
+    majoritaire
+  );
+  assert.deepEqual(
+    out.filter((x) => x[0] === "n"),
+    minoritaire
+  );
+  assert.deepEqual(
+    out.filter((x) => x[0] === "r"),
+    rare
+  );
+});
+
 test("isPromotionalItem détecte les libellés éditoriaux standard (sponsorisé)", () => {
   assert.ok(lib.isPromotionalItem({ title: "[Sponsorisé] Une offre incroyable" }));
   assert.ok(lib.isPromotionalItem({ title: "Sponsorisé : ce produit change tout" }));

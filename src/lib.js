@@ -340,6 +340,45 @@
     return out;
   }
 
+  /** Tour de rôle PONDÉRÉ : comme roundRobin, mais chaque file porte un poids —
+   *  à chaque tour, on sert celle dont la part déjà servie est la plus en
+   *  retard sur son poids (score = (déjà servi + 1) / poids, on prend le plus
+   *  petit). Poids tous égaux à 1 reproduit exactement roundRobin. Une file
+   *  vide, absente ou de poids nul n'est jamais servie.
+   *
+   *  Sert à fusionner en UN seul passage des flux dont la cadence n'obéit pas
+   *  à la même règle — par exemple, dans index.html, vidéo/article/Wikipédia :
+   *  Wikipédia doit garder la fréquence du curseur de dose (poids fixe, choisi
+   *  par l'utilisateur) pendant que vidéo et article se partagent le reste au
+   *  prorata de ce qu'ils ont chacun à offrir (poids proportionnel à leur
+   *  compte). Les fusionner en deux temps (d'abord vidéo/article, puis
+   *  Wikipédia par-dessus le résultat) laissait la vidéo tomber n'importe où
+   *  dans chaque bloc d'actus consécutives — parfois collée à l'insertion
+   *  Wikipédia, parfois loin d'elle, au hasard de l'endroit où le bloc
+   *  commençait à se couper. */
+  function weightedRoundRobin(streams) {
+    const st = streams.filter((s) => s.items && s.items.length && s.poids > 0);
+    const pos = st.map(() => 0);
+    const servi = st.map(() => 0);
+    const out = [];
+    for (;;) {
+      let bi = -1;
+      let bscore = Infinity;
+      for (let i = 0; i < st.length; i++) {
+        if (pos[i] >= st[i].items.length) continue;
+        const score = (servi[i] + 1) / st[i].poids;
+        if (score < bscore) {
+          bscore = score;
+          bi = i;
+        }
+      }
+      if (bi < 0) break;
+      out.push(st[bi].items[pos[bi]++]);
+      servi[bi]++;
+    }
+    return out;
+  }
+
   /** Dédoublonne plusieurs listes (une par catégorie), mélange, et les sert à
    *  TOUR DE RÔLE — une carte par catégorie, puis on recommence — en plaçant les
    *  articles illustrés d'abord À L'INTÉRIEUR de chaque catégorie.
@@ -1194,6 +1233,7 @@
     seenKey,
     dropSeen,
     roundRobin,
+    weightedRoundRobin,
     dedupAndRank,
     dedupNews,
     canonicalLink,

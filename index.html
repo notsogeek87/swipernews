@@ -923,9 +923,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=156"></script>
-<script src="src/learn-core.js?v=156"></script>
-<script src="src/i18n.js?v=156"></script>
+<script src="src/lib.js?v=157"></script>
+<script src="src/learn-core.js?v=157"></script>
+<script src="src/i18n.js?v=157"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -933,7 +933,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","interleave","roundRobin","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeShortsFeedUrl","isYoutubeShortsFeedUrl","youtubeFeedName","isLequipeFeedUrl","lequipeRubrique","lequipeFeedName"],
+  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","roundRobin","weightedRoundRobin","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeShortsFeedUrl","isYoutubeShortsFeedUrl","youtubeFeedName","isLequipeFeedUrl","lequipeRubrique","lequipeFeedName"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket","perCatLimit"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -1032,7 +1032,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,interleave,roundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,roundRobin,weightedRoundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1113,12 +1113,16 @@ const LS_NSRC="fluxswipe.newssrc.v1";
 /* ---------- Le fil unique ----------
    Deux réserves, un seul fil. Les actus (RSS, finies, triées par date) et les
    articles Wikipédia (tirage sans fin) sont collectés SÉPARÉMENT, puis
-   entrelacés à cadence fixe par interleave() : `items` n'est jamais construit à
-   la main, il est toujours le mélange des deux réserves.
+   mélangées par mixLists() (voir plus bas) selon la dose : `items` n'est
+   jamais construit à la main, il est toujours le mélange des deux réserves.
    C'est ce qui permet à chaque moitié de vivre sa vie — un flux qui répond, un
-   lot Wikipédia de plus — sans que l'autre ait à être rechargée, et sans
-   réordonner ce qui est déjà lu (voir la propriété de préfixe testée dans
-   test/lib.test.js). */
+   lot Wikipédia de plus — sans que l'autre ait à être rechargée. Ce qui ne
+   bouge JAMAIS, ce sont les cartes déjà affichées (voir `fige` dans remix,
+   plus bas) : elles sont retirées des deux réserves AVANT le mélange, donc
+   jamais reconsidérées. Au-delà de cette fenêtre gelée, l'ordre du reste peut
+   se redessiner d'un mélange à l'autre (un nouveau lot déplace les
+   proportions) — sans conséquence, puisque ces cartes n'ont encore jamais été
+   sous les yeux. */
 let feeds=load(),newsItems=[],learnItems=[],items=[];
 const markKind=k=>it=>(it.kind===k?it:{...it,kind:k});
 
@@ -1157,14 +1161,38 @@ function persistMix(n){
   mixScore=clampMix(n);
   try{localStorage.setItem(LS_MIX,String(mixScore));}catch(e){warn("save mix",e);}
 }
-/* Entrelacement selon la dose : une seule règle, partagée par le fil et par son
-   aperçu dans les réglages. interleave() pose UN élément de sa 2e liste tous
-   les `every` de la 1re — pour une dose penchée vers Wikipédia, on lui passe
-   donc les deux listes dans l'autre sens. */
+/* Mélange selon la dose : une seule règle, partagée par le fil et par son
+   aperçu dans les réglages. Un seul passage pour les TROIS flux (vidéo,
+   article, Wikipédia) — vidéo est tirée d'`actus` (voir videoIdOf) et
+   entrelacée avec les articles au prorata de ce que chacun a à offrir,
+   PENDANT que Wikipédia garde la fréquence du curseur de dose (`m`), via
+   `weightedRoundRobin()` (src/lib.js). Les fusionner en deux temps — d'abord
+   vidéo/article, puis Wikipédia par-dessus le résultat — laissait la vidéo
+   tomber n'importe où dans chaque bloc d'actus consécutives, parfois collée à
+   l'insertion Wikipédia, parfois loin d'elle.
+   La tête revient à celui des deux réglages qui DOMINE la dose (`m.news` ou
+   `m.learn`, le plus grand des deux) — à égalité, aux actus, pour garder
+   « carte 1 = actu la plus récente » comme comportement par défaut. C'est
+   la même règle qu'avant (interleave posait toujours en tête la liste passée
+   en premier argument, or l'ancien code choisissait cet ordre exactement sur
+   ce critère), juste rendue explicite plutôt que déduite de l'ordre des
+   arguments. */
 function mixLists(news,learn,m){
-  if(!m.learn)return news.slice();
   if(!m.news)return learn.slice();
-  return m.learn===1?interleave(news,learn,m.news):interleave(learn,news,m.learn);
+  if(!news.length)return m.learn?learn.slice():[];
+  const wikiLeads=learn.length>0&&m.learn>m.news;
+  const tete=wikiLeads?learn[0]:news[0];
+  const resteNews=wikiLeads?news:news.slice(1);
+  const resteLearn=wikiLeads?learn.slice(1):learn;
+  const videos=[],articles=[];
+  for(const it of resteNews)(videoIdOf(it)?videos:articles).push(it);
+  const total=videos.length+articles.length;
+  const streams=[
+    {items:articles,poids:total?articles.length/total:0},
+    {items:videos,poids:total?videos.length/total:0},
+  ];
+  if(m.learn&&resteLearn.length)streams.push({items:resteLearn,poids:m.learn/m.news});
+  return [tete,...weightedRoundRobin(streams)];
 }
 /* Recompose le fil. Au-delà de MAX_ITEMS on jette la TÊTE (les plus anciennes
    cartes, déjà lues : le fil ne grandit que par le bas), et on retire des deux
@@ -1547,7 +1575,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="156";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="157";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2856,7 +2884,7 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
        de tête (elle doit rester la carte 1), donc on la préserve et on ne
        mélange que le reste. */
     queues.push(...shuffle(queues.splice(1)));
-    newsItems=alterneTypes(roundRobin(queues,[],CONFIG.MAX_NEWS));
+    newsItems=roundRobin(queues,[],CONFIG.MAX_NEWS);
     remix(!top);
   }
 
@@ -3791,34 +3819,12 @@ const ICON_PLAY=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 /* Identifiant de la vidéo intégrable portée par un article, "" sinon —
    le SEUL point de décision « cette carte est-elle une carte vidéo ? ».
    Six endroits en dépendent (cardHTML pour la classe, les trois marqueurs de
-   sonde et la pastille ; applyBg pour l'image de secours ; alterneTypes pour
-   l'alternance vidéo/article ci-dessous) : les laisser tester chacun de leur
+   sonde et la pastille ; applyBg pour l'image de secours ; mixLists pour
+   l'alternance vidéo/article/Wikipédia) : les laisser tester chacun de leur
    côté, c'est se garantir qu'ils divergeront.
    Wikipédia est exclu d'emblée — ses liens ne sont jamais des vidéos, et lui
    poser la question à chaque carte ne ferait que payer un `new URL` pour rien. */
 function videoIdOf(it){return it&&it.kind!=="learn"?youtubeId(it.link):"";}
-/* Alterne vidéo/article dans le fil des actus, INDÉPENDAMMENT du tour de rôle
-   par source ci-dessus (rebuild) : celui-ci équilibre déjà les sources entre
-   elles, mais plusieurs chaînes YouTube suivies restent plusieurs sources DE
-   VIDÉOS — rien n'empêchait alors leurs cartes de tomber les unes après les
-   autres, l'ordre entre sources n'ayant aucune raison de croiser un type avec
-   l'autre. La tête (déjà fixée par rebuild, l'actu la plus récente) est
-   préservée telle quelle ; le reste est reconstruit en servant le type
-   minoritaire aussi souvent que sa proportion le permet, via `interleave()`
-   (src/lib.js) — déjà l'outil de la dose actus/Wikipédia, réutilisé ici pour
-   la même raison : répartir un type rare au lieu de le laisser aux extrémités
-   du hasard. Si un type est absent (aucune chaîne suivie, ou aucun article),
-   il n'y a rien à alterner. */
-function alterneTypes(list){
-  if(list.length<3)return list;
-  const tete=list[0],reste=list.slice(1);
-  const videos=[],articles=[];
-  for(const it of reste)(videoIdOf(it)?videos:articles).push(it);
-  if(!videos.length||!articles.length)return list;
-  const [minor,major]=videos.length<=articles.length?[videos,articles]:[articles,videos];
-  const pas=Math.max(1,Math.round(major.length/minor.length));
-  return [tete,...interleave(major,minor,pas)];
-}
 function cardHTML(it,id){
   const img=safeImg(it.img,location.href);
   const link=safeLink(it.link,location.href);
@@ -4140,9 +4146,10 @@ function hideTop(){topEl.classList.add("top--away");document.body.classList.add(
    réapprovisionner la réserve AVANT qu'elle ne s'épuise, pas seulement près
    du bas du fil entier. Sans ça, une dose penchée vers Wikipédia avec une
    réserve d'actus bien plus grande (un seul lot Wikipédia contre jusqu'à
-   MAX_NEWS actus) interlace ce lot puis DÉVERSE tout le reste des actus d'un
-   coup dès qu'il est épuisé (interleave, src/lib.js, ne remélange pas quand
-   une des deux listes est vide) : le seuil « près du bas de TOUT le fil »
+   MAX_NEWS actus) mélange ce lot puis DÉVERSE tout le reste des actus sans
+   plus jamais en recroiser une seule (weightedRoundRobin, src/lib.js, exclut
+   une file épuisée du tour de rôle sans jamais y revenir) : le seuil « près
+   du bas de TOUT le fil »
    ne se déclenchait qu'après ce déversement, bien après que l'utilisateur
    ait déjà traversé plusieurs écrans d'actus sans le moindre article. */
 function learnCardsAhead(depuis){
