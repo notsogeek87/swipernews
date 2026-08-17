@@ -2059,9 +2059,9 @@ const scenarios = {
       calls.player
     );
     console.log(
-      "après ▶ — barre du haut dépliée (attendu : false) :",
+      "après ▶ — barre du haut masquée (attendu : true) :",
       await page.evaluate(
-        () => document.querySelector(".top")?.classList.contains("show") ?? "n/a"
+        () => document.querySelector(".top")?.classList.contains("top--away") ?? "n/a"
       )
     );
 
