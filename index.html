@@ -523,6 +523,12 @@
     padding:13px 18px;border-radius:var(--radius-sm);cursor:pointer;font-size:14px;
     box-shadow:var(--shadow-ember);transition:filter .2s}
   .addbox button:hover,.applybtn:hover{filter:brightness(1.15)}
+  .addbox button:disabled{cursor:default;filter:none;opacity:.7}
+  /* Même piste/segment que .spinner (état de résolution d'une chaîne YouTube,
+     voir addFeed), en miniature pour tenir dans le bouton. */
+  .addspin{display:inline-block;width:15px;height:15px;vertical-align:-3px;
+    border:2px solid var(--surface);border-top-color:var(--flare);
+    border-radius:calc(var(--radius-sm) / 3);animation:spin .9s linear infinite}
   .applybtn{width:100%;margin-top:16px;padding:15px;font-size:16px}
   .iorow{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;padding-top:18px;border-top:1px solid rgba(149,28,4,.3)}
   .iobtn{flex:1 1 auto;min-width:120px;background:transparent;border:1.5px solid var(--redline);color:var(--ink);
@@ -5014,13 +5020,30 @@ function pushFeedUrl(url,inp){
   // le nom d'hôte, exactement comme avant.
   if(isYoutubeFeedUrl(url))nommerChaine(url);
 }
+/* État « en train de résoudre une chaîne YouTube » du bouton d'ajout : le
+   toast de resolveYoutubeChannelFeed s'efface après 1,8 s, largement avant
+   que la résolution (plusieurs requêtes en cascade) n'ait fini — sans rien
+   d'autre, l'utilisateur ne voit plus aucun signe que quelque chose se passe.
+   Le bouton porte donc lui-même l'état, pour toute la durée : désactivé, son
+   libellé remplacé par un petit indicateur de chargement (voir .addspin) ;
+   l'URL saisie reste visible mais l'entrée se verrouille aussi, pour ne pas
+   laisser modifier ou soumettre une seconde fois une valeur déjà en vol. */
+function resolutionChaineEnCours(on){
+  const inp=document.getElementById("newUrl"),btn=document.getElementById("addFeedBtn");
+  inp.disabled=on;btn.disabled=on;
+  if(on){btn.dataset.label=btn.innerHTML;btn.innerHTML='<span class="addspin" role="status" aria-label="'+escAttr(T("toast.youtubeResolving"))+'"></span>';}
+  else if(btn.dataset.label!==undefined){btn.innerHTML=btn.dataset.label;delete btn.dataset.label;}
+}
 async function addFeed(){const inp=document.getElementById("newUrl");const url=inp.value.trim();
   // Page de chaîne (`/@nom`, `/channel/UC…`, `/c/…`, `/user/…`) : pas encore un
   // flux, à intercepter AVANT isFeedUrl (qui l'accepterait telle quelle, pour
   // ne jamais rien charger ensuite). Voir resolveYoutubeChannelFeed.
   if(isYoutubeChannelPageUrl(url)){
     toast(T("toast.youtubeResolving"));
-    const rss=await resolveYoutubeChannelFeed(url);
+    resolutionChaineEnCours(true);
+    let rss;
+    try{rss=await resolveYoutubeChannelFeed(url);}
+    finally{resolutionChaineEnCours(false);}
     if(!rss){toast(T("toast.youtubeChannelNotFound"));return;}
     pushFeedUrl(rss,inp);
     return;
