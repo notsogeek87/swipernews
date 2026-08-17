@@ -115,6 +115,7 @@
       "sheet.sources.importFile": "↑ Importer un fichier",
       "sheet.sources.suggestTitle": "Sources suggérées — un tap pour ajouter",
       "sheet.sources.deleteAria": "Supprimer {name}",
+      "sheet.sources.shareAria": "Partager {name}",
       "sheet.sources.unreachable": "injoignable",
 
       "sheet.apply": "Voir mon fil",
@@ -326,6 +327,7 @@
       "sheet.sources.importFile": "↑ Import a file",
       "sheet.sources.suggestTitle": "Suggested sources — tap to add",
       "sheet.sources.deleteAria": "Delete {name}",
+      "sheet.sources.shareAria": "Share {name}",
       "sheet.sources.unreachable": "unreachable",
 
       "sheet.apply": "See my feed",
