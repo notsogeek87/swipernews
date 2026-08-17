@@ -923,9 +923,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=155"></script>
-<script src="src/learn-core.js?v=155"></script>
-<script src="src/i18n.js?v=155"></script>
+<script src="src/lib.js?v=156"></script>
+<script src="src/learn-core.js?v=156"></script>
+<script src="src/i18n.js?v=156"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1547,7 +1547,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="155";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="156";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2856,7 +2856,7 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
        de tête (elle doit rester la carte 1), donc on la préserve et on ne
        mélange que le reste. */
     queues.push(...shuffle(queues.splice(1)));
-    newsItems=roundRobin(queues,[],CONFIG.MAX_NEWS);
+    newsItems=alterneTypes(roundRobin(queues,[],CONFIG.MAX_NEWS));
     remix(!top);
   }
 
@@ -3790,12 +3790,35 @@ const ICON_PAYWALL=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const ICON_PLAY=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M10 8.2l6.2 3.8L10 15.8z" fill="currentColor" stroke="none"></path></svg>`;
 /* Identifiant de la vidéo intégrable portée par un article, "" sinon —
    le SEUL point de décision « cette carte est-elle une carte vidéo ? ».
-   Cinq endroits en dépendent (cardHTML pour la classe, les trois marqueurs de
-   sonde et la pastille ; applyBg pour l'image de secours) : les laisser tester
-   chacun de leur côté, c'est se garantir qu'ils divergeront.
+   Six endroits en dépendent (cardHTML pour la classe, les trois marqueurs de
+   sonde et la pastille ; applyBg pour l'image de secours ; alterneTypes pour
+   l'alternance vidéo/article ci-dessous) : les laisser tester chacun de leur
+   côté, c'est se garantir qu'ils divergeront.
    Wikipédia est exclu d'emblée — ses liens ne sont jamais des vidéos, et lui
    poser la question à chaque carte ne ferait que payer un `new URL` pour rien. */
 function videoIdOf(it){return it&&it.kind!=="learn"?youtubeId(it.link):"";}
+/* Alterne vidéo/article dans le fil des actus, INDÉPENDAMMENT du tour de rôle
+   par source ci-dessus (rebuild) : celui-ci équilibre déjà les sources entre
+   elles, mais plusieurs chaînes YouTube suivies restent plusieurs sources DE
+   VIDÉOS — rien n'empêchait alors leurs cartes de tomber les unes après les
+   autres, l'ordre entre sources n'ayant aucune raison de croiser un type avec
+   l'autre. La tête (déjà fixée par rebuild, l'actu la plus récente) est
+   préservée telle quelle ; le reste est reconstruit en servant le type
+   minoritaire aussi souvent que sa proportion le permet, via `interleave()`
+   (src/lib.js) — déjà l'outil de la dose actus/Wikipédia, réutilisé ici pour
+   la même raison : répartir un type rare au lieu de le laisser aux extrémités
+   du hasard. Si un type est absent (aucune chaîne suivie, ou aucun article),
+   il n'y a rien à alterner. */
+function alterneTypes(list){
+  if(list.length<3)return list;
+  const tete=list[0],reste=list.slice(1);
+  const videos=[],articles=[];
+  for(const it of reste)(videoIdOf(it)?videos:articles).push(it);
+  if(!videos.length||!articles.length)return list;
+  const [minor,major]=videos.length<=articles.length?[videos,articles]:[articles,videos];
+  const pas=Math.max(1,Math.round(major.length/minor.length));
+  return [tete,...interleave(major,minor,pas)];
+}
 function cardHTML(it,id){
   const img=safeImg(it.img,location.href);
   const link=safeLink(it.link,location.href);
