@@ -294,49 +294,171 @@
 
   /** Clé de jour civil LOCAL, "YYYY-MM-DD" — pas UTC : "aujourd'hui" doit
    *  correspondre au jour vécu par l'utilisateur. Sert de brique aux
-   *  statistiques de cartes défilées (voir cardScrollStats) et à la clé de
+   *  statistiques de cartes défilées (voir statsBuckets) et à la clé de
    *  bornage par jour du stockage correspondant. */
   function dayKey(d) {
     const p = (n) => String(n).padStart(2, "0");
     return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
   }
-  /** Clé d'heure civile locale, "YYYY-MM-DDTHH". */
-  function hourKeyOf(d) {
-    return dayKey(d) + "T" + String(d.getHours()).padStart(2, "0");
+  /** Index du quart d'heure dans la journée, 0..95, heure LOCALE — la
+   *  granularité la plus fine conservée (voir bumpCardScroll), pour le détail
+   *  « heure en cours » de statsBuckets. */
+  function quarterIndex(d) {
+    return d.getHours() * 4 + Math.floor(d.getMinutes() / 15);
   }
-  /**
-   * Agrège un compteur de cartes défilées, tenu au JOUR (`days`, un objet
-   * {"YYYY-MM-DD": n}) plus le compteur de l'HEURE en cours (`hourKey`,
-   * `hourCount`), en cinq fenêtres calendaires : heure/jour/semaine/mois/
-   * année. Jamais de fenêtre glissante : la semaine est lundi→dimanche, le
-   * mois et l'année sont des périodes civiles — cohérent entre les cinq.
-   * Le format `days` étant zéro-rempli, une comparaison de chaînes suffit à
-   * la fois pour reconnaître "aujourd'hui" et pour borner la semaine :
-   * l'ordre lexical y est l'ordre chronologique.
-   */
-  function cardScrollStats(days, hourKey, hourCount, now) {
-    now = now instanceof Date ? now : new Date(now || Date.now());
-    const today = dayKey(now);
-    const wd = (now.getDay() + 6) % 7; // 0=lundi..6=dimanche
-    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - wd);
-    const weekStartKey = dayKey(weekStart);
-    const monthPrefix = today.slice(0, 7);
-    const yearPrefix = today.slice(0, 4);
+  /** Lundi (civil, heure locale) de la semaine contenant `d`. */
+  function mondayOf(d) {
+    const wd = (d.getDay() + 6) % 7; // 0=lundi..6=dimanche
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() - wd);
+  }
+  /** Somme les entrées de `days` ({"YYYY-MM-DD": n}) dont la clé tombe entre
+   *  `fromKey` et `toKey` inclus — comparaison de chaînes, valide puisque le
+   *  format zéro-rempli trie lexicalement comme chronologiquement. */
+  function sumDaysRange(days, fromKey, toKey) {
     const src = days && typeof days === "object" ? days : {};
-    let day = 0,
-      week = 0,
-      month = 0,
-      year = 0;
+    let n = 0;
     for (const k in src) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
-      const n = src[k] || 0;
-      if (k === today) day += n;
-      if (k >= weekStartKey && k <= today) week += n;
-      if (k.slice(0, 7) === monthPrefix) month += n;
-      if (k.slice(0, 4) === yearPrefix) year += n;
+      if (k >= fromKey && k <= toKey) n += src[k] || 0;
     }
-    const hour = hourKey === hourKeyOf(now) ? hourCount || 0 : 0;
-    return { hour, day, week, month, year };
+    return n;
+  }
+  /** Regroupe les quarts d'heure d'AUJOURD'HUI (`todaySlots`, voir
+   *  bumpCardScroll — { day:"YYYY-MM-DD", slots:{quarterIndex: n} }, réservé
+   *  au jour courant, jamais conservé au-delà) en 24 totaux horaires. Un
+   *  `todaySlots` d'un autre jour (pas encore basculé par bumpCardScroll,
+   *  cas d'une réouverture après minuit sans nouvelle carte défilée) rend 24
+   *  zéros plutôt que les quarts de la veille. */
+  function hourlyFromSlots(todaySlots, today) {
+    const out = new Array(24).fill(0);
+    if (!todaySlots || todaySlots.day !== today || !todaySlots.slots) return out;
+    const src = todaySlots.slots;
+    for (const q in src) {
+      const qi = parseInt(q, 10);
+      if (!Number.isInteger(qi) || qi < 0 || qi > 95) continue;
+      out[Math.floor(qi / 4)] += src[q] || 0;
+    }
+    return out;
+  }
+  /**
+   * Détail d'UNE fenêtre pour l'affichage (feuille « Mon activité ») : ses
+   * buckets internes, son total, et le total de la période civile qui la
+   * PRÉCÈDE immédiatement (pour « +2 par rapport à hier »-style). Jamais de
+   * fenêtre glissante — mêmes bornes civiles que l'ancien cardScrollStats,
+   * qu'elle remplace : semaine lundi→dimanche, mois et année civils.
+   *   hour  (4 buckets)  : les quarts de l'HEURE en cours (todaySlots).
+   *   day   (24 buckets) : chaque heure d'AUJOURD'HUI (todaySlots agrégés).
+   *   week  (7 buckets)  : lundi→dimanche de la semaine en cours (days).
+   *   month (≤6 buckets) : une semaine civile par bucket, tronquée aux bornes
+   *     du mois (days) — le nombre de buckets dépend du jour de la semaine
+   *     sur lequel tombe le 1er du mois.
+   *   year  (12 buckets) : un mois de l'année en cours (days).
+   * Une clé/quart absent de `days`/`todaySlots` vaut 0 — comme pour l'ancien
+   * cardScrollStats, l'absence de donnée EST un zéro, jamais un état
+   * « inconnu » à part : `prevTotal` à 0 peut donc dire aussi bien « rien ce
+   * jour-là » que « pas encore assez d'historique », les deux se valant pour
+   * l'utilisateur (rien à comparer).
+   * Les BUCKETS ne portent pas de libellé : à l'appelant de le poser via `i`
+   * (0-based) — statsBuckets reste sans dépendance à la langue, comme le
+   * reste de ce module.
+   */
+  function statsBuckets(period, days, todaySlots, now) {
+    now = now instanceof Date ? now : new Date(now || Date.now());
+    const today = dayKey(now);
+    if (period === "hour") {
+      const hourly = hourlyFromSlots(todaySlots, today);
+      const h = now.getHours();
+      const quarters =
+        todaySlots && todaySlots.day === today && todaySlots.slots
+          ? todaySlots.slots
+          : {};
+      const buckets = [0, 1, 2, 3].map((i) => ({ i, value: quarters[h * 4 + i] || 0 }));
+      // Minuit : l'heure précédente est hier, jamais conservée dans todaySlots.
+      const prevTotal = h > 0 ? hourly[h - 1] : 0;
+      return { buckets, total: hourly[h], prevTotal };
+    }
+    if (period === "day") {
+      const hourly = hourlyFromSlots(todaySlots, today);
+      const buckets = hourly.map((value, i) => ({ i, value }));
+      const yesterday = dayKey(
+        new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+      );
+      return {
+        buckets,
+        total: (days && days[today]) || 0,
+        prevTotal: (days && days[yesterday]) || 0,
+      };
+    }
+    if (period === "week") {
+      const monday = mondayOf(now);
+      const buckets = [];
+      let total = 0;
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+        const v = (days && days[dayKey(d)]) || 0;
+        buckets.push({ i, value: v });
+        total += v;
+      }
+      const prevMonday = new Date(
+        monday.getFullYear(),
+        monday.getMonth(),
+        monday.getDate() - 7
+      );
+      const prevSunday = new Date(
+        monday.getFullYear(),
+        monday.getMonth(),
+        monday.getDate() - 1
+      );
+      const prevTotal = sumDaysRange(days, dayKey(prevMonday), dayKey(prevSunday));
+      return { buckets, total, prevTotal };
+    }
+    if (period === "month") {
+      const y = now.getFullYear(),
+        m = now.getMonth();
+      const monthStartKey = dayKey(new Date(y, m, 1));
+      const monthEndKey = dayKey(new Date(y, m + 1, 0));
+      const buckets = [];
+      let cursor = mondayOf(new Date(y, m, 1)),
+        i = 0;
+      while (dayKey(cursor) <= monthEndKey) {
+        const weekEnd = new Date(
+          cursor.getFullYear(),
+          cursor.getMonth(),
+          cursor.getDate() + 6
+        );
+        const from = dayKey(cursor) < monthStartKey ? monthStartKey : dayKey(cursor);
+        const to = dayKey(weekEnd) > monthEndKey ? monthEndKey : dayKey(weekEnd);
+        buckets.push({ i, value: sumDaysRange(days, from, to) });
+        cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 7);
+        i++;
+      }
+      const total = sumDaysRange(days, monthStartKey, monthEndKey);
+      const prevMonthEnd = new Date(y, m, 0);
+      const prevMonthStart = new Date(
+        prevMonthEnd.getFullYear(),
+        prevMonthEnd.getMonth(),
+        1
+      );
+      const prevTotal = sumDaysRange(days, dayKey(prevMonthStart), dayKey(prevMonthEnd));
+      return { buckets, total, prevTotal };
+    }
+    // year
+    const y = now.getFullYear();
+    const buckets = [];
+    let total = 0;
+    for (let m = 0; m < 12; m++) {
+      const from = dayKey(new Date(y, m, 1)),
+        to = dayKey(new Date(y, m + 1, 0));
+      const v = sumDaysRange(days, from, to);
+      buckets.push({ i: m, value: v });
+      total += v;
+    }
+    const prevTotal = sumDaysRange(
+      days,
+      dayKey(new Date(y - 1, 0, 1)),
+      dayKey(new Date(y - 1, 11, 31))
+    );
+    return { buckets, total, prevTotal };
   }
 
   /** Mélange en place (Fisher-Yates) et renvoie le tableau. */
@@ -1399,8 +1521,11 @@
     escAttr,
     relTime,
     dayKey,
-    hourKeyOf,
-    cardScrollStats,
+    quarterIndex,
+    mondayOf,
+    sumDaysRange,
+    hourlyFromSlots,
+    statsBuckets,
     shuffle,
     seenKey,
     dropSeen,

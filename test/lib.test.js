@@ -84,68 +84,133 @@ test("relTime rend une durée compacte, vide si non parsable", () => {
   assert.equal(lib.relTime("pas une date", now), "");
 });
 
-test("dayKey/hourKeyOf : format zéro-rempli, heure locale", () => {
-  const d = new Date(2026, 0, 5, 9, 0, 0); // 5 janvier 2026, 9h — mois/heure à un chiffre
+test("dayKey/quarterIndex : format zéro-rempli, heure locale", () => {
+  const d = new Date(2026, 0, 5, 9, 7, 0); // 5 janvier 2026, 9h07 — mois/heure à un chiffre
   assert.equal(lib.dayKey(d), "2026-01-05");
-  assert.equal(lib.hourKeyOf(d), "2026-01-05T09");
+  assert.equal(lib.quarterIndex(d), 9 * 4 + 0); // 9h07 : 1er quart de l'heure
+  assert.equal(lib.quarterIndex(new Date(2026, 0, 5, 9, 44, 0)), 9 * 4 + 2); // 9h44 : 3e quart
 });
 
-test("cardScrollStats : jour/semaine/mois/année à partir d'un total par jour", () => {
-  // Jeudi 15 janvier 2026 à midi (évite tout effet de fuseau sur le jour civil).
-  const now = Date.parse("2026-01-15T12:00:00Z");
-  const days = {
-    "2026-01-15": 5, // aujourd'hui
-    "2026-01-13": 3, // mardi, même semaine (lundi 12 → dimanche 18)
-    "2026-01-09": 7, // vendredi précédent, même mois mais semaine d'avant
-    "2026-06-01": 40, // même année, mois différent
-    "2025-12-20": 20, // année différente
+test("mondayOf : lundi de la semaine, y compris pour un lundi ou un dimanche", () => {
+  assert.equal(lib.dayKey(lib.mondayOf(new Date(2026, 0, 15))), "2026-01-12"); // jeudi
+  assert.equal(lib.dayKey(lib.mondayOf(new Date(2026, 0, 12))), "2026-01-12"); // déjà lundi
+  assert.equal(lib.dayKey(lib.mondayOf(new Date(2026, 0, 18))), "2026-01-12"); // dimanche
+});
+
+test("sumDaysRange : somme bornée, clés malformées ignorées", () => {
+  const days = { "2026-01-10": 3, "2026-01-15": 5, "2026-01-20": 7, "pas-une-date": 999 };
+  assert.equal(lib.sumDaysRange(days, "2026-01-10", "2026-01-15"), 8);
+  assert.equal(lib.sumDaysRange(days, "2026-01-01", "2026-01-31"), 15);
+  assert.equal(lib.sumDaysRange(null, "2026-01-01", "2026-01-31"), 0);
+});
+
+test("hourlyFromSlots : agrège les quarts en 24 totaux horaires, ignore un autre jour", () => {
+  const todaySlots = { day: "2026-01-15", slots: { 52: 5, 54: 2, 55: 1, 56: 2, 59: 3 } };
+  const hourly = lib.hourlyFromSlots(todaySlots, "2026-01-15");
+  assert.equal(hourly.length, 24);
+  assert.equal(hourly[13], 8); // quarts 52,54,55 (53 absent = 0)
+  assert.equal(hourly[14], 5); // quarts 56,59 (57,58 absents)
+  assert.equal(hourly[0], 0);
+  // todaySlots d'un jour PÉRIMÉ (réouverture après minuit, rien défilé depuis) : zéros partout
+  assert.deepEqual(lib.hourlyFromSlots(todaySlots, "2026-01-16"), new Array(24).fill(0));
+});
+
+test("statsBuckets(hour) : 4 quarts de l'heure en cours, comparaison à l'heure précédente", () => {
+  const now = Date.parse("2026-01-15T14:30:00Z"); // 14h30 : 3e quart de l'heure
+  const todaySlots = {
+    day: "2026-01-15",
+    slots: { 52: 5, 54: 2, 55: 1, 56: 2, 57: 1, 59: 3 }, // hour13={52..55}, hour14={56..59}
   };
-  const s = lib.cardScrollStats(days, "", 0, now);
-  assert.equal(s.day, 5);
-  assert.equal(s.week, 8); // 15 + 13 janvier seulement
-  assert.equal(s.month, 15); // 15 + 13 + 9 janvier
-  assert.equal(s.year, 55); // 15 (janvier) + 40 (juin) — 2025-12-20 exclu
-  assert.equal(s.hour, 0); // aucun hourKey fourni
+  const s = lib.statsBuckets("hour", {}, todaySlots, now);
+  assert.deepEqual(
+    s.buckets.map((b) => b.value),
+    [2, 1, 0, 3]
+  ); // quarts 56,57,58(absent),59
+  assert.equal(s.total, 6); // 2+1+0+3
+  assert.equal(s.prevTotal, 8); // heure 13 : 5+0+2+1
 });
 
-test("cardScrollStats : compteur d'heure valable seulement s'il correspond à l'heure de `now`", () => {
-  const now = Date.parse("2026-01-15T14:30:00Z");
-  assert.equal(lib.cardScrollStats({}, "2026-01-15T14", 9, now).hour, 9);
-  assert.equal(lib.cardScrollStats({}, "2026-01-15T13", 9, now).hour, 0); // heure précédente : périmé
+test("statsBuckets(hour) : à minuit, l'heure précédente (hier) n'est jamais dans todaySlots", () => {
+  const now = Date.parse("2026-01-15T00:10:00Z");
+  const s = lib.statsBuckets("hour", {}, { day: "2026-01-15", slots: { 0: 4 } }, now);
+  assert.equal(s.total, 4);
+  assert.equal(s.prevTotal, 0);
 });
 
-test("cardScrollStats : clés malformées ignorées, objet `days` absent toléré", () => {
-  const now = Date.parse("2026-01-15T12:00:00Z");
-  const s = lib.cardScrollStats(
-    { "2026-01-15": 2, "pas-une-date": 999, "": 1 },
-    "",
-    0,
-    now
-  );
-  assert.equal(s.day, 2);
-  assert.deepEqual(lib.cardScrollStats(null, "", 0, now), {
-    hour: 0,
-    day: 0,
-    week: 0,
-    month: 0,
-    year: 0,
-  });
+test("statsBuckets(day) : 24 buckets horaires, total/prevTotal viennent de `days`", () => {
+  const now = Date.parse("2026-01-15T18:00:00Z");
+  const days = { "2026-01-15": 12, "2026-01-14": 9 };
+  const todaySlots = { day: "2026-01-15", slots: { 36: 4, 56: 8 } }; // hour9=4, hour14=8
+  const s = lib.statsBuckets("day", days, todaySlots, now);
+  assert.equal(s.buckets.length, 24);
+  assert.equal(s.buckets[9].value, 4);
+  assert.equal(s.buckets[14].value, 8);
+  assert.equal(s.total, 12); // days[aujourd'hui], PAS la somme des quarts
+  assert.equal(s.prevTotal, 9); // days[hier]
 });
 
-test("cardScrollStats : la semaine civile peut chevaucher deux mois ou deux années", () => {
+test("statsBuckets(week) : 7 buckets lundi→dimanche, comparaison à la semaine dernière", () => {
   // Jeudi 1er janvier 2026 : le lundi de sa semaine (29 décembre 2025) est
-  // dans le mois ET l'année précédents — « semaine » doit quand même les
-  // compter, sans les compter dans « mois »/« année ».
+  // dans le mois ET l'année précédents — la semaine doit quand même le
+  // compter (comportement hérité de l'ancien cardScrollStats).
   const now = Date.parse("2026-01-01T12:00:00Z");
   const days = {
     "2026-01-01": 2, // jeudi (aujourd'hui)
-    "2025-12-29": 4, // lundi de la même semaine, année précédente
-    "2025-12-15": 30, // même année, hors semaine courante
+    "2025-12-29": 4, // lundi de la même semaine
+    "2025-12-22": 10, // lundi de la semaine PRÉCÉDENTE
+    "2025-12-15": 30, // plus ancien, hors des deux semaines
   };
-  const s = lib.cardScrollStats(days, "", 0, now);
-  assert.equal(s.week, 6); // 2 + 4
-  assert.equal(s.month, 2); // janvier 2026 seul
-  assert.equal(s.year, 2); // 2026 seul, 2025 exclu
+  const s = lib.statsBuckets("week", days, {}, now);
+  assert.equal(s.buckets.length, 7);
+  assert.equal(s.buckets[0].value, 4); // lundi 29/12
+  assert.equal(s.buckets[3].value, 2); // jeudi 01/01
+  assert.equal(s.total, 6);
+  assert.equal(s.prevTotal, 10); // 22/12 → 28/12
+});
+
+test("statsBuckets(month) : un bucket par semaine civile tronquée au mois", () => {
+  // Janvier 2026 commence un jeudi : 5 buckets (29/12→04/01, 05→11, 12→18,
+  // 19→25, 26→31), le premier et le dernier tronqués aux bornes du mois.
+  const now = Date.parse("2026-01-20T12:00:00Z");
+  const days = {
+    "2026-01-02": 3, // bucket 0 (01→04, 29-31/12 hors mois)
+    "2026-01-10": 5, // bucket 1 (05→11)
+    "2026-01-15": 5, // bucket 2 (12→18)
+    "2026-01-20": 2, // bucket 3 (19→25)
+    "2026-01-30": 6, // bucket 4 (26→31)
+    "2025-12-30": 100, // décembre : exclu du total, compte pour prevTotal
+  };
+  const s = lib.statsBuckets("month", days, {}, now);
+  assert.deepEqual(
+    s.buckets.map((b) => b.value),
+    [3, 5, 5, 2, 6]
+  );
+  assert.equal(s.total, 21);
+  assert.equal(s.prevTotal, 100); // décembre 2025 entier
+});
+
+test("statsBuckets(year) : 12 buckets mensuels, comparaison à l'année précédente", () => {
+  const now = Date.parse("2026-06-20T12:00:00Z");
+  const days = {
+    "2026-02-01": 5,
+    "2026-06-15": 10,
+    "2025-11-01": 50, // année précédente
+    "2025-03-01": 25, // année précédente
+  };
+  const s = lib.statsBuckets("year", days, {}, now);
+  assert.equal(s.buckets.length, 12);
+  assert.equal(s.buckets[1].value, 5); // février, index 1
+  assert.equal(s.buckets[5].value, 10); // juin, index 5
+  assert.equal(s.total, 15);
+  assert.equal(s.prevTotal, 75); // 50 + 25, année 2025 entière
+});
+
+test("statsBuckets : `days`/`todaySlots` absents tolérés, jamais d'exception", () => {
+  const now = Date.parse("2026-01-15T12:00:00Z");
+  const s = lib.statsBuckets("day", null, null, now);
+  assert.equal(s.buckets.length, 24);
+  assert.equal(s.total, 0);
+  assert.equal(s.prevTotal, 0);
 });
 
 test("dropSeen écarte le déjà-vu mais ne tarit jamais le fil", () => {

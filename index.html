@@ -648,38 +648,86 @@
   .menurow__i{flex:0 0 auto;width:24px;height:24px;display:grid;place-items:center;color:var(--flare)}
   .menurow__i svg{width:22px;height:22px;display:block}
 
-  /* Mon activité (statsSheet) : un chiffre VEDETTE (aujourd'hui) au-dessus
-     d'un petit graphique en barres pour comparer les cinq fenêtres d'un
-     coup d'œil — une liste label/valeur ne disait rien de la PROPORTION
-     entre elles. Même langage que .mix__viz (aperçu de la dose) : piste en
-     --molten, remplissage en --flare, pas de couleur inventée pour l'un ou
-     l'autre. */
-  .statshero{text-align:center;margin:2px 0 26px}
+  /* Mon activité (statsSheet) : UN chiffre vedette pour la PÉRIODE CHOISIE
+     (onglets heure/jour/semaine/mois/année) + sa comparaison à la période
+     précédente, puis le détail de cette période en graphique ET en tableau.
+     Remplace l'ancien affichage des cinq fenêtres à plat : juxtaposer une
+     heure et une année ne dit rien (échelles incomparables), et rien n'y
+     répondait à la vraie question — « suis-je plus actif que d'habitude,
+     LÀ, sur CETTE période ? ». */
+  .statshero{text-align:center;margin:2px 0 18px}
   .statshero__n{display:block;font-family:var(--font-mono);letter-spacing:-.03em;
     font-size:46px;font-weight:700;line-height:1;color:var(--flare)}
   .statshero__l{display:block;color:var(--ash);font-size:13px;margin-top:6px}
-  /* align-items:flex-START, pas flex-end : les 5 colonnes n'ont PAS la même
-     hauteur totale dès qu'un libellé passe sur deux lignes (« Cette
-     semaine », le plus long) — un alignement par le BAS aurait alors décalé
-     les barres les unes par rapport aux autres pour faire coïncider les bas
-     de colonne, la plus haute colonne (celle au libellé sur deux lignes)
-     tirant sa barre vers le haut. Par le HAUT, chiffre et barre restent à la
-     même hauteur pour les cinq, quel que soit le nombre de lignes du
-     libellé sous chacune. */
-  .statsbars{display:flex;align-items:flex-start;gap:10px;padding:0 2px}
-  .statsbar{flex:1 1 0;display:flex;flex-direction:column;align-items:center;min-width:0}
-  .statsbar__n{font-family:var(--font-mono);letter-spacing:-.03em;font-weight:600;font-size:13px;margin-bottom:6px}
+  .statshero__cmp{display:block;font-size:13px;margin-top:4px;min-height:1.3em}
+
+  /* Sélecteur de période : un « segmented control ». La sélection ne tient
+     JAMAIS à la seule couleur : fond plein + gras + un repère (petit trait)
+     cumulés, pour rester lisible même sans perception des couleurs (voir
+     aussi le contraste texte/fond, pensé pour rester lisible). */
+  .statstabs{display:flex;gap:6px;padding:3px;background:var(--molten);
+    border-radius:var(--radius-sm);margin-bottom:18px}
+  /* white-space/overflow posés EXPLICITEMENT (pas laissés à all:unset) :
+     un <button> retombe sur des défauts de navigateur peu fiables d'un
+     moteur à l'autre pour ces deux propriétés — texte qui déborde SANS
+     revenir à la ligne, visible par-dessus l'onglet voisin plutôt que
+     contenu dans sa propre boîte. Constaté à une largeur extrême (zoom
+     texte poussé), jamais aux 320-390 px ciblés, mais autant s'en prémunir
+     : `overflow:hidden` est le filet, `white-space:normal` autorise un
+     retour à la ligne AVANT d'en avoir besoin. */
+  .statstab{all:unset;box-sizing:border-box;flex:1 1 0;min-width:0;text-align:center;color:var(--ash);
+    font-family:var(--font-sans);font-size:12.5px;font-weight:500;letter-spacing:-.01em;
+    white-space:normal;overflow:hidden;line-height:1.2;
+    padding:9px 2px 7px;border-radius:calc(var(--radius-sm) - 2px);cursor:pointer;
+    position:relative;transition:background .2s,color .2s}
+  .statstab[aria-selected="true"]{background:var(--flare);color:var(--bg);font-weight:700}
+  /* Repère SUPPLÉMENTAIRE (pas seulement la couleur) : un trait sous l'onglet
+     actif, visible même sans distinguer flare de molten. */
+  .statstab[aria-selected="true"]::after{content:"";position:absolute;left:50%;bottom:1px;
+    width:14px;height:2px;background:currentColor;transform:translateX(-50%);border-radius:2px}
+  .statstab:focus-visible{outline:2px solid var(--flare);outline-offset:2px}
+
+  .statschart{display:flex;align-items:flex-end;gap:4px;padding:0 2px;min-height:150px}
+  /* De vrais <button> (reset complet via all:unset) : sélectionnables au
+     TOUCHER et au clavier, pas seulement au survol de la souris. */
+  .statsbar{all:unset;box-sizing:border-box;flex:1 1 0;min-width:0;display:flex;flex-direction:column;
+    align-items:center;cursor:pointer}
+  .statsbar:focus-visible{outline:2px solid var(--flare);outline-offset:2px;border-radius:var(--radius-sm)}
+  .statsbar__n{font-family:var(--font-mono);letter-spacing:-.03em;font-weight:600;font-size:12px;margin-bottom:6px}
   /* Hauteur FIXE (pas un flex-grow) : le remplissage se pose en pixels, pas en
      pourcentage — un pourcentage sur un item flex sans hauteur déclarée n'est
      pas fiable d'un moteur à l'autre. */
-  .statsbar__col{width:100%;max-width:36px;height:110px;display:flex;align-items:flex-end;
+  .statsbar__col{width:100%;max-width:34px;height:110px;display:flex;align-items:flex-end;
     background:var(--molten);border-radius:var(--radius-sm);overflow:hidden}
-  .statsbar__fill{width:100%;min-height:4px;background:var(--flare);border-radius:var(--radius-sm);
-    transition:height .4s cubic-bezier(.2,.8,.2,1)}
-  /* min-height réservée pour DEUX lignes (line-height×2) : même si la plupart
-     des libellés tiennent sur une, le bas du graphique reste net au lieu de
-     suivre le seul libellé qui passe à la ligne. */
-  .statsbar__l{color:var(--ash);font-size:11.5px;line-height:1.25;min-height:2.5em;margin-top:8px;text-align:center}
+  .statsbar__fill{width:100%;min-height:4px;background:var(--flare);border-radius:var(--radius-sm)}
+  .statsbar__l{color:var(--ash);font-size:10.5px;line-height:1.25;margin-top:7px;text-align:center;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  /* Vue DENSE (24 barres, période « jour ») : ni nombre ni libellé propres à
+     CHAQUE barre (illisibles à cette largeur — « 00h » y tronquait en « 0. »
+     avant ce correctif), juste la hauteur ; la valeur exacte reste accessible
+     au clavier/toucher (aria-label + .statsreadout) et dans le tableau. Les
+     repères passent dans .statsaxis, un axe SÉPARÉ à 4 graduations espacées
+     régulièrement, libre de la largeur d'une colonne de barre. */
+  .statsaxis{display:flex;justify-content:space-between;padding:0 2px;
+    margin-top:4px;color:var(--ash);font-size:10.5px}
+
+  /* Confirme au TOUCHER/CLAVIER la valeur d'une barre — sans dépendre du
+     survol de la souris (voir focusin délégué). Vide par défaut : le texte
+     d'invite vient de `data-hint` (posé par période dense uniquement), pas
+     d'un contenu qui resterait affiché après un changement d'onglet. */
+  .statsreadout{color:var(--ink);font-size:13px;text-align:center;min-height:1.4em;
+    margin:10px 0 16px;font-weight:500}
+  .statsreadout:empty::before{content:attr(data-hint);color:var(--ash);font-weight:400}
+
+  .statstablebtn{all:unset;box-sizing:border-box;display:block;margin:0 auto;color:var(--flare);
+    font-family:var(--font-sans);font-weight:600;font-size:13px;letter-spacing:-.01em;
+    cursor:pointer;padding:8px 10px;border-radius:var(--radius-sm)}
+  .statstablebtn:focus-visible{outline:2px solid var(--flare);outline-offset:2px}
+  .statstablewrap{margin-top:6px;overflow-x:auto}
+  .statstable{width:100%;border-collapse:collapse;font-size:13px}
+  .statstable th,.statstable td{text-align:left;padding:7px 4px;border-bottom:1px solid rgba(149,28,4,.3)}
+  .statstable th{color:var(--ash);font-weight:600;font-size:12px}
+  .statstable td:last-child,.statstable th:last-child{text-align:right;font-family:var(--font-mono);letter-spacing:-.03em}
 
   /* Réglage « Ouvrir les articles » (app packagée uniquement, voir renderReadPref).
      Segmenté plutôt qu'un interrupteur : les deux destinations sont nommées, on
@@ -1007,8 +1055,11 @@
 </div>
 
 <!-- Mon activité : ouverte depuis menuSheet (menuStatsBtn), jamais autrement.
-     Compte les cartes défilées (bumpCardScroll, depuis onCardChange) ;
-     renderStats() y pose les cinq nombres, sur le modèle de renderMix(). -->
+     Compte les cartes défilées (bumpCardScroll, depuis onCardChange).
+     renderStats() construit tout le contenu dans le point de montage : un
+     chiffre vedette + sa comparaison à la période précédente, cinq onglets de
+     période (heure/jour/semaine/mois/année), le détail de la période choisie
+     en graphique ET en tableau — voir le commentaire de STATS_HTML. -->
 <div class="sheet" id="statsSheet" role="dialog" aria-modal="true" aria-labelledby="statsTitle">
   <div class="sheet__panel" tabindex="-1">
     <div class="sheet__grip"></div>
@@ -1059,9 +1110,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=175"></script>
-<script src="src/learn-core.js?v=175"></script>
-<script src="src/i18n.js?v=175"></script>
+<script src="src/lib.js?v=176"></script>
+<script src="src/learn-core.js?v=176"></script>
+<script src="src/i18n.js?v=176"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1179,7 +1230,7 @@ const CONFIG = {
 
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
-const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,dayKey,hourKeyOf,cardScrollStats,shuffle,
+const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,dayKey,quarterIndex,statsBuckets,shuffle,
   seenKey,dropSeen,roundRobin,weightedRoundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
@@ -1595,14 +1646,21 @@ function addSeenNews(it){
 }
 
 /* ---------- Compteur de cartes défilées ----------
-   Statistiques heure/jour/semaine/mois/année, affichées dans la feuille
-   « Mon activité » (renderStats). Incrémenté depuis onCardChange, au même
-   endroit et avec le même garde que markVisibleSeen (samePending) : chaque
-   VRAIE transition de carte compte une fois, jamais deux. Contrairement à
-   markVisibleSeen, il ne fait pas d'exception pour les vidéos — une vidéo
-   croisée sans être lancée reste une carte défilée, au sens de ce compteur.
-   Stockage borné (STATS_DAYS_MAX) à un peu plus d'un an de jours, pour ne
-   jamais grossir sans fin. */
+   Détail heure/jour/semaine/mois/année, affiché dans la feuille « Mon
+   activité » (renderStats, statsBuckets côté src/lib.js). Incrémenté depuis
+   onCardChange, au même endroit et avec le même garde que markVisibleSeen
+   (samePending) : chaque VRAIE transition de carte compte une fois, jamais
+   deux. Contrairement à markVisibleSeen, il ne fait pas d'exception pour les
+   vidéos — une vidéo croisée sans être lancée reste une carte défilée, au
+   sens de ce compteur.
+   Deux niveaux de granularité, pour deux besoins différents :
+   - `days` ({"YYYY-MM-DD":n}) : un total par jour, conservé sur la durée
+     (borné à STATS_DAYS_MAX). Base des fenêtres semaine/mois/année.
+   - `today` ({day,slots:{quartIndex:n}}) : les quarts d'heure du jour EN
+     COURS seulement, jamais conservés au-delà — la seule fenêtre qui a besoin
+     d'un détail plus fin que le jour (vues « heure » et « jour »). Réinitialisé
+     dès que `dayKey(now)` change, sans quoi une réouverture après minuit
+     resservirait les quarts de la veille sous l'étiquette du jour neuf. */
 const LS_STATS="fluxswipe.cardstats.v1";
 const STATS_DAYS_MAX=400;
 function sanitizeStats(raw){
@@ -1612,19 +1670,26 @@ function sanitizeStats(raw){
       if(/^\d{4}-\d{2}-\d{2}$/.test(k)&&typeof raw.days[k]==="number"&&raw.days[k]>=0)days[k]=raw.days[k];
     }
   }
-  const hourKey=raw&&typeof raw.hourKey==="string"&&/^\d{4}-\d{2}-\d{2}T\d{2}$/.test(raw.hourKey)?raw.hourKey:"";
-  const hourCount=raw&&typeof raw.hourCount==="number"&&raw.hourCount>=0?raw.hourCount:0;
-  return {days,hourKey,hourCount};
+  let today={day:"",slots:{}};
+  if(raw&&typeof raw.today==="object"&&raw.today&&/^\d{4}-\d{2}-\d{2}$/.test(raw.today.day)&&raw.today.slots&&typeof raw.today.slots==="object"){
+    const slots={};
+    for(const q in raw.today.slots){
+      const qi=parseInt(q,10);
+      if(Number.isInteger(qi)&&qi>=0&&qi<=95&&typeof raw.today.slots[q]==="number"&&raw.today.slots[q]>=0)slots[qi]=raw.today.slots[q];
+    }
+    today={day:raw.today.day,slots};
+  }
+  return {days,today};
 }
 let cardStats=(()=>{try{return sanitizeStats(JSON.parse(localStorage.getItem(LS_STATS)||"{}"));}
-  catch(e){return {days:{},hourKey:"",hourCount:0};}})();
+  catch(e){return {days:{},today:{day:"",slots:{}}};}})();
 let statsDirty=false,statsPersistT;
 function persistStats(){if(!statsDirty)return;statsDirty=false;
   try{localStorage.setItem(LS_STATS,JSON.stringify(cardStats));}catch(e){warn("save stats",e);}}
 function bumpCardScroll(){
-  const now=new Date(),dk=dayKey(now),hk=hourKeyOf(now);
-  if(cardStats.hourKey!==hk){cardStats.hourKey=hk;cardStats.hourCount=0;}
-  cardStats.hourCount++;
+  const now=new Date(),dk=dayKey(now),qi=quarterIndex(now);
+  if(cardStats.today.day!==dk)cardStats.today={day:dk,slots:{}};
+  cardStats.today.slots[qi]=(cardStats.today.slots[qi]||0)+1;
   cardStats.days[dk]=(cardStats.days[dk]||0)+1;
   const keys=Object.keys(cardStats.days);
   if(keys.length>STATS_DAYS_MAX){                     // garde les jours les plus RÉCENTS
@@ -1834,7 +1899,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="175";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="176";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -5433,44 +5498,189 @@ document.addEventListener("change",e=>{
   renderMix();
 });
 
-/* Mon activité (statsSheet) : mêmes principes que renderMix — un seul
-   gabarit, un seul point de montage. Les libellés sont posés via T() à
-   CHAQUE rendu plutôt qu'en `data-i18n` : le mount n'est rempli qu'à la 1re
-   ouverture (bien après le passage initial d'applyI18n() sur le document),
-   un `data-i18n` y resterait donc ignoré jusqu'au prochain changement de
-   langue — même raison que pour .mix__ends.
-   Un chiffre vedette (aujourd'hui) + un graphique en barres, pas une liste
-   label/valeur : une liste dit CHAQUE nombre mais rien de la PROPORTION
-   entre eux, exactement ce qu'on vient chercher ici (« ai-je plus lu cette
-   semaine que d'habitude ? »). */
-const STATS_HTML=`<div class="statshero">
+/* Mon activité (statsSheet) : UN chiffre vedette pour la période choisie
+   (onglets heure/jour/semaine/mois/année, sélecteur ARIA « tablist ») + sa
+   comparaison à la période civile précédente, puis le détail de CETTE
+   période en graphique de barres ET en tableau (bouton « Voir les
+   données »). Remplace l'ancien affichage des cinq fenêtres à plat, qui
+   juxtaposait des échelles incomparables sans jamais répondre à « suis-je
+   plus actif que d'habitude, LÀ, sur cette période ? ».
+   Mêmes principes que renderMix pour le point de montage : un seul gabarit,
+   posé une seule fois (`firstPaint`) ; tabs et bouton tableau, STATIQUES
+   après cette 1re pose, gardent leurs gestionnaires DIRECTEMENT (posés dans
+   le bloc `if(firstPaint)`) — le graphique, lui, est reconstruit à CHAQUE
+   rendu (le nombre de barres varie selon la période, 4 à 24), donc ses
+   boutons n'existent pas encore au 1er rendu : leur seul écouteur possible
+   est une délégation, posée une fois pour toutes sur `document`
+   (voir le `focusin` juste après cette fonction). Les libellés sont posés
+   via T() à CHAQUE rendu plutôt qu'en `data-i18n` : le mount n'est rempli
+   qu'à la 1re OUVERTURE, bien après le passage initial d'applyI18n() sur le
+   document — un `data-i18n` y resterait ignoré jusqu'au prochain changement
+   de langue, même raison que pour .mix__ends. */
+const STATS_HTML=`<div class="statshero" aria-live="polite">
   <b class="statshero__n"></b>
   <span class="statshero__l"></span>
+  <span class="statshero__cmp"></span>
 </div>
-<div class="statsbars">
-  <div class="statsbar" data-b="hour"><b class="statsbar__n"></b><span class="statsbar__col"><span class="statsbar__fill"></span></span><span class="statsbar__l"></span></div>
-  <div class="statsbar" data-b="day"><b class="statsbar__n"></b><span class="statsbar__col"><span class="statsbar__fill"></span></span><span class="statsbar__l"></span></div>
-  <div class="statsbar" data-b="week"><b class="statsbar__n"></b><span class="statsbar__col"><span class="statsbar__fill"></span></span><span class="statsbar__l"></span></div>
-  <div class="statsbar" data-b="month"><b class="statsbar__n"></b><span class="statsbar__col"><span class="statsbar__fill"></span></span><span class="statsbar__l"></span></div>
-  <div class="statsbar" data-b="year"><b class="statsbar__n"></b><span class="statsbar__col"><span class="statsbar__fill"></span></span><span class="statsbar__l"></span></div>
+<div class="statstabs" role="tablist">
+  <button type="button" class="statstab" role="tab" data-p="hour"></button>
+  <button type="button" class="statstab" role="tab" data-p="day"></button>
+  <button type="button" class="statstab" role="tab" data-p="week"></button>
+  <button type="button" class="statstab" role="tab" data-p="month"></button>
+  <button type="button" class="statstab" role="tab" data-p="year"></button>
+</div>
+<div class="statschart" role="group"></div>
+<div class="statsaxis hidden"></div>
+<p class="statsreadout" aria-live="polite"></p>
+<button type="button" class="statstablebtn" aria-expanded="false"></button>
+<div class="statstablewrap hidden">
+  <table class="statstable">
+    <caption class="visually-hidden"></caption>
+    <thead><tr><th scope="col"></th><th scope="col"></th></tr></thead>
+    <tbody></tbody>
+  </table>
 </div>`;
-const STATS_BAR_H=110;   // doit rester d'accord avec .statsbar__col{height:110px}
+let statsPeriod="day";     // dernière période choisie DANS la session, pas persistée
+let statsTableOpen=false;  // idem, garde son état d'un onglet à l'autre
+/* +N/-N (compte) ou +N/-N % (proportion) selon la période : sur une heure ou
+   un jour, un pourcentage serait bruyant pour de petits nombres (+1 carte →
+   +100 %, +∞ % si la veille est à 0) ; sur semaine/mois/année, où les totaux
+   sont plus gros, le pourcentage porte mieux l'info. `prevTotal` à 0 retombe
+   TOUJOURS sur le compte, un pourcentage n'y a pas de sens. */
+function statsCmpText(period,total,prevTotal){
+  const ref=T("stats.cmp.ref."+period);
+  const delta=total-prevTotal;
+  if(delta===0)return T("stats.cmp.flat",{ref});
+  const usePct=(period==="week"||period==="month"||period==="year")&&prevTotal>0;
+  if(usePct){
+    const pct=Math.round((Math.abs(delta)/prevTotal)*100);
+    return T(delta>0?"stats.cmp.upPct":"stats.cmp.downPct",{n:pct,ref});
+  }
+  return T(delta>0?"stats.cmp.upAbs":"stats.cmp.downAbs",{n:Math.abs(delta),ref});
+}
+/* Libellé d'UN bucket, propre à la période — statsBuckets (src/lib.js) reste
+   sans dépendance à la langue, c'est ici qu'on la lui donne. */
+function statsBucketLabel(period,i){
+  if(period==="hour")return String(i*15).padStart(2,"0");
+  if(period==="day")return T("stats.hourShort",{h:String(i).padStart(2,"0")});
+  if(period==="week")return T("stats.wd."+i);
+  if(period==="month")return T("stats.monthWeek",{n:i+1});
+  return T("stats.mo."+i);
+}
+/* Vue DENSE (24 barres, période « jour ») : ni nombre ni libellé SOUS chaque
+   barre — une colonne de ~11px à 320px ne peut porter ni l'un ni l'autre
+   lisiblement ("00h" y tronquait en "0."). Les repères vont dans .statsaxis,
+   un axe SÉPARÉ à 4 graduations (voir renderStats), indépendant de la
+   largeur des colonnes. La valeur exacte reste accessible : au lecteur
+   d'écran par `aria-label`, au toucher/clavier par .statsreadout (`focusin`
+   délégué plus bas), et dans le tableau — jamais seulement au survol de la
+   souris. */
+function statsChartHTML(period,buckets){
+  const dense=buckets.length>12;
+  const max=Math.max(1,...buckets.map((b)=>b.value));
+  return buckets
+    .map((b)=>{
+      const h=Math.max(4,Math.round((b.value/max)*110));   // 110 doit rester d'accord avec .statsbar__col{height:110px}
+      const label=statsBucketLabel(period,b.i);
+      const aria=T("stats.barAria",{label,n:b.value});
+      return (
+        `<button type="button" class="statsbar" data-label="${escAttr(label)}" data-n="${b.value}" aria-label="${escAttr(aria)}">`+
+        (dense?"":`<b class="statsbar__n">${esc(String(b.value))}</b>`)+
+        `<span class="statsbar__col"><span class="statsbar__fill" style="height:${h}px"></span></span>`+
+        (dense?"":`<span class="statsbar__l">${esc(label)}</span>`)+
+        `</button>`
+      );
+    })
+    .join("");
+}
+function statsTableHTML(period,buckets){
+  return buckets
+    .map((b)=>`<tr><td>${esc(statsBucketLabel(period,b.i))}</td><td>${esc(String(b.value))}</td></tr>`)
+    .join("");
+}
 function renderStats(){
-  const s=cardScrollStats(cardStats.days,cardStats.hourKey,cardStats.hourCount,new Date());
-  const bars=[["hour",s.hour],["day",s.day],["week",s.week],["month",s.month],["year",s.year]];
-  const max=Math.max(1,...bars.map(b=>b[1]));   // au moins 1 : jamais de division par zéro le 1er jour
+  const {buckets,total,prevTotal}=statsBuckets(statsPeriod,cardStats.days,cardStats.today,new Date());
+  const dense=buckets.length>12;
   document.querySelectorAll("[data-statsmount]").forEach(mount=>{
-    if(!mount.firstElementChild)mount.innerHTML=STATS_HTML;
-    mount.querySelector(".statshero__n").textContent=s.day;
-    mount.querySelector(".statshero__l").textContent=T("stats.heroLabel");
-    bars.forEach(([k,n])=>{
-      const bar=mount.querySelector(`.statsbar[data-b="${k}"]`);
-      bar.querySelector(".statsbar__n").textContent=n;
-      bar.querySelector(".statsbar__fill").style.height=Math.round((n/max)*STATS_BAR_H)+"px";
-      bar.querySelector(".statsbar__l").textContent=T("stats."+k);
+    const firstPaint=!mount.firstElementChild;
+    if(firstPaint)mount.innerHTML=STATS_HTML;
+    mount.querySelector(".statstabs").setAttribute("aria-label",T("stats.periodLabel"));
+    mount.querySelectorAll(".statstab").forEach(tab=>{
+      const p=tab.dataset.p,sel=p===statsPeriod;
+      tab.textContent=T("stats.tab."+p);
+      tab.setAttribute("aria-selected",sel?"true":"false");
+      tab.tabIndex=sel?0:-1;
     });
+    mount.querySelector(".statshero__n").textContent=total;
+    mount.querySelector(".statshero__l").textContent=T("stats."+statsPeriod);
+    mount.querySelector(".statshero__cmp").textContent=statsCmpText(statsPeriod,total,prevTotal);
+    const chart=mount.querySelector(".statschart");
+    chart.className="statschart"+(dense?" statschart--dense":"");
+    chart.setAttribute("aria-label",T("stats.chart.aria."+statsPeriod));
+    chart.innerHTML=statsChartHTML(statsPeriod,buckets);
+    // Axe à 4 graduations, réservé à la vue dense (voir statsChartHTML) :
+    // indices espacés régulièrement sur les buckets, jamais tronqués puisque
+    // libres de la largeur d'une colonne de barre.
+    const axis=mount.querySelector(".statsaxis");
+    axis.classList.toggle("hidden",!dense);
+    axis.innerHTML=dense
+      ? [0,Math.floor(buckets.length/4),Math.floor(buckets.length/2),Math.floor((buckets.length*3)/4)]
+          .map(i=>`<span>${esc(statsBucketLabel(statsPeriod,buckets[i].i))}</span>`)
+          .join("")
+      : "";
+    const readout=mount.querySelector(".statsreadout");
+    readout.textContent="";
+    readout.dataset.hint=dense?T("stats.readoutHint"):"";
+    const tableBtn=mount.querySelector(".statstablebtn");
+    tableBtn.textContent=T(statsTableOpen?"stats.table.hide":"stats.table.show");
+    tableBtn.setAttribute("aria-expanded",statsTableOpen?"true":"false");
+    mount.querySelector(".statstablewrap").classList.toggle("hidden",!statsTableOpen);
+    mount.querySelector(".statstable caption").textContent=
+      T("stats.table.caption",{period:T("stats.tab."+statsPeriod)});
+    mount.querySelector(".statstable thead th:first-child").textContent=T("stats.table.period");
+    mount.querySelector(".statstable thead th:last-child").textContent=T("stats.table.count");
+    mount.querySelector(".statstable tbody").innerHTML=statsTableHTML(statsPeriod,buckets);
+    if(firstPaint){
+      mount.querySelectorAll(".statstab").forEach(tab=>{
+        tab.onclick=()=>{statsPeriod=tab.dataset.p;renderStats();};
+      });
+      mount.querySelector(".statstabs").addEventListener("keydown",statsTabsKeydown);
+      tableBtn.onclick=()=>{statsTableOpen=!statsTableOpen;renderStats();};
+    }
   });
 }
+/* Navigation clavier du sélecteur de période, motif ARIA « tablist » standard
+   (flèches, Origine/Fin), à activation IMMÉDIATE — avec 5 onglets courts, un
+   aller-retour supplémentaire pour valider n'apporterait rien. Les onglets
+   sont STATIQUES (jamais recréés, voir renderStats) : `tabs[j]` désigne donc
+   toujours le même nœud avant et après le rendu déclenché ici, on peut lui
+   redonner le focus sans le re-chercher dans le DOM. */
+function statsTabsKeydown(e){
+  const tabs=[...e.currentTarget.querySelectorAll(".statstab")];
+  const i=tabs.indexOf(document.activeElement);
+  if(i<0)return;
+  let j=-1;
+  if(e.key==="ArrowRight")j=(i+1)%tabs.length;
+  else if(e.key==="ArrowLeft")j=(i-1+tabs.length)%tabs.length;
+  else if(e.key==="Home")j=0;
+  else if(e.key==="End")j=tabs.length-1;
+  else return;
+  e.preventDefault();
+  statsPeriod=tabs[j].dataset.p;
+  renderStats();
+  tabs[j].focus();
+}
+// Confirme au TOUCHER/CLAVIER la valeur d'une barre (statsreadout, voir sa
+// CSS) — les barres du graphique sont reconstruites à chaque rendu
+// (statsChartHTML), donc un écouteur direct serait perdu à chaque changement
+// d'onglet ; la délégation sur `document`, posée une seule fois, survit à
+// n'importe quel nombre de reconstructions.
+document.addEventListener("focusin",e=>{
+  const bar=e.target.closest("#statsSheet .statsbar");
+  if(!bar)return;
+  const readout=document.querySelector("#statsSheet .statsreadout");
+  if(readout)readout.textContent=T("stats.readout",{label:bar.dataset.label,n:bar.dataset.n});
+});
 function openSettings(replaceFrom){
   pendingInt=new Set(interests);
   renderMix();renderIntGrid();renderList();renderSuggest();renderReadPref();renderLangPref();

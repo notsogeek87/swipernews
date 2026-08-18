@@ -382,27 +382,57 @@ genre de script dérape.
   pilotée par `opacity`/`pointer-events`, glissement par `transform` sur
   `.sheet__panel`. Rien d'autre que ce panneau n'a cette forme : les feuilles
   de contenu (listes, réglages) se lisent mieux en plein écran depuis le bas.
-- `bumpCardScroll()` / `cardScrollStats()` (`src/lib.js`, testée) — le
-  compteur de cartes défilées derrière « Mon activité » (`statsSheet`).
-  Incrémenté dans `onCardChange(userScroll)`, au même endroit et avec le MÊME
-  garde que `markVisibleSeen` (`samePending`) — mais PAS au même déclencheur :
-  `userScroll` (vrai UNIQUEMENT depuis `onScrollFrame`, le vrai gestionnaire de
-  défilement) distingue un swipe RÉEL d'un simple recalage de suivi.
-  `onCardChange()` est aussi appelé sans avoir bougé le doigt — après un rendu
-  (nouveau lot, dose changée), après `adoptItems()`, depuis un saut « Articles
-  en mémoire » — et l'index courant peut alors désigner un article DIFFÉRENT
-  (tête remplacée par un lot neuf) sans que l'utilisateur ait swipé. Compter
-  sur `samePending` seul (comme `markVisibleSeen`, qui lui doit continuer à
-  tourner dans tous les cas) faisait grimper le compteur à l'ouverture, avant
-  le premier swipe. Contrairement à `markVisibleSeen`, aucune exception pour
-  les vidéos — une vidéo croisée sans être lancée reste une carte défilée, au
-  sens de ce compteur (différent de « vu »). Stockage compact à dessein : un
-  total par JOUR civil local (`cardStats.days`) plus un compteur pour l'HEURE
-  en cours seulement — jamais de bucket horaire au long cours, inutile et
-  coûteux en stockage. `cardScrollStats()` recompose les cinq fenêtres
-  (heure/jour/semaine/mois/année) à la lecture, toutes CALENDAIRES (semaine
-  lundi→dimanche), jamais glissantes — cohérent entre les cinq. `days` est
-  élagué à `STATS_DAYS_MAX` (~400) pour ne jamais grossir sans fin.
+- `bumpCardScroll()` (incrément) / `statsBuckets()` (`src/lib.js`, testée,
+  calcul) — le compteur de cartes défilées derrière « Mon activité »
+  (`statsSheet`). Incrémenté dans `onCardChange(userScroll)`, au même endroit
+  et avec le MÊME garde que `markVisibleSeen` (`samePending`) — mais PAS au
+  même déclencheur : `userScroll` (vrai UNIQUEMENT depuis `onScrollFrame`, le
+  vrai gestionnaire de défilement) distingue un swipe RÉEL d'un simple
+  recalage de suivi. `onCardChange()` est aussi appelé sans avoir bougé le
+  doigt — après un rendu (nouveau lot, dose changée), après `adoptItems()`,
+  depuis un saut « Articles en mémoire » — et l'index courant peut alors
+  désigner un article DIFFÉRENT (tête remplacée par un lot neuf) sans que
+  l'utilisateur ait swipé. Compter sur `samePending` seul (comme
+  `markVisibleSeen`, qui lui doit continuer à tourner dans tous les cas)
+  faisait grimper le compteur à l'ouverture, avant le premier swipe.
+  Contrairement à `markVisibleSeen`, aucune exception pour les vidéos — une
+  vidéo croisée sans être lancée reste une carte défilée, au sens de ce
+  compteur (différent de « vu »).
+  Stockage à DEUX niveaux (`cardStats`) : `days` ({"YYYY-MM-DD":n}), un total
+  par jour civil local conservé sur la durée (élagué à `STATS_DAYS_MAX`,
+  ~400, pour ne jamais grossir sans fin) ; `today` ({day,slots}), les QUARTS
+  D'HEURE du jour EN COURS seulement — jamais conservés au-delà, réinitialisés
+  dès que `dayKey(now)` change — la seule fenêtre qui a besoin d'un détail
+  plus fin que le jour. `statsBuckets(period,...)` recompose le détail d'UNE
+  période (heure : 4 quarts : jour : 24 heures ; semaine : 7 jours ; mois :
+  ≤6 semaines civiles tronquées au mois ; année : 12 mois), toutes CALENDAIRES
+  (semaine lundi→dimanche), jamais glissantes, plus le total de la période
+  civile PRÉCÉDENTE (pour la comparaison affichée) — une clé/quart absent vaut
+  0, jamais un état « inconnu » à part.
+  « Mon activité » (`STATS_HTML`/`renderStats()`) affiche UN chiffre vedette +
+  sa comparaison pour la période choisie parmi 5 onglets (heure/jour/semaine/
+  mois/année, motif ARIA « tablist » — `aria-selected`, tabindex flottant,
+  flèches/Origine/Fin dans `statsTabsKeydown`), le détail en graphique de
+  barres ET en tableau (« Voir les données », alternative accessible aux
+  mêmes buckets). Remplace un premier essai qui juxtaposait les cinq fenêtres
+  à plat : des échelles incomparables (une heure et une année) ne disent rien
+  de la PROPORTION, ni si UNE période donnée est haute ou basse pour
+  elle-même. Vue « jour » (24 barres) DENSE : ni nombre ni libellé sous
+  chaque barre (illisibles à cette largeur — un « 00h » y tronquait en
+  « 0. »), un axe SÉPARÉ à 4 graduations à la place (`.statsaxis`, indices
+  espacés régulièrement, libre de la largeur d'une colonne) ; la valeur exacte
+  reste accessible via `aria-label` (lecteur d'écran), `.statsreadout`
+  (toucher/clavier, `focusin` délégué sur `document` puisque les barres sont
+  reconstruites à chaque rendu) et le tableau. La comparaison choisit compte
+  ou pourcentage selon la période (`statsCmpText`) : un pourcentage serait
+  bruyant sur heure/jour (+1 carte → +100 %), plus lisible sur semaine/mois/
+  année où les totaux sont plus gros ; retombe sur le compte si la période
+  précédente est à 0 (pourcentage sans objet). Les références de comparaison
+  (`stats.cmp.ref.*`, `src/i18n.js`) portent leur PRÉPOSITION complète
+  (« au mois dernier », pas « le mois dernier ») : composer « par rapport à »
+  + une référence choisie par période cassait l'accord (« à le mois
+  dernier ») — seul le français a cette contrainte, l'anglais garde
+  « compared to {ref} » sans article.
 - `openHistory()` / `histRowHTML()` — la feuille « Articles en mémoire »
   (bouton liste de la barre du haut) : une VUE de `items`, refaite à chaque
   ouverture, qui ramène sur une carte dépassée d'un swipe de trop. Rien n'est
