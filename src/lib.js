@@ -893,6 +893,66 @@
     }
   }
 
+  /** URL `playlistItems.list` : jusqu'à 20 vidéos d'une playlist (Shorts,
+   *  ou toute autre — l'API n'a pas besoin, contrairement au flux RSS, de
+   *  distinguer une playlist CHOISIE d'une playlist auto-générée : les deux
+   *  s'interrogent de la même façon). Un secours de fetchFeedRobust
+   *  (index.html) n'a pas vocation à remplacer durablement un flux RSS
+   *  revenu au chargement suivant — pas la peine d'en demander plus qu'une
+   *  page. */
+  function youtubeApiPlaylistItemsUrl(playlistId, key) {
+    return (
+      "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=20&playlistId=" +
+      encodeURIComponent(playlistId || "") +
+      "&key=" +
+      encodeURIComponent(key || "")
+    );
+  }
+
+  /** Meilleure vignette d'un objet `snippet.thumbnails` de playlistItems.list
+   *  (la plus large déclarée). Contrairement au flux RSS, chaque taille
+   *  annonce sa largeur exacte : pas de nom de fichier à interpréter (voir
+   *  YT_THUMB_W, plus haut, qui existe pour cette raison côté RSS). */
+  function youtubeApiBestThumbnail(thumbnails) {
+    const list =
+      thumbnails && typeof thumbnails === "object" ? Object.values(thumbnails) : [];
+    let best = "",
+      bestW = -1;
+    for (const t of list) {
+      if (t && t.url && (t.width || 0) > bestW) {
+        best = t.url;
+        bestW = t.width || 0;
+      }
+    }
+    return best;
+  }
+
+  /** Items exploitables d'une réponse `playlistItems.list`, dans une forme
+   *  proche de celle de fetchFeed/fetchFeedRss2Json (index.html) — mais SANS
+   *  `source` : seul l'appelant sait, pour cette chaîne, ce que doit porter
+   *  ce champ (voir nomDeSource), et `channelTitle` (une propriété de
+   *  chaque item, pas de la réponse) est fourni tel quel pour le déterminer.
+   *  Un item sans identifiant de vidéo VALIDE (voir youtubeId, YT_HOSTS) est
+   *  écarté plutôt que de produire un lien inerte. */
+  function youtubeApiItemsFromPlaylistResponse(json) {
+    const items = json && Array.isArray(json.items) ? json.items : [];
+    return items
+      .map((it) => {
+        const sn = it && it.snippet;
+        const vid = sn && sn.resourceId && sn.resourceId.videoId;
+        if (!vid || !/^[A-Za-z0-9_-]{11}$/.test(vid)) return null;
+        return {
+          title: String((sn && sn.title) || "").trim(),
+          link: "https://www.youtube.com/watch?v=" + vid,
+          desc: String((sn && sn.description) || "").trim(),
+          img: youtubeApiBestThumbnail(sn && sn.thumbnails),
+          date: (sn && sn.publishedAt) || "",
+          channelTitle: (sn && sn.channelTitle) || "",
+        };
+      })
+      .filter((it) => it && it.title);
+  }
+
   /* ---------- L'Équipe ----------
      Les flux RSS de L'Équipe (dwh.lequipe.fr) n'ont pas de titre pertinent :
      ils sont tous généré par une même API avec le même titre de base. La
@@ -1314,6 +1374,9 @@
     youtubeApiChannelsByUsernameUrl,
     youtubeApiSearchChannelUrl,
     youtubeApiChannelIdFromResponse,
+    youtubeApiPlaylistItemsUrl,
+    youtubeApiBestThumbnail,
+    youtubeApiItemsFromPlaylistResponse,
     isLequipeFeedUrl,
     lequipeRubrique,
     lequipeFeedName,

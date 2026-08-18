@@ -948,9 +948,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=160"></script>
-<script src="src/learn-core.js?v=160"></script>
-<script src="src/i18n.js?v=160"></script>
+<script src="src/lib.js?v=161"></script>
+<script src="src/learn-core.js?v=161"></script>
+<script src="src/i18n.js?v=161"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1064,7 +1064,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,roundRobin,weightedRoundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,roundRobin,weightedRoundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1607,7 +1607,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="160";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="161";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2101,6 +2101,38 @@ async function fetchFeedRss2Json(feed,timeout=7000){
     date:it.pubDate||"",tags:clampText(Array.isArray(it.categories)?it.categories.join(" "):"",TAGS_MAX)
   })).filter(i=>i.title);
 }
+/* Secours de fetchFeedRobust, YouTube seul : ni le flux RSS ni rss2json n'ont
+   ramené quoi que ce soit — l'API officielle (playlistItems.list) prend le
+   relais pour CE chargement, avec la clé propre de l'utilisateur (voir
+   ytApiKey). Retrouve la playlist à interroger sans dupliquer la substitution
+   de urlDuFlux (point UNIQUE, voir son commentaire) : channel_id → Shorts,
+   playlist choisie → elle-même, telle quelle. Seul le cas `user=` (aucune
+   substitution possible sans requête, voir resolveYoutubeChannelFeed) demande
+   un aller-retour de plus, par l'API — MÊME chemin qu'à l'ajout d'une chaîne
+   (resolveYoutubeChannelIdViaApi). Rend [] si rien n'a pu être déterminé,
+   jamais d'exception : les autres sources doivent pouvoir continuer. */
+async function fetchFeedYoutubeApi(feed,key){
+  let playlistId="";
+  try{playlistId=new URL(urlDuFlux(feed)).searchParams.get("playlist_id")||"";}catch(e){}
+  if(!playlistId){
+    let params;
+    try{params=new URL(feed.url).searchParams;}catch(e){params=null;}
+    const user=(params&&params.get("user"))||"";
+    const idApi=user?await resolveYoutubeChannelIdViaApi(user,key):"";
+    playlistId=idApi?"UUSH"+idApi.slice(2):"";
+  }
+  if(!playlistId)return [];
+  const raw=youtubeApiItemsFromPlaylistResponse(
+    await fetchYoutubeApiJson(youtubeApiPlaylistItemsUrl(playlistId,key)));
+  if(!raw.length)return [];
+  // Même règle que les deux autres transports : une chaîne YouTube prend le
+  // nom que la réponse annonce (voir nomDeSource), jamais celui déjà stocké.
+  const source=nomDeSource(feed,raw[0].channelTitle);
+  return raw.map(it=>({
+    source,title:clampText(it.title,TITLE_MAX),desc:clampText(it.desc),
+    link:it.link,img:it.img,date:it.date,tags:""
+  }));
+}
 /* Récupération robuste d'un flux : backend/proxys + XML d'abord, puis repli rss2json.
    Filtre sponsorisé/bons plans appliqué ICI, après le repli : un flux
    entièrement composé de ce genre d'articles ne doit pas déclencher le repli
@@ -2127,7 +2159,18 @@ async function fetchFeedRobust(feed){
      requête tierce inutile par source et par rafraîchissement. */
   if((!a||!a.length)&&!(parse&&fluxShorts(feed))){
     if(!reste())throw new Error("budget");
-    a=await fetchFeedRss2Json(feed,Math.min(7000,reste()));
+    try{a=await fetchFeedRss2Json(feed,Math.min(7000,reste()));}catch(e){a=null;}
+    /* Secours FINAL, YouTube seul, seulement si l'utilisateur a renseigné sa
+       propre clé (réglage avancé, voir ytApiKey) : ni le flux RSS ni rss2json
+       n'ont ramené quoi que ce soit. L'API officielle prend alors le relais
+       pour CE chargement — rien n'est réécrit dans feed.url, le flux RSS
+       reste le chemin par défaut au prochain (voir fetchFeedYoutubeApi). Sans
+       clé, ou pour une source qui n'est pas YouTube : comportement IDENTIQUE
+       à avant cette clé, jusqu'au throw final. */
+    if((!a||!a.length)&&ytApiKey&&isYoutubeFeedUrl(feed.url)&&reste()){
+      try{a=await fetchFeedYoutubeApi(feed,ytApiKey);}catch(e){warn("secours API YouTube",e);}
+    }
+    if(!a)throw new Error("budget");
   }
   let result=filterSponsored?a.filter(i=>!isPromotionalItem(i)):a;
   if(filterVideoOnly)result=result.filter(i=>videoIdOf(i));

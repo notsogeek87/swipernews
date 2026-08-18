@@ -795,6 +795,59 @@ test("youtubeApiChannelIdFromResponse lit l'identifiant selon la forme de la ré
   assert.equal(lib.youtubeApiChannelIdFromResponse(null), "");
 });
 
+test("youtubeApiPlaylistItemsUrl construit l'URL playlistItems.list", () => {
+  const url = lib.youtubeApiPlaylistItemsUrl("UUSHabcdefghijklmnopqrstuv", "MACLE");
+  assert.match(
+    url,
+    /^https:\/\/www\.googleapis\.com\/youtube\/v3\/playlistItems\?part=snippet&maxResults=20&playlistId=/
+  );
+  assert.match(url, /playlistId=UUSHabcdefghijklmnopqrstuv&/);
+  assert.match(url, /key=MACLE$/);
+});
+
+test("youtubeApiBestThumbnail choisit la vignette la plus large déclarée", () => {
+  assert.equal(
+    lib.youtubeApiBestThumbnail({
+      default: { url: "https://i.ytimg.com/small.jpg", width: 120 },
+      maxres: { url: "https://i.ytimg.com/big.jpg", width: 1280 },
+      medium: { url: "https://i.ytimg.com/mid.jpg", width: 320 },
+    }),
+    "https://i.ytimg.com/big.jpg"
+  );
+  // Rien d'exploitable : "".
+  assert.equal(lib.youtubeApiBestThumbnail({}), "");
+  assert.equal(lib.youtubeApiBestThumbnail(null), "");
+});
+
+test("youtubeApiItemsFromPlaylistResponse ne garde que les items avec un vrai identifiant de vidéo", () => {
+  const json = {
+    items: [
+      {
+        snippet: {
+          title: "Un Short",
+          description: "Description",
+          resourceId: { videoId: "dQw4w9WgXcQ" },
+          thumbnails: { high: { url: "https://i.ytimg.com/hq.jpg", width: 480 } },
+          publishedAt: "2026-01-01T00:00:00Z",
+          channelTitle: "Une Chaîne",
+        },
+      },
+      // Pas de resourceId.videoId exploitable : écarté.
+      { snippet: { title: "Sans vidéo", resourceId: {} } },
+      // Pas de titre : écarté (comme fetchFeed/fetchFeedRss2Json).
+      { snippet: { title: "", resourceId: { videoId: "dQw4w9WgXcQ" } } },
+    ],
+  };
+  const out = lib.youtubeApiItemsFromPlaylistResponse(json);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].title, "Un Short");
+  assert.equal(out[0].link, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  assert.equal(out[0].img, "https://i.ytimg.com/hq.jpg");
+  assert.equal(out[0].channelTitle, "Une Chaîne");
+  assert.deepEqual(lib.youtubeApiItemsFromPlaylistResponse({}), []);
+  assert.deepEqual(lib.youtubeApiItemsFromPlaylistResponse(null), []);
+});
+
 test("les vignettes YouTube déclarent leur taille par leur nom de fichier", () => {
   // Sans ça, imageSizeFromUrl rend 0 sur une URL ytimg, et applyBg part sonder
   // /api/og pour CHAQUE carte vidéo défilée — le défaut déjà corrigé côté
