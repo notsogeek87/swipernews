@@ -23,8 +23,12 @@
             <!-- Lien de partage d'une source (voir shareFeed/feedDeepLink dans
                  index.html) : schéma personnalisé, pas des App Links https —
                  pas d'assetlinks.json à signer et héberger. Hors de cette app,
-                 swipernews:// ne mène nulle part, ce qui est voulu. Relayé côté
-                 web par @capacitor/app (appUrlOpen), voir handleDeepLink. -->
+                 swipernews:// ne mène nulle part, ce qui est voulu ; c'est pour
+                 ça qu'il n'est jamais partagé tel quel (aucune appli de
+                 messagerie ne le reconnaît comme lien) mais via le sas
+                 https://news.lielu.eu/add.html, qui y rebondit — voir add.html.
+                 Relayé côté web par @capacitor/app (appUrlOpen), voir
+                 handleDeepLink. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

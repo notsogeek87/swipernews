@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Ajouter une source — SwiperNews</title>
+<style>
+  :root{color-scheme:dark}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:#190501;color:#f7f6ff;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding:24px;box-sizing:border-box}
+  .card{max-width:420px;width:100%;text-align:center}
+  h1{font-size:20px;margin:0 0 8px}
+  p{color:#baadab;margin:0 0 20px;word-break:break-word}
+  .name{color:#f7f6ff;font-weight:600}
+  a.btn{display:inline-block;background:#fa5838;color:#190501;font-weight:700;text-decoration:none;
+    padding:14px 22px;border-radius:999px;margin-bottom:16px}
+  .fallback{font-size:14px;color:#baadab}
+  .fallback code{display:block;margin-top:8px;color:#f7f6ff;word-break:break-all;
+    background:#340a01;border-radius:8px;padding:10px}
+</style>
+</head>
+<body>
+<div class="card" id="card"></div>
+<script>
+/* Page-relais : Signal/WhatsApp/etc. n'auto-lient QUE les liens http(s), pas
+   les schémas personnalisés — un lien swipernews://… partagé tel quel restait
+   du texte inerte, jamais cliquable (voir handleDeepLink/feedDeepLink dans
+   index.html). Cette page https://news.lielu.eu/add.html sert donc de sas :
+   un lien normal, cliquable partout, qui rebondit vers swipernews:// une fois
+   ouvert. Pas d'App Links (assetlinks.json signé avec la clé de RELEASE,
+   invérifiable dans cet environnement de dev, voir CLAUDE.md) — ce
+   contournement ne demande aucun secret ni build signé.
+   Le bond automatique (location.replace) échoue silencieusement hors Android
+   ou sans l'app installée ; le bouton, lui, est un VRAI geste utilisateur
+   (clic sur une ancre), la forme la plus fiable pour faire naviguer un
+   navigateur mobile vers un schéma personnalisé. */
+(function(){
+  var q=new URLSearchParams(location.search);
+  var url=q.get("url"), name=(q.get("name")||"").trim();
+  var fr=!/^en/i.test(navigator.language||"");
+  var card=document.getElementById("card");
+  if(!url){
+    card.innerHTML="<h1>"+(fr?"Lien invalide":"Invalid link")+"</h1>"+
+      "<p>"+(fr?"Il manque l'adresse de la source à ajouter.":"The source's address is missing.")+"</p>";
+    return;
+  }
+  var deep="swipernews://add?url="+encodeURIComponent(url)+(name?"&name="+encodeURIComponent(name):"");
+  var label=name?('<span class="name">'+escapeHtml(name)+'</span>'):(fr?"cette source":"this source");
+  card.innerHTML=
+    "<h1>"+(fr?"Ajouter "+label+" à SwiperNews":"Add "+label+" to SwiperNews")+"</h1>"+
+    "<p>"+(fr?"Ouverture de l'app…":"Opening the app…")+"</p>"+
+    '<a class="btn" href="'+escapeHtml(deep)+'">'+(fr?"📲 Ouvrir dans l'app":"📲 Open in the app")+"</a>"+
+    '<p class="fallback">'+(fr
+      ?"Sur Android, avec SwiperNews installé. Sinon, ajoute la source à la main :"
+      :"On Android, with SwiperNews installed. Otherwise, add the source by hand:")+
+      "<code>"+escapeHtml(url)+"</code></p>";
+  function escapeHtml(s){return String(s).replace(/[&<>"']/g,function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+  // Différé après le chargement de CETTE page : tenté pendant l'analyse, le
+  // rebond interrompait le navigateur en plein chargement — certains
+  // navigateurs mobiles ignorent alors la redirection au lieu de proposer
+  // d'ouvrir l'app. Le bouton reste le repli fiable dans tous les cas (un
+  // vrai geste utilisateur, jamais bloqué).
+  setTimeout(function(){try{location.replace(deep);}catch(e){}},50);
+})();
+</script>
+</body>
+</html>

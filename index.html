@@ -507,7 +507,13 @@
   .feedrow .actions{margin-left:auto;display:flex;align-items:center;gap:8px}
   .feedrow .share{background:none;border:none;color:var(--ash);cursor:pointer;display:flex;padding:0}
   .feedrow .share svg{width:18px;height:18px}
-  .feedrow .del{background:none;border:none;color:var(--ash);font-size:18px;cursor:pointer}
+  .feedrow .del{background:none;border:none;color:var(--ash);font-size:18px;cursor:pointer;
+    border-radius:var(--radius-sm);padding:2px 6px}
+  /* Armé par un premier appui (voir delFeed) : partage et suppression sont
+     l'un à côté de l'autre dans .actions, un appui destiné au partage tombe
+     facilement sur ✕. Le second appui, sur CE bouton redevenu rouge plein,
+     confirme ; ailleurs ou passé quelques secondes, il se désarme tout seul. */
+  .feedrow .del--confirm{background:var(--redline);color:#fff}
   .sponsorrow{display:flex;align-items:center;gap:10px;padding:4px 0 16px;cursor:pointer;font-size:14px}
   .sponsorrow input[type=checkbox]{width:20px;height:20px;accent-color:var(--flare);flex-shrink:0}
   .addbox{display:flex;gap:8px;margin:18px 0 8px}
@@ -962,9 +968,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=166"></script>
-<script src="src/learn-core.js?v=166"></script>
-<script src="src/i18n.js?v=166"></script>
+<script src="src/lib.js?v=167"></script>
+<script src="src/learn-core.js?v=167"></script>
+<script src="src/i18n.js?v=167"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1679,7 +1685,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="166";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="167";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -4230,17 +4236,18 @@ async function shareItem(it){
    de copier le texte — un flux se partage rarement vers un réseau social, la
    grille de destinations de openShareMenu serait hors-sujet ici. */
 const FEED_SHARE_TAG=`📲 Ajoute-le dans SwiperNews — l'actu & la culture en swipe : ${APP_URL}`;
-/* Lien « un geste » : schéma personnalisé (swipernews://), pas des App Links
-   https. Un App Link exigerait un assetlinks.json signé avec l'empreinte de
-   la clé de RELEASE, hébergé sur news.lielu.eu, et ne s'activerait qu'après
-   un build signé — invérifiable ici (pas de SDK Android, voir plus haut) et
-   hors de propos : le but n'est QUE de faire un geste de moins dans l'app
-   elle-même, jamais de faire marcher ce lien dans un navigateur. Hors de
-   l'app, `swipernews://` ne mène nulle part — c'est le compromis accepté en
-   échange de la simplicité. Voir handleDeepLink et l'intent-filter dédié
-   dans AndroidManifest.xml. */
+/* Lien « un geste ». Le schéma personnalisé (swipernews://) tout seul a été
+   essayé d'abord — le plus simple, pas d'App Links https, donc pas
+   d'assetlinks.json à signer avec la clé de RELEASE (invérifiable ici, voir
+   plus haut). Mais collé tel quel dans un texte partagé, il n'est reconnu
+   comme lien PAR AUCUNE appli de messagerie testée (Signal en particulier) :
+   leur auto-lien ne reconnaît que http(s), le reste reste du texte inerte,
+   jamais cliquable. add.html sert donc de sas : un lien https normal (auto-
+   lié partout), qui rebondit vers swipernews:// une fois ouvert — voir
+   add.html pour le détail du rebond et son repli. Toujours pas d'App Links :
+   ce sas ne demande ni secret ni build signé. */
 function feedDeepLink(f){
-  return `swipernews://add?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(f.name)}`;
+  return `${APP_URL}/add.html?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(f.name)}`;
 }
 async function shareFeed(i){
   const f=feeds[i];
@@ -5298,14 +5305,17 @@ if(firstRun)openSettings();
    dessous le disait déjà, mais elle est longue et se lit mal — la précision
    remonte donc sur la ligne du nom, et seulement quand il y a ambiguïté. */
 function renderList(){const lbl=feedLabels(feeds);
-  document.getElementById("feedList").innerHTML=feeds.map((f,i)=>`
+  document.getElementById("feedList").innerHTML=feeds.map((f,i)=>{
+    const armed=delConfirm===f.url;
+    return `
   <div class="feedrow"><input type="checkbox" ${f.on?"checked":""} data-toggle="${i}">
     <div><div class="name">${esc(lbl[i])}${unreachable.has(f.url)&&!filterVideoOnly?`<span class="badge-ko">${esc(T("sheet.sources.unreachable"))}</span>`:""}</div>
       <div class="url">${esc(f.url)}</div></div>
     <div class="actions">
       <button class="share" data-share="${i}" aria-label="${escAttr(T("sheet.sources.shareAria",{name:lbl[i]}))}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
-      <button class="del" data-del="${i}" aria-label="${escAttr(T("sheet.sources.deleteAria",{name:lbl[i]}))}">✕</button>
-    </div></div>`).join("");}
+      <button class="del${armed?" del--confirm":""}" data-del="${i}" aria-label="${escAttr(T(armed?"sheet.sources.deleteConfirmAria":"sheet.sources.deleteAria",{name:lbl[i]}))}">✕</button>
+    </div></div>`;
+  }).join("");}
 /* Suggestions : chips « + Source » pour celles pas encore présentes (plus de sources = plus d'articles) */
 function renderSuggest(){
   const box=document.getElementById("suggestBox");
@@ -5318,7 +5328,27 @@ function renderSuggest(){
     ).join("")+`</div>`;
 }
 function toggleFeed(i){feeds[i].on=!feeds[i].on;save();}
-function delFeed(i){feeds.splice(i,1);save();renderList();renderSuggest();}
+/* Confirmation à deux appuis, PAS de sheet/dialog séparé (pas d'entrée
+   d'historique à poser : voir pushDialogState dans la carte du code, ça ne
+   concerne que ce qui s'ouvre PAR-DESSUS ce panneau). Le ✕ tout proche du
+   partage dans .actions rend l'appui accidentel courant — d'où l'état
+   ARMÉ par un premier appui : le bouton devient rouge plein, un second appui
+   sur LUI confirme, tout le reste (appui ailleurs, quelques secondes, un
+   re-rendu de la liste pour toute autre raison) désarme.
+   Par URL et non par index : entre les deux appuis, la liste a pu se
+   re-rendre (ajout d'une suggestion, import…) et les index auraient bougé. */
+let delConfirm=null,delConfirmT;
+function delFeed(i){
+  const f=feeds[i];
+  if(!f)return;
+  clearTimeout(delConfirmT);
+  if(delConfirm===f.url){
+    delConfirm=null;feeds.splice(i,1);save();renderList();renderSuggest();
+    return;
+  }
+  delConfirm=f.url;renderList();
+  delConfirmT=setTimeout(()=>{if(delConfirm===f.url){delConfirm=null;renderList();}},3000);
+}
 /* Dédoublonnage, stockage, re-rendu : commun à une URL déjà valide, qu'elle
    ait été saisie telle quelle ou résolue depuis une page de chaîne YouTube. */
 function pushFeedUrl(url,inp){
