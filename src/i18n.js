@@ -120,6 +120,7 @@
       "sheet.sources.ytkey.desc":
         "Seulement si l'ajout d'une chaîne échoue. Optionnelle, et propre à toi : jamais partagée avec personne d'autre.",
       "sheet.sources.ytkey.placeholder": "Clé API YouTube Data v3",
+      "sheet.sources.ytkey.verify": "Vérifier",
       "sheet.sources.ytkey.link": "Comment obtenir une clé gratuite ↗",
 
       "sheet.apply": "Voir mon fil",
@@ -224,6 +225,10 @@
       "toast.feedsAlreadyPresent": "Sources déjà présentes",
       "toast.feedAdded": "{name} ajouté",
       "toast.updateReady": "Nouvelle version prête",
+      "toast.ytkey.empty": "Colle une clé avant de vérifier",
+      "toast.ytkey.checking": "Vérification de la clé…",
+      "toast.ytkey.valid": "Clé valide, enregistrée",
+      "toast.ytkey.invalid": "Clé invalide, ou quota dépassé",
 
       "installbar.title": "Installe SwiperNews",
       "installbar.sub": "Plein écran, hors-ligne, lancement en un tap.",
@@ -336,6 +341,7 @@
       "sheet.sources.ytkey.desc":
         "Only if adding a channel fails. Optional, and yours alone: never shared with anyone else.",
       "sheet.sources.ytkey.placeholder": "YouTube Data API v3 key",
+      "sheet.sources.ytkey.verify": "Verify",
       "sheet.sources.ytkey.link": "How to get a free key ↗",
 
       "sheet.apply": "See my feed",
@@ -437,6 +443,10 @@
       "toast.feedsAlreadyPresent": "Sources already present",
       "toast.feedAdded": "{name} added",
       "toast.updateReady": "New version ready",
+      "toast.ytkey.empty": "Paste a key before verifying",
+      "toast.ytkey.checking": "Checking the key…",
+      "toast.ytkey.valid": "Key valid, saved",
+      "toast.ytkey.invalid": "Invalid key, or quota exceeded",
 
       "installbar.title": "Install SwiperNews",
       "installbar.sub": "Full screen, offline, launches in one tap.",

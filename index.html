@@ -542,9 +542,9 @@
   .ytadv{margin-top:14px;font-size:13px;color:var(--ash)}
   .ytadv summary{cursor:pointer;font-weight:500;color:var(--ink)}
   .ytadv p.sub{margin:8px 0;font-size:13px}
-  .ytadv input{width:100%;background:transparent;border:1px solid var(--redline);color:var(--ink);
-    padding:11px 14px;border-radius:var(--radius-sm);font-family:var(--font-sans);font-size:13px;box-sizing:border-box}
-  .ytadv input:focus{border-color:var(--flare);outline:none}
+  .ytadv .addbox{margin:8px 0}
+  .ytadv .addbox input{font-size:13px;padding:11px 14px}
+  .ytadv .addbox button{font-size:13px;padding:11px 14px}
   .ytadv a{color:var(--flare)}
 
   /* Articles en mémoire. L'en-tête reste au-dessus de la liste pendant qu'on la
@@ -847,7 +847,10 @@
     <details class="ytadv">
       <summary data-i18n="sheet.sources.ytkey.summary">🔑 Secours : clé API YouTube (avancé)</summary>
       <p class="sub" data-i18n="sheet.sources.ytkey.desc">Seulement si l'ajout d'une chaîne échoue. Optionnelle, et propre à toi : jamais partagée avec personne d'autre.</p>
-      <input id="ytApiKeyInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-attr="placeholder:sheet.sources.ytkey.placeholder" placeholder="Clé API YouTube Data v3">
+      <div class="addbox">
+        <input id="ytApiKeyInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-attr="placeholder:sheet.sources.ytkey.placeholder" placeholder="Clé API YouTube Data v3">
+        <button type="button" id="ytApiKeyVerify" data-i18n="sheet.sources.ytkey.verify">Vérifier</button>
+      </div>
       <p class="sub"><a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener" data-i18n="sheet.sources.ytkey.link">Comment obtenir une clé gratuite ↗</a></p>
     </details>
 
@@ -945,9 +948,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=159"></script>
-<script src="src/learn-core.js?v=159"></script>
-<script src="src/i18n.js?v=159"></script>
+<script src="src/lib.js?v=160"></script>
+<script src="src/learn-core.js?v=160"></script>
+<script src="src/i18n.js?v=160"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1604,7 +1607,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="159";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="160";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -5053,9 +5056,30 @@ document.getElementById("videoFilterChk").onchange=e=>{
   try{localStorage.setItem(LS_VIDEO_ONLY,filterVideoOnly?"1":"0");}catch(_){}
   feedsDirty=true;
 };
-// Ne sert qu'au PROCHAIN ajout de chaîne (resolveYoutubeChannelFeed) : pas de
-// flux déjà chargé qui en dépende, donc pas de feedsDirty ni de rechargement.
-document.getElementById("ytApiKeyInput").onchange=e=>saveYtApiKey(e.target.value);
+/* La clé n'est enregistrée qu'après VÉRIFICATION réussie — jamais au simple
+   blur du champ. Une clé fautive (faute de frappe, restriction mal posée
+   côté Google Cloud) enregistrée en silence se serait révélée seulement au
+   prochain ajout de chaîne en échec, sans que rien ne dise si la cause est la
+   clé ou autre chose. Le bouton teste la clé sur la chaîne officielle
+   @YouTube — garantie d'exister, sans rapport avec les chaînes suivies —
+   donc RENDS un verdict immédiat plutôt qu'un silence. Ne sert qu'au
+   PROCHAIN ajout de chaîne (resolveYoutubeChannelFeed) : pas de flux déjà
+   chargé qui en dépende, donc pas de feedsDirty ni de rechargement. */
+async function verifieYtApiKey(){
+  const inp=document.getElementById("ytApiKeyInput"),btn=document.getElementById("ytApiKeyVerify");
+  const key=inp.value.trim();
+  if(!key){toast(T("toast.ytkey.empty"));return;}
+  const label=btn.innerHTML;
+  btn.disabled=true;btn.innerHTML='<span class="addspin" role="status" aria-label="'+escAttr(T("toast.ytkey.checking"))+'"></span>';
+  toast(T("toast.ytkey.checking"));
+  try{
+    const id=youtubeApiChannelIdFromResponse(
+      await fetchYoutubeApiJson(youtubeApiChannelsByHandleUrl("YouTube",key)));
+    if(id){saveYtApiKey(key);toast(T("toast.ytkey.valid"));}
+    else toast(T("toast.ytkey.invalid"));
+  }finally{btn.disabled=false;btn.innerHTML=label;}
+}
+document.getElementById("ytApiKeyVerify").onclick=verifieYtApiKey;
 document.getElementById("applySettings").onclick=applySettings;
 renderMixUI();
 /* Premier lancement : on ouvre les réglages AVANT de charger quoi que ce soit.
@@ -5198,14 +5222,17 @@ async function resolveYoutubeChannelFeed(pageUrl){
 }
 /* Requête JSON à l'API YouTube Data v3 : direct d'abord (CORS ouvert chez
    Google pour cette API, comme pour Wikipédia — voir srcWikipedia), repli sur
-   fetchText sinon (proxy web, pont natif). Rend null au moindre souci —
-   jamais d'exception qui interromprait la cascade de
+   fetchText sinon (proxy web, pont natif) — mais SEULEMENT si la requête a
+   vraiment échoué (réseau, CORS). Une clé invalide ou un quota épuisé
+   répondent 400/403 avec un corps JSON exploitable (voir
+   youtubeApiChannelIdFromResponse, qui n'y trouvera simplement aucun
+   `items`) : les traiter comme un échec de transport ferait attendre toute
+   la cascade de proxys pour un verdict que Google a déjà donné. Rend null au
+   moindre souci — jamais d'exception qui interromprait la cascade de
    resolveYoutubeChannelFeed. */
 async function fetchYoutubeApiJson(url){
   try{
-    const res=await fetchWithTimeout(url,{},8000);
-    if(!res.ok)throw new Error("http "+res.status);
-    return await res.json();
+    return await (await fetchWithTimeout(url,{},8000)).json();
   }catch(e){
     try{return JSON.parse(await fetchText(url,()=>8000));}
     catch(e2){warn("clé API YouTube",e2);return null;}
