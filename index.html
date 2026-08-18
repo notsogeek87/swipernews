@@ -648,15 +648,27 @@
   .menurow__i{flex:0 0 auto;width:24px;height:24px;display:grid;place-items:center;color:var(--flare)}
   .menurow__i svg{width:22px;height:22px;display:block}
 
-  /* Mon activité (statsSheet) : liste label/valeur, une ligne par fenêtre.
-     Les nombres en police mono comme .about — même famille que la version et
-     le reste des données brutes de l'app. */
-  .stats{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column}
-  .stats li{display:flex;justify-content:space-between;align-items:baseline;
-    padding:11px 2px;border-bottom:1px solid rgba(149,28,4,.3);font-size:15px}
-  .stats li:last-child{border-bottom:none}
-  .stats__label{color:var(--ash)}
-  .stats__val{font-family:var(--font-mono);letter-spacing:-.03em;font-weight:600}
+  /* Mon activité (statsSheet) : un chiffre VEDETTE (aujourd'hui) au-dessus
+     d'un petit graphique en barres pour comparer les cinq fenêtres d'un
+     coup d'œil — une liste label/valeur ne disait rien de la PROPORTION
+     entre elles. Même langage que .mix__viz (aperçu de la dose) : piste en
+     --molten, remplissage en --flare, pas de couleur inventée pour l'un ou
+     l'autre. */
+  .statshero{text-align:center;margin:2px 0 26px}
+  .statshero__n{display:block;font-family:var(--font-mono);letter-spacing:-.03em;
+    font-size:46px;font-weight:700;line-height:1;color:var(--flare)}
+  .statshero__l{display:block;color:var(--ash);font-size:13px;margin-top:6px}
+  .statsbars{display:flex;align-items:flex-end;gap:10px;padding:0 2px}
+  .statsbar{flex:1 1 0;display:flex;flex-direction:column;align-items:center;min-width:0}
+  .statsbar__n{font-family:var(--font-mono);letter-spacing:-.03em;font-weight:600;font-size:13px;margin-bottom:6px}
+  /* Hauteur FIXE (pas un flex-grow) : le remplissage se pose en pixels, pas en
+     pourcentage — un pourcentage sur un item flex sans hauteur déclarée n'est
+     pas fiable d'un moteur à l'autre. */
+  .statsbar__col{width:100%;max-width:36px;height:110px;display:flex;align-items:flex-end;
+    background:var(--molten);border-radius:var(--radius-sm);overflow:hidden}
+  .statsbar__fill{width:100%;min-height:4px;background:var(--flare);border-radius:var(--radius-sm);
+    transition:height .4s cubic-bezier(.2,.8,.2,1)}
+  .statsbar__l{color:var(--ash);font-size:11.5px;margin-top:8px;text-align:center}
 
   /* Réglage « Ouvrir les articles » (app packagée uniquement, voir renderReadPref).
      Segmenté plutôt qu'un interrupteur : les deux destinations sont nommées, on
@@ -1036,9 +1048,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=173"></script>
-<script src="src/learn-core.js?v=173"></script>
-<script src="src/i18n.js?v=173"></script>
+<script src="src/lib.js?v=174"></script>
+<script src="src/learn-core.js?v=174"></script>
+<script src="src/i18n.js?v=174"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1811,7 +1823,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="173";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="174";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -5415,27 +5427,37 @@ document.addEventListener("change",e=>{
    CHAQUE rendu plutôt qu'en `data-i18n` : le mount n'est rempli qu'à la 1re
    ouverture (bien après le passage initial d'applyI18n() sur le document),
    un `data-i18n` y resterait donc ignoré jusqu'au prochain changement de
-   langue — même raison que pour .mix__ends. */
-const STATS_HTML=`<ul class="stats">
-  <li><span class="stats__label"></span><b class="stats__val" data-b="hour"></b></li>
-  <li><span class="stats__label"></span><b class="stats__val" data-b="day"></b></li>
-  <li><span class="stats__label"></span><b class="stats__val" data-b="week"></b></li>
-  <li><span class="stats__label"></span><b class="stats__val" data-b="month"></b></li>
-  <li><span class="stats__label"></span><b class="stats__val" data-b="year"></b></li>
-</ul>`;
+   langue — même raison que pour .mix__ends.
+   Un chiffre vedette (aujourd'hui) + un graphique en barres, pas une liste
+   label/valeur : une liste dit CHAQUE nombre mais rien de la PROPORTION
+   entre eux, exactement ce qu'on vient chercher ici (« ai-je plus lu cette
+   semaine que d'habitude ? »). */
+const STATS_HTML=`<div class="statshero">
+  <b class="statshero__n"></b>
+  <span class="statshero__l"></span>
+</div>
+<div class="statsbars">
+  <div class="statsbar" data-b="hour"><b class="statsbar__n"></b><span class="statsbar__col"><span class="statsbar__fill"></span></span><span class="statsbar__l"></span></div>
+  <div class="statsbar" data-b="day"><b class="statsbar__n"></b><span class="statsbar__col"><span class="statsbar__fill"></span></span><span class="statsbar__l"></span></div>
+  <div class="statsbar" data-b="week"><b class="statsbar__n"></b><span class="statsbar__col"><span class="statsbar__fill"></span></span><span class="statsbar__l"></span></div>
+  <div class="statsbar" data-b="month"><b class="statsbar__n"></b><span class="statsbar__col"><span class="statsbar__fill"></span></span><span class="statsbar__l"></span></div>
+  <div class="statsbar" data-b="year"><b class="statsbar__n"></b><span class="statsbar__col"><span class="statsbar__fill"></span></span><span class="statsbar__l"></span></div>
+</div>`;
+const STATS_BAR_H=110;   // doit rester d'accord avec .statsbar__col{height:110px}
 function renderStats(){
   const s=cardScrollStats(cardStats.days,cardStats.hourKey,cardStats.hourCount,new Date());
+  const bars=[["hour",s.hour],["day",s.day],["week",s.week],["month",s.month],["year",s.year]];
+  const max=Math.max(1,...bars.map(b=>b[1]));   // au moins 1 : jamais de division par zéro le 1er jour
   document.querySelectorAll("[data-statsmount]").forEach(mount=>{
     if(!mount.firstElementChild)mount.innerHTML=STATS_HTML;
-    const labels=mount.querySelectorAll(".stats__label");
-    labels[0].textContent=T("stats.hour");labels[1].textContent=T("stats.day");
-    labels[2].textContent=T("stats.week");labels[3].textContent=T("stats.month");
-    labels[4].textContent=T("stats.year");
-    mount.querySelector('[data-b="hour"]').textContent=s.hour;
-    mount.querySelector('[data-b="day"]').textContent=s.day;
-    mount.querySelector('[data-b="week"]').textContent=s.week;
-    mount.querySelector('[data-b="month"]').textContent=s.month;
-    mount.querySelector('[data-b="year"]').textContent=s.year;
+    mount.querySelector(".statshero__n").textContent=s.day;
+    mount.querySelector(".statshero__l").textContent=T("stats.heroLabel");
+    bars.forEach(([k,n])=>{
+      const bar=mount.querySelector(`.statsbar[data-b="${k}"]`);
+      bar.querySelector(".statsbar__n").textContent=n;
+      bar.querySelector(".statsbar__fill").style.height=Math.round((n/max)*STATS_BAR_H)+"px";
+      bar.querySelector(".statsbar__l").textContent=T("stats."+k);
+    });
   });
 }
 function openSettings(replaceFrom){

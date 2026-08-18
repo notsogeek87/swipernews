@@ -51,6 +51,7 @@
 
       "stats.title": "Mon activité",
       "stats.sub": "Cartes défilées, tous types confondus.",
+      "stats.heroLabel": "cartes défilées aujourd'hui",
       "stats.hour": "Cette heure",
       "stats.day": "Aujourd'hui",
       "stats.week": "Cette semaine",
@@ -297,6 +298,7 @@
 
       "stats.title": "My activity",
       "stats.sub": "Cards scrolled, all types combined.",
+      "stats.heroLabel": "cards scrolled today",
       "stats.hour": "This hour",
       "stats.day": "Today",
       "stats.week": "This week",
