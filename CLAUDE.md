@@ -433,6 +433,19 @@ genre de script dérape.
   + une référence choisie par période cassait l'accord (« à le mois
   dernier ») — seul le français a cette contrainte, l'anglais garde
   « compared to {ref} » sans article.
+  `resetStats()` : bouton de réinitialisation en pied de feuille, même
+  mécanique à DOUBLE appui que `delFeed` (`statsResetArmed`, un 2e appui dans
+  les 3 s confirme, sinon désarmement automatique — jamais de `confirm()`
+  natif, l'app n'en utilise nulle part ailleurs). Utile pour de vrai, mais
+  aussi la sortie proposée pour le seul cas où `days`/`today` peuvent diverger
+  du réel : une mise à jour EN COURS DE JOURNÉE change la forme du stockage
+  (c'est arrivé une fois pendant la construction de cette fonctionnalité,
+  passant de `hourKey`/`hourCount` à `today.slots`) — le total du jour
+  (`days`, champ inchangé) reste bon, mais le détail par heure d'AVANT la
+  mise à jour est perdu (jamais écrit dans le nouveau format), d'où un
+  graphique à zéro partout alors que le total ne l'est pas. Se résorbe tout
+  seul le lendemain (nouveau jour, nouveau `today` écrit dans le format
+  courant) ; le bouton permet de repartir propre tout de suite si on préfère.
 - `openHistory()` / `histRowHTML()` — la feuille « Articles en mémoire »
   (bouton liste de la barre du haut) : une VUE de `items`, refaite à chaque
   ouverture, qui ramène sur une carte dépassée d'un swipe de trop. Rien n'est

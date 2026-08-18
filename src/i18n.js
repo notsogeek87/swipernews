@@ -107,6 +107,8 @@
       "stats.cmp.downAbs": "-{n} par rapport {ref}",
       "stats.cmp.upPct": "+{n} % par rapport {ref}",
       "stats.cmp.downPct": "-{n} % par rapport {ref}",
+      "stats.reset": "Réinitialiser mes statistiques",
+      "stats.reset.confirm": "Confirmer ? Tout sera perdu",
 
       "hist.title": "Articles en mémoire",
       "hist.sub": "{n} articles gardés sous la main. Touche-en un pour y revenir.",
@@ -287,6 +289,7 @@
       "toast.copied": "Copié",
       "toast.copyFailed": "Copie impossible",
       "toast.refreshing": "Actualisation…",
+      "toast.statsReset": "Statistiques réinitialisées",
       "toast.invalidUrl": "URL invalide",
       "toast.youtubeResolving": "Recherche du flux YouTube…",
       "toast.youtubeChannelNotFound":
@@ -403,6 +406,8 @@
       "stats.cmp.downAbs": "-{n} compared to {ref}",
       "stats.cmp.upPct": "+{n}% compared to {ref}",
       "stats.cmp.downPct": "-{n}% compared to {ref}",
+      "stats.reset": "Reset my activity stats",
+      "stats.reset.confirm": "Confirm? Everything will be lost",
 
       "hist.title": "Articles in memory",
       "hist.sub": "{n} articles kept at hand. Tap one to go back to it.",
@@ -581,6 +586,7 @@
       "toast.copied": "Copied",
       "toast.copyFailed": "Copy failed",
       "toast.refreshing": "Refreshing…",
+      "toast.statsReset": "Activity stats reset",
       "toast.invalidUrl": "Invalid URL",
       "toast.youtubeResolving": "Looking up the YouTube feed…",
       "toast.youtubeChannelNotFound": "Could not determine this channel's RSS feed.",

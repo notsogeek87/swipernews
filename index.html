@@ -729,6 +729,16 @@
   .statstable th{color:var(--ash);font-weight:600;font-size:12px}
   .statstable td:last-child,.statstable th:last-child{text-align:right;font-family:var(--font-mono);letter-spacing:-.03em}
 
+  /* Réinitialiser (double appui, voir resetStats) : discret par défaut (ash,
+     comme une action secondaire), le rouge plein n'apparaît qu'UNE fois armé
+     — jamais la couleur seule pour dire « attention » : le LIBELLÉ change
+     aussi (« Confirmer ? »), comme .del--confirm au-dessus. */
+  .statsresetbtn{all:unset;box-sizing:border-box;display:block;margin:22px auto 0;color:var(--ash);
+    font-family:var(--font-sans);font-weight:500;font-size:12.5px;letter-spacing:-.01em;
+    cursor:pointer;padding:8px 10px;border-radius:var(--radius-sm)}
+  .statsresetbtn--armed{background:var(--redline);color:#fff;font-weight:700}
+  .statsresetbtn:focus-visible{outline:2px solid var(--flare);outline-offset:2px}
+
   /* Réglage « Ouvrir les articles » (app packagée uniquement, voir renderReadPref).
      Segmenté plutôt qu'un interrupteur : les deux destinations sont nommées, on
      n'a pas à deviner ce que « activé » veut dire. */
@@ -1110,9 +1120,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=177"></script>
-<script src="src/learn-core.js?v=177"></script>
-<script src="src/i18n.js?v=177"></script>
+<script src="src/lib.js?v=178"></script>
+<script src="src/learn-core.js?v=178"></script>
+<script src="src/i18n.js?v=178"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1899,7 +1909,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="177";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="178";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -5539,9 +5549,11 @@ const STATS_HTML=`<div class="statshero" aria-live="polite">
     <thead><tr><th scope="col"></th><th scope="col"></th></tr></thead>
     <tbody></tbody>
   </table>
-</div>`;
+</div>
+<button type="button" class="statsresetbtn"></button>`;
 let statsPeriod="day";     // dernière période choisie DANS la session, pas persistée
 let statsTableOpen=false;  // idem, garde son état d'un onglet à l'autre
+let statsResetArmed=false,statsResetT;   // même mécanique à double appui que delFeed (voir plus bas)
 /* +N/-N (compte) ou +N/-N % (proportion) selon la période : sur une heure ou
    un jour, un pourcentage serait bruyant pour de petits nombres (+1 carte →
    +100 %, +∞ % si la veille est à 0) ; sur semaine/mois/année, où les totaux
@@ -5645,14 +5657,41 @@ function renderStats(){
     mount.querySelector(".statstable thead th:first-child").textContent=T("stats.table.period");
     mount.querySelector(".statstable thead th:last-child").textContent=T("stats.table.count");
     mount.querySelector(".statstable tbody").innerHTML=statsTableHTML(statsPeriod,buckets);
+    const resetBtn=mount.querySelector(".statsresetbtn");
+    resetBtn.textContent=T(statsResetArmed?"stats.reset.confirm":"stats.reset");
+    resetBtn.classList.toggle("statsresetbtn--armed",statsResetArmed);
     if(firstPaint){
       mount.querySelectorAll(".statstab").forEach(tab=>{
         tab.onclick=()=>{statsPeriod=tab.dataset.p;renderStats();};
       });
       mount.querySelector(".statstabs").addEventListener("keydown",statsTabsKeydown);
       tableBtn.onclick=()=>{statsTableOpen=!statsTableOpen;renderStats();};
+      resetBtn.onclick=resetStats;
     }
   });
+}
+/* Réinitialise cardStats (days ET today), à double appui — même mécanique
+   que delFeed (voir plus bas) : le 1er appui arme (le bouton change de
+   libellé et de couleur), le 2e dans les 3 s confirme, sinon il se désarme
+   tout seul. Utile pour de vrai (recommencer un suivi propre), et sert aussi
+   de filet en cas de compteur qui semblerait faux — voir CLAUDE.md pour le
+   cas d'une mise à jour EN COURS DE JOURNÉE qui laisse le détail par heure
+   à 0 pendant que le total reste bon (rien à réinitialiser dans ce cas
+   précis, ça se résorbe tout seul le lendemain, mais le bouton reste la
+   sortie la plus simple à proposer). */
+function resetStats(){
+  clearTimeout(statsResetT);
+  if(!statsResetArmed){
+    statsResetArmed=true;
+    renderStats();
+    statsResetT=setTimeout(()=>{statsResetArmed=false;renderStats();},3000);
+    return;
+  }
+  statsResetArmed=false;
+  cardStats={days:{},today:{day:"",slots:{}}};
+  statsDirty=true;clearTimeout(statsPersistT);persistStats();   // écriture immédiate, pas d'attente des 800 ms habituels
+  toast(T("toast.statsReset"));
+  renderStats();
 }
 /* Navigation clavier du sélecteur de période, motif ARIA « tablist » standard
    (flèches, Origine/Fin), à activation IMMÉDIATE — avec 5 onglets courts, un
