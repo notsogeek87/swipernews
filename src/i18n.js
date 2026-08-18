@@ -116,6 +116,11 @@
       "sheet.sources.deleteAria": "Supprimer {name}",
       "sheet.sources.shareAria": "Partager {name}",
       "sheet.sources.unreachable": "injoignable",
+      "sheet.sources.ytkey.summary": "🔑 Secours : clé API YouTube (avancé)",
+      "sheet.sources.ytkey.desc":
+        "Seulement si l'ajout d'une chaîne échoue. Optionnelle, et propre à toi : jamais partagée avec personne d'autre.",
+      "sheet.sources.ytkey.placeholder": "Clé API YouTube Data v3",
+      "sheet.sources.ytkey.link": "Comment obtenir une clé gratuite ↗",
 
       "sheet.apply": "Voir mon fil",
 
@@ -327,6 +332,11 @@
       "sheet.sources.deleteAria": "Delete {name}",
       "sheet.sources.shareAria": "Share {name}",
       "sheet.sources.unreachable": "unreachable",
+      "sheet.sources.ytkey.summary": "🔑 Fallback: YouTube API key (advanced)",
+      "sheet.sources.ytkey.desc":
+        "Only if adding a channel fails. Optional, and yours alone: never shared with anyone else.",
+      "sheet.sources.ytkey.placeholder": "YouTube Data API v3 key",
+      "sheet.sources.ytkey.link": "How to get a free key ↗",
 
       "sheet.apply": "See my feed",
 

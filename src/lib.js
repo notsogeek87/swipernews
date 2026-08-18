@@ -831,6 +831,68 @@
     return id ? "https://www.youtube.com/feeds/videos.xml?channel_id=" + id : "";
   }
 
+  /* ---------- Clé API YouTube Data v3 (secours optionnel) ----------
+     RSS/HTML (ci-dessus) restent le chemin par défaut, sans rien à configurer.
+     Une chaîne dont le handle actuel n'est ni un ancien identifiant
+     "utilisateur" ni retrouvable dans le HTML (mur de consentement, page
+     réduite servie à une requête sans navigateur) ne se résout alors JAMAIS —
+     d'où ce dernier recours, qui n'existe que si l'utilisateur a lui-même
+     renseigné SA PROPRE clé dans les réglages avancés : jamais de clé
+     embarquée dans l'app (quota partagé par tous les utilisateurs, épuisable
+     quel que soit le soin apporté à la restreindre — voir CLAUDE.md). Trois
+     formes, du moins coûteux en quota au plus (channels.list : 1 unité ;
+     search.list : 100) — resolveYoutubeChannelFeed (index.html) les enchaîne
+     et vérifie chaque résultat par une vraie requête, ce qui ne peut donc pas
+     vivre ici. */
+
+  /** URL `channels.list` pour un handle actuel (`/@nom`). Un handle déjà
+   *  préfixé par `@` ne devient pas `@@nom`. */
+  function youtubeApiChannelsByHandleUrl(handle, key) {
+    return (
+      "https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=" +
+      encodeURIComponent("@" + String(handle || "").replace(/^@/, "")) +
+      "&key=" +
+      encodeURIComponent(key || "")
+    );
+  }
+
+  /** URL `channels.list` pour un ancien identifiant "utilisateur"
+   *  (`/user/…`, ou `/c/…` quand ce nom en est un). */
+  function youtubeApiChannelsByUsernameUrl(username, key) {
+    return (
+      "https://www.googleapis.com/youtube/v3/channels?part=id&forUsername=" +
+      encodeURIComponent(username || "") +
+      "&key=" +
+      encodeURIComponent(key || "")
+    );
+  }
+
+  /** URL `search.list` : dernier recours, pour un `/c/…` qui n'est ni un
+   *  handle ni un ancien nom d'utilisateur. */
+  function youtubeApiSearchChannelUrl(query, key) {
+    return (
+      "https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=1&q=" +
+      encodeURIComponent(query || "") +
+      "&key=" +
+      encodeURIComponent(key || "")
+    );
+  }
+
+  /** Identifiant de chaîne extrait d'une réponse `channels.list`
+   *  (`items[0].id`, une chaîne) ou `search.list` (`items[0].id.channelId`).
+   *  "" si absent ou mal formé — jamais fait confiance à une forme qui ne
+   *  ressemble pas à un vrai identifiant (voir YT_CHANNEL_RE). */
+  function youtubeApiChannelIdFromResponse(json) {
+    try {
+      const item = json && Array.isArray(json.items) ? json.items[0] : null;
+      if (!item) return "";
+      const id = typeof item.id === "string" ? item.id : item.id && item.id.channelId;
+      return id && YT_CHANNEL_RE.test(id) ? id : "";
+    } catch (_) {
+      return "";
+    }
+  }
+
   /* ---------- L'Équipe ----------
      Les flux RSS de L'Équipe (dwh.lequipe.fr) n'ont pas de titre pertinent :
      ils sont tous généré par une même API avec le même titre de base. La
@@ -1248,6 +1310,10 @@
     youtubeRssLinkFromHtml,
     youtubeChannelIdFromHtml,
     youtubeFeedUrlFromChannelHtml,
+    youtubeApiChannelsByHandleUrl,
+    youtubeApiChannelsByUsernameUrl,
+    youtubeApiSearchChannelUrl,
+    youtubeApiChannelIdFromResponse,
     isLequipeFeedUrl,
     lequipeRubrique,
     lequipeFeedName,

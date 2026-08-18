@@ -536,6 +536,16 @@
     transition:background .2s}
   .iobtn:hover{background:rgba(149,28,4,.15)}
   .iobtn:active{transform:scale(.97)}
+  /* Secours optionnel (clé API YouTube) : replié par défaut, discret — un
+     <details> plutôt qu'une section pleine, pour ne pas donner à un réglage
+     que quasi personne ne touche le même poids visuel que les autres. */
+  .ytadv{margin-top:14px;font-size:13px;color:var(--ash)}
+  .ytadv summary{cursor:pointer;font-weight:500;color:var(--ink)}
+  .ytadv p.sub{margin:8px 0;font-size:13px}
+  .ytadv input{width:100%;background:transparent;border:1px solid var(--redline);color:var(--ink);
+    padding:11px 14px;border-radius:var(--radius-sm);font-family:var(--font-sans);font-size:13px;box-sizing:border-box}
+  .ytadv input:focus{border-color:var(--flare);outline:none}
+  .ytadv a{color:var(--flare)}
 
   /* Articles en mémoire. L'en-tête reste au-dessus de la liste pendant qu'on la
      parcourt : fond opaque et marges négatives pour couvrir toute la largeur du
@@ -829,6 +839,18 @@
 
     <div id="suggestBox"></div>
 
+    <!-- Secours optionnel, replié par défaut : n'existe que pour qui tombe
+         vraiment sur une chaîne YouTube que RSS/HTML n'arrivent pas à
+         résoudre (voir resolveYoutubeChannelFeed). Rien à configurer pour
+         tout le monde d'autre — la clé, propre à l'utilisateur, n'est jamais
+         envoyée nulle part sauf à l'API YouTube elle-même. -->
+    <details class="ytadv">
+      <summary data-i18n="sheet.sources.ytkey.summary">🔑 Secours : clé API YouTube (avancé)</summary>
+      <p class="sub" data-i18n="sheet.sources.ytkey.desc">Seulement si l'ajout d'une chaîne échoue. Optionnelle, et propre à toi : jamais partagée avec personne d'autre.</p>
+      <input id="ytApiKeyInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-attr="placeholder:sheet.sources.ytkey.placeholder" placeholder="Clé API YouTube Data v3">
+      <p class="sub"><a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener" data-i18n="sheet.sources.ytkey.link">Comment obtenir une clé gratuite ↗</a></p>
+    </details>
+
     <div class="iorow">
       <button class="iobtn" id="exportOpml" data-i18n="sheet.sources.exportOpml">↓ Exporter (OPML)</button>
       <button class="iobtn" id="exportJson" data-i18n="sheet.sources.exportJson">↓ Exporter (JSON)</button>
@@ -923,9 +945,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=158"></script>
-<script src="src/learn-core.js?v=158"></script>
-<script src="src/i18n.js?v=158"></script>
+<script src="src/lib.js?v=159"></script>
+<script src="src/learn-core.js?v=159"></script>
+<script src="src/i18n.js?v=159"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1039,7 +1061,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
-  seenKey,dropSeen,roundRobin,weightedRoundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,roundRobin,weightedRoundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1582,7 +1604,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="158";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="159";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -1759,6 +1781,24 @@ let filterVideoOnly=(()=>{
   try{const v=localStorage.getItem(LS_VIDEO_ONLY);return v===null?false:v==="1";}
   catch(e){return false;}
 })();
+
+/* ---------- Clé API YouTube (secours, réglage avancé) ----------
+   Réglage AVANCÉ, replié par défaut (voir la feuille des sources) : "" pour
+   quasi tout le monde, RSS/HTML (resolveYoutubeChannelFeed) suffisant seuls
+   la plupart du temps. Jamais de clé embarquée dans l'app — voir le
+   commentaire au-dessus de youtubeApiChannelsByHandleUrl (src/lib.js) pour
+   pourquoi. Celle-ci est la clé PROPRE à l'utilisateur, saisie à la main :
+   son quota (10 000 unités/jour par défaut chez Google) n'est donc jamais
+   partagé avec personne d'autre. */
+const LS_YTKEY="fluxswipe.ytapikey.v1";
+let ytApiKey=(()=>{try{return localStorage.getItem(LS_YTKEY)||"";}catch(e){return "";}})();
+function saveYtApiKey(v){
+  ytApiKey=String(v||"").trim();
+  try{
+    if(ytApiKey)localStorage.setItem(LS_YTKEY,ytApiKey);
+    else localStorage.removeItem(LS_YTKEY);
+  }catch(e){warn("save yt api key",e);}
+}
 
 /* ---------- Mode « Cacher les articles déjà lus » ----------
    Défaut ACTIVÉ : c'est le comportement historique de l'app, déjà en place
@@ -4960,6 +5000,7 @@ function openSettings(){
   renderMix();renderIntGrid();renderList();renderSuggest();renderReadPref();renderLangPref();
   document.getElementById("sponsorFilterChk").checked=filterSponsored;
   document.getElementById("videoFilterChk").checked=filterVideoOnly;
+  document.getElementById("ytApiKeyInput").value=ytApiKey;
   const premier=!interestsChosen();
   document.getElementById("introWelcome").classList.toggle("hidden",!premier); // intro visible seulement la 1ère fois
   // Accueil du 1er lancement : on ne demande qu'une chose à la fois. Les
@@ -5012,6 +5053,9 @@ document.getElementById("videoFilterChk").onchange=e=>{
   try{localStorage.setItem(LS_VIDEO_ONLY,filterVideoOnly?"1":"0");}catch(_){}
   feedsDirty=true;
 };
+// Ne sert qu'au PROCHAIN ajout de chaîne (resolveYoutubeChannelFeed) : pas de
+// flux déjà chargé qui en dépende, donc pas de feedsDirty ni de rechargement.
+document.getElementById("ytApiKeyInput").onchange=e=>saveYtApiKey(e.target.value);
 document.getElementById("applySettings").onclick=applySettings;
 renderMixUI();
 /* Premier lancement : on ouvre les réglages AVANT de charger quoi que ce soit.
@@ -5113,12 +5157,18 @@ async function verifieFluxChaine(rss){
        depuis ce nom SANS jamais charger la page — ça marche pour toute
        chaîne dont le nom actuel correspond à un ancien identifiant
        "utilisateur", ce qui couvre une bonne partie des chaînes existantes.
-    3. En dernier recours seulement : télécharger la page et y chercher le
-       lien RSS annoncé ou le channelId (youtubeFeedUrlFromChannelHtml,
-       src/lib.js). C'est le chemin le plus fragile — Google peut servir,
-       à une requête sans navigateur, un mur de consentement au lieu de la
-       vraie page (voir isYoutubeHost, api/feed.js, et nativeGet, qui posent
-       déjà les cookies et le user-agent nécessaires pour l'éviter).
+    3. SEULEMENT si l'utilisateur a renseigné sa propre clé API (réglage
+       avancé, voir ytApiKey) : l'API officielle YouTube Data v3
+       (resolveYoutubeChannelIdViaApi). Plus fiable que l'étape suivante —
+       tentée avant elle — mais jamais tentée sans clé : pas de clé embarquée
+       dans l'app (voir le commentaire au-dessus de
+       youtubeApiChannelsByHandleUrl, src/lib.js).
+    4. En dernier recours : télécharger la page et y chercher le lien RSS
+       annoncé ou le channelId (youtubeFeedUrlFromChannelHtml, src/lib.js).
+       C'est le chemin le plus fragile — Google peut servir, à une requête
+       sans navigateur, un mur de consentement au lieu de la vraie page (voir
+       isYoutubeHost, api/feed.js, et nativeGet, qui posent déjà les cookies
+       et le user-agent nécessaires pour l'éviter).
    Rend "" si rien n'a pu être déterminé ; le toast d'échec est à charge de
    l'appelant. */
 async function resolveYoutubeChannelFeed(pageUrl){
@@ -5133,11 +5183,54 @@ async function resolveYoutubeChannelFeed(pageUrl){
       const rss="https://www.youtube.com/feeds/videos.xml?user="+encodeURIComponent(handle);
       if(await verifieFluxChaine(rss))return rss;
     }
+    if(ytApiKey){
+      const idApi=await resolveYoutubeChannelIdViaApi(handle,ytApiKey);
+      if(idApi){
+        const rss="https://www.youtube.com/feeds/videos.xml?channel_id="+idApi;
+        if(await verifieFluxChaine(rss))return rss;
+      }
+    }
     const html=await fetchText(pageUrl,()=>8000);
     const rss=youtubeFeedUrlFromChannelHtml(html);
     if(!rss)return "";
     return (await verifieFluxChaine(rss))?rss:"";
   }catch(e){warn("résolution chaîne YouTube",e);return "";}
+}
+/* Requête JSON à l'API YouTube Data v3 : direct d'abord (CORS ouvert chez
+   Google pour cette API, comme pour Wikipédia — voir srcWikipedia), repli sur
+   fetchText sinon (proxy web, pont natif). Rend null au moindre souci —
+   jamais d'exception qui interromprait la cascade de
+   resolveYoutubeChannelFeed. */
+async function fetchYoutubeApiJson(url){
+  try{
+    const res=await fetchWithTimeout(url,{},8000);
+    if(!res.ok)throw new Error("http "+res.status);
+    return await res.json();
+  }catch(e){
+    try{return JSON.parse(await fetchText(url,()=>8000));}
+    catch(e2){warn("clé API YouTube",e2);return null;}
+  }
+}
+/* Résout un identifiant de chaîne via l'API officielle : essaie le handle
+   actuel, puis un ancien identifiant "utilisateur", puis une recherche par
+   nom en tout dernier recours (100 unités de quota — seule façon de
+   retrouver un `/c/…` qui n'est ni l'un ni l'autre). "" si `handle` est vide
+   (URL `/channel/UC…` déjà tentée avant l'appel, ou forme non reconnue) ou si
+   rien n'a abouti — une clé invalide ou un quota épuisé rendent alors
+   simplement "", et resolveYoutubeChannelFeed retombe sur le scraping HTML
+   comme si la clé n'existait pas. */
+async function resolveYoutubeChannelIdViaApi(handle,key){
+  if(!handle)return "";
+  const essais=[
+    youtubeApiChannelsByHandleUrl(handle,key),
+    youtubeApiChannelsByUsernameUrl(handle,key),
+    youtubeApiSearchChannelUrl(handle,key),
+  ];
+  for(const url of essais){
+    const id=youtubeApiChannelIdFromResponse(await fetchYoutubeApiJson(url));
+    if(id)return id;
+  }
+  return "";
 }
 async function nommerChaine(url){
   try{

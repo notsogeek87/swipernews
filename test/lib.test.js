@@ -751,6 +751,50 @@ test("youtubeFeedUrlFromChannelHtml combine lien annoncé et channelId", () => {
   assert.equal(lib.youtubeFeedUrlFromChannelHtml("<html>rien ici</html>"), "");
 });
 
+test("youtubeApiChannelsByHandleUrl construit l'URL channels.list pour un handle", () => {
+  const url = lib.youtubeApiChannelsByHandleUrl("ScienceEtonnante", "MACLE");
+  assert.match(
+    url,
+    /^https:\/\/www\.googleapis\.com\/youtube\/v3\/channels\?part=id&forHandle=/
+  );
+  assert.match(url, /forHandle=%40ScienceEtonnante&/);
+  assert.match(url, /key=MACLE$/);
+  // Un handle déjà préfixé par @ ne devient pas "@@nom".
+  assert.match(lib.youtubeApiChannelsByHandleUrl("@nom", "k"), /forHandle=%40nom&/);
+});
+
+test("youtubeApiChannelsByUsernameUrl construit l'URL channels.list pour un ancien identifiant", () => {
+  const url = lib.youtubeApiChannelsByUsernameUrl("unepersonne", "MACLE");
+  assert.match(url, /forUsername=unepersonne/);
+  assert.match(url, /key=MACLE$/);
+});
+
+test("youtubeApiSearchChannelUrl construit l'URL search.list en dernier recours", () => {
+  const url = lib.youtubeApiSearchChannelUrl("Arte Documentaires", "MACLE");
+  assert.match(url, /type=channel/);
+  assert.match(url, /q=Arte%20Documentaires/);
+  assert.match(url, /key=MACLE$/);
+});
+
+test("youtubeApiChannelIdFromResponse lit l'identifiant selon la forme de la réponse", () => {
+  const id = "UCabcdefghijklmnopqrstuv";
+  // channels.list : id est directement la chaîne.
+  assert.equal(lib.youtubeApiChannelIdFromResponse({ items: [{ id }] }), id);
+  // search.list : id est un objet {channelId}.
+  assert.equal(
+    lib.youtubeApiChannelIdFromResponse({ items: [{ id: { channelId: id } }] }),
+    id
+  );
+  // Liste vide, forme inattendue, ou identifiant mal formé : rien.
+  assert.equal(lib.youtubeApiChannelIdFromResponse({ items: [] }), "");
+  assert.equal(lib.youtubeApiChannelIdFromResponse({}), "");
+  assert.equal(
+    lib.youtubeApiChannelIdFromResponse({ items: [{ id: "pasUnIdentifiant" }] }),
+    ""
+  );
+  assert.equal(lib.youtubeApiChannelIdFromResponse(null), "");
+});
+
 test("les vignettes YouTube déclarent leur taille par leur nom de fichier", () => {
   // Sans ça, imageSizeFromUrl rend 0 sur une URL ytimg, et applyBg part sonder
   // /api/og pour CHAQUE carte vidéo défilée — le défaut déjà corrigé côté
