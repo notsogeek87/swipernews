@@ -658,7 +658,15 @@
   .statshero__n{display:block;font-family:var(--font-mono);letter-spacing:-.03em;
     font-size:46px;font-weight:700;line-height:1;color:var(--flare)}
   .statshero__l{display:block;color:var(--ash);font-size:13px;margin-top:6px}
-  .statsbars{display:flex;align-items:flex-end;gap:10px;padding:0 2px}
+  /* align-items:flex-START, pas flex-end : les 5 colonnes n'ont PAS la même
+     hauteur totale dès qu'un libellé passe sur deux lignes (« Cette
+     semaine », le plus long) — un alignement par le BAS aurait alors décalé
+     les barres les unes par rapport aux autres pour faire coïncider les bas
+     de colonne, la plus haute colonne (celle au libellé sur deux lignes)
+     tirant sa barre vers le haut. Par le HAUT, chiffre et barre restent à la
+     même hauteur pour les cinq, quel que soit le nombre de lignes du
+     libellé sous chacune. */
+  .statsbars{display:flex;align-items:flex-start;gap:10px;padding:0 2px}
   .statsbar{flex:1 1 0;display:flex;flex-direction:column;align-items:center;min-width:0}
   .statsbar__n{font-family:var(--font-mono);letter-spacing:-.03em;font-weight:600;font-size:13px;margin-bottom:6px}
   /* Hauteur FIXE (pas un flex-grow) : le remplissage se pose en pixels, pas en
@@ -668,7 +676,10 @@
     background:var(--molten);border-radius:var(--radius-sm);overflow:hidden}
   .statsbar__fill{width:100%;min-height:4px;background:var(--flare);border-radius:var(--radius-sm);
     transition:height .4s cubic-bezier(.2,.8,.2,1)}
-  .statsbar__l{color:var(--ash);font-size:11.5px;margin-top:8px;text-align:center}
+  /* min-height réservée pour DEUX lignes (line-height×2) : même si la plupart
+     des libellés tiennent sur une, le bas du graphique reste net au lieu de
+     suivre le seul libellé qui passe à la ligne. */
+  .statsbar__l{color:var(--ash);font-size:11.5px;line-height:1.25;min-height:2.5em;margin-top:8px;text-align:center}
 
   /* Réglage « Ouvrir les articles » (app packagée uniquement, voir renderReadPref).
      Segmenté plutôt qu'un interrupteur : les deux destinations sont nommées, on
@@ -1048,9 +1059,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=174"></script>
-<script src="src/learn-core.js?v=174"></script>
-<script src="src/i18n.js?v=174"></script>
+<script src="src/lib.js?v=175"></script>
+<script src="src/learn-core.js?v=175"></script>
+<script src="src/i18n.js?v=175"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1823,7 +1834,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="174";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="175";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
