@@ -228,6 +228,11 @@
   .rail button:hover{background:rgba(149,28,4,.15)}
   .rail button:active{transform:scale(.88)}
   .rail button svg{width:23px;height:23px;display:block}
+  /* Enregistré : même accent corail que les autres états « on » de l'app
+     (filterbtn.on, intchip.on) — c'est l'icône PLEINE (ICON_SAVED, posée par
+     updateRail) qui porte l'essentiel du signal, la couleur ne fait que
+     l'appuyer. */
+  .rail button.on{color:var(--flare);border-color:var(--flare)}
 
   /* Plus de jauge de progression : le fil unique est SANS FIN (quand les actus
      sont épuisées, Wikipédia prend le relais indéfiniment), donc une position
@@ -325,20 +330,6 @@
      entre elles, ce qu'aucun glyphe de police ne garantit (chacun a sa propre
      hauteur d'œil et sa propre position sur la ligne de base). */
   .top .actions button svg{width:20px;height:20px;display:block}
-  /* Interrupteur « boussole » : allumé = Wikipédia dans le fil. L'état ALLUMÉ
-     prend le dégradé cocoa -> molten des boutons pleins (comme la puce active
-     d'un segmenté) et passe l'icône en corail ; l'état éteint recule d'un cran
-     — liseré effacé, icône en cendre. L'écart se lit donc par le REMPLISSAGE
-     et par la luminance, pas seulement par la teinte. Pas de bascule animée :
-     une pastille qui coulisse serait le seul objet mobile d'une barre qui, elle,
-     se veut immobile pendant la lecture. */
-  /* Sélecteurs préfixés par `.top .actions` : la règle générique des boutons de
-     la barre y impose déjà `color`, et sans cette précision l'icône restait en
-     linen dans les deux états — l'écart se serait joué sur le seul remplissage. */
-  .top .actions .iconbtn--toggle{transition:background .2s,border-color .2s,color .2s}
-  .top .actions .iconbtn--toggle.on{background:linear-gradient(135deg,var(--surface),var(--molten));
-    border-color:var(--flare);color:var(--flare);box-shadow:var(--shadow-ember)}
-  .top .actions .iconbtn--toggle:not(.on){border-color:rgba(149,28,4,.45);color:var(--ash)}
 
   /* Rangée de filtres : DEUX PASTILLES, une par filtre (📰 la source des actus,
      🎓 le thème des articles Wikipédia).
@@ -598,6 +589,17 @@
     font-size:10.5px;padding:1px 6px;border-radius:var(--radius-sm);
     white-space:nowrap;flex:0 0 auto}
   .histempty{color:var(--ash);font-size:14px;padding:14px 0}
+  /* Rangée « Enregistrés » : même habillage que .histrow (elle n'ouvre rien
+     par elle-même — d'où cursor:default), mais DEUX zones tactiles, pas une :
+     un <a> pour ouvrir l'article (histrow__* réutilisés tels quels) et un
+     bouton de retrait, qu'un <button> unique ne pourrait pas imbriquer
+     (élément interactif dans un élément interactif, invalide). */
+  .savedrow{cursor:default}
+  .savedrow__open{display:flex;align-items:flex-start;gap:12px;flex:1 1 auto;min-width:0;
+    background:transparent;border:none;color:inherit;font:inherit;text-align:left;
+    text-decoration:none;padding:0;cursor:pointer}
+  .savedrow__del{flex:0 0 auto;align-self:center;background:none;border:none;
+    color:var(--ash);font-size:18px;line-height:1;cursor:pointer;padding:6px}
   /* Pied du panneau de réglages : discret, jamais un titre. */
   .about{color:var(--ash);font-family:var(--font-mono);letter-spacing:-.03em;
     font-size:11.5px;text-align:center;margin-top:16px;opacity:.75}
@@ -754,9 +756,10 @@
       <!-- Articles en mémoire : la liste de ce que le fil garde sous la main,
            pour revenir sur une carte dépassée d'un swipe de trop. -->
       <button id="histBtn" class="iconbtn" aria-haspopup="dialog" data-i18n-attr="title:top.history.title,aria-label:top.history.aria"></button>
-      <!-- Boussole : ouvre la dose d'apprentissage. Son état (plein/fantôme)
-           dit si Wikipédia est dans le fil ; voir updateDoseBtn(). -->
-      <button id="doseBtn" class="iconbtn iconbtn--toggle" aria-haspopup="dialog"></button>
+      <!-- Enregistrés : liste PERSISTÉE (voir toggleSave), à ne pas confondre
+           avec « Articles en mémoire » juste au-dessus, qui n'est qu'une vue
+           du fil en cours. -->
+      <button id="savedBtn" class="iconbtn" aria-haspopup="dialog" data-i18n-attr="title:top.saved.title,aria-label:top.saved.aria"></button>
       <button id="reloadBtn" class="iconbtn" data-i18n-attr="title:top.reload.title,aria-label:top.reload.aria"></button>
       <button id="openSheet" class="iconbtn" data-i18n-attr="title:top.settings.title,aria-label:top.settings.aria"></button>
     </div>
@@ -781,6 +784,9 @@
 
 <!-- Rail unique, partagé par toutes les cartes (agit sur la carte visible) -->
 <div class="rail hidden" id="rail">
+  <!-- État (creux/plein) et libellé posés par updateRail() : ils dépendent de
+       la carte visible, donc ne peuvent pas être statiques comme shareBtn. -->
+  <button id="saveBtn"></button>
   <button id="shareBtn" data-i18n-attr="aria-label:rail.share.aria,title:rail.share.title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
 </div>
 
@@ -820,8 +826,6 @@
 
     <h3 class="secttl" data-i18n="sheet.mix.title">🎚️ Dose d'apprentissage</h3>
     <p class="sub" data-i18n="dose.sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
-    <!-- Même bloc que dans la feuille de la boussole, rempli par renderMix() :
-         un seul curseur, deux points de montage (comme les réglages du lecteur). -->
     <div data-mixmount></div>
 
     <h3 class="secttl" data-i18n="sheet.interests.title">🎓 Centres d'intérêt</h3>
@@ -875,17 +879,6 @@
   </div>
 </div>
 
-<!-- Dose d'apprentissage, ouverte depuis la boussole de la barre du haut. Le
-     même curseur qu'au bas des réglages : un seul état, deux points de montage. -->
-<div class="sheet" id="mixSheet" role="dialog" aria-modal="true" aria-labelledby="mixTitle">
-  <div class="sheet__panel" tabindex="-1">
-    <div class="sheet__grip"></div>
-    <h2 id="mixTitle" data-i18n="dose.title">Dose d'apprentissage</h2>
-    <p class="sub" data-i18n="dose.sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
-    <div data-mixmount></div>
-  </div>
-</div>
-
 <!-- Articles en mémoire, ouverts depuis la barre du haut. Une feuille comme le
      reste de l'app, et non une vraie page : le fil doit rester EXACTEMENT où on
      l'a laissé derrière (une page le déchargerait, donc le rechargerait, et on
@@ -904,6 +897,22 @@
       <label class="sponsorrow histhide"><input type="checkbox" id="histHideSeenChk"><span data-i18n="hist.hideSeen">Cacher les articles déjà lus du fil</span></label>
     </div>
     <div id="histList"></div>
+  </div>
+</div>
+
+<!-- Articles enregistrés : liste PERSISTÉE (voir toggleSave/LS_SAVED), à la
+     différence d'« Articles en mémoire » qui n'est qu'une vue de `items`. Une
+     rangée OUVRE l'article (openArticle) au lieu de faire défiler le fil :
+     rien ne garantit qu'un article enregistré fasse encore partie de `items`,
+     ni même du fil que l'utilisateur a sous les yeux au moment où il l'ouvre. -->
+<div class="sheet" id="savedSheet" role="dialog" aria-modal="true" aria-labelledby="savedTitle">
+  <div class="sheet__panel" tabindex="-1">
+    <div class="sheet__grip"></div>
+    <div class="histhead">
+      <h2 id="savedTitle" data-i18n="saved.title">Enregistrés</h2>
+      <p class="sub" id="savedSub"></p>
+    </div>
+    <div id="savedList"></div>
   </div>
 </div>
 
@@ -948,9 +957,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=161"></script>
-<script src="src/learn-core.js?v=161"></script>
-<script src="src/i18n.js?v=161"></script>
+<script src="src/lib.js?v=162"></script>
+<script src="src/learn-core.js?v=162"></script>
+<script src="src/i18n.js?v=162"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1049,6 +1058,11 @@ const CONFIG = {
      flux RSS au bout de quelques jours — la mémoriser plus longtemps ne sert
      plus à rien. 800 liens canoniques pèsent ~70 Ko, contre ~5 Mo de quota. */
   SEEN_NEWS_MAX: 800,
+  /* Articles ENREGISTRÉS (bouton du rail) : liste PERSISTÉE, sans rapport
+     avec seen/seenNews (qui ne gardent qu'une clé, jamais un article capable
+     de se réafficher hors du fil qui l'a servi). Le plafond évite une
+     croissance sans fin ; les plus récents restent (voir toggleSave). */
+  SAVED_MAX: 300,
   /* Âge maximal d'une vidéo YouTube (Shorts ou playlist choisie) pour rester
      dans le fil — 1 mois. Propre à YouTube : une chaîne peut publier depuis
      des années sans jamais faire sortir ses vieux Shorts du flux « derniers
@@ -1474,6 +1488,59 @@ function addSeenNews(it){
   clearTimeout(seenNewsPersistT);seenNewsPersistT=setTimeout(persistSeenNews,800);
 }
 
+/* ---------- Articles enregistrés ----------
+   Différence de nature avec seen/seenNews juste au-dessus : ceux-là ne gardent
+   qu'une CLÉ (un article vu n'a besoin que d'être reconnu, jamais réaffiché).
+   Un article enregistré, lui, doit pouvoir se lister et se rouvrir bien après
+   avoir quitté le fil qui l'a servi — un flux RSS ne garde que ses N derniers
+   items, et le fil mêlé lui-même plafonne à MAX_ITEMS. D'où un SNAPSHOT complet
+   par entrée (titre, lien, image, source, date), pas seulement une clé.
+   Clé d'identité = seenKey(it), la même que partout ailleurs dans l'app. */
+const LS_SAVED="fluxswipe.saved.v1";
+/* Comme sanitizeFeeds/usableItem : une entrée mal formée (autre forme laissée
+   par une version antérieure, stockage altéré) est écartée plutôt que de faire
+   planter la liste ou l'ouverture d'un article. */
+function sanitizeSaved(raw){
+  if(!Array.isArray(raw))return [];
+  return raw.filter(x=>x&&typeof x==="object"&&typeof x.link==="string"&&x.link&&typeof x.title==="string"&&x.title)
+    .map(x=>({
+      key:typeof x.key==="string"&&x.key?x.key:seenKey(x),
+      title:x.title,link:x.link,
+      img:typeof x.img==="string"?x.img:"",
+      source:typeof x.source==="string"?x.source:"",
+      date:typeof x.date==="string"?x.date:"",
+      kind:x.kind==="learn"?"learn":"news",
+      cat:typeof x.cat==="string"?x.cat:"",
+    }));
+}
+let saved=(()=>{try{return sanitizeSaved(JSON.parse(localStorage.getItem(LS_SAVED)||"[]"));}
+  catch(e){return [];}})();
+function persistSaved(){try{localStorage.setItem(LS_SAVED,JSON.stringify(saved));}catch(e){warn("save saved",e);}}
+function isSaved(it){const k=seenKey(it);return saved.some(x=>x.key===k);}
+/* Le plus récent enregistré en TÊTE (unshift) : c'est ce qu'on vient de mettre
+   de côté, donc ce qu'on a le plus de chances de vouloir rouvrir bientôt. */
+function toggleSave(it){
+  if(!it||!it.link)return;
+  const k=seenKey(it),i=saved.findIndex(x=>x.key===k);
+  if(i>=0)saved.splice(i,1);
+  else{
+    saved.unshift({key:k,title:it.title||"",link:it.link,img:it.img||"",source:it.source||"",
+      date:it.date||"",kind:it.kind==="learn"?"learn":"news",cat:it.cat||""});
+    if(saved.length>CONFIG.SAVED_MAX)saved.length=CONFIG.SAVED_MAX;
+  }
+  persistSaved();
+  updateRail(it);
+  if(savedSheet.classList.contains("open"))renderSavedList();
+}
+function unsave(key){
+  const i=saved.findIndex(x=>x.key===key);
+  if(i<0)return;
+  saved.splice(i,1);
+  persistSaved();
+  renderSavedList();
+  updateRail();   // la carte à l'écran peut être celle qu'on vient de retirer
+}
+
 /* ---------- Reprise de position entre sessions ----------
    On mémorise l'article courant (par lien, pas par index car le tri peut bouger)
    pour reprendre au même endroit à la réouverture de l'app.
@@ -1607,7 +1674,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="161";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="162";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -3916,6 +3983,12 @@ const ICON_PAYWALL=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 // le reste de la famille est en tracé : c'est la seule icône posée en grand au
 // milieu d'une image, et un triangle creux de 76 px s'y lit mal.
 const ICON_PLAY=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M10 8.2l6.2 3.8L10 15.8z" fill="currentColor" stroke="none"></path></svg>`;
+// Enregistrer un article (rail) : même tracé pour les deux états, seul le
+// remplissage change — creux quand rien n'est enregistré, plein sinon (voir
+// updateRail). La feuille « Enregistrés » (topline) réutilise ICON_SAVE seul,
+// elle ne reflète l'état d'aucune carte en particulier.
+const ICON_SAVE=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>`;
+const ICON_SAVED=`<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>`;
 /* Identifiant de la vidéo intégrable portée par un article, "" sinon —
    le SEUL point de décision « cette carte est-elle une carte vidéo ? ».
    Six endroits en dépendent (cardHTML pour la classe, les trois marqueurs de
@@ -4087,9 +4160,22 @@ feedEl.addEventListener("click",e=>{
 /* Rail unique : il agit sur la carte visible (une seule instance pour toute
    l'app au lieu d'une par carte). Masqué sur la carte de fin. */
 const railEl=document.getElementById("rail");
+const saveBtn=document.getElementById("saveBtn");
 function updateRail(it=currentItem()){
   railEl.classList.toggle("hidden",!it);
+  // Icône ET libellé dépendent de l'état : contrairement à shareBtn (aria/title
+  // statiques posés par data-i18n-attr), ceux-ci changent à chaque bascule.
+  const on=!!(it&&isSaved(it));
+  saveBtn.classList.toggle("on",on);
+  saveBtn.innerHTML=on?ICON_SAVED:ICON_SAVE;
+  const t=on?T("rail.save.titleOn"):T("rail.save.titleOff");
+  saveBtn.title=t;saveBtn.setAttribute("aria-label",t);
 }
+saveBtn.onclick=e=>{
+  e.stopPropagation();
+  const it=currentItem();
+  if(it)toggleSave(it);
+};
 document.getElementById("shareBtn").onclick=e=>{
   e.stopPropagation();
   const it=currentItem();
@@ -4661,9 +4747,9 @@ function survivingLink(m){
   }
   return "";
 }
-/* Ce que la dose change dans l'interface : le bouton 🎓, et les deux barres de
-   puces — filtrer une moitié absente du fil n'aurait aucun sens. */
-function renderMixUI(){updateDoseBtn();renderFilters();renderMix();}
+/* Ce que la dose change dans l'interface : les deux barres de puces — filtrer
+   une moitié absente du fil n'aurait aucun sens. */
+function renderMixUI(){renderFilters();renderMix();}
 function applyMix(){
   const m=mixLevel();
   const alt=survivingLink(m);
@@ -4677,21 +4763,6 @@ function setMixScore(n){
   if(clampMix(n)===mixScore)return;
   persistMix(n);applyMix();
 }
-/* Boussole de la barre du haut : elle OUVRE la dose. C'était un interrupteur
-   tout ou rien, qui n'atteignait que les deux extrémités d'un réglage qui en
-   compte six — et il fallait passer par les réglages pour les quatre autres.
-   Le même geste donne maintenant toute l'échelle, « actus seules » compris
-   (le cran de gauche). Le bouton continue de DIRE l'état en cours : plein et
-   corail quand Wikipédia est dans le fil, fantôme quand il n'y est plus. */
-const doseBtn=document.getElementById("doseBtn");
-function updateDoseBtn(){
-  const on=!!mixLevel().learn;
-  doseBtn.classList.toggle("on",on);
-  const t=T("dose.titlePrefix")+mixLabel(mixScore).toLowerCase();
-  doseBtn.title=t;doseBtn.setAttribute("aria-label",t);
-}
-doseBtn.onclick=()=>{renderMix();openDialog(mixSheet);};
-
 /* ---------- Articles en mémoire ----------
    Un swipe de trop et l'article est passé : le fil n'a aucune marche arrière
    fine (le retour arrière ferme les panneaux, il ne remonte pas les cartes), et
@@ -4783,6 +4854,57 @@ histList.addEventListener("click",e=>{
   onCardChange();   // position mémorisée aussitôt, sans attendre une frame de défilement
 });
 
+/* ---------- Articles enregistrés ----------
+   Contrairement à la feuille précédente, celle-ci ne fait JAMAIS défiler le
+   fil : un article enregistré peut avoir été jeté depuis (remix au-delà de
+   MAX_ITEMS, changement de filtre) ou n'avoir jamais fait partie du fil que
+   l'utilisateur a sous les yeux au moment où il rouvre la liste. Chaque
+   rangée est donc un lien réel vers l'article (comme card__open), pas un
+   retour dans `items` — voir openArticle. */
+const savedSheet=document.getElementById("savedSheet"),savedListEl=document.getElementById("savedList");
+function savedRowHTML(x){
+  const img=safeImg(x.img,location.href);
+  // Même repli que histRowHTML pour Wikipédia (pas de source qui informe) ;
+  // même détection vidéo que cardHTML/card__open (voir data-video plus bas).
+  const src=(x.kind==="learn"&&x.cat&&catLabelT(x.cat))||x.source||"";
+  const vid=x.kind!=="learn"&&youtubeId(x.link);
+  return `<div class="histrow savedrow" data-sk="${escAttr(x.key)}">
+    <a class="savedrow__open" data-open${vid?" data-video":""} href="${escAttr(x.link)}" target="_blank" rel="noopener">
+      ${img?`<img class="histrow__th" src="${escAttr(img)}" alt="" loading="lazy" decoding="async" width="58" height="58">`
+      :`<span class="histrow__th"></span>`}
+      <span class="histrow__txt">
+        <span class="histrow__top">
+          <span class="histrow__src">${esc(src)}</span>
+          ${x.date?`<span class="histrow__date">${esc(relTime(x.date))}</span>`:""}
+        </span>
+        <span class="histrow__ttl">${esc(x.title||"")}</span>
+      </span>
+    </a>
+    <button type="button" class="savedrow__del" data-sd="${escAttr(x.key)}" aria-label="${escAttr(T("saved.removeAria"))}">✕</button>
+  </div>`;
+}
+function renderSavedList(){
+  savedListEl.innerHTML=saved.length?saved.map(savedRowHTML).join("")
+    :`<p class="histempty">${esc(T("saved.empty"))}</p>`;
+  document.getElementById("savedSub").textContent=
+    saved.length?T("saved.sub",{n:saved.length}):T("saved.subEmpty");
+}
+function openSaved(){renderSavedList();openDialog(savedSheet);}
+document.getElementById("savedBtn").onclick=openSaved;
+savedSheet.onclick=e=>{if(e.target===savedSheet)closeDialog(savedSheet);};
+savedListEl.addEventListener("click",e=>{
+  const del=e.target.closest("[data-sd]");
+  if(del){unsave(del.dataset.sd);return;}
+  // a[data-open] : même mécanique que le fil (voir plus haut), sauf qu'il n'y
+  // a ici aucune carte dont marquer la vidéo « vue » — ouvrir depuis la liste
+  // des enregistrés n'est pas la parcourir.
+  const open=e.target.closest("a[data-open]");
+  if(open&&open.href){
+    const t=open.querySelector(".histrow__ttl");
+    if(openArticle(open.href,t?t.textContent:"",{noReader:"video" in open.dataset}))e.preventDefault();
+  }
+});
+
 /* ---------- Les deux filtres : une pastille chacun ----------
    📰 restreint la moitié « actus » à UNE source, 🎓 la moitié Wikipédia à UN
    thème — depuis la page principale, sans ouvrir les réglages. Les sources
@@ -4799,8 +4921,9 @@ const srcBtn=document.getElementById("srcBtn"),catBtn=document.getElementById("c
    partagées avec les cartes. En HTML elles auraient été un deuxième exemplaire
    des mêmes tracés, à corriger deux fois. */
 function setIcons(){
-  doseBtn.innerHTML=ICON_DISCOVER;
   document.getElementById("histBtn").innerHTML=ICON_LIST;
+  document.getElementById("savedBtn").innerHTML=ICON_SAVE;
+  saveBtn.innerHTML=ICON_SAVE;   // état réel posé par updateRail(), dès la 1re carte
   document.getElementById("reloadBtn").innerHTML=ICON_RELOAD;
   document.getElementById("openSheet").innerHTML=ICON_SETTINGS;
   srcBtn.querySelector(".filterbtn__i").innerHTML=ICON_RSS;
@@ -5039,8 +5162,6 @@ document.addEventListener("change",e=>{
   setMixScore(parseInt(e.target.value,10));
   renderMix();
 });
-const mixSheet=document.getElementById("mixSheet");
-mixSheet.onclick=e=>{if(e.target===mixSheet)closeDialog(mixSheet);};
 function openSettings(){
   pendingInt=new Set(interests);
   renderMix();renderIntGrid();renderList();renderSuggest();renderReadPref();renderLangPref();

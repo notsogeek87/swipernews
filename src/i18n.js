@@ -41,6 +41,8 @@
       "top.feed.aria": "Fil d'articles",
       "top.history.title": "Les articles que le fil garde en mémoire",
       "top.history.aria": "Articles en mémoire",
+      "top.saved.title": "Tes articles enregistrés",
+      "top.saved.aria": "Enregistrés",
 
       "hist.title": "Articles en mémoire",
       "hist.sub": "{n} articles gardés sous la main. Touche-en un pour y revenir.",
@@ -50,10 +52,18 @@
       "hist.hideSeen": "Cacher les articles déjà lus du fil",
       "hist.seenBadge": "Lu",
 
+      "saved.title": "Enregistrés",
+      "saved.sub": "{n} articles enregistrés. Touche-en un pour l'ouvrir.",
+      "saved.subEmpty": "Rien d'enregistré pour l'instant.",
+      "saved.empty": "Enregistre une carte pour la retrouver ici.",
+      "saved.removeAria": "Retirer des enregistrés",
+
       "about.version": "Version {v}",
 
       "rail.share.aria": "Partager cet article",
       "rail.share.title": "Partager",
+      "rail.save.titleOn": "Retirer des enregistrés",
+      "rail.save.titleOff": "Enregistrer cet article",
 
       "hint.swipe": "Swipe",
 
@@ -83,7 +93,6 @@
       "sheet.mix.title": "🎚️ Dose d'apprentissage",
       "dose.title": "Dose d'apprentissage",
       "dose.sub": "Combien d'articles Wikipédia se glissent entre tes actus.",
-      "dose.titlePrefix": "Dose d'apprentissage : ",
 
       "mix.end.news": "Actus",
       "mix.end.learn": "Apprendre",
@@ -262,6 +271,8 @@
       "top.feed.aria": "Article feed",
       "top.history.title": "The articles the feed keeps in memory",
       "top.history.aria": "Articles in memory",
+      "top.saved.title": "Your saved articles",
+      "top.saved.aria": "Saved",
 
       "hist.title": "Articles in memory",
       "hist.sub": "{n} articles kept at hand. Tap one to go back to it.",
@@ -271,10 +282,18 @@
       "hist.hideSeen": "Hide already-read articles from the feed",
       "hist.seenBadge": "Read",
 
+      "saved.title": "Saved",
+      "saved.sub": "{n} saved articles. Tap one to open it.",
+      "saved.subEmpty": "Nothing saved yet.",
+      "saved.empty": "Save a card to find it here.",
+      "saved.removeAria": "Remove from saved",
+
       "about.version": "Version {v}",
 
       "rail.share.aria": "Share this article",
       "rail.share.title": "Share",
+      "rail.save.titleOn": "Remove from saved",
+      "rail.save.titleOff": "Save this article",
 
       "hint.swipe": "Swipe",
 
@@ -303,7 +322,6 @@
       "sheet.mix.title": "🎚️ Learning dose",
       "dose.title": "Learning dose",
       "dose.sub": "How many Wikipedia articles slip in between your news.",
-      "dose.titlePrefix": "Learning dose: ",
 
       "mix.end.news": "News",
       "mix.end.learn": "Learn",
