@@ -221,13 +221,15 @@
   .rail.hidden{display:none}
   /* Bouton fantôme (liseré signal-red) : le texte/icône reste en linen, pas
      dans la couleur du bord — sur ce fond très sombre, une icône corail-signal
-     serait à peine visible ; le rôle de ce rouge est le trait, pas l'encre. */
+     serait à peine visible ; le rôle de ce rouge est le trait, pas l'encre.
+     46px : la même hauteur que .card__open (padding 14px + ligne de 15px, voir
+     plus haut) — sans ça, les boutons du bas ne s'alignaient pas entre eux. */
   .rail button{background:transparent;border:1.5px solid var(--redline);color:var(--ink);
-    width:52px;height:52px;border-radius:var(--radius-sm);cursor:pointer;
+    width:46px;height:46px;border-radius:var(--radius-sm);cursor:pointer;
     display:grid;place-items:center;transition:transform .15s,background .2s}
   .rail button:hover{background:rgba(149,28,4,.15)}
   .rail button:active{transform:scale(.88)}
-  .rail button svg{width:23px;height:23px;display:block}
+  .rail button svg{width:20px;height:20px;display:block}
   /* Enregistré : même accent corail que les autres états « on » de l'app
      (filterbtn.on, intchip.on) — c'est l'icône PLEINE (ICON_SAVED, posée par
      updateRail) qui porte l'essentiel du signal, la couleur ne fait que
@@ -957,9 +959,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=163"></script>
-<script src="src/learn-core.js?v=163"></script>
-<script src="src/i18n.js?v=163"></script>
+<script src="src/lib.js?v=164"></script>
+<script src="src/learn-core.js?v=164"></script>
+<script src="src/i18n.js?v=164"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1674,7 +1676,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="163";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="164";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
