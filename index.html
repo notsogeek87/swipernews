@@ -968,9 +968,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=167"></script>
-<script src="src/learn-core.js?v=167"></script>
-<script src="src/i18n.js?v=167"></script>
+<script src="src/lib.js?v=168"></script>
+<script src="src/learn-core.js?v=168"></script>
+<script src="src/i18n.js?v=168"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1685,7 +1685,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="167";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="168";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -4249,10 +4249,34 @@ const FEED_SHARE_TAG=`📲 Ajoute-le dans SwiperNews — l'actu & la culture en 
 function feedDeepLink(f){
   return `${APP_URL}/add.html?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(f.name)}`;
 }
+/* Contrairement au reste de l'app (jamais de dépendance au backend, voir
+   isNativeApp/nativeGet plus haut), ce lien EST un appel à news.lielu.eu — et
+   ne sert à rien si le serveur ne répond pas. On le vérifie donc juste avant
+   de partager plutôt que d'offrir un lien mort : timeout court et volontaire
+   (1,5 s), l'utilisateur attend devant la feuille de partage. Repli SANS le
+   lien (ni son texte d'intro) si indisponible — il reste le nom et l'URL du
+   flux, à ajouter à la main, exactement comme avant cette fonctionnalité. */
+const SHARE_LINK_CHECK_MS=1500;
+async function addLinkReachable(){
+  const probe=APP_URL+"/add.html";
+  try{
+    const http=isNativeApp&&window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.CapacitorHttp;
+    if(http){
+      const res=await http.request({url:probe,method:"HEAD",connectTimeout:SHARE_LINK_CHECK_MS,readTimeout:SHARE_LINK_CHECK_MS});
+      return res.status>=200&&res.status<400;
+    }
+    const ctrl=new AbortController();
+    const t=setTimeout(()=>ctrl.abort(),SHARE_LINK_CHECK_MS);
+    try{const res=await fetch(probe,{method:"HEAD",cache:"no-store",signal:ctrl.signal});return res.ok;}
+    finally{clearTimeout(t);}
+  }catch(_){return false;}
+}
 async function shareFeed(i){
   const f=feeds[i];
   if(!f)return;
-  const text=[f.name,f.url,T("share.feed.tapToAdd"),feedDeepLink(f),FEED_SHARE_TAG].filter(Boolean).join("\n\n");
+  const reachable=await addLinkReachable();
+  const text=[f.name,f.url,reachable?T("share.feed.tapToAdd"):null,reachable?feedDeepLink(f):null,FEED_SHARE_TAG]
+    .filter(Boolean).join("\n\n");
   const iab=iabPlugin();
   if(isNativeApp&&iab&&iab.share){
     try{await iab.share({title:f.name,text});return;}catch(e){warn("partage flux",e);}
