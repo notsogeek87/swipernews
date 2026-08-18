@@ -84,6 +84,70 @@ test("relTime rend une durée compacte, vide si non parsable", () => {
   assert.equal(lib.relTime("pas une date", now), "");
 });
 
+test("dayKey/hourKeyOf : format zéro-rempli, heure locale", () => {
+  const d = new Date(2026, 0, 5, 9, 0, 0); // 5 janvier 2026, 9h — mois/heure à un chiffre
+  assert.equal(lib.dayKey(d), "2026-01-05");
+  assert.equal(lib.hourKeyOf(d), "2026-01-05T09");
+});
+
+test("cardScrollStats : jour/semaine/mois/année à partir d'un total par jour", () => {
+  // Jeudi 15 janvier 2026 à midi (évite tout effet de fuseau sur le jour civil).
+  const now = Date.parse("2026-01-15T12:00:00Z");
+  const days = {
+    "2026-01-15": 5, // aujourd'hui
+    "2026-01-13": 3, // mardi, même semaine (lundi 12 → dimanche 18)
+    "2026-01-09": 7, // vendredi précédent, même mois mais semaine d'avant
+    "2026-06-01": 40, // même année, mois différent
+    "2025-12-20": 20, // année différente
+  };
+  const s = lib.cardScrollStats(days, "", 0, now);
+  assert.equal(s.day, 5);
+  assert.equal(s.week, 8); // 15 + 13 janvier seulement
+  assert.equal(s.month, 15); // 15 + 13 + 9 janvier
+  assert.equal(s.year, 55); // 15 (janvier) + 40 (juin) — 2025-12-20 exclu
+  assert.equal(s.hour, 0); // aucun hourKey fourni
+});
+
+test("cardScrollStats : compteur d'heure valable seulement s'il correspond à l'heure de `now`", () => {
+  const now = Date.parse("2026-01-15T14:30:00Z");
+  assert.equal(lib.cardScrollStats({}, "2026-01-15T14", 9, now).hour, 9);
+  assert.equal(lib.cardScrollStats({}, "2026-01-15T13", 9, now).hour, 0); // heure précédente : périmé
+});
+
+test("cardScrollStats : clés malformées ignorées, objet `days` absent toléré", () => {
+  const now = Date.parse("2026-01-15T12:00:00Z");
+  const s = lib.cardScrollStats(
+    { "2026-01-15": 2, "pas-une-date": 999, "": 1 },
+    "",
+    0,
+    now
+  );
+  assert.equal(s.day, 2);
+  assert.deepEqual(lib.cardScrollStats(null, "", 0, now), {
+    hour: 0,
+    day: 0,
+    week: 0,
+    month: 0,
+    year: 0,
+  });
+});
+
+test("cardScrollStats : la semaine civile peut chevaucher deux mois ou deux années", () => {
+  // Jeudi 1er janvier 2026 : le lundi de sa semaine (29 décembre 2025) est
+  // dans le mois ET l'année précédents — « semaine » doit quand même les
+  // compter, sans les compter dans « mois »/« année ».
+  const now = Date.parse("2026-01-01T12:00:00Z");
+  const days = {
+    "2026-01-01": 2, // jeudi (aujourd'hui)
+    "2025-12-29": 4, // lundi de la même semaine, année précédente
+    "2025-12-15": 30, // même année, hors semaine courante
+  };
+  const s = lib.cardScrollStats(days, "", 0, now);
+  assert.equal(s.week, 6); // 2 + 4
+  assert.equal(s.month, 2); // janvier 2026 seul
+  assert.equal(s.year, 2); // 2026 seul, 2025 exclu
+});
+
 test("dropSeen écarte le déjà-vu mais ne tarit jamais le fil", () => {
   const seen = new Set(["l1|A"]);
   const list = [

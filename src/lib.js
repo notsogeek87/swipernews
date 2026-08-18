@@ -292,6 +292,53 @@
     return Math.round(d / 86400) + " j";
   }
 
+  /** Clé de jour civil LOCAL, "YYYY-MM-DD" — pas UTC : "aujourd'hui" doit
+   *  correspondre au jour vécu par l'utilisateur. Sert de brique aux
+   *  statistiques de cartes défilées (voir cardScrollStats) et à la clé de
+   *  bornage par jour du stockage correspondant. */
+  function dayKey(d) {
+    const p = (n) => String(n).padStart(2, "0");
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+  }
+  /** Clé d'heure civile locale, "YYYY-MM-DDTHH". */
+  function hourKeyOf(d) {
+    return dayKey(d) + "T" + String(d.getHours()).padStart(2, "0");
+  }
+  /**
+   * Agrège un compteur de cartes défilées, tenu au JOUR (`days`, un objet
+   * {"YYYY-MM-DD": n}) plus le compteur de l'HEURE en cours (`hourKey`,
+   * `hourCount`), en cinq fenêtres calendaires : heure/jour/semaine/mois/
+   * année. Jamais de fenêtre glissante : la semaine est lundi→dimanche, le
+   * mois et l'année sont des périodes civiles — cohérent entre les cinq.
+   * Le format `days` étant zéro-rempli, une comparaison de chaînes suffit à
+   * la fois pour reconnaître "aujourd'hui" et pour borner la semaine :
+   * l'ordre lexical y est l'ordre chronologique.
+   */
+  function cardScrollStats(days, hourKey, hourCount, now) {
+    now = now instanceof Date ? now : new Date(now || Date.now());
+    const today = dayKey(now);
+    const wd = (now.getDay() + 6) % 7; // 0=lundi..6=dimanche
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - wd);
+    const weekStartKey = dayKey(weekStart);
+    const monthPrefix = today.slice(0, 7);
+    const yearPrefix = today.slice(0, 4);
+    const src = days && typeof days === "object" ? days : {};
+    let day = 0,
+      week = 0,
+      month = 0,
+      year = 0;
+    for (const k in src) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
+      const n = src[k] || 0;
+      if (k === today) day += n;
+      if (k >= weekStartKey && k <= today) week += n;
+      if (k.slice(0, 7) === monthPrefix) month += n;
+      if (k.slice(0, 4) === yearPrefix) year += n;
+    }
+    const hour = hourKey === hourKeyOf(now) ? hourCount || 0 : 0;
+    return { hour, day, week, month, year };
+  }
+
   /** Mélange en place (Fisher-Yates) et renvoie le tableau. */
   function shuffle(a) {
     for (let i = a.length - 1; i > 0; i--) {
@@ -1351,6 +1398,9 @@
     esc,
     escAttr,
     relTime,
+    dayKey,
+    hourKeyOf,
+    cardScrollStats,
     shuffle,
     seenKey,
     dropSeen,

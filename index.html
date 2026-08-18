@@ -322,9 +322,9 @@
     vertical-align:-.06em;margin-left:2px;opacity:0;
     animation:brandBlink .62s linear 680ms 3 forwards}
   @keyframes brandBlink{0%,49.9%{opacity:1}50%,100%{opacity:0}}
-  /* Les quatre boutons, à droite de la marque. Ils ne partagent plus leur
-     rangée avec les pastilles : leur écart peut donc rester à 8 px, et leur
-     boîte de 38 px — la cible du doigt — n'a jamais à se rogner. */
+  /* Le bouton menu, à droite de la marque. Il ne partage plus sa rangée avec
+     les pastilles : sa boîte de 38 px — la cible du doigt — n'a jamais à se
+     rogner. */
   .top .actions{display:flex;gap:8px;flex:0 0 auto;margin-left:auto}
   .top .actions button{background:transparent;border:1.5px solid var(--redline);color:var(--ink);
     padding:9px 14px;border-radius:var(--radius-sm);font-family:var(--font-sans);font-weight:500;font-size:13px;
@@ -615,6 +615,30 @@
   .about{color:var(--ash);font-family:var(--font-mono);letter-spacing:-.03em;
     font-size:11.5px;text-align:center;margin-top:16px;opacity:.75}
 
+  /* Lignes du menu (menuSheet) : icône + libellé, sur le modèle de .histrow
+     (rangée pleine largeur, cible tactile généreuse) mais sans vignette — ce
+     ne sont que des actions, rien à prévisualiser. */
+  .menulist{display:flex;flex-direction:column;margin-top:6px}
+  .menurow{display:flex;align-items:center;gap:14px;width:100%;text-align:left;
+    background:transparent;border:none;border-bottom:1px solid rgba(149,28,4,.3);
+    color:var(--ink);font-family:var(--font-sans);font-size:15px;font-weight:500;
+    padding:14px 2px;cursor:pointer}
+  .menurow:hover{background:rgba(149,28,4,.12)}
+  .menurow:active{transform:scale(.99)}
+  .menurow:last-child{border-bottom:none}
+  .menurow__i{flex:0 0 auto;width:24px;height:24px;display:grid;place-items:center;color:var(--flare)}
+  .menurow__i svg{width:22px;height:22px;display:block}
+
+  /* Mon activité (statsSheet) : liste label/valeur, une ligne par fenêtre.
+     Les nombres en police mono comme .about — même famille que la version et
+     le reste des données brutes de l'app. */
+  .stats{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column}
+  .stats li{display:flex;justify-content:space-between;align-items:baseline;
+    padding:11px 2px;border-bottom:1px solid rgba(149,28,4,.3);font-size:15px}
+  .stats li:last-child{border-bottom:none}
+  .stats__label{color:var(--ash)}
+  .stats__val{font-family:var(--font-mono);letter-spacing:-.03em;font-weight:600}
+
   /* Réglage « Ouvrir les articles » (app packagée uniquement, voir renderReadPref).
      Segmenté plutôt qu'un interrupteur : les deux destinations sont nommées, on
      n'a pas à deviner ce que « activé » veut dire. */
@@ -754,25 +778,19 @@
 <div class="syncbar" id="syncbar" aria-hidden="true"></div>
 
 <header class="top">
-  <!-- Rangée 1 : la marque À GAUCHE, les boutons d'action À DROITE. Elle ne
-       portait que la marque, pendant que la rangée du dessous entassait deux
-       pastilles ET quatre boutons — les pastilles y étaient réduites à « T… ».
-       Une rangée à moitié vide au-dessus d'une rangée saturée : les boutons
-       sont donc remontés là où la place était.
+  <!-- Rangée 1 : la marque À GAUCHE, le bouton menu À DROITE. Ce dernier
+       portait 4 icônes (Articles en mémoire, Enregistrés, Actualiser,
+       Réglages) posées à plat — une rangée qui grossissait à chaque nouvelle
+       action de la barre. Un seul bouton menu ouvre maintenant menuSheet, qui
+       les liste toutes (+ « Mon activité », voir statsSheet) : la rangée
+       n'accueille plus jamais plus d'une icône, quel que soit le nombre
+       d'actions.
        Les icônes sont posées par setIcons() depuis les mêmes constantes que
        les cartes : une seule famille de tracés dans toute l'app. -->
   <div class="topline">
     <div class="brand"><span class="brand__logo"><img src="logo-192.png?v=42" alt="" width="28" height="28"></span><span class="brand__text" data-text="SwiperNews">SwiperNews</span></div>
     <div class="actions">
-      <!-- Articles en mémoire : la liste de ce que le fil garde sous la main,
-           pour revenir sur une carte dépassée d'un swipe de trop. -->
-      <button id="histBtn" class="iconbtn" aria-haspopup="dialog" data-i18n-attr="title:top.history.title,aria-label:top.history.aria"></button>
-      <!-- Enregistrés : liste PERSISTÉE (voir toggleSave), à ne pas confondre
-           avec « Articles en mémoire » juste au-dessus, qui n'est qu'une vue
-           du fil en cours. -->
-      <button id="savedBtn" class="iconbtn" aria-haspopup="dialog" data-i18n-attr="title:top.saved.title,aria-label:top.saved.aria"></button>
-      <button id="reloadBtn" class="iconbtn" data-i18n-attr="title:top.reload.title,aria-label:top.reload.aria"></button>
-      <button id="openSheet" class="iconbtn" data-i18n-attr="title:top.settings.title,aria-label:top.settings.aria"></button>
+      <button id="menuBtn" class="iconbtn" aria-haspopup="dialog" data-i18n-attr="title:top.menu.title,aria-label:top.menu.aria"></button>
     </div>
   </div>
   <!-- Rangée 2 : les deux filtres, et rien qu'eux — chacun sa MOITIÉ de la
@@ -788,6 +806,25 @@
     <button class="filterbtn" id="catBtn" aria-haspopup="dialog"><span class="filterbtn__i" aria-hidden="true"></span><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true"></span></button>
   </div>
 </header>
+
+<!-- Menu, ouvert depuis menuBtn : liste les 4 actions qui vivaient avant en
+     rangée 1 (id inchangés, donc handlers et setIcons() les retrouvent tels
+     quels), plus « Mon activité » (statsSheet). Une ligne qui ouvre un autre
+     panneau utilise replaceDialog, jamais openDialog/openHistory() etc. :
+     voir le commentaire de replaceDialog, plus bas près de closeDialog. -->
+<div class="sheet" id="menuSheet" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+  <div class="sheet__panel" tabindex="-1">
+    <div class="sheet__grip"></div>
+    <h2 id="menuTitle" data-i18n="menu.title">Menu</h2>
+    <div class="menulist">
+      <button type="button" class="menurow" id="histBtn"><span class="menurow__i"></span><span data-i18n="top.history.aria">Articles en mémoire</span></button>
+      <button type="button" class="menurow" id="savedBtn"><span class="menurow__i"></span><span data-i18n="top.saved.aria">Enregistrés</span></button>
+      <button type="button" class="menurow" id="reloadBtn"><span class="menurow__i"></span><span data-i18n="top.reload.aria">Actualiser</span></button>
+      <button type="button" class="menurow" id="openSheet"><span class="menurow__i"></span><span data-i18n="top.settings.aria">Réglages</span></button>
+      <button type="button" class="menurow" id="menuStatsBtn"><span class="menurow__i"></span><span data-i18n="menu.stats">Mon activité</span></button>
+    </div>
+  </div>
+</div>
 
 <div class="demobadge hidden" id="demobadge" role="status" data-i18n="demobadge.text">Wikipédia injoignable — articles de démo</div>
 
@@ -927,6 +964,18 @@
   </div>
 </div>
 
+<!-- Mon activité : ouverte depuis menuSheet (menuStatsBtn), jamais autrement.
+     Compte les cartes défilées (bumpCardScroll, depuis onCardChange) ;
+     renderStats() y pose les cinq nombres, sur le modèle de renderMix(). -->
+<div class="sheet" id="statsSheet" role="dialog" aria-modal="true" aria-labelledby="statsTitle">
+  <div class="sheet__panel" tabindex="-1">
+    <div class="sheet__grip"></div>
+    <h2 id="statsTitle" data-i18n="stats.title">Mon activité</h2>
+    <p class="sub" data-i18n="stats.sub">Cartes défilées, tous types confondus.</p>
+    <div data-statsmount></div>
+  </div>
+</div>
+
 <!-- Liste d'un filtre, ouverte depuis sa pastille. Une feuille plutôt qu'un
      menu flottant : c'est la forme que le reste de l'app utilise déjà, et les
      puces y tiennent toutes, sur plusieurs lignes s'il le faut. -->
@@ -968,9 +1017,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=170"></script>
-<script src="src/learn-core.js?v=170"></script>
-<script src="src/i18n.js?v=170"></script>
+<script src="src/lib.js?v=171"></script>
+<script src="src/learn-core.js?v=171"></script>
+<script src="src/i18n.js?v=171"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1088,7 +1137,7 @@ const CONFIG = {
 
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
-const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,shuffle,
+const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,dayKey,hourKeyOf,cardScrollStats,shuffle,
   seenKey,dropSeen,roundRobin,weightedRoundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
@@ -1131,6 +1180,10 @@ function applyI18n(){
   });
   // Contenu généré : il n'a pas de data-i18n à relire (voir renderAbout).
   if(typeof renderAbout==="function")renderAbout();
+  // window.__statsReady : même piège que __aboutReady juste au-dessus — le 1er
+  // appel d'applyI18n() tourne avant que `cardStats` (let, plus bas) ne soit
+  // initialisé ; sans ce drapeau, ReferenceError (zone morte temporelle).
+  if(typeof renderStats==="function"&&window.__statsReady)renderStats();
 }
 document.documentElement.lang=LANG;
 applyI18n();
@@ -1499,6 +1552,49 @@ function addSeenNews(it){
   clearTimeout(seenNewsPersistT);seenNewsPersistT=setTimeout(persistSeenNews,800);
 }
 
+/* ---------- Compteur de cartes défilées ----------
+   Statistiques heure/jour/semaine/mois/année, affichées dans la feuille
+   « Mon activité » (renderStats). Incrémenté depuis onCardChange, au même
+   endroit et avec le même garde que markVisibleSeen (samePending) : chaque
+   VRAIE transition de carte compte une fois, jamais deux. Contrairement à
+   markVisibleSeen, il ne fait pas d'exception pour les vidéos — une vidéo
+   croisée sans être lancée reste une carte défilée, au sens de ce compteur.
+   Stockage borné (STATS_DAYS_MAX) à un peu plus d'un an de jours, pour ne
+   jamais grossir sans fin. */
+const LS_STATS="fluxswipe.cardstats.v1";
+const STATS_DAYS_MAX=400;
+function sanitizeStats(raw){
+  const days={};
+  if(raw&&typeof raw==="object"&&raw.days&&typeof raw.days==="object"){
+    for(const k in raw.days){
+      if(/^\d{4}-\d{2}-\d{2}$/.test(k)&&typeof raw.days[k]==="number"&&raw.days[k]>=0)days[k]=raw.days[k];
+    }
+  }
+  const hourKey=raw&&typeof raw.hourKey==="string"&&/^\d{4}-\d{2}-\d{2}T\d{2}$/.test(raw.hourKey)?raw.hourKey:"";
+  const hourCount=raw&&typeof raw.hourCount==="number"&&raw.hourCount>=0?raw.hourCount:0;
+  return {days,hourKey,hourCount};
+}
+let cardStats=(()=>{try{return sanitizeStats(JSON.parse(localStorage.getItem(LS_STATS)||"{}"));}
+  catch(e){return {days:{},hourKey:"",hourCount:0};}})();
+let statsDirty=false,statsPersistT;
+function persistStats(){if(!statsDirty)return;statsDirty=false;
+  try{localStorage.setItem(LS_STATS,JSON.stringify(cardStats));}catch(e){warn("save stats",e);}}
+function bumpCardScroll(){
+  const now=new Date(),dk=dayKey(now),hk=hourKeyOf(now);
+  if(cardStats.hourKey!==hk){cardStats.hourKey=hk;cardStats.hourCount=0;}
+  cardStats.hourCount++;
+  cardStats.days[dk]=(cardStats.days[dk]||0)+1;
+  const keys=Object.keys(cardStats.days);
+  if(keys.length>STATS_DAYS_MAX){                     // garde les jours les plus RÉCENTS
+    keys.sort();
+    for(const k of keys.slice(0,keys.length-STATS_DAYS_MAX))delete cardStats.days[k];
+  }
+  statsDirty=true;clearTimeout(statsPersistT);statsPersistT=setTimeout(persistStats,800);
+}
+// cardStats est initialisé : renderStats() peut désormais lire ses totaux sans
+// lever de ReferenceError (même piège que __aboutReady, voir plus bas).
+window.__statsReady=true;
+
 /* ---------- Articles enregistrés ----------
    Différence de nature avec seen/seenNews juste au-dessus : ceux-là ne gardent
    qu'une CLÉ (un article vu n'a besoin que d'être reconnu, jamais réaffiché).
@@ -1655,6 +1751,7 @@ function onCardChange(){
   if(playingCard&&feedEl.children[i]!==playingCard)stopVideo();
   const samePending=pendingSeenItem===it||(pendingSeenItem&&it&&pendingSeenItem.link&&pendingSeenItem.link===it.link);
   if(!samePending){
+    if(pendingSeenItem)bumpCardScroll();   // on quitte une VRAIE carte précédente : une de plus au compteur
     markVisibleSeen(pendingSeenItem);   // on quitte cette carte : c'est CE geste qui la marque vue
     pendingSeenItem=it;
   }
@@ -1685,7 +1782,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="170";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="171";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -4001,6 +4098,12 @@ const ICON_RELOAD=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICON_LIST=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="9" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="9" y1="18" x2="21" y2="18"></line><line x1="4" y1="6" x2="4.01" y2="6"></line><line x1="4" y1="12" x2="4.01" y2="12"></line><line x1="4" y1="18" x2="4.01" y2="18"></line></svg>`;
 const ICON_SETTINGS=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`;
 const ICON_CHEV=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+// Bouton menu (barre du haut) : trois barres pleines, sans les points d'ICON_LIST
+// — celui-ci réapparaît EN LIGNE dans menuSheet, distinct visuellement du bouton
+// qui l'ouvre.
+const ICON_MENU=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg>`;
+// Ligne « Mon activité » du menu : trois barres de hauteurs croissantes.
+const ICON_STATS=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="12"></line><line x1="12" y1="20" x2="12" y2="6"></line><line x1="18" y1="20" x2="18" y2="14"></line></svg>`;
 // Signale un article payant, une fois confirmé par checkPaywall() (voir plus bas).
 const ICON_PAYWALL=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>`;
 // Lecture d'une carte vidéo. Le triangle est PLEIN (fill, stroke:none) alors que
@@ -4558,6 +4661,18 @@ function closeDialog(el,fromHistory){
   // chargé (on ne charge plus derrière la feuille), il faut le faire.
   if(!feedLoadStarted)loadFeeds();
 }
+/* Bascule du menu vers un panneau plus précis SANS toucher à l'historique :
+   `to` reprend l'entrée déjà posée par `from` (voir pushDialogState) — en
+   pousser une deuxième casserait « une seule couche à la fois » (voir plus
+   haut) et le retour arrière fermerait le panneau du dessous au lieu de
+   celui affiché. Réservé aux lignes de menuSheet ; le fond est déjà inert
+   depuis l'ouverture du menu, inutile d'y retoucher. */
+function replaceDialog(from,to){
+  from.classList.remove("open");
+  to.classList.add("open");
+  const f=to.querySelector(".sheet__panel");
+  if(f){try{f.focus();}catch(_){}}
+}
 // Boucle de tabulation à l'intérieur du panneau ouvert
 document.addEventListener("keydown",e=>{
   if(e.key!=="Tab")return;
@@ -4570,8 +4685,15 @@ document.addEventListener("keydown",e=>{
   if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
   else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
 });
-document.getElementById("openSheet").onclick=openSettings;
-document.getElementById("reloadBtn").onclick=()=>{toast(T("toast.refreshing"));loadFeeds(true);};
+const menuSheet=document.getElementById("menuSheet"),statsSheet=document.getElementById("statsSheet");
+document.getElementById("menuBtn").onclick=()=>openDialog(menuSheet);
+menuSheet.onclick=e=>{if(e.target===menuSheet)closeDialog(menuSheet);};
+statsSheet.onclick=e=>{if(e.target===statsSheet)closeDialog(statsSheet);};
+document.getElementById("openSheet").onclick=()=>openSettings(menuSheet);
+// reloadBtn n'ouvre aucun panneau ensuite : fermeture NORMALE du menu (elle
+// consomme bien l'unique entrée d'historique posée à son ouverture), pas
+// replaceDialog.
+document.getElementById("reloadBtn").onclick=()=>{closeDialog(menuSheet);toast(T("toast.refreshing"));loadFeeds(true);};
 
 /* ---------- Réglage « Ouvrir les articles » (app packagée) ----------
    Un seul point de montage depuis la fusion des panneaux (querySelectorAll
@@ -4711,7 +4833,10 @@ document.getElementById("importBtn").onclick=()=>document.getElementById("import
 document.getElementById("importFile").onchange=importFromFile;
 // État vide
 document.getElementById("emptyRetry").onclick=()=>loadFeeds(true);
-document.getElementById("emptyOpen").onclick=()=>document.getElementById("openSheet").click();
+// Appel DIRECT (pas via le menu, jamais ouvert ici) : openSettings() sans
+// argument pousse sa propre entrée d'historique, comme n'importe quel
+// panneau ouvert seul.
+document.getElementById("emptyOpen").onclick=()=>openSettings();
 // Délégation des lignes de flux générées (case à cocher + suppression)
 document.getElementById("feedList").addEventListener("click",e=>{
   const del=e.target.closest("[data-del]");
@@ -4902,10 +5027,14 @@ function renderHistList(){
   document.getElementById("histSub").textContent=
     items.length?T("hist.sub",{n:items.length}):T("hist.subEmpty");
 }
-function openHistory(){
+/* `replaceFrom` : appelée depuis une ligne de menuSheet, elle bascule dessus
+   (replaceDialog) au lieu d'empiler une 2e entrée d'historique — voir le
+   commentaire de replaceDialog. Sans argument (comportement d'origine),
+   ouverture normale. */
+function openHistory(replaceFrom){
   histHideSeenChk.checked=hideSeen;
   renderHistList();
-  openDialog(histSheet);
+  if(replaceFrom)replaceDialog(replaceFrom,histSheet);else openDialog(histSheet);
   // La liste s'ouvre SUR la position courante, jamais en haut : ce qu'on vient
   // y chercher est presque toujours juste au-dessus de la carte en cours.
   // Position calculée plutôt que scrollIntoView, pour ne bouger que ce panneau —
@@ -4917,7 +5046,7 @@ function openHistory(){
     p.scrollTop=Math.max(0,row.offsetTop-p.offsetTop-p.clientHeight/2);
   }
 }
-document.getElementById("histBtn").onclick=openHistory;
+document.getElementById("histBtn").onclick=()=>openHistory(menuSheet);
 // Ne rafraîchit PAS cette liste (elle ne dépend plus de hideSeen) : l'effet
 // n'apparaît qu'au PROCHAIN chargement du fil (↻, filet des 30 min,
 // réouverture) — voir fetchLearn / loadLearnPart / rebuild.
@@ -4976,8 +5105,8 @@ function renderSavedList(){
   document.getElementById("savedSub").textContent=
     saved.length?T("saved.sub",{n:saved.length}):T("saved.subEmpty");
 }
-function openSaved(){renderSavedList();openDialog(savedSheet);}
-document.getElementById("savedBtn").onclick=openSaved;
+function openSaved(replaceFrom){renderSavedList();if(replaceFrom)replaceDialog(replaceFrom,savedSheet);else openDialog(savedSheet);}
+document.getElementById("savedBtn").onclick=()=>openSaved(menuSheet);
 savedSheet.onclick=e=>{if(e.target===savedSheet)closeDialog(savedSheet);};
 savedListEl.addEventListener("click",e=>{
   const del=e.target.closest("[data-sd]");
@@ -5008,11 +5137,13 @@ const srcBtn=document.getElementById("srcBtn"),catBtn=document.getElementById("c
    partagées avec les cartes. En HTML elles auraient été un deuxième exemplaire
    des mêmes tracés, à corriger deux fois. */
 function setIcons(){
-  document.getElementById("histBtn").innerHTML=ICON_LIST;
-  document.getElementById("savedBtn").innerHTML=ICON_SAVE;
+  document.getElementById("menuBtn").innerHTML=ICON_MENU;
+  document.getElementById("histBtn").querySelector(".menurow__i").innerHTML=ICON_LIST;
+  document.getElementById("savedBtn").querySelector(".menurow__i").innerHTML=ICON_SAVE;
   saveBtn.innerHTML=ICON_SAVE;   // état réel posé par updateRail(), dès la 1re carte
-  document.getElementById("reloadBtn").innerHTML=ICON_RELOAD;
-  document.getElementById("openSheet").innerHTML=ICON_SETTINGS;
+  document.getElementById("reloadBtn").querySelector(".menurow__i").innerHTML=ICON_RELOAD;
+  document.getElementById("openSheet").querySelector(".menurow__i").innerHTML=ICON_SETTINGS;
+  document.getElementById("menuStatsBtn").querySelector(".menurow__i").innerHTML=ICON_STATS;
   srcBtn.querySelector(".filterbtn__i").innerHTML=ICON_RSS;
   catBtn.querySelector(".filterbtn__i").innerHTML=ICON_TAG;
   document.querySelectorAll(".filterbtn__c").forEach(el=>{el.innerHTML=ICON_CHEV;});
@@ -5249,7 +5380,36 @@ document.addEventListener("change",e=>{
   setMixScore(parseInt(e.target.value,10));
   renderMix();
 });
-function openSettings(){
+
+/* Mon activité (statsSheet) : mêmes principes que renderMix — un seul
+   gabarit, un seul point de montage. Les libellés sont posés via T() à
+   CHAQUE rendu plutôt qu'en `data-i18n` : le mount n'est rempli qu'à la 1re
+   ouverture (bien après le passage initial d'applyI18n() sur le document),
+   un `data-i18n` y resterait donc ignoré jusqu'au prochain changement de
+   langue — même raison que pour .mix__ends. */
+const STATS_HTML=`<ul class="stats">
+  <li><span class="stats__label"></span><b class="stats__val" data-b="hour"></b></li>
+  <li><span class="stats__label"></span><b class="stats__val" data-b="day"></b></li>
+  <li><span class="stats__label"></span><b class="stats__val" data-b="week"></b></li>
+  <li><span class="stats__label"></span><b class="stats__val" data-b="month"></b></li>
+  <li><span class="stats__label"></span><b class="stats__val" data-b="year"></b></li>
+</ul>`;
+function renderStats(){
+  const s=cardScrollStats(cardStats.days,cardStats.hourKey,cardStats.hourCount,new Date());
+  document.querySelectorAll("[data-statsmount]").forEach(mount=>{
+    if(!mount.firstElementChild)mount.innerHTML=STATS_HTML;
+    const labels=mount.querySelectorAll(".stats__label");
+    labels[0].textContent=T("stats.hour");labels[1].textContent=T("stats.day");
+    labels[2].textContent=T("stats.week");labels[3].textContent=T("stats.month");
+    labels[4].textContent=T("stats.year");
+    mount.querySelector('[data-b="hour"]').textContent=s.hour;
+    mount.querySelector('[data-b="day"]').textContent=s.day;
+    mount.querySelector('[data-b="week"]').textContent=s.week;
+    mount.querySelector('[data-b="month"]').textContent=s.month;
+    mount.querySelector('[data-b="year"]').textContent=s.year;
+  });
+}
+function openSettings(replaceFrom){
   pendingInt=new Set(interests);
   renderMix();renderIntGrid();renderList();renderSuggest();renderReadPref();renderLangPref();
   document.getElementById("sponsorFilterChk").checked=filterSponsored;
@@ -5260,8 +5420,13 @@ function openSettings(){
   // Accueil du 1er lancement : on ne demande qu'une chose à la fois. Les
   // réglages du lecteur attendront la prochaine ouverture du panneau.
   sheet.querySelector("[data-readmount]").classList.toggle("hidden",premier);
-  openDialog(sheet);
+  if(replaceFrom)replaceDialog(replaceFrom,sheet);else openDialog(sheet);
 }
+function openStats(replaceFrom){
+  renderStats();
+  if(replaceFrom)replaceDialog(replaceFrom,statsSheet);else openDialog(statsSheet);
+}
+document.getElementById("menuStatsBtn").onclick=()=>openStats(menuSheet);
 function renderIntGrid(){
   const grid=document.getElementById("intGrid");
   grid.innerHTML=CATEGORIES.filter(c=>c.key!=="random").map(c=>

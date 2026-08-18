@@ -353,11 +353,40 @@ genre de script dérape.
 - `renderFilters()` / `openPicker()` — les deux pastilles de filtre et leur
   feuille. `filterChips()` fabrique les puces une seule fois pour les deux, qui
   ne peuvent donc pas diverger. La barre du haut tient en DEUX rangées, un
-  métier chacune : marque + boutons d'action (`.topline`), puis les filtres
-  seuls (`.toprow.filters`, une moitié de largeur par pastille). Ne pas
-  remettre les boutons avec les pastilles : à quatre icônes, elles retombent à
-  « T… ». `filtersEl` EST la rangée — la masquer ne doit pas laisser une rangée
-  vide, donc l'écart de 11 px qui la précède.
+  métier chacune : marque + bouton menu (`.topline`), puis les filtres seuls
+  (`.toprow.filters`, une moitié de largeur par pastille). Ne pas remettre les
+  pastilles avec le bouton menu : elles retombent à « T… » dès qu'elles
+  partagent la rangée avec autre chose. `filtersEl` EST la rangée — la masquer
+  ne doit pas laisser une rangée vide, donc l'écart de 11 px qui la précède.
+- `menuBtn` / `menuSheet` / `replaceDialog()` — la barre du haut avait QUATRE
+  boutons d'icône à plat (Articles en mémoire, Enregistrés, Actualiser,
+  Réglages) : une rangée qui grossissait à chaque action ajoutée, et qui a
+  justement dû grossir pour « Mon activité » (voir `bumpCardScroll` plus bas).
+  Un seul bouton menu ouvre maintenant `menuSheet`, qui les liste toutes (id
+  inchangés — `histBtn`/`savedBtn`/`reloadBtn`/`openSheet` — donc leurs
+  handlers et `setIcons()` les retrouvent tels quels, seulement déplacés dans
+  la feuille). Naviguer du menu vers un panneau plus précis ne peut PAS passer
+  par un `openDialog()` ordinaire : « une seule couche à la fois »
+  (`pushDialogState`, voir plus bas) interdirait d'empiler une 2e entrée
+  d'historique par-dessus celle du menu, et le retour arrière fermerait le
+  panneau du dessous au lieu de celui affiché. `replaceDialog(from,to)` bascule
+  donc les classes `.open` SANS toucher à l'historique : le panneau visé
+  reprend l'entrée déjà posée par le menu. `openHistory()`/`openSaved()`/
+  `openSettings()` prennent donc un `replaceFrom` optionnel (absent : ouverture
+  normale, comme au 1er lancement ou depuis le CTA du fil vide).
+- `bumpCardScroll()` / `cardScrollStats()` (`src/lib.js`, testée) — le
+  compteur de cartes défilées derrière « Mon activité » (`statsSheet`).
+  Incrémenté dans `onCardChange()`, au même endroit et avec le MÊME garde que
+  `markVisibleSeen` (`samePending`) : une vraie transition de carte compte une
+  fois, jamais deux. Contrairement à `markVisibleSeen`, aucune exception pour
+  les vidéos — une vidéo croisée sans être lancée reste une carte défilée, au
+  sens de ce compteur (différent de « vu »). Stockage compact à dessein : un
+  total par JOUR civil local (`cardStats.days`) plus un compteur pour l'HEURE
+  en cours seulement — jamais de bucket horaire au long cours, inutile et
+  coûteux en stockage. `cardScrollStats()` recompose les cinq fenêtres
+  (heure/jour/semaine/mois/année) à la lecture, toutes CALENDAIRES (semaine
+  lundi→dimanche), jamais glissantes — cohérent entre les cinq. `days` est
+  élagué à `STATS_DAYS_MAX` (~400) pour ne jamais grossir sans fin.
 - `openHistory()` / `histRowHTML()` — la feuille « Articles en mémoire »
   (bouton liste de la barre du haut) : une VUE de `items`, refaite à chaque
   ouverture, qui ramène sur une carte dépassée d'un swipe de trop. Rien n'est

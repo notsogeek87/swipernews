@@ -43,6 +43,19 @@
       "top.history.aria": "Articles en mémoire",
       "top.saved.title": "Tes articles enregistrés",
       "top.saved.aria": "Enregistrés",
+      "top.menu.title": "Menu",
+      "top.menu.aria": "Menu",
+
+      "menu.title": "Menu",
+      "menu.stats": "Mon activité",
+
+      "stats.title": "Mon activité",
+      "stats.sub": "Cartes défilées, tous types confondus.",
+      "stats.hour": "Cette heure",
+      "stats.day": "Aujourd'hui",
+      "stats.week": "Cette semaine",
+      "stats.month": "Ce mois-ci",
+      "stats.year": "Cette année",
 
       "hist.title": "Articles en mémoire",
       "hist.sub": "{n} articles gardés sous la main. Touche-en un pour y revenir.",
@@ -276,6 +289,19 @@
       "top.history.aria": "Articles in memory",
       "top.saved.title": "Your saved articles",
       "top.saved.aria": "Saved",
+      "top.menu.title": "Menu",
+      "top.menu.aria": "Menu",
+
+      "menu.title": "Menu",
+      "menu.stats": "My activity",
+
+      "stats.title": "My activity",
+      "stats.sub": "Cards scrolled, all types combined.",
+      "stats.hour": "This hour",
+      "stats.day": "Today",
+      "stats.week": "This week",
+      "stats.month": "This month",
+      "stats.year": "This year",
 
       "hist.title": "Articles in memory",
       "hist.sub": "{n} articles kept at hand. Tap one to go back to it.",
