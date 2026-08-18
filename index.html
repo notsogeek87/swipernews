@@ -1110,9 +1110,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=176"></script>
-<script src="src/learn-core.js?v=176"></script>
-<script src="src/i18n.js?v=176"></script>
+<script src="src/lib.js?v=177"></script>
+<script src="src/learn-core.js?v=177"></script>
+<script src="src/i18n.js?v=177"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1899,7 +1899,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="176";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="177";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -5623,8 +5623,13 @@ function renderStats(){
     // libres de la largeur d'une colonne de barre.
     const axis=mount.querySelector(".statsaxis");
     axis.classList.toggle("hidden",!dense);
+    // Le DERNIER bucket est un repère à part entière, pas seulement les 3
+    // quartiles intermédiaires : sans lui, l'axe s'arrêtait à 18h (3/4 de
+    // 24) sans jamais montrer que le graphique va bien jusqu'au bout de la
+    // journée — les six dernières heures semblaient absentes, alors qu'elles
+    // étaient déjà là, juste sans repère.
     axis.innerHTML=dense
-      ? [0,Math.floor(buckets.length/4),Math.floor(buckets.length/2),Math.floor((buckets.length*3)/4)]
+      ? [...new Set([0,Math.floor(buckets.length/4),Math.floor(buckets.length/2),Math.floor((buckets.length*3)/4),buckets.length-1])]
           .map(i=>`<span>${esc(statsBucketLabel(statsPeriod,buckets[i].i))}</span>`)
           .join("")
       : "";
