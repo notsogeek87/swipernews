@@ -100,8 +100,15 @@ module.exports = async function handler(req, res) {
   // veut un tirage qui n'a encore été servi à personne. On ne met pas cette
   // réponse en cache — l'URL étant unique, elle n'y serait de toute façon
   // jamais relue, et une entrée par appui sur ↻ ne ferait qu'encombrer.
+  // stale-while-revalidate borné à 10 min (pas 1h) : au-delà de 5+10 min, le
+  // CDN redemande un vrai tirage plutôt que de resservir indéfiniment un seau
+  // peu sollicité, et le navigateur (qui lit ce même nombre — voir le
+  // commentaire de fetchLearn dans index.html) arrête d'en resservir sa copie
+  // disque après le même délai. Signalé par une utilisatrice : un article
+  // Wikipédia (catégorie étroite, peu de trafic sur ce couple filtre/seau)
+  // revenait sans arrêt sur plusieurs réouvertures dans l'heure.
   if (q.n) res.setHeader("Cache-Control", "no-store");
-  else res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=3600");
+  else res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
   res.status(200).json({ items });
 };
 

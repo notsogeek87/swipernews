@@ -968,9 +968,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=169"></script>
-<script src="src/learn-core.js?v=169"></script>
-<script src="src/i18n.js?v=169"></script>
+<script src="src/lib.js?v=170"></script>
+<script src="src/learn-core.js?v=170"></script>
+<script src="src/i18n.js?v=170"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1685,7 +1685,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="169";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="170";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2451,12 +2451,18 @@ async function fetchLearn(count=CONFIG.BATCH_SIZE,keys=catKeysForBatch(),frais){
          pendant cinq minutes (s-maxage) : appuyer trois fois sur ↻ y repioche
          souvent le lot qu'on vient de lire. Côté navigateur, c'est pire — la
          réponse ne porte que `s-maxage` (ignoré par un cache privé) et
-         `stale-while-revalidate=3600`, donc Chrome sert sa copie disque, telle
-         quelle, pendant une heure : le lot Wikipédia « rechargé » n'était même
-         pas allé sur le réseau. TOUT le reste de l'app passe déjà `no-store`
-         (flux RSS, Wikipédia en direct) — c'est cet appel-ci, et lui seul, qui
-         l'oubliait, d'où des actus qui se renouvelaient et une moitié Wikipédia
-         figée à côté. */
+         `stale-while-revalidate` (voir api/learn.js — 10 min, pas plus), donc
+         Chrome sert sa copie disque, telle quelle, pendant ce délai : le lot
+         Wikipédia « rechargé » n'était même pas allé sur le réseau. TOUT le
+         reste de l'app passe déjà `no-store` (flux RSS, Wikipédia en direct) —
+         c'est cet appel-ci, et lui seul, qui l'oubliait, d'où des actus qui se
+         renouvelaient et une moitié Wikipédia figée à côté.
+         Ce même délai borne aussi, côté serveur, combien de temps un seau peu
+         sollicité (filtre étroit, peu de trafic) peut resservir le même
+         tirage à CHAQUE réouverture au-delà des 30 min de fraîcheur — c'était
+         3600 s (1h) à l'origine, ramené à 600 s après un signalement : un
+         article Wikipédia précis revenait sans arrêt sur plusieurs
+         réouvertures dans l'heure. */
       /* `cats` TRIÉ, jamais dans l'ordre du tirage. C'est l'URL qui sert de clé
          de cache, et `keys` arrive mélangé (shuffle dans catKeysForBatch) : le
          même trio de catégories produisait donc jusqu'à 3! = 6 URL distinctes,
