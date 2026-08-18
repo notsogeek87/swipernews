@@ -374,11 +374,27 @@ genre de script dérape.
   reprend l'entrée déjà posée par le menu. `openHistory()`/`openSaved()`/
   `openSettings()` prennent donc un `replaceFrom` optionnel (absent : ouverture
   normale, comme au 1er lancement ou depuis le CTA du fil vide).
+  `#menuSheet` est un tiroir LATÉRAL (glissé depuis la DROITE, où vit le
+  bouton qui l'ouvre), pas une feuille qui monte du bas comme les autres :
+  seule exception à `.sheet{align-items:flex-end}`, avec sa propre
+  transition — `display:flex!important` en permanence (jamais le
+  `display:none` de `.sheet`, qui interdirait toute transition), visibilité
+  pilotée par `opacity`/`pointer-events`, glissement par `transform` sur
+  `.sheet__panel`. Rien d'autre que ce panneau n'a cette forme : les feuilles
+  de contenu (listes, réglages) se lisent mieux en plein écran depuis le bas.
 - `bumpCardScroll()` / `cardScrollStats()` (`src/lib.js`, testée) — le
   compteur de cartes défilées derrière « Mon activité » (`statsSheet`).
-  Incrémenté dans `onCardChange()`, au même endroit et avec le MÊME garde que
-  `markVisibleSeen` (`samePending`) : une vraie transition de carte compte une
-  fois, jamais deux. Contrairement à `markVisibleSeen`, aucune exception pour
+  Incrémenté dans `onCardChange(userScroll)`, au même endroit et avec le MÊME
+  garde que `markVisibleSeen` (`samePending`) — mais PAS au même déclencheur :
+  `userScroll` (vrai UNIQUEMENT depuis `onScrollFrame`, le vrai gestionnaire de
+  défilement) distingue un swipe RÉEL d'un simple recalage de suivi.
+  `onCardChange()` est aussi appelé sans avoir bougé le doigt — après un rendu
+  (nouveau lot, dose changée), après `adoptItems()`, depuis un saut « Articles
+  en mémoire » — et l'index courant peut alors désigner un article DIFFÉRENT
+  (tête remplacée par un lot neuf) sans que l'utilisateur ait swipé. Compter
+  sur `samePending` seul (comme `markVisibleSeen`, qui lui doit continuer à
+  tourner dans tous les cas) faisait grimper le compteur à l'ouverture, avant
+  le premier swipe. Contrairement à `markVisibleSeen`, aucune exception pour
   les vidéos — une vidéo croisée sans être lancée reste une carte défilée, au
   sens de ce compteur (différent de « vu »). Stockage compact à dessein : un
   total par JOUR civil local (`cardStats.days`) plus un compteur pour l'HEURE
