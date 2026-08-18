@@ -968,9 +968,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=168"></script>
-<script src="src/learn-core.js?v=168"></script>
-<script src="src/i18n.js?v=168"></script>
+<script src="src/lib.js?v=169"></script>
+<script src="src/learn-core.js?v=169"></script>
+<script src="src/i18n.js?v=169"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1685,7 +1685,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="168";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="169";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -4246,8 +4246,19 @@ const FEED_SHARE_TAG=`📲 Ajoute-le dans SwiperNews — l'actu & la culture en 
    lié partout), qui rebondit vers swipernews:// une fois ouvert — voir
    add.html pour le détail du rebond et son repli. Toujours pas d'App Links :
    ce sas ne demande ni secret ni build signé. */
+/* encodeURIComponent laisse `! ' ( ) *` tels quels (non réservés en RFC 3986)
+   — mais un nom de source AVEC UNE APOSTROPHE (« L'actu d'IndieMag », vu en
+   usage réel) casse le lien : les détecteurs de lien des applis de
+   messagerie l'excluent justement de leur motif (elle sert de ponctuation
+   dans le texte autour d'une URL), donc le lien affiché s'arrête net à
+   l'apostrophe. Le paramètre `url=` passant AVANT `name=` reste intact — le
+   lien tronqué ajoute quand même la bonne source, silencieusement, ce qui a
+   caché le bug le temps de le remarquer. */
+function encodeURIComponentStrict(s){
+  return encodeURIComponent(s).replace(/[!'()*]/g,c=>"%"+c.charCodeAt(0).toString(16).toUpperCase());
+}
 function feedDeepLink(f){
-  return `${APP_URL}/add.html?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(f.name)}`;
+  return `${APP_URL}/add.html?url=${encodeURIComponentStrict(f.url)}&name=${encodeURIComponentStrict(f.name)}`;
 }
 /* Contrairement au reste de l'app (jamais de dépendance au backend, voir
    isNativeApp/nativeGet plus haut), ce lien EST un appel à news.lielu.eu — et
