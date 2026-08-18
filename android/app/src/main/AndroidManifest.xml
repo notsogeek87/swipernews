@@ -19,6 +19,18 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Lien de partage d'une source (voir shareFeed/feedDeepLink dans
+                 index.html) : schéma personnalisé, pas des App Links https —
+                 pas d'assetlinks.json à signer et héberger. Hors de cette app,
+                 swipernews:// ne mène nulle part, ce qui est voulu. Relayé côté
+                 web par @capacitor/app (appUrlOpen), voir handleDeepLink. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="swipernews" android:host="add" />
+            </intent-filter>
         </activity>
 
         <!-- Navigateur intégré : ouvert par-dessus le fil (pas de LAUNCHER, pas

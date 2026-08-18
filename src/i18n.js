@@ -209,6 +209,8 @@
 
       "share.title": "Partager",
       "share.copy": "Copier",
+      "share.feed.tapToAdd":
+        "👉 Sur Android avec SwiperNews installé, ce lien l'ajoute directement :",
 
       "toast.bl.downloading": "Téléchargement de la liste…",
       "toast.bl.unavailablePrefix": "Liste indisponible — ",
@@ -437,6 +439,8 @@
 
       "share.title": "Share",
       "share.copy": "Copy",
+      "share.feed.tapToAdd":
+        "👉 On Android with SwiperNews installed, this link adds it directly:",
 
       "toast.bl.downloading": "Downloading the list…",
       "toast.bl.unavailablePrefix": "List unavailable — ",
