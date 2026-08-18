@@ -161,6 +161,24 @@ function isYoutubeHost(url) {
   }
 }
 
+// Vrai pour le point d'accès XML des flux (`/feeds/videos.xml`, chaîne ou
+// playlist) — PAS pour une page HTML de chaîne (`/@nom`, `/channel/…`).
+// Sert à exempter ce point d'accès des en-têtes de contournement ci-dessous :
+// contrairement à ce que supposait le code jusqu'ici (« indifférent au
+// user-agent, déjà en prod »), lui envoyer un user-agent de navigateur mobile
+// accompagné des cookies CONSENT/SOCS fait que Google le rejette (constaté en
+// prod le 2026-08-18, un jour après l'introduction de ces en-têtes) — un
+// point d'accès de flux qui s'annonce honnêtement comme tel passe, un
+// navigateur qui interroge une route API sans le reste d'un vrai navigateur
+// est justement ce que la détection anti-bot repère.
+function isYoutubeFeedPath(url) {
+  try {
+    return new URL(String(url || "")).pathname === "/feeds/videos.xml";
+  } catch (_) {
+    return false;
+  }
+}
+
 // Le front est same-origin : il n'a besoin d'aucun CORS. Un "*" ferait de ce
 // point d'accès un proxy ouvert utilisable par n'importe quel site, à nos frais
 // d'exécution et sous notre réputation IP. On n'ouvre donc qu'une origine
@@ -200,19 +218,21 @@ async function handler(req, res) {
   const t = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
   try {
     // safeFetch, jamais fetch : les redirections sont revalidées une à une.
-    const ytHost = isYoutubeHost(url);
+    // Le contournement ci-dessous (user-agent de navigateur + cookies) ne vise
+    // QUE la page HTML d'une chaîne (/@nom, /channel/…) : voir
+    // isYoutubeFeedPath, dont l'exemption du point d'accès XML des flux est
+    // le correctif du rejet constaté le 2026-08-18.
+    const ytHost = isYoutubeHost(url) && !isYoutubeFeedPath(url);
     const { res: upstream } = await safeFetch(url, {
       signal: ctl.signal,
       headers: ytHost
         ? {
-            // YouTube : voir isYoutubeHost. Le user-agent transparent ci-dessous
-            // convient au point d'accès XML des flux (déjà en prod, indifférent
-            // au user-agent), mais PAS à la page HTML d'une chaîne — un
-            // navigateur mobile réel évite les traitements que Google réserve
-            // aux clients qui ne s'annoncent pas comme tel. CONSENT et SOCS :
-            // les deux cookies du mécanisme de consentement UE chez Google
-            // depuis sa refonte 2024 — CONSENT seul ne suffit plus à éviter le
-            // mur de consentement à la place de la page demandée.
+            // Page HTML d'une chaîne YouTube. Un navigateur mobile réel évite
+            // les traitements que Google réserve aux clients qui ne
+            // s'annoncent pas comme tel. CONSENT et SOCS : les deux cookies du
+            // mécanisme de consentement UE chez Google depuis sa refonte 2024
+            // — CONSENT seul ne suffit plus à éviter le mur de consentement à
+            // la place de la page demandée.
             "user-agent":
               "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36",
             accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -256,3 +276,4 @@ module.exports.assertSafeUrl = assertSafeUrl;
 module.exports.isPrivateIp = isPrivateIp;
 module.exports.safeFetch = safeFetch;
 module.exports.isYoutubeHost = isYoutubeHost;
+module.exports.isYoutubeFeedPath = isYoutubeFeedPath;

@@ -58,6 +58,18 @@ test("isYoutubeHost reconnaît les hôtes YouTube, avec ou sans www.", () => {
   assert.equal(feed.isYoutubeHost(""), false);
 });
 
+test("isYoutubeFeedPath ne reconnaît que le point d'accès XML des flux", () => {
+  assert.equal(
+    feed.isYoutubeFeedPath("https://www.youtube.com/feeds/videos.xml?channel_id=UCabc"),
+    true
+  );
+  assert.equal(feed.isYoutubeFeedPath("https://youtube.com/feeds/videos.xml"), true);
+  assert.equal(feed.isYoutubeFeedPath("https://www.youtube.com/@nom"), false);
+  assert.equal(feed.isYoutubeFeedPath("https://www.youtube.com/channel/UCabc"), false);
+  assert.equal(feed.isYoutubeFeedPath("pas une url"), false);
+  assert.equal(feed.isYoutubeFeedPath(""), false);
+});
+
 test("assertSafeUrl refuse une URL malformée", async () => {
   await assert.rejects(() => feed.assertSafeUrl("pas une url"));
 });
