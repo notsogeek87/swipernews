@@ -118,8 +118,9 @@
   .card__play:active svg{transform:scale(.92)}
   /* Pendant la lecture, la carte EST le lecteur : le bloc de texte s'efface
      plutôt que de manger le bas de l'image. Le rail de partage, lui, est en
-     position:fixed hors du fil — il reste disponible, mais s'efface aussi au
-     bout d'1 s pour ne pas rester posé sur l'image (voir armRailHide). */
+     position:fixed hors du fil — enregistrer/partager n'ayant pas de sens
+     pendant la lecture, startVideo() l'efface pour toute sa durée (voir
+     .rail--away plus bas). */
   .card--playing .card__body,.card--playing .card__play{opacity:0;pointer-events:none}
   .card__body{position:relative;z-index:2;padding:28px 22px calc(44px + env(safe-area-inset-bottom));
     transition:opacity .18s ease}
@@ -224,11 +225,8 @@
     display:flex;flex-direction:row;gap:18px;align-items:center;
     transition:transform .25s ease,opacity .25s ease}
   .rail.hidden{display:none}
-  /* Pendant la lecture d'une vidéo, le rail (et la barre du haut avec lui)
-     s'efface au bout d'1 s (voir armRailHide) plutôt que de rester en
-     permanence sur l'image — revealRail() le ramène au prochain appui,
-     détecté par la perte de focus de la fenêtre (voir plus bas : un iframe
-     cross-origin n'expose aucun clic à la page qui l'englobe). */
+  /* Posée par startVideo()/retirée par stopVideo() : enregistrer/partager
+     n'ont rien à faire sur l'image pendant la lecture d'une vidéo. */
   .rail.rail--away{transform:translateY(12px);opacity:0;pointer-events:none}
   /* Bouton fantôme (liseré signal-red) : le texte/icône reste en linen, pas
      dans la couleur du bord — sur ce fond très sombre, une icône corail-signal
@@ -1128,9 +1126,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=182"></script>
-<script src="src/learn-core.js?v=182"></script>
-<script src="src/i18n.js?v=182"></script>
+<script src="src/lib.js?v=183"></script>
+<script src="src/learn-core.js?v=183"></script>
+<script src="src/i18n.js?v=183"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1917,7 +1915,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="182";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="183";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -4368,7 +4366,6 @@ function stopVideo(){
   if(!playingCard)return;
   const f=playingCard.querySelector(".card__video");
   if(f)f.remove();               // retirer l'iframe suffit à couper l'image ET le son
-  clearTimeout(railHideTimer);
   railEl.classList.remove("rail--away");   // le prochain rail (autre carte) repart visible
   playingCard.classList.remove("card--playing");
   playingCard=null;
@@ -4398,7 +4395,14 @@ function startVideo(card){
   card.classList.add("card--playing");
   playingCard=card;
   disableCaptions(f);
-  armRailHide();
+  // Enregistrer/partager n'ont pas de sens tant qu'on regarde : le rail
+  // s'efface pour toute la durée de la lecture, sans minuterie ni retour au
+  // toucher — stopVideo() le restaure. Plus simple que le cycle masquage/
+  // réapparition essayé d'abord, qui butait sur le même mur qu'ailleurs dans
+  // ce fichier : un iframe cross-origin n'expose aucun clic à la page qui
+  // l'englobe, donc rien à l'intérieur de la vidéo ne peut fiablement
+  // redéclencher une réapparition.
+  railEl.classList.add("rail--away");
   /* Intercepte le bouton retour pour quitter la vidéo (comme pour les panneaux).
      Sans cela, le retour quitte l'app ; ici, il rend la carte vidéo avec son
      titre et son bouton play. */
@@ -4453,34 +4457,6 @@ feedEl.addEventListener("click",e=>{
    l'app au lieu d'une par carte). Masqué sur la carte de fin. */
 const railEl=document.getElementById("rail");
 const saveBtn=document.getElementById("saveBtn");
-/* Auto-masquage du rail (et de la barre du haut avec lui) PENDANT une vidéo
-   (voir startVideo/stopVideo) : armRailHide() le programme 1 s après le
-   lancement ou tout appui de retour, revealRail() l'annule et le
-   reprogramme. Aucun rapport avec `hidden` (posée par updateRail selon
-   l'existence d'une carte courante) : les deux classes sont indépendantes et
-   peuvent cohabiter.
-   Le déclencheur du retour n'est PAS un clic sur la carte : un iframe
-   cross-origin (l'intégration YouTube) n'expose aucun événement de clic à la
-   page qui l'englobe — un calque intercepteur au-dessus a été essayé, mais il
-   avalait alors le appui, empêchant les contrôles YouTube eux-mêmes (barre de
-   progression) de réapparaître. Le signal fiable est la perte de focus de la
-   fenêtre : cliquer DANS l'iframe déplace le focus dedans, donc déclenche
-   `blur` sur `window`, sans intercepter le clic. Voir l'écouteur plus bas. */
-let railHideTimer=null;
-function armRailHide(){
-  clearTimeout(railHideTimer);
-  railHideTimer=setTimeout(()=>{
-    railEl.classList.add("rail--away");
-    hideTop();
-  },1000);
-}
-function revealRail(){
-  clearTimeout(railHideTimer);
-  railEl.classList.remove("rail--away");
-  showTop();
-  armRailHide();
-}
-window.addEventListener("blur",()=>{if(playingCard)revealRail();});
 function updateRail(it=currentItem()){
   railEl.classList.toggle("hidden",!it);
   // Icône ET libellé dépendent de l'état : contrairement à shareBtn (aria/title
