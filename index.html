@@ -1164,9 +1164,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=187"></script>
-<script src="src/learn-core.js?v=187"></script>
-<script src="src/i18n.js?v=187"></script>
+<script src="src/lib.js?v=188"></script>
+<script src="src/learn-core.js?v=188"></script>
+<script src="src/i18n.js?v=188"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1265,6 +1265,18 @@ const CONFIG = {
      flux RSS au bout de quelques jours — la mémoriser plus longtemps ne sert
      plus à rien. 800 liens canoniques pèsent ~70 Ko, contre ~5 Mo de quota. */
   SEEN_NEWS_MAX: 800,
+  /* Une actu (article ou vidéo) déjà vue reste écartée du tour de rôle pendant
+     ce délai, même si sa file n'a rien d'autre à offrir — voir rebuild().
+     Sans lui, une source pauvre (chaîne YouTube à un seul Short, flux qui ne
+     publie presque jamais) revenait proposer le MÊME item à chaque
+     rafraîchissement dès son fond épuisé, alors que « repoussé en fin de
+     file, jamais retiré » n'était censé s'appliquer qu'entre DEUX items
+     distincts d'une même source. Ni trop court (l'effet ne se verrait pas, la
+     resurgence resterait quasi immédiate à chaque ↻) ni trop long (la source
+     perdrait sa part du tour de rôle pour de bon tant qu'elle ne publie
+     rien) : un jour laisse largement le temps de croiser autre chose d'ici
+     là, sans faire disparaître durablement une chaîne à faible cadence. */
+  NEWS_SEEN_COOLDOWN_MS: 24*3600*1000,
   /* Articles ENREGISTRÉS (bouton du rail) : liste PERSISTÉE, sans rapport
      avec seen/seenNews (qui ne gardent qu'une clé, jamais un article capable
      de se réafficher hors du fil qui l'a servi). Le plafond évite une
@@ -1684,18 +1696,38 @@ function addSeen(it){
    supprimer viderait la file d'une source lente entièrement lue, et lui ferait
    reperdre la part que le tour de rôle vient tout juste de lui rendre. */
 const LS_SEEN_NEWS="fluxswipe.seennews.v1";
+/* Clé → date de dernière lecture (ms epoch), pas un simple Set : rebuild() s'en
+   sert pour écarter TEMPORAIREMENT une actu tout juste vue (voir
+   NEWS_SEEN_COOLDOWN_MS ci-dessous et son usage dans rebuild), sans quoi une
+   source pauvre en contenu (typiquement une chaîne YouTube à un seul Short) la
+   reproposait à chaque rafraîchissement une fois son fond épuisé. Format de
+   stockage : tableau de paires [clé,date] ; les entrées de l'ancien format
+   (tableau de clés nues, sans date) sont acceptées à la relecture et valent
+   date 0 — assez ancien pour ne jamais bloquer un retour, donc aucune migration
+   à faire. */
 let seenNews=(()=>{try{const a=JSON.parse(localStorage.getItem(LS_SEEN_NEWS)||"[]");
-  return new Set(Array.isArray(a)?a.filter(x=>typeof x==="string"):[]);}catch(e){return new Set();}})();
+    if(!Array.isArray(a))return new Map();
+    return new Map(a.map(x=>Array.isArray(x)?[x[0],x[1]]:[x,0])
+      .filter(([k,t])=>typeof k==="string"&&typeof t==="number"));
+  }catch(e){return new Map();}})();
 let seenNewsDirty=false,seenNewsPersistT;
 function persistSeenNews(){if(!seenNewsDirty)return;seenNewsDirty=false;
   try{localStorage.setItem(LS_SEEN_NEWS,JSON.stringify([...seenNews]));}catch(e){warn("save seen news",e);}}
 function newsKey(it){return it&&it.link?canonicalLink(it.link):"";}
 function newsSeen(it){const k=newsKey(it);return !!k&&seenNews.has(k);}
+/* Date (ms epoch) de dernière lecture, ou undefined si jamais vue. */
+function newsSeenAt(it){const k=newsKey(it);return k?seenNews.get(k):undefined;}
 function addSeenNews(it){
   const k=newsKey(it);
-  if(!k||seenNews.has(k))return;
-  seenNews.add(k);seenNewsDirty=true;
-  if(seenNews.size>CONFIG.SEEN_NEWS_MAX)seenNews=new Set([...seenNews].slice(-CONFIG.SEEN_NEWS_MAX));
+  if(!k)return;
+  const neuf=!seenNews.has(k);
+  // Rejouer une vidéo (ou rouvrir un article depuis « Articles en mémoire »)
+  // repousse le cooldown à partir de CETTE lecture, pas de la première.
+  seenNews.set(k,Date.now());seenNewsDirty=true;
+  if(neuf&&seenNews.size>CONFIG.SEEN_NEWS_MAX){
+    const plusAncienne=seenNews.keys().next().value;   // ordre d'insertion Map = ordre d'ajout
+    seenNews.delete(plusAncienne);
+  }
   clearTimeout(seenNewsPersistT);seenNewsPersistT=setTimeout(persistSeenNews,800);
 }
 
@@ -1953,7 +1985,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="187";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="188";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -3313,6 +3345,25 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
       f.push(it);
     }
     const queues=[...files.values()];
+    /* Écarte, TEMPORAIREMENT, les items vus il y a moins de NEWS_SEEN_COOLDOWN_MS
+       — sinon une file dont TOUT le contenu vient d'être vu garde quand même sa
+       part du tour de rôle (voir plus bas), et resert donc le même item à
+       chaque rafraîchissement dès qu'une source ne publie plus rien de neuf
+       (typiquement une chaîne YouTube à un seul Short). Par file, jamais
+       globalement : une file qui n'a plus rien de frais est simplement sautée
+       ce tour-ci (roundRobin gère déjà les files vides), les autres continuent
+       normalement. Repli à l'identique de dropSeen (src/lib.js) si ce filtre
+       viderait TOUTES les files à la fois (tout, toutes sources confondues,
+       vient d'être vu) : mieux vaut resservir du déjà-vu qu'un fil sans actus.
+       Non appliqué si hideSeen est désactivé, par cohérence avec le tri juste
+       en dessous — décocher la case doit vraiment tout remontrer. */
+    if(hideSeen){
+      const frais=queues.map(q=>q.filter(it=>{
+        const t=newsSeenAt(it);
+        return t===undefined||Date.now()-t>=CONFIG.NEWS_SEEN_COOLDOWN_MS;
+      }));
+      if(frais.some(q=>q.length)){queues.length=0;queues.push(...frais);}
+    }
     /* Dans une file : le NON LU d'abord, puis la date. Sans ce premier critère,
        l'article le plus récent d'une source reste en tête de sa file tant
        qu'elle n'en publie pas un autre — donc une heure entière pour une source
