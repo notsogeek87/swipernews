@@ -1164,9 +1164,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=186"></script>
-<script src="src/learn-core.js?v=186"></script>
-<script src="src/i18n.js?v=186"></script>
+<script src="src/lib.js?v=187"></script>
+<script src="src/learn-core.js?v=187"></script>
+<script src="src/i18n.js?v=187"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1953,7 +1953,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="186";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="187";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -5807,6 +5807,12 @@ document.addEventListener("focusin",e=>{
 });
 function openSettings(replaceFrom){
   pendingInt=new Set(interests);
+  // Repliés à CHAQUE ouverture du panneau, pas seulement au 1er chargement :
+  // feedGroupOpen survit sinon d'un ajout/suppression à l'autre DANS la même
+  // ouverture (c'est le but), mais fermer puis rouvrir la feuille doit
+  // retrouver l'état réduit — sans quoi un groupe déplié une fois resterait
+  // déplié pour le reste de la session.
+  feedGroupOpen={rss:false,vid:false};
   renderMix();renderIntGrid();renderList();renderSuggest();renderReadPref();renderLangPref();
   document.getElementById("sponsorFilterChk").checked=filterSponsored;
   document.getElementById("videoFilterChk").checked=filterVideoOnly;
@@ -5918,10 +5924,13 @@ if(firstRun)openSettings();
    n'aurait rien à distinguer, juste une couche de plus à ouvrir pour rien.
    RÉDUITS par défaut (voir feedGroupOpen) — c'est le point de la demande :
    la liste ne s'ouvre plus sur des dizaines de lignes, il faut un appui pour
-   déplier CHAQUE groupe. L'état de repli survit aux re-rendus DANS la
-   session (ajout, suppression, coche) grâce à feedGroupOpen, mais reprend à
-   « réduit » à chaque nouvelle ouverture de la feuille des réglages : pas de
-   persistance disque, un simple objet en mémoire. */
+   déplier CHAQUE groupe. L'état de repli survit aux re-rendus DANS une même
+   ouverture (ajout, suppression, coche), pour ne pas refermer un groupe
+   qu'on vient de déplier sous prétexte qu'on y ajoute une source — mais
+   openSettings() le réinitialise EXPLICITEMENT à chaque ouverture du
+   panneau : sans ce reset, un groupe déplié une fois le resterait pour le
+   reste de la session, y compris en refermant puis rouvrant la feuille. Pas
+   de persistance disque, un simple objet en mémoire. */
 let feedGroupOpen={rss:false,vid:false};
 function renderList(){const lbl=feedLabels(feeds);
   const rowHTML=(f,i)=>{
