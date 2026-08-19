@@ -111,13 +111,6 @@
      loin dans le DOM, donc la pastille « Ouvrir sur YouTube » et le titre gardent
      leur cible par-dessus. Le lecteur prend la même boîte que .card__bg. */
   .card__video{position:absolute;inset:0;width:100%;height:100%;border:0;z-index:1;background:#000}
-  /* Capte le PREMIER appui sur la vidéo une fois le rail masqué : un iframe
-     cross-origin n'expose aucun événement de clic à la page qui l'englobe,
-     donc rien d'autre ne peut faire réapparaître le rail. Inerte
-     (pointer-events:none) tant que le rail est visible, pour laisser les
-     appuis suivants atteindre les contrôles YouTube eux-mêmes (pause…). */
-  .card__videotap{position:absolute;inset:0;z-index:2;pointer-events:none}
-  .card__videotap.tap-active{pointer-events:auto}
   .card__play{position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;
     background:none;border:0;padding:0;color:#fff;cursor:pointer;-webkit-tap-highlight-color:transparent;
     transition:opacity .18s ease}
@@ -231,9 +224,11 @@
     display:flex;flex-direction:row;gap:18px;align-items:center;
     transition:transform .25s ease,opacity .25s ease}
   .rail.hidden{display:none}
-  /* Pendant la lecture d'une vidéo, le rail s'efface au bout d'1 s (voir
-     armRailHide) plutôt que de rester en permanence sur l'image — showRail()
-     le ramène au prochain appui, via .card__videotap ci-dessous. */
+  /* Pendant la lecture d'une vidéo, le rail (et la barre du haut avec lui)
+     s'efface au bout d'1 s (voir armRailHide) plutôt que de rester en
+     permanence sur l'image — revealRail() le ramène au prochain appui,
+     détecté par la perte de focus de la fenêtre (voir plus bas : un iframe
+     cross-origin n'expose aucun clic à la page qui l'englobe). */
   .rail.rail--away{transform:translateY(12px);opacity:0;pointer-events:none}
   /* Bouton fantôme (liseré signal-red) : le texte/icône reste en linen, pas
      dans la couleur du bord — sur ce fond très sombre, une icône corail-signal
@@ -1133,9 +1128,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=180"></script>
-<script src="src/learn-core.js?v=180"></script>
-<script src="src/i18n.js?v=180"></script>
+<script src="src/lib.js?v=181"></script>
+<script src="src/learn-core.js?v=181"></script>
+<script src="src/i18n.js?v=181"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1922,7 +1917,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="180";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="181";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -4343,7 +4338,6 @@ function cardHTML(it,id){
    `playsinline=1` : sans lui, certains moteurs mobiles basculent d'office en
    plein écran système, ce qui sort de la carte — donc du fil. */
 let playingCard=null;
-let videoTapEl=null;
 function pushVideoState(){
   try{history.pushState({snVideo:true},"");}catch(e){warn("history push",e);}
 }
@@ -4354,7 +4348,6 @@ function stopVideo(){
   if(!playingCard)return;
   const f=playingCard.querySelector(".card__video");
   if(f)f.remove();               // retirer l'iframe suffit à couper l'image ET le son
-  if(videoTapEl){videoTapEl.remove();videoTapEl=null;}
   clearTimeout(railHideTimer);
   railEl.classList.remove("rail--away");   // le prochain rail (autre carte) repart visible
   playingCard.classList.remove("card--playing");
@@ -4378,11 +4371,6 @@ function startVideo(card){
   // automatiques par défaut (langue du compte/navigateur), jamais demandés ici.
   f.src="https://www.youtube-nocookie.com/embed/"+id+"?autoplay=1&playsinline=1&rel=0&modestbranding=1&cc_load_policy=0";
   card.insertBefore(f,card.firstChild);
-  const tap=document.createElement("div");
-  tap.className="card__videotap";
-  tap.addEventListener("click",revealRail);   // laissé remonter : le même appui ramène aussi la barre du haut (feedEl click → showTop)
-  card.insertBefore(tap,f.nextSibling);
-  videoTapEl=tap;
   card.classList.add("card--playing");
   playingCard=card;
   armRailHide();
@@ -4440,24 +4428,34 @@ feedEl.addEventListener("click",e=>{
    l'app au lieu d'une par carte). Masqué sur la carte de fin. */
 const railEl=document.getElementById("rail");
 const saveBtn=document.getElementById("saveBtn");
-/* Auto-masquage du rail PENDANT une vidéo (voir startVideo/stopVideo) :
-   armRailHide() le programme 1 s après le lancement ou tout appui de retour,
-   revealRail() (appelée par .card__videotap) l'annule et le reprogramme.
-   Aucun rapport avec `hidden` (posée par updateRail selon l'existence d'une
-   carte courante) : les deux classes sont indépendantes et peuvent cohabiter. */
+/* Auto-masquage du rail (et de la barre du haut avec lui) PENDANT une vidéo
+   (voir startVideo/stopVideo) : armRailHide() le programme 1 s après le
+   lancement ou tout appui de retour, revealRail() l'annule et le
+   reprogramme. Aucun rapport avec `hidden` (posée par updateRail selon
+   l'existence d'une carte courante) : les deux classes sont indépendantes et
+   peuvent cohabiter.
+   Le déclencheur du retour n'est PAS un clic sur la carte : un iframe
+   cross-origin (l'intégration YouTube) n'expose aucun événement de clic à la
+   page qui l'englobe — un calque intercepteur au-dessus a été essayé, mais il
+   avalait alors le appui, empêchant les contrôles YouTube eux-mêmes (barre de
+   progression) de réapparaître. Le signal fiable est la perte de focus de la
+   fenêtre : cliquer DANS l'iframe déplace le focus dedans, donc déclenche
+   `blur` sur `window`, sans intercepter le clic. Voir l'écouteur plus bas. */
 let railHideTimer=null;
 function armRailHide(){
   clearTimeout(railHideTimer);
   railHideTimer=setTimeout(()=>{
     railEl.classList.add("rail--away");
-    if(videoTapEl)videoTapEl.classList.add("tap-active");
+    hideTop();
   },1000);
 }
 function revealRail(){
+  clearTimeout(railHideTimer);
   railEl.classList.remove("rail--away");
-  if(videoTapEl)videoTapEl.classList.remove("tap-active");
+  showTop();
   armRailHide();
 }
+window.addEventListener("blur",()=>{if(playingCard)revealRail();});
 function updateRail(it=currentItem()){
   railEl.classList.toggle("hidden",!it);
   // Icône ET libellé dépendent de l'état : contrairement à shareBtn (aria/title
