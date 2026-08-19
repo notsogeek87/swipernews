@@ -1128,9 +1128,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=181"></script>
-<script src="src/learn-core.js?v=181"></script>
-<script src="src/i18n.js?v=181"></script>
+<script src="src/lib.js?v=182"></script>
+<script src="src/learn-core.js?v=182"></script>
+<script src="src/i18n.js?v=182"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1917,7 +1917,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="181";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="182";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -4338,6 +4338,26 @@ function cardHTML(it,id){
    `playsinline=1` : sans lui, certains moteurs mobiles basculent d'office en
    plein écran système, ce qui sort de la carte — donc du fil. */
 let playingCard=null;
+/* Éteint le module sous-titres via l'API postMessage du lecteur intégré —
+   PAS le script officiel `iframe_api` de YouTube, qui est un chargement de
+   script tiers que la CSP du projet interdit (`script-src 'self'`, voir
+   vercel.json) et qu' « aucun appel à un tiers non choisi » exclurait de
+   toute façon. Le lecteur embarqué dans l'iframe écoute déjà ces messages
+   sans lui : le script officiel n'est qu'un confort d'API côté page hôte,
+   jamais requis côté récepteur. `enablejsapi=1` dans l'URL (voir startVideo)
+   est ce qui l'autorise à répondre.
+   Aucun accusé de réception n'existe tant que le lecteur n'a pas terminé son
+   propre chargement interne (indépendant du `load` de l'iframe, qui ne dit
+   rien de l'état du lecteur JS) : trois tentatives espacées, sans requête ni
+   effet de bord si le module est déjà éteint ou l'iframe déjà partie. */
+function disableCaptions(f){
+  const send=()=>{
+    if(!f.contentWindow)return;
+    try{f.contentWindow.postMessage(JSON.stringify({event:"command",func:"unloadModule",args:["captions"]}),"*");}
+    catch(e){warn("disableCaptions",e);}
+  };
+  [300,900,1800].forEach(ms=>setTimeout(send,ms));
+}
 function pushVideoState(){
   try{history.pushState({snVideo:true},"");}catch(e){warn("history push",e);}
 }
@@ -4367,12 +4387,17 @@ function startVideo(card){
   f.allow="autoplay; encrypted-media; picture-in-picture; fullscreen";
   f.setAttribute("allowfullscreen","");
   f.referrerPolicy="strict-origin-when-cross-origin";
-  // cc_load_policy=0 : sans lui YouTube affiche parfois les sous-titres
-  // automatiques par défaut (langue du compte/navigateur), jamais demandés ici.
-  f.src="https://www.youtube-nocookie.com/embed/"+id+"?autoplay=1&playsinline=1&rel=0&modestbranding=1&cc_load_policy=0";
+  // cc_load_policy=0 est en réalité déjà la valeur par défaut de YouTube : il
+  // NE force rien, il retombe sur « préférence de l'utilisateur » — laquelle
+  // vient d'un cookie posé sur youtube-nocookie.com par un embed précédent
+  // (ici ou ailleurs) où les sous-titres avaient été activés, et persiste
+  // silencieusement d'une vidéo à l'autre. Seul enablejsapi=1 + un ordre
+  // postMessage explicite (voir disableCaptions) éteint vraiment le module.
+  f.src="https://www.youtube-nocookie.com/embed/"+id+"?autoplay=1&playsinline=1&rel=0&modestbranding=1&cc_load_policy=0&enablejsapi=1";
   card.insertBefore(f,card.firstChild);
   card.classList.add("card--playing");
   playingCard=card;
+  disableCaptions(f);
   armRailHide();
   /* Intercepte le bouton retour pour quitter la vidéo (comme pour les panneaux).
      Sans cela, le retour quitte l'app ; ici, il rend la carte vidéo avec son
