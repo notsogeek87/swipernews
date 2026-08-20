@@ -1091,7 +1091,13 @@
       <button class="iobtn" id="exportJson" data-i18n="sheet.sources.exportJson">↓ Exporter (JSON)</button>
       <button class="iobtn" id="importBtn" data-i18n="sheet.sources.importFile">↑ Importer un fichier</button>
     </div>
-    <input id="importFile" type="file" accept=".opml,.xml,.json,application/json,text/xml" style="display:none">
+    <!-- ".opml" ne suffit pas seul : Android n'a aucune entrée pour cette
+         extension dans son MimeTypeMap, donc le sélecteur de documents (qui
+         filtre par MIME, pas par extension) lui attribue "application/octet-
+         stream" et le masque — seul ".xml" passait. D'où les MIME génériques
+         en plus des types XML/JSON attendus ; importFromFile() reste la seule
+         vraie validation, par contenu. -->
+    <input id="importFile" type="file" accept=".opml,.xml,.json,application/json,text/xml,application/xml,text/x-opml,application/octet-stream,text/plain" style="display:none">
 
     <!-- Réglages du lecteur, remplis par renderReadPref() (vide hors app
          packagée). Un seul point de montage depuis la fusion des panneaux. -->
@@ -1204,9 +1210,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=192"></script>
-<script src="src/learn-core.js?v=192"></script>
-<script src="src/i18n.js?v=192"></script>
+<script src="src/lib.js?v=193"></script>
+<script src="src/learn-core.js?v=193"></script>
+<script src="src/i18n.js?v=193"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2025,7 +2031,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="192";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="193";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
