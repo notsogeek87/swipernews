@@ -18,7 +18,7 @@ Binaries:
 Builds:
   - versionName: 1.5.3
     versionCode: 105030000
-    commit: 49db86be0af5bb1129ab22e19bb3ec6fe8012c57
+    commit: eeb7a8aff31e61ad78df27fc20a8746304679115
     subdir: android
     sudo:
       - echo "deb https://deb.debian.org/debian forky main" > /etc/apt/sources.list.d/forky.list

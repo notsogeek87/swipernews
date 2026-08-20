@@ -76,7 +76,7 @@ Builds:
     # rebumps purement Play Store (versionCode déjà envoyé, refusé en réenvoi),
     # sans rapport avec les tags publics vX.Y.Z. versionCode n'a besoin que de
     # croître, pas d'être continu.
-    commit: 49db86be0af5bb1129ab22e19bb3ec6fe8012c57
+    commit: eeb7a8aff31e61ad78df27fc20a8746304679115
     subdir: android
     # Le nodejs de Debian stable est trop vieux : la CLI Capacitor 8 exige
     # Node 22 et refuse Node 20 (d'où le setup-node@22 d'android.yml). D'où
