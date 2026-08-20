@@ -1164,9 +1164,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=189"></script>
-<script src="src/learn-core.js?v=189"></script>
-<script src="src/i18n.js?v=189"></script>
+<script src="src/lib.js?v=190"></script>
+<script src="src/learn-core.js?v=190"></script>
+<script src="src/i18n.js?v=190"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1985,7 +1985,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="189";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="190";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -5856,6 +5856,17 @@ document.addEventListener("focusin",e=>{
   const readout=document.querySelector("#statsSheet .statsreadout");
   if(readout)readout.textContent=T("stats.readout",{label:bar.dataset.label,n:bar.dataset.n});
 });
+// Déclaré ici, loin de renderList() (sa lecture principale, plus bas) : sinon
+// « let » en zone morte temporelle jusqu'à cette ligne, alors qu'openSettings()
+// l'assigne dès le tout premier lancement (firstRun, avant même le premier
+// rendu de la liste) — une ReferenceError alors non rattrapée y coupait le
+// script en plein chargement, empêchant tout clic ultérieur sur Réglages de
+// fonctionner pour le reste de la session.
+let feedGroupOpen={rss:false,vid:false};
+// Même raison qu'au-dessus (feedGroupOpen) : renderList() la lit dès le
+// premier rendu de la liste, avant que sa déclaration plus bas (près de
+// delFeed, qui l'écrit) n'ait pu s'exécuter.
+let delConfirm=null,delConfirmT;
 function openSettings(replaceFrom){
   pendingInt=new Set(interests);
   // Repliés à CHAQUE ouverture du panneau, pas seulement au 1er chargement :
@@ -5981,8 +5992,8 @@ if(firstRun)openSettings();
    openSettings() le réinitialise EXPLICITEMENT à chaque ouverture du
    panneau : sans ce reset, un groupe déplié une fois le resterait pour le
    reste de la session, y compris en refermant puis rouvrant la feuille. Pas
-   de persistance disque, un simple objet en mémoire. */
-let feedGroupOpen={rss:false,vid:false};
+   de persistance disque, un simple objet en mémoire (déclaré plus haut, avant
+   openSettings() — voir son commentaire). */
 function renderList(){const lbl=feedLabels(feeds);
   const rowHTML=(f,i)=>{
     const armed=delConfirm===f.url;
@@ -6030,8 +6041,9 @@ function toggleFeed(i){feeds[i].on=!feeds[i].on;save();}
    sur LUI confirme, tout le reste (appui ailleurs, quelques secondes, un
    re-rendu de la liste pour toute autre raison) désarme.
    Par URL et non par index : entre les deux appuis, la liste a pu se
-   re-rendre (ajout d'une suggestion, import…) et les index auraient bougé. */
-let delConfirm=null,delConfirmT;
+   re-rendre (ajout d'une suggestion, import…) et les index auraient bougé.
+   (delConfirm/delConfirmT déclarées plus haut, avant openSettings() — voir
+   son commentaire.) */
 function delFeed(i){
   const f=feeds[i];
   if(!f)return;
