@@ -1001,19 +1001,21 @@
   </div>
 </div>
 
-<!-- Accueil du 1er lancement : explique le principe et fait choisir les
-     centres d'intérêt Wikipédia AVANT tout chargement réseau. Feuille séparée
-     du panneau de réglages (#sheet, juste après) : y ouvrir le panneau
-     COMPLET (dose, sources, lecteur…) noyait la seule question qui compte au
-     tout premier lancement — « quels centres d'intérêt ? » — dans des
-     réglages dont on n'a pas encore de raison de se soucier, d'où le retour
-     « ça ouvre les réglages, on est perdu ». N'apparaît qu'une fois :
-     interestsChosen() (LS_INT posé) devient vrai dès validation, et ce
-     panneau ne s'ouvre plus jamais ensuite — tout reste modifiable depuis
-     Réglages, ⚙ dans le menu du haut, message rappelé ci-dessous. Réutilise
-     le même point d'entrée que le panneau de réglages (pendingInt,
-     renderIntGrid, CATEGORIES) : les deux grilles de puces ne peuvent donc
-     pas diverger, et rien n'est dupliqué que le texte d'accueil lui-même. -->
+<!-- Accueil du 1er lancement : explique le principe et fait régler la dose et
+     les centres d'intérêt Wikipédia AVANT tout chargement réseau. Feuille
+     séparée du panneau de réglages (#sheet, juste après) : y ouvrir le
+     panneau COMPLET (sources, lecteur…) noyait les deux seuls réglages qui
+     comptent au tout premier lancement dans des options dont on n'a pas
+     encore de raison de se soucier, d'où le retour « ça ouvre les réglages,
+     on est perdu ». N'apparaît qu'une fois : interestsChosen() (LS_INT posé)
+     devient vrai dès validation, et ce panneau ne s'ouvre plus jamais
+     ensuite — tout reste modifiable depuis Réglages, ⚙ dans le menu du haut,
+     message rappelé ci-dessous. Réutilise les MÊMES points de montage que le
+     panneau de réglages (data-mixmount/renderMix, pendingInt/renderIntGrid) :
+     les deux curseurs et les deux grilles de puces ne peuvent donc pas
+     diverger, et rien n'est dupliqué que le texte d'accueil lui-même. Voir
+     startWelcome() pour la garde qui force un rechargement si la dose a déjà
+     lancé un 1er loadFeeds() pendant qu'on choisissait encore. -->
 <div class="sheet" id="welcomeSheet" role="dialog" aria-modal="true" data-i18n-attr="aria-label:welcome.aria">
   <div class="sheet__panel" tabindex="-1">
     <div class="sheet__grip"></div>
@@ -1022,6 +1024,13 @@
       <h2 data-i18n="welcome.title">Bienvenue sur SwiperNews</h2>
     </div>
     <p class="intro" data-i18n="welcome.pitch">✨ Le swipe qui rend plus malin. Un seul fil : tes actus, et entre elles des articles Wikipédia qui t'apprennent un truc que tu ne connaissais pas.</p>
+    <h3 class="secttl" data-i18n="sheet.mix.title">🎚️ Dose d'apprentissage</h3>
+    <p class="sub" data-i18n="dose.sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
+    <!-- Même point de montage que le panneau de réglages (voir renderMix,
+         qui remplit CHAQUE [data-mixmount] trouvé) : un seul balisage, un
+         seul état (mixScore), donc les deux curseurs ne peuvent pas
+         diverger — glisser ici change déjà la dose pour de vrai. -->
+    <div data-mixmount></div>
     <h3 class="secttl" data-i18n="sheet.interests.title">🎓 Centres d'intérêt</h3>
     <p class="sub" data-i18n="welcome.interests.sub">Choisis les thèmes qui t'intéressent — ou aucun, pour un peu de tout. Modifiable à tout moment depuis les réglages ⚙.</p>
     <div class="intgrid" id="welcomeIntGrid"></div>
@@ -1195,9 +1204,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=191"></script>
-<script src="src/learn-core.js?v=191"></script>
-<script src="src/i18n.js?v=191"></script>
+<script src="src/lib.js?v=192"></script>
+<script src="src/learn-core.js?v=192"></script>
+<script src="src/i18n.js?v=192"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2016,7 +2025,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="191";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="192";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -5937,14 +5946,22 @@ function renderIntGrid(gridId){
    pour toute feuille refermée sans avoir chargé) — pas de loadFeeds() ici. */
 function openWelcome(){
   pendingInt=new Set(interests);
-  renderIntGrid("welcomeIntGrid");
+  renderMix();renderIntGrid("welcomeIntGrid");
   openDialog(welcomeSheet);
 }
 function startWelcome(){
+  const avant=interests.join(",");
   interests=CATEGORIES.filter(c=>pendingInt.has(c.key)).map(c=>c.key); // garde l'ordre défini
   try{localStorage.setItem(LS_INT,JSON.stringify(interests));}catch(e){}
   renderFilters();
-  closeDialog(welcomeSheet);
+  // Le curseur de dose vit aussi sur cet accueil (data-mixmount) : le
+  // glisser puis le relâcher a pu lancer un tout 1er loadFeeds() via
+  // applyMix(), AVANT ce clic — avec des intérêts encore vides. La garde
+  // !feedLoadStarted de closeDialog() ne suffit alors plus (elle croirait le
+  // fil déjà à jour) : comme applySettings(), on force si les intérêts ont
+  // vraiment changé depuis l'ouverture.
+  if(interests.join(",")!==avant||!feedLoadStarted)loadFeeds(true);
+  closeDialog(welcomeSheet);                    // ne relancera pas un 2e chargement
   try{window.dispatchEvent(new Event("interests-validated"));}catch(e){} // autorise la bannière d'install
 }
 document.getElementById("welcomeStart").onclick=startWelcome;
