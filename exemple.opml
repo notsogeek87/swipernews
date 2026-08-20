@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head><title>SwiperNews — exemple de sources</title></head>
+  <body>
+    <outline type="rss" text="France Info" title="France Info" xmlUrl="https://www.francetvinfo.fr/titres.rss"/>
+    <outline type="rss" text="JeuxVideo.com" title="JeuxVideo.com" xmlUrl="https://www.jeuxvideo.com/rss/rss.xml"/>
+    <outline type="rss" text="L&#39;actu d&#39;IndieMag" title="L&#39;actu d&#39;IndieMag" xmlUrl="https://www.indiemag.fr/feed/rss.xml"/>
+    <outline type="rss" text="Courrier international - Actualités France et Monde, vidéos, infographies" title="Courrier international - Actualités France et Monde, vidéos, infographies" xmlUrl="https://www.courrierinternational.com/feed/all/rss.xml"/>
+    <outline type="rss" text="Les Surligneurs" title="Les Surligneurs" xmlUrl="https://lessurligneurs.eu/feed/"/>
+    <outline type="rss" text="01net" title="01net" xmlUrl="https://www.01net.com/actualites/feed/"/>
+    <outline type="rss" text="Journal du Geek" title="Journal du Geek" xmlUrl="https://www.journaldugeek.com/feed/"/>
+    <outline type="rss" text="Les Numériques - Toute l&#39;actualité" title="Les Numériques - Toute l&#39;actualité" xmlUrl="https://www.lesnumeriques.com/rss-news.xml"/>
+    <outline type="rss" text="Les news de Korben" title="Les news de Korben" xmlUrl="https://korben.info/feed"/>
+    <outline type="rss" text="Pixels : Toute l’actualité sur Le Monde.fr." title="Pixels : Toute l’actualité sur Le Monde.fr." xmlUrl="https://www.lemonde.fr/pixels/rss_full.xml"/>
+    <outline type="rss" text="Ente - Feed" title="Ente - Feed" xmlUrl="https://ente.io/rss.xml"/>
+    <outline type="rss" text="influenth.com" title="influenth.com" xmlUrl="https://www.influenth.com/feed"/>
+    <outline type="rss" text="frandroid.com" title="frandroid.com" xmlUrl="https://www.frandroid.com/feed"/>
+    <outline type="rss" text="midilibre.fr" title="midilibre.fr" xmlUrl="https://www.midilibre.fr/rss.xml"/>
+    <outline type="rss" text="courrierinternational.com" title="courrierinternational.com" xmlUrl="https://www.courrierinternational.com/feed/rubrique/geopolitique/rss.xml"/>
+    <outline type="rss" text="courrierinternational.com" title="courrierinternational.com" xmlUrl="https://www.courrierinternational.com/feed/rubrique/economie/rss.xml"/>
+    <outline type="rss" text="courrierinternational.com" title="courrierinternational.com" xmlUrl="https://www.courrierinternational.com/feed/rubrique/politique/rss.xml"/>
+    <outline type="rss" text="courrierinternational.com" title="courrierinternational.com" xmlUrl="https://www.courrierinternational.com/feed/rubrique/science-environnement/rss.xml"/>
+    <outline type="rss" text="courrierinternational.com" title="courrierinternational.com" xmlUrl="https://www.courrierinternational.com/feed/rubrique/culture/rss.xml"/>
+    <outline type="rss" text="courrierinternational.com" title="courrierinternational.com" xmlUrl="https://www.courrierinternational.com/feed/rubrique/france/rss.xml"/>
+    <outline type="rss" text="newsroom-deezer.com" title="newsroom-deezer.com" xmlUrl="https://newsroom-deezer.com/fr/feed"/>
+    <outline type="rss" text="dwh.lequipe.fr" title="dwh.lequipe.fr" xmlUrl="https://dwh.lequipe.fr/api/edito/rss?path=/Football/"/>
+    <outline type="rss" text="YT · Courrier international" title="YT · Courrier international" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UC7xph2qAEotmyUPJbFVI95w"/>
+    <outline type="rss" text="YT · Léo - TechMaker" title="YT · Léo - TechMaker" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCRhyS_ylPQ5GWBl1lK92ftA&amp;utm_source=chatgpt.com"/>
+    <outline type="rss" text="YT · Arkeo Toys" title="YT · Arkeo Toys" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCoRReVQsekQ-tOwUo-lCOpA"/>
+    <outline type="rss" text="YT · Bazar du Grenier" title="YT · Bazar du Grenier" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCCMxHHciWRBBouzk-PGzmtQ"/>
+    <outline type="rss" text="YT · Ecran Large" title="YT · Ecran Large" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCp8CElQTorSmhH_jVgSSv5g"/>
+    <outline type="rss" text="YT · Nightech" title="YT · Nightech" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCu6HC8ahaPWqqfSvic7nWyQ"/>
+    <outline type="rss" text="YT · Frandroid" title="YT · Frandroid" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCgoxc-VKU0cw9BcM9z_qokg"/>
+    <outline type="rss" text="YT · Conkerax" title="YT · Conkerax" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCnyXbcCPqBOf_qXjyNF7dlg"/>
+    <outline type="rss" text="YT · Invitation au voyage" title="YT · Invitation au voyage" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCL_cZf5sHKQHMRIEax5o3sg"/>
+    <outline type="rss" text="YT · Le Monde" title="YT · Le Monde" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCYpRDnhk5H8h16jpS84uqsA"/>
+    <outline type="rss" text="YT · Sheshounet" title="YT · Sheshounet" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UC4peNo-31r7fhQZgu0_JRIA"/>
+    <outline type="rss" text="YT · Jeux Vidéo Magazine" title="YT · Jeux Vidéo Magazine" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCDGmZYT5QfvfEXgzaEAYNpg"/>
+    <outline type="rss" text="YT · Iconoclaste" title="YT · Iconoclaste" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCeVpI1jEdMUfboWOtl_Bq6g"/>
+    <outline type="rss" text="YT · HugoDécrypte - Actus du jour" title="YT · HugoDécrypte - Actus du jour" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCAcAnMF0OrCtUep3Y4M-ZPw"/>
+    <outline type="rss" text="YT · FRED" title="YT · FRED" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UC9faHFOrNIFxMXrpykPHOnA"/>
+    <outline type="rss" text="YT · Journal du Geek" title="YT · Journal du Geek" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCQvNFAufGf8mtN2_L8thysg"/>
+    <outline type="rss" text="YT · Le dessous des images - ARTE" title="YT · Le dessous des images - ARTE" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UC4DJ3WmfGvZv6PlKUuA057A"/>
+    <outline type="rss" text="YT · 01net" title="YT · 01net" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UC6joDErOGcFJC1vHNSfsYQg"/>
+    <outline type="rss" text="YT · Brut" title="YT · Brut" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCSKdvgqdnj72_SLggp7BDTg"/>
+    <outline type="rss" text="YT · Monsieur Pixel" title="YT · Monsieur Pixel" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCwsQtHFlS-LKVn8xJ3TaupQ"/>
+    <outline type="rss" text="YT · AlloCiné" title="YT · AlloCiné" xmlUrl="https://www.youtube.com/feeds/videos.xml?user=allocine"/>
+    <outline type="rss" text="YT · Monsieur GRrr" title="YT · Monsieur GRrr" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCTOAKgwfqqCbOytF3RNGGVw"/>
+    <outline type="rss" text="YT · Maxime Gasteuil" title="YT · Maxime Gasteuil" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCrw4ZBB7tqU3ZKe4TIL4q3g"/>
+    <outline type="rss" text="YT · Konbini" title="YT · Konbini" xmlUrl="https://www.youtube.com/feeds/videos.xml?user=konbini"/>
+    <outline type="rss" text="AFP RSS" title="AFP RSS" xmlUrl="https://www.afp.com/fr/actus/afp_communique/all/feed"/>
+    <outline type="rss" text="YT · Invitation au voyage" title="YT · Invitation au voyage" xmlUrl="https://www.youtube.com/feeds/videos.xml?user=arte"/>
+    <outline type="rss" text="YT · Le Parisien" title="YT · Le Parisien" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCfHn_8-ehdem86fEvlFg-Gw"/>
+    <outline type="rss" text="YT · Brandon Le Proktor" title="YT · Brandon Le Proktor" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCGjKSSIpN7aYQluu04kPrsA"/>
+    <outline type="rss" text="YT · franceinfo" title="YT · franceinfo" xmlUrl="https://www.youtube.com/feeds/videos.xml?user=franceinfo"/>
+    <outline type="rss" text="YT · JV - Jeux Vidéo" title="YT · JV - Jeux Vidéo" xmlUrl="https://www.youtube.com/feeds/videos.xml?user=officialjvcom"/>
+    <outline type="rss" text="YT · MOSIMANN" title="YT · MOSIMANN" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCtaRinTphVJqoLc0LpKhK2w"/>
+    <outline type="rss" text="YT · Rémi Lou" title="YT · Rémi Lou" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCt3bV9VvoCrXILlR1Z6kGmQ"/>
+    <outline type="rss" text="YT · Tu mourras moins bête - ARTE" title="YT · Tu mourras moins bête - ARTE" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCKtG_lXZk4pRJkapfK0eprA"/>
+    <outline type="rss" text="YT · Sylvqin" title="YT · Sylvqin" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCseGV3amBLISlIOMQodPfVQ"/>
+    <outline type="rss" text="YT · SUSHI NIHILISTE" title="YT · SUSHI NIHILISTE" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCqH0qUc5t05h20yl-hPw2Pw"/>
+  </body>
+</opml>

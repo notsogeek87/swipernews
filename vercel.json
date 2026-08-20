@@ -23,8 +23,25 @@
       ]
     },
     {
-      "source": "/(sw.js|manifest.webmanifest|index.html|add.html)",
+      "source": "/(sw.js|manifest.webmanifest|index.html|add.html|exemple.html)",
       "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/exemple.opml",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/x-opml; charset=utf-8"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"swipernews-exemple.opml\""
+        },
         {
           "key": "Cache-Control",
           "value": "public, max-age=0, must-revalidate"
@@ -63,6 +80,10 @@
     {
       "source": "/.well-known/assetlinks.json",
       "destination": "/well-known/assetlinks.json"
+    },
+    {
+      "source": "/exemple",
+      "destination": "/exemple.html"
     }
   ]
 }
