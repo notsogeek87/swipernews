@@ -54,9 +54,28 @@ Builds:
     scandelete:
       - node_modules
 
+  - versionName: 1.5.0
+    versionCode: 105000000
+    commit: 6bc4b9bea16fa3465cb942c8f8067aee7f7469fd
+    subdir: android
+    sudo:
+      - echo "deb https://deb.debian.org/debian forky main" > /etc/apt/sources.list.d/forky.list
+      - apt-get update
+      - apt-get install -y -t forky npm
+    gradle:
+      - yes
+    output: app/build/outputs/apk/release/app-release-unsigned.apk
+    prebuild:
+      - npm ci
+      - npm run cap:sync
+    scanignore:
+      - node_modules/@capacitor/assets/node_modules/@capacitor/cli/assets/capacitor-cordova-android-plugins.tar.gz
+    scandelete:
+      - node_modules
+
 AllowedAPKSigningKeys: cc849a79fc39de5f8b4af5fcda1dbdb4230ad554aef85b484e5c7fd49caa6238
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$
-CurrentVersion: 1.4.1
-CurrentVersionCode: 104010000
+CurrentVersion: 1.5.0
+CurrentVersionCode: 105000000

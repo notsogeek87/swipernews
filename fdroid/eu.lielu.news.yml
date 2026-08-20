@@ -126,19 +126,35 @@ Builds:
     scandelete:
       - node_modules
 
-  # Version courante. L'entrée 1.3.0 ci-dessus est CONSERVÉE bien qu'elle ne
-  # soit plus la dernière : c'est celle qui a déjà passé leur scanner et leur
-  # build, elle vaut donc preuve que la recette fonctionne. Une entrée qui
-  # échouerait ne ferait pas retomber l'autre.
-  #
-  # Rien d'autre ne change d'une entrée à l'autre : seuls versionName,
-  # versionCode et commit bougent. Le versionCode suit ici le barème élargi
-  # (majeur × 10⁸ + mineur × 10⁶ + correctif × 10⁴), contrairement à l'entrée
-  # 1.3.0 qui date de l'ancien — c'est normal, chacune décrit ce que produit un
-  # Gradle nu à SON commit.
+  # Entrée conservée bien qu'elle ne soit plus la dernière : c'est celle qui a
+  # déjà passé leur scanner et leur build, elle vaut donc preuve que la
+  # recette fonctionne. Une entrée qui échouerait ne ferait pas retomber les
+  # autres. Rien d'autre ne change d'une entrée à l'autre : seuls
+  # versionName, versionCode et commit bougent.
   - versionName: "1.4.1"
     versionCode: 104010000
     commit: 5f54a5c6001c93bcb197f5ba2ed1f6d65c94c499
+    subdir: android
+    sudo:
+      - echo "deb https://deb.debian.org/debian forky main" > /etc/apt/sources.list.d/forky.list
+      - apt-get update
+      - apt-get install -y -t forky npm
+    gradle:
+      - yes
+    output: app/build/outputs/apk/release/app-release-unsigned.apk
+    prebuild:
+      - npm ci
+      - npm run cap:sync
+    scanignore:
+      - node_modules/@capacitor/assets/node_modules/@capacitor/cli/assets/capacitor-cordova-android-plugins.tar.gz
+    scandelete:
+      - node_modules
+
+  # Version courante. Le versionCode suit le barème élargi (majeur × 10⁸ +
+  # mineur × 10⁶ + correctif × 10⁴), comme 1.4.1.
+  - versionName: "1.5.0"
+    versionCode: 105000000
+    commit: 6bc4b9bea16fa3465cb942c8f8067aee7f7469fd
     subdir: android
     sudo:
       - echo "deb https://deb.debian.org/debian forky main" > /etc/apt/sources.list.d/forky.list
@@ -175,5 +191,5 @@ AutoUpdateMode: Version
 # Restreint aux tags de version : le dépôt porte aussi des tags android-v*
 # posés par la CI à chaque build, qui ne sont pas des versions publiées.
 UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$
-CurrentVersion: "1.4.1"
-CurrentVersionCode: 104010000
+CurrentVersion: "1.5.0"
+CurrentVersionCode: 105000000
