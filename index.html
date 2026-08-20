@@ -1226,9 +1226,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=194"></script>
-<script src="src/learn-core.js?v=194"></script>
-<script src="src/i18n.js?v=194"></script>
+<script src="src/lib.js?v=195"></script>
+<script src="src/learn-core.js?v=195"></script>
+<script src="src/i18n.js?v=195"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2047,7 +2047,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="194";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="195";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2341,8 +2341,22 @@ async function dropBlocklist(){
    précisément `video,iframe,embed`, et une page YouTube n'atteint de toute façon
    jamais MIN_SCORE. Sans cette sortie, « Ouvrir sur YouTube » livrait une page
    complète PLUS un toast d'échec du lecteur. */
+/* `opts.external` : ne JAMAIS ouvrir cette page dans notre WebView maison,
+   vidéo seule à ce jour. Elle ne peut pas y jouer son rôle : Google refuse par
+   principe qu'une connexion à un compte aboutisse dans une WebView générique
+   (protection anti-hameçonnage documentée côté Google — seuls un vrai
+   navigateur ou l'appli officielle passent), donc le mur « confirmez que vous
+   n'êtes pas un robot » y resterait bloqué à vie, « Se connecter » ne menant
+   jamais nulle part (voir aussi la garde du même mur dans startVideo/CSS
+   .card__vclose, pour la lecture SUR la carte — même origine, même impasse).
+   On laisse alors le lien garder son comportement natif : `target="_blank"`
+   dans la WebView du pont Capacitor est déjà confié à l'appareil (appli
+   YouTube installée, sinon le navigateur système) — voir le piège `blob:`/
+   `data:` documenté dans CLAUDE.md, qui décrit le même `Bridge.launchIntent`
+   pour tout le reste, http(s) compris. */
 function openArticle(url,title,opts){
   if(!isNativeApp||readPref==="browser")return false;
+  if(opts&&opts.external)return false;
   const iab=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
   if(!iab||!iab.open)return false;
   // L'appel est asynchrone : en cas d'échec (URL refusée côté natif), on
@@ -4613,7 +4627,7 @@ feedEl.addEventListener("click",e=>{
       const it=cardReg.get(+card.dataset.id);
       if(it)addSeenNews(it);
     }
-    if(openArticle(openLink.href,t?t.textContent:"",{noReader:"video" in openLink.dataset}))e.preventDefault();
+    if(openArticle(openLink.href,t?t.textContent:"",{noReader:"video" in openLink.dataset,external:"video" in openLink.dataset}))e.preventDefault();
   }
 });
 /* Rail unique : il agit sur la carte visible (une seule instance pour toute
@@ -5450,7 +5464,7 @@ savedListEl.addEventListener("click",e=>{
   const open=e.target.closest("a[data-open]");
   if(open&&open.href){
     const t=open.querySelector(".histrow__ttl");
-    if(openArticle(open.href,t?t.textContent:"",{noReader:"video" in open.dataset}))e.preventDefault();
+    if(openArticle(open.href,t?t.textContent:"",{noReader:"video" in open.dataset,external:"video" in open.dataset}))e.preventDefault();
   }
 });
 
