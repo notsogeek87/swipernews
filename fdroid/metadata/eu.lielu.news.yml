@@ -16,9 +16,9 @@ Binaries:
   https://github.com/notsogeek87/swipernews/releases/download/v%v/swipernews-%v.apk
 
 Builds:
-  - versionName: 1.5.0
-    versionCode: 105000000
-    commit: 6bc4b9bea16fa3465cb942c8f8067aee7f7469fd
+  - versionName: 1.5.3
+    versionCode: 105030000
+    commit: 49db86be0af5bb1129ab22e19bb3ec6fe8012c57
     subdir: android
     sudo:
       - echo "deb https://deb.debian.org/debian forky main" > /etc/apt/sources.list.d/forky.list
@@ -39,5 +39,5 @@ AllowedAPKSigningKeys: cc849a79fc39de5f8b4af5fcda1dbdb4230ad554aef85b484e5c7fd49
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$
-CurrentVersion: 1.5.0
-CurrentVersionCode: 105000000
+CurrentVersion: 1.5.3
+CurrentVersionCode: 105030000

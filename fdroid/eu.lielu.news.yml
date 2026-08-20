@@ -61,9 +61,9 @@ Builds:
   # AutoUpdateMode: Version ajoute de toute façon une entrée par tag une fois
   # la recette acceptée, la revue initiale n'a donc besoin que d'un build qui
   # marche pour la version courante.
-  - versionName: "1.5.0"
-    versionCode: 105000000
-    # Hash complet du commit à compiler, et non le tag `v1.5.0` : un tag peut
+  - versionName: "1.5.3"
+    versionCode: 105030000
+    # Hash complet du commit à compiler, et non le tag `v1.5.3` : un tag peut
     # être déplacé, un hash non — F-Droid l'exige pour que la recette désigne
     # un arbre de sources immuable.
     #
@@ -71,7 +71,12 @@ Builds:
     # commit : android/app/build.gradle porte les mêmes valeurs, écrites en
     # clair, faute de -PversionCode/-PversionName ici. Les deux se bougent
     # ensemble.
-    commit: 6bc4b9bea16fa3465cb942c8f8067aee7f7469fd
+    #
+    # 1.5.1 et 1.5.2 n'ont jamais eu de tag ni d'entrée ici : ce sont des
+    # rebumps purement Play Store (versionCode déjà envoyé, refusé en réenvoi),
+    # sans rapport avec les tags publics vX.Y.Z. versionCode n'a besoin que de
+    # croître, pas d'être continu.
+    commit: 49db86be0af5bb1129ab22e19bb3ec6fe8012c57
     subdir: android
     # Le nodejs de Debian stable est trop vieux : la CLI Capacitor 8 exige
     # Node 22 et refuse Node 20 (d'où le setup-node@22 d'android.yml). D'où
@@ -146,5 +151,5 @@ AutoUpdateMode: Version
 # Restreint aux tags de version : le dépôt porte aussi des tags android-v*
 # posés par la CI à chaque build, qui ne sont pas des versions publiées.
 UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$
-CurrentVersion: "1.5.0"
-CurrentVersionCode: 105000000
+CurrentVersion: "1.5.3"
+CurrentVersionCode: 105030000
