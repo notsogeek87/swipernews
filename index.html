@@ -122,6 +122,22 @@
      pendant la lecture, startVideo() l'efface pour toute sa durée (voir
      .rail--away plus bas). */
   .card--playing .card__body,.card--playing .card__play{opacity:0;pointer-events:none}
+  /* Échappatoire posée par startVideo()/retirée par stopVideo() — voir son
+     commentaire : YouTube bloque parfois la lecture derrière un mur « confirmez
+     que vous n'êtes pas un robot » (réputation de l'IP, rien que l'app puisse
+     lever) où le lien « Se connecter » ne fait jamais rien : Google refuse par
+     principe qu'un formulaire de connexion s'affiche dans un cadre tiers.
+     Sans bouton distinct, la seule sortie était le retour (matériel/geste), que
+     le lecteur intégré de YouTube peut lui-même intercepter. z-index au-dessus
+     de .card__video (1) et .card__body (2) : un sibling, jamais un enfant de
+     .card__body, sinon la règle ci-dessus l'éteindrait avec le reste. */
+  .card__vclose{position:absolute;
+    top:calc(12px + max(env(safe-area-inset-top),var(--systop,0px),var(--systop-min,0px)));
+    right:16px;z-index:3;width:40px;height:40px;border-radius:50%;
+    background:rgba(0,0,0,.55);border:0;color:#fff;font-size:18px;line-height:1;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    -webkit-tap-highlight-color:transparent}
+  .card__vclose:active{transform:scale(.92)}
   .card__body{position:relative;z-index:2;padding:28px 22px calc(44px + env(safe-area-inset-bottom));
     transition:opacity .18s ease}
   /* Flou LOCAL derrière le texte, solidaire du bloc : il couvre exactement le
@@ -1210,9 +1226,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=193"></script>
-<script src="src/learn-core.js?v=193"></script>
-<script src="src/i18n.js?v=193"></script>
+<script src="src/lib.js?v=194"></script>
+<script src="src/learn-core.js?v=194"></script>
+<script src="src/i18n.js?v=194"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2031,7 +2047,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="193";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="194";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -4501,6 +4517,8 @@ function stopVideo(){
   if(!playingCard)return;
   const f=playingCard.querySelector(".card__video");
   if(f)f.remove();               // retirer l'iframe suffit à couper l'image ET le son
+  const c=playingCard.querySelector(".card__vclose");
+  if(c)c.remove();
   railEl.classList.remove("rail--away");   // le prochain rail (autre carte) repart visible
   playingCard.classList.remove("card--playing");
   playingCard=null;
@@ -4527,6 +4545,16 @@ function startVideo(card){
   // postMessage explicite (voir disableCaptions) éteint vraiment le module.
   f.src="https://www.youtube-nocookie.com/embed/"+id+"?autoplay=1&playsinline=1&rel=0&modestbranding=1&cc_load_policy=0&enablejsapi=1";
   card.insertBefore(f,card.firstChild);
+  // Voir le commentaire de .card__vclose (CSS) : seule échappatoire garantie
+  // quand YouTube bloque la lecture derrière son mur anti-robot, où « Se
+  // connecter » ne fait jamais rien dans un cadre tiers.
+  const closeBtn=document.createElement("button");
+  closeBtn.type="button";
+  closeBtn.className="card__vclose";
+  closeBtn.setAttribute("aria-label",T("card.closeVideo"));
+  closeBtn.textContent="✕";
+  closeBtn.onclick=e=>{e.stopPropagation();e.preventDefault();stopVideo();};
+  card.appendChild(closeBtn);
   card.classList.add("card--playing");
   playingCard=card;
   disableCaptions(f);

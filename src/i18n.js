@@ -331,6 +331,7 @@
       // pastille, qui reste le chemin vers les commentaires et la chaîne.
       "card.playVideo": "Lire la vidéo",
       "card.openYoutube": "Ouvrir sur YouTube",
+      "card.closeVideo": "Fermer la vidéo",
       "card.demo": "Article de démo",
       "card.paywall.title": "Accès payant probable",
     },
@@ -632,6 +633,7 @@
       "card.readArticle": "Read article",
       "card.playVideo": "Play video",
       "card.openYoutube": "Open on YouTube",
+      "card.closeVideo": "Close video",
       "card.demo": "Demo article",
       "card.paywall.title": "Likely paywalled",
 
