@@ -149,9 +149,15 @@
       "empty.unavailable.msg":
         "Ni tes flux ni Wikipédia n'ont répondu (hors-ligne, ou proxy indisponible). Réessaie, ou vérifie tes sources.",
 
+      "welcome.aria": "Bienvenue sur SwiperNews",
+      "welcome.title": "Bienvenue sur SwiperNews",
+      "welcome.pitch":
+        "✨ Le swipe qui rend plus malin. Un seul fil : tes actus, et entre elles des articles Wikipédia qui t'apprennent un truc que tu ne connaissais pas.",
+      "welcome.interests.sub":
+        "Choisis les thèmes qui t'intéressent — ou aucun, pour un peu de tout. Modifiable à tout moment depuis les réglages ⚙.",
+      "welcome.start": "C'est parti →",
+
       "sheet.aria": "Réglages de ton fil",
-      "sheet.intro":
-        "✨ Le swipe qui rend plus malin. Un seul fil : tes actus, et entre elles des articles Wikipédia qui t'apprennent un truc que tu ne connaissais pas. Choisis ce qui allume ta curiosité 👇",
       "sheet.title": "Ton fil",
       "sheet.subtitle":
         "Tes actus et des articles Wikipédia, en alternance dans un seul fil.",
@@ -450,9 +456,15 @@
       "empty.unavailable.msg":
         "Neither your feeds nor Wikipedia responded (offline, or the proxy is unavailable). Try again, or check your sources.",
 
+      "welcome.aria": "Welcome to SwiperNews",
+      "welcome.title": "Welcome to SwiperNews",
+      "welcome.pitch":
+        "✨ The swipe that makes you smarter. One single feed: your news, with Wikipedia articles slipped in between that teach you something you didn't know.",
+      "welcome.interests.sub":
+        "Pick the topics you're into — or none, for a bit of everything. You can change this anytime from settings ⚙.",
+      "welcome.start": "Let's go →",
+
       "sheet.aria": "Your feed's settings",
-      "sheet.intro":
-        "✨ The swipe that makes you smarter. One single feed: your news, with Wikipedia articles slipped in between that teach you something you didn't know. Pick what sparks your curiosity 👇",
       "sheet.title": "Your feed",
       "sheet.subtitle": "Your news and Wikipedia articles, alternating in a single feed.",
 

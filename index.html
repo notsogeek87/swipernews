@@ -437,6 +437,12 @@
   .intro{background:rgba(252,172,156,.12);border:1px solid var(--redline);color:var(--ink);
     font-size:14px;line-height:1.45;padding:13px 15px;border-radius:var(--radius-md);margin-bottom:18px}
 
+  /* En-tête du panneau d'accueil (logo + titre) : seul endroit où le logo
+     apparaît ailleurs que dans .brand de la barre du haut. */
+  .welcomehead{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .welcomehead img{border-radius:var(--radius-sm)}
+  .welcomehead h2{margin-bottom:0}
+
   /* Étiquette (mode démo) : même traitement que .card__cat. */
   /* Sous la barre du haut : 113 px de barre + 13 px d'air, plus ce que le
      système occupe au-dessus d'elle (voir « systop »). */
@@ -995,6 +1001,34 @@
   </div>
 </div>
 
+<!-- Accueil du 1er lancement : explique le principe et fait choisir les
+     centres d'intérêt Wikipédia AVANT tout chargement réseau. Feuille séparée
+     du panneau de réglages (#sheet, juste après) : y ouvrir le panneau
+     COMPLET (dose, sources, lecteur…) noyait la seule question qui compte au
+     tout premier lancement — « quels centres d'intérêt ? » — dans des
+     réglages dont on n'a pas encore de raison de se soucier, d'où le retour
+     « ça ouvre les réglages, on est perdu ». N'apparaît qu'une fois :
+     interestsChosen() (LS_INT posé) devient vrai dès validation, et ce
+     panneau ne s'ouvre plus jamais ensuite — tout reste modifiable depuis
+     Réglages, ⚙ dans le menu du haut, message rappelé ci-dessous. Réutilise
+     le même point d'entrée que le panneau de réglages (pendingInt,
+     renderIntGrid, CATEGORIES) : les deux grilles de puces ne peuvent donc
+     pas diverger, et rien n'est dupliqué que le texte d'accueil lui-même. -->
+<div class="sheet" id="welcomeSheet" role="dialog" aria-modal="true" data-i18n-attr="aria-label:welcome.aria">
+  <div class="sheet__panel" tabindex="-1">
+    <div class="sheet__grip"></div>
+    <div class="welcomehead">
+      <img src="logo-192.png?v=42" alt="" width="56" height="56">
+      <h2 data-i18n="welcome.title">Bienvenue sur SwiperNews</h2>
+    </div>
+    <p class="intro" data-i18n="welcome.pitch">✨ Le swipe qui rend plus malin. Un seul fil : tes actus, et entre elles des articles Wikipédia qui t'apprennent un truc que tu ne connaissais pas.</p>
+    <h3 class="secttl" data-i18n="sheet.interests.title">🎓 Centres d'intérêt</h3>
+    <p class="sub" data-i18n="welcome.interests.sub">Choisis les thèmes qui t'intéressent — ou aucun, pour un peu de tout. Modifiable à tout moment depuis les réglages ⚙.</p>
+    <div class="intgrid" id="welcomeIntGrid"></div>
+    <button class="applybtn" id="welcomeStart" data-i18n="welcome.start">C'est parti →</button>
+  </div>
+</div>
+
 <!-- Panneau UNIQUE : le fil est unique, ses réglages le sont aussi. Les deux
      feuilles d'avant (Sources d'un côté, Centres d'intérêt de l'autre) étaient
      le reflet des deux modes ; sans modes, elles n'avaient plus de raison
@@ -1002,7 +1036,6 @@
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" data-i18n-attr="aria-label:sheet.aria">
   <div class="sheet__panel" tabindex="-1">
     <div class="sheet__grip"></div>
-    <p class="intro hidden" id="introWelcome" data-i18n="sheet.intro">✨ Le swipe qui rend plus malin. Un seul fil : tes actus, et entre elles des articles Wikipédia qui t'apprennent un truc que tu ne connaissais pas. Choisis ce qui allume ta curiosité 👇</p>
     <h2 data-i18n="sheet.title">Ton fil</h2>
     <p class="sub" data-i18n="sheet.subtitle">Tes actus et des articles Wikipédia, en alternance dans un seul fil.</p>
 
@@ -1052,9 +1085,7 @@
     <input id="importFile" type="file" accept=".opml,.xml,.json,application/json,text/xml" style="display:none">
 
     <!-- Réglages du lecteur, remplis par renderReadPref() (vide hors app
-         packagée). Un seul point de montage depuis la fusion des panneaux ;
-         masqué pendant l'accueil du 1er lancement, où l'on ne demande qu'une
-         chose à la fois. -->
+         packagée). Un seul point de montage depuis la fusion des panneaux. -->
     <div data-readmount></div>
 
     <button class="applybtn" id="applySettings" data-i18n="sheet.apply">Voir mon fil</button>
@@ -1164,9 +1195,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=190"></script>
-<script src="src/learn-core.js?v=190"></script>
-<script src="src/i18n.js?v=190"></script>
+<script src="src/lib.js?v=191"></script>
+<script src="src/learn-core.js?v=191"></script>
+<script src="src/i18n.js?v=191"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1985,7 +2016,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="190";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="191";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -4854,6 +4885,7 @@ document.addEventListener("keydown",e=>{
 
 /* ---------- Panneau de réglages (unique) ---------- */
 const sheet=document.getElementById("sheet");
+const welcomeSheet=document.getElementById("welcomeSheet");
 /* Gestion du focus des panneaux modaux.
    `aria-modal` ne piège PAS le focus par lui-même : sans `inert` sur le reste
    du document, la tabulation continue derrière le panneau. On mémorise aussi
@@ -5875,15 +5907,10 @@ function openSettings(replaceFrom){
   // retrouver l'état réduit — sans quoi un groupe déplié une fois resterait
   // déplié pour le reste de la session.
   feedGroupOpen={rss:false,vid:false};
-  renderMix();renderIntGrid();renderList();renderSuggest();renderReadPref();renderLangPref();
+  renderMix();renderIntGrid("intGrid");renderList();renderSuggest();renderReadPref();renderLangPref();
   document.getElementById("sponsorFilterChk").checked=filterSponsored;
   document.getElementById("videoFilterChk").checked=filterVideoOnly;
   document.getElementById("ytApiKeyInput").value=ytApiKey;
-  const premier=!interestsChosen();
-  document.getElementById("introWelcome").classList.toggle("hidden",!premier); // intro visible seulement la 1ère fois
-  // Accueil du 1er lancement : on ne demande qu'une chose à la fois. Les
-  // réglages du lecteur attendront la prochaine ouverture du panneau.
-  sheet.querySelector("[data-readmount]").classList.toggle("hidden",premier);
   if(replaceFrom)replaceDialog(replaceFrom,sheet);else openDialog(sheet);
 }
 function openStats(replaceFrom){
@@ -5891,8 +5918,11 @@ function openStats(replaceFrom){
   if(replaceFrom)replaceDialog(replaceFrom,statsSheet);else openDialog(statsSheet);
 }
 document.getElementById("menuStatsBtn").onclick=()=>openStats(menuSheet);
-function renderIntGrid(){
-  const grid=document.getElementById("intGrid");
+// gridId : "intGrid" (panneau de réglages) ou "welcomeIntGrid" (accueil du 1er
+// lancement, voir openWelcome) — les deux grilles lisent/écrivent le MÊME
+// pendingInt, jamais ouvertes en même temps, donc rien ne peut diverger.
+function renderIntGrid(gridId){
+  const grid=document.getElementById(gridId);
   grid.innerHTML=CATEGORIES.filter(c=>c.key!=="random").map(c=>
     `<button class="intchip ${pendingInt.has(c.key)?"on":""}" data-k="${c.key}">${esc(catLabelT(c.key))}</button>`).join("");
   grid.querySelectorAll("button").forEach(b=>b.onclick=()=>{
@@ -5901,6 +5931,27 @@ function renderIntGrid(){
     b.classList.toggle("on");
   });
 }
+/* Accueil du 1er lancement (voir le commentaire au-dessus de #welcomeSheet
+   dans le HTML). Enregistre les centres d'intérêt et laisse closeDialog()
+   déclencher le premier chargement (garde `!feedLoadStarted`, déjà en place
+   pour toute feuille refermée sans avoir chargé) — pas de loadFeeds() ici. */
+function openWelcome(){
+  pendingInt=new Set(interests);
+  renderIntGrid("welcomeIntGrid");
+  openDialog(welcomeSheet);
+}
+function startWelcome(){
+  interests=CATEGORIES.filter(c=>pendingInt.has(c.key)).map(c=>c.key); // garde l'ordre défini
+  try{localStorage.setItem(LS_INT,JSON.stringify(interests));}catch(e){}
+  renderFilters();
+  closeDialog(welcomeSheet);
+  try{window.dispatchEvent(new Event("interests-validated"));}catch(e){} // autorise la bannière d'install
+}
+document.getElementById("welcomeStart").onclick=startWelcome;
+// Toucher le fond referme sans valider (comme #sheet) : closeDialog() lance
+// quand même loadFeeds() via sa garde !feedLoadStarted — interests reste
+// alors [], qui vaut "random" (voir catKeysForBatch), un repli raisonnable.
+welcomeSheet.onclick=e=>{if(e.target===welcomeSheet)closeDialog(welcomeSheet);};
 /* Validation du panneau : les intérêts et les sources sont maintenant réglés
    au même endroit, ils s'appliquent donc d'un seul geste. Les sources, elles,
    sont déjà enregistrées au fil des clics (save()) — c'est le rechargement du
@@ -5962,13 +6013,15 @@ async function verifieYtApiKey(){
 document.getElementById("ytApiKeyVerify").onclick=verifieYtApiKey;
 document.getElementById("applySettings").onclick=applySettings;
 renderMixUI();
-/* Premier lancement : on ouvre les réglages AVANT de charger quoi que ce soit.
-   Charger un fil derrière la feuille était du réseau gaspillé, et surtout le
-   contenu était remplacé sous les yeux de l'utilisateur dès qu'il validait. Le
-   chargement est déclenché par applySettings(), ou à la fermeture de la feuille
-   si elle est refermée sans valider. */
+/* Premier lancement : on ouvre l'accueil (#welcomeSheet) AVANT de charger quoi
+   que ce soit. Charger un fil derrière la feuille était du réseau gaspillé, et
+   surtout le contenu était remplacé sous les yeux de l'utilisateur dès qu'il
+   validait. Le chargement est déclenché par startWelcome(), ou à la fermeture
+   de la feuille si elle est refermée sans valider — les sources par défaut
+   (DEFAULT_FEEDS) suffisent déjà à remplir le fil, seuls les centres
+   d'intérêt Wikipédia manquent encore d'un choix. */
 const firstRun=!interestsChosen();
-if(firstRun)openSettings();
+if(firstRun)openWelcome();
 /* Les libellés passent par feedLabels (src/lib.js) : plusieurs flux d'un même
    site arrivent tous sous le titre du site, et trois lignes « Courrier
    international » à l'identique ne disent pas laquelle on coche. L'URL en
