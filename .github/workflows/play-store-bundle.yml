@@ -85,6 +85,19 @@ jobs:
           mv app/build/outputs/bundle/release/app-release.aab "../$aab"
           echo "aab=$aab" >> "$GITHUB_OUTPUT"
 
+      # Diagnostic temporaire (écran vide constaté sur l'install Play Store) :
+      # un .aab est un simple zip, listable sans bundletool. On vérifie que
+      # index.html et les modules src/*.js sont bien présents et non vides
+      # dans le module de base, exactement comme dans l'APK GitHub qui
+      # fonctionne — à retirer une fois la cause identifiée.
+      - name: Diagnostic — contenu du bundle
+        run: |
+          echo "### Contenu de base/assets/public (bundle) ###"
+          unzip -l "${{ steps.build.outputs.aab }}" | grep -E "assets/public" || echo "AUCUN FICHIER assets/public TROUVÉ"
+          echo ""
+          echo "### AndroidManifest (proto) présent ###"
+          unzip -l "${{ steps.build.outputs.aab }}" | grep -E "manifest/AndroidManifest.xml"
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.build.outputs.aab }}
