@@ -64,8 +64,12 @@ ininstallable par-dessus une version publiée. L'élargissement a eu lieu en
 1.3.2 et fait sauter le `versionCode` de `10301` à `103020000`. Un saut est
 sans conséquence côté F-Droid — seule la croissance compte — mais il est
 **irréversible** : rien ne permet de revenir à des valeurs plus petites.
-Les entrées `Builds:` déjà écrites (1.3.0 → `10300`) restent telles quelles :
-elles décrivent ce que produit un Gradle nu à leur commit, qui n'a pas changé.
+La recette ne garde qu'**une seule** entrée `Builds:`, celle de la version
+courante — demandé en revue par licaon-kter, voir plus bas. Les entrées des
+versions précédentes (1.3.0, 1.4.1) ont été retirées plutôt que conservées
+comme preuve historique : `AutoUpdateMode: Version` ajoute de toute façon une
+entrée par tag une fois la recette acceptée, la revue initiale n'a besoin que
+d'un build qui marche pour la version courante.
 
 ## Build reproductible : l'APK publié doit exister, et coïncider
 
@@ -169,6 +173,7 @@ se fait donc à la main, sur `fdroiddata` :
 | Node depuis Debian `forky`, pas depuis un script NodeSource | licaon-kter | `eu.lielu.news.yml` |
 | `prebuild:` au lieu d'`init:`, `scandelete:` plutôt qu'une liste de `scanignore:` | licaon-kter | `eu.lielu.news.yml` |
 | Les binaires de `sharp`/vips ne devraient pas être là | licaon-kter | contournés par `scandelete:` ; à supprimer pour de bon en sortant `@capacitor/assets` des `devDependencies`, une fois la MR acceptée |
+| Ne garder qu'une seule entrée `Builds:` (la dernière), pas l'historique des versions publiées | licaon-kter | `eu.lielu.news.yml` — 1.3.0 et 1.4.1 retirées, seule 1.5.0 reste |
 
 Le bloc de suggestion de licaon-kter reconduisait `output:` — il l'avait
 simplement recopié du fichier d'alors. Ne pas l'appliquer tel quel : duckniii
