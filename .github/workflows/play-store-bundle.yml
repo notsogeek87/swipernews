@@ -1,0 +1,93 @@
+name: Play Store AAB
+
+# Build manuel du .aab (Android App Bundle) signé pour Google Play. Séparé
+# d'android.yml/release.yml : ceux-là produisent des .apk signés de la clé du
+# PROJET (celle que F-Droid vérifie, AllowedAPKSigningKeys). Play Store, lui,
+# utilise le modèle Play App Signing : on signe seulement d'une clé
+# d'UPLOAD (PLAY_STORE_*, distincte), que Google re-signe ensuite de sa
+# propre clé — les deux clés ne se mélangent jamais.
+#
+# Déclenchement manuel uniquement : la toute première publication passe par
+# un upload à la main dans Play Console (tests internes/fermés). Une
+# automatisation complète (Gradle Play Publisher) pourra suivre une fois
+# l'app sortie des tests fermés obligatoires.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22" # plancher de la CLI Capacitor 8, qui refuse Node 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21" # exigé par Capacitor 8 / AGP 8.13
+          cache: gradle
+
+      - name: Install dependencies
+        run: |
+          for essai in 1 2 3; do
+            if npm ci; then exit 0; fi
+            echo "::warning::npm ci a échoué (tentative $essai/3), nouvelle tentative"
+            sleep $((essai * 15))
+          done
+          echo "::error::npm ci a échoué trois fois de suite"
+          exit 1
+
+      - name: Prépare le SDK Android
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null
+          "$sdkmanager" "platforms;android-36" "build-tools;36.0.0" > /dev/null
+
+      - name: Synchronise les assets web dans le projet natif
+        run: npm run cap:sync
+
+      - name: Lit la version
+        id: version
+        run: |
+          set -euo pipefail
+          name="$(sed -n 's/^ *versionName "\(.*\)"$/\1/p' android/app/build.gradle)"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - name: Déchiffre la clé d'upload Play Store
+        env:
+          KEYSTORE_BASE64: ${{ secrets.PLAY_STORE_KEYSTORE_B64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Secret PLAY_STORE_KEYSTORE_B64 manquant."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/play-upload.keystore"
+
+      - name: Build AAB
+        id: build
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/play-upload.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.PLAY_STORE_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.PLAY_STORE_KEYSTORE_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.PLAY_STORE_KEY_PASSWORD }}
+        working-directory: android
+        run: |
+          set -euo pipefail
+          ./gradlew bundleRelease --no-daemon
+          aab="swipernews-${{ steps.version.outputs.name }}.aab"
+          mv app/build/outputs/bundle/release/app-release.aab "../$aab"
+          echo "aab=$aab" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.aab }}
+          path: ${{ steps.build.outputs.aab }}
+          if-no-files-found: error
+          retention-days: 30
