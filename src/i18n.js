@@ -125,6 +125,7 @@
       "saved.removeAria": "Retirer des enregistrés",
 
       "about.version": "Version {v}",
+      "about.contact.label": "Nous contacter",
 
       "rail.share.aria": "Partager cet article",
       "rail.share.title": "Partager",
@@ -437,6 +438,7 @@
       "saved.removeAria": "Remove from saved",
 
       "about.version": "Version {v}",
+      "about.contact.label": "Contact us",
 
       "rail.share.aria": "Share this article",
       "rail.share.title": "Share",

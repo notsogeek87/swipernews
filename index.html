@@ -682,6 +682,10 @@
   /* Pied du panneau de réglages : discret, jamais un titre. */
   .about{color:var(--ash);font-family:var(--font-mono);letter-spacing:-.03em;
     font-size:11.5px;text-align:center;margin-top:16px;opacity:.75}
+  /* Coordonnées : lisible sans être un titre — exigence Google Play (voir le
+     commentaire HTML), pas une simple mention technique comme .about. */
+  .about-contact{color:var(--ash);font-size:13px;text-align:center;margin-top:6px}
+  .about-contact a{color:var(--flare)}
 
   /* Menu : panneau LATÉRAL depuis la DROITE — le bouton qui l'ouvre est en
      haut à droite, contrairement aux autres feuilles (contenu à parcourir :
@@ -1132,6 +1136,14 @@
          renderAbout(), voir le commentaire qui l'accompagne pour ce qui s'y
          affichait avant et pourquoi c'est parti. -->
     <p class="about" id="about"></p>
+    <!-- Coordonnées : exigence de la politique Google Play « Actualités et
+         magazines » (« inclure une section clairement étiquetée pour les
+         coordonnées dans l'appli ET le site web »). Une adresse seule ne
+         suffit pas sans son étiquette — d'où le libellé traduit séparé du
+         lien, qui lui reste identique dans toutes les langues. `news.lielu.eu`
+         sert ce même index.html : le site web hérite du correctif sans rien
+         de plus à faire. -->
+    <p class="about-contact"><span data-i18n="about.contact.label">Nous contacter</span> : <a href="mailto:contact@lielu.eu">contact@lielu.eu</a></p>
   </div>
 </div>
 
@@ -1234,9 +1246,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=198"></script>
-<script src="src/learn-core.js?v=198"></script>
-<script src="src/i18n.js?v=198"></script>
+<script src="src/lib.js?v=199"></script>
+<script src="src/learn-core.js?v=199"></script>
+<script src="src/i18n.js?v=199"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2055,7 +2067,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="198";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="199";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
