@@ -208,6 +208,15 @@
       "sheet.sources.ytkey.verify": "Vérifier",
       "sheet.sources.ytkey.link": "Comment obtenir une clé gratuite ↗",
 
+      "sheet.legif.title": "Actualité juridique (Légifrance)",
+      "sheet.legif.desc":
+        "Réservé à qui en a l'usage (avocats, juristes) : les derniers textes publiés au Journal officiel, à un rythme fixe dans le fil. Nécessite tes propres identifiants API PISTE (gratuits, sur inscription) — jamais partagés avec personne d'autre, et jamais envoyés ailleurs qu'à l'API Légifrance elle-même.",
+      "sheet.legif.toggle": "Activer l'actualité juridique",
+      "sheet.legif.clientIdPlaceholder": "Identifiant client (client_id)",
+      "sheet.legif.clientSecretPlaceholder": "Secret client (client_secret)",
+      "sheet.legif.verify": "Vérifier",
+      "sheet.legif.link": "Créer un compte PISTE (gratuit) ↗",
+
       "sheet.apply": "Voir mon fil",
 
       "lang.title": "🌐 Langue",
@@ -225,6 +234,7 @@
       "filter.cat.sub": "Les articles Wikipédia seront tirés dans ce thème.",
       "filter.cat.allChip": "🎓 Tous",
       "filter.cat.allShort": "Tous",
+      "filter.legif.label": "⚖️ Légifrance",
 
       "read.label": "Ouvrir les articles",
       "read.desc.app":
@@ -317,6 +327,10 @@
       "toast.ytkey.checking": "Vérification de la clé…",
       "toast.ytkey.valid": "Clé valide, enregistrée",
       "toast.ytkey.invalid": "Clé invalide, ou quota dépassé",
+      "toast.legif.empty": "Renseigne l'identifiant et le secret avant de vérifier",
+      "toast.legif.checking": "Vérification des identifiants…",
+      "toast.legif.valid": "Identifiants valides, enregistrés",
+      "toast.legif.invalid": "Identifiants invalides",
 
       "installbar.title": "Installe SwiperNews",
       "installbar.sub": "Plein écran, hors-ligne, lancement en un tap.",
@@ -327,6 +341,7 @@
 
       "card.discover": "Découvrir",
       "card.readArticle": "Lire l'article",
+      "card.badge.legif": "Journal officiel",
       // Cartes vidéo : « Lire la vidéo » sert au ▶ (aria-label) ET au titre de
       // l'iframe ; « Ouvrir sur YouTube » remplace « Lire l'article » sur la
       // pastille, qui reste le chemin vers les commentaires et la chaîne.
@@ -521,6 +536,15 @@
       "sheet.sources.ytkey.verify": "Verify",
       "sheet.sources.ytkey.link": "How to get a free key ↗",
 
+      "sheet.legif.title": "Legal news (Légifrance)",
+      "sheet.legif.desc":
+        "For those who actually need it (lawyers, legal professionals): the latest texts published in France's official gazette, at a fixed pace in the feed. Requires your own PISTE API credentials (free, by signup) — never shared with anyone else, and never sent anywhere but the Légifrance API itself.",
+      "sheet.legif.toggle": "Enable legal news",
+      "sheet.legif.clientIdPlaceholder": "Client ID (client_id)",
+      "sheet.legif.clientSecretPlaceholder": "Client secret (client_secret)",
+      "sheet.legif.verify": "Verify",
+      "sheet.legif.link": "Create a free PISTE account ↗",
+
       "sheet.apply": "See my feed",
 
       "lang.title": "🌐 Language",
@@ -538,6 +562,7 @@
       "filter.cat.sub": "Wikipedia articles will be drawn from this topic.",
       "filter.cat.allChip": "🎓 All",
       "filter.cat.allShort": "All",
+      "filter.legif.label": "⚖️ Légifrance",
 
       "read.label": "Open articles",
       "read.desc.app":
@@ -627,6 +652,10 @@
       "toast.ytkey.checking": "Checking the key…",
       "toast.ytkey.valid": "Key valid, saved",
       "toast.ytkey.invalid": "Invalid key, or quota exceeded",
+      "toast.legif.empty": "Enter the client ID and secret before verifying",
+      "toast.legif.checking": "Checking credentials…",
+      "toast.legif.valid": "Credentials valid, saved",
+      "toast.legif.invalid": "Invalid credentials",
 
       "installbar.title": "Install SwiperNews",
       "installbar.sub": "Full screen, offline, launches in one tap.",
@@ -637,6 +666,7 @@
 
       "card.discover": "Discover",
       "card.readArticle": "Read article",
+      "card.badge.legif": "Official gazette",
       "card.playVideo": "Play video",
       "card.openYoutube": "Open on YouTube",
       "card.closeVideo": "Close video",

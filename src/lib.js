@@ -1122,6 +1122,80 @@
       .filter((it) => it && it.title);
   }
 
+  /* ---------- Actualité juridique Légifrance (API PISTE, secours réservé) ----------
+     Fonctionnalité optionnelle, DÉSACTIVÉE par défaut et réservée aux
+     utilisateurs qui en ont l'usage (avocats, juristes) : contrairement aux
+     actus RSS et à Wikipédia, l'API Légifrance (plateforme PISTE, DILA) exige
+     un compte développeur PERSONNEL (client_id + client_secret, obtenus par
+     inscription gratuite sur piste.gouv.fr) et un échange OAuth2
+     client_credentials avant tout appel de contenu — jamais de clé d'app
+     partagée (même principe que la clé YouTube ci-dessus). Le client_secret
+     ne devant jamais être exposé dans un navigateur, cette source n'existe
+     que côté natif Android (CapacitorHttp, index.html), jamais sur le web. */
+
+  const LEGIFRANCE_TOKEN_URL = "https://oauth.piste.gouv.fr/api/oauth/token";
+  const LEGIFRANCE_API_BASE = "https://api.piste.gouv.fr/dila/legifrance/lf-engine-app";
+
+  /** Corps form-encodé de l'échange OAuth2 client_credentials. */
+  function legifranceTokenBody(clientId, secret) {
+    return (
+      "grant_type=client_credentials&client_id=" +
+      encodeURIComponent(clientId || "") +
+      "&client_secret=" +
+      encodeURIComponent(secret || "") +
+      "&scope=openid"
+    );
+  }
+
+  /** Jeton exploitable d'une réponse d'échange OAuth2 : `{token, expiresAt}`,
+   *  ou null si `access_token` est absent ou mal formé. `expiresAt` retient
+   *  une marge de 30 s sur `expires_in` (annoncé en secondes) pour ne jamais
+   *  présenter un jeton expiré au moment précis de son usage. */
+  function legifranceAccessTokenFromResponse(json) {
+    const token = json && typeof json.access_token === "string" ? json.access_token : "";
+    if (!token) return null;
+    const ttl = Number(json.expires_in);
+    const ttlMs = (Number.isFinite(ttl) && ttl > 30 ? ttl - 30 : 60) * 1000;
+    return { token, expiresAt: Date.now() + ttlMs };
+  }
+
+  /** URL des derniers textes publiés au Journal officiel. Nom d'endpoint et
+   *  paramètres PROVISOIRES : à confirmer sur le Swagger PISTE avant usage
+   *  réel (réseau bloqué vers piste.gouv.fr au moment d'écrire ceci) — posé
+   *  en un seul point pour rester facile à corriger. */
+  function legifranceLastTextsUrl(limit) {
+    return (
+      LEGIFRANCE_API_BASE +
+      "/consult/lastNJo?nbElement=" +
+      encodeURIComponent(limit || 20)
+    );
+  }
+
+  /** Items exploitables d'une réponse "derniers textes du JO" — forme
+   *  PROVISOIRE (voir legifranceLastTextsUrl), à ajuster une fois le schéma
+   *  réel confirmé. Un texte sans identifiant ni titre est écarté plutôt que
+   *  de produire une carte inerte. */
+  function legifranceItemsFromResponse(json) {
+    const list = json && Array.isArray(json.results) ? json.results : [];
+    return list
+      .map((it) => ({
+        id: (it && (it.id || it.cid)) || "",
+        titre: collapse((it && (it.titre || it.title)) || ""),
+        resume: collapse((it && (it.resume || it.nature)) || ""),
+        date: (it && (it.datePublication || it.date)) || "",
+      }))
+      .filter((it) => it.id && it.titre);
+  }
+
+  /** URL publique legifrance.fr d'un texte JORF depuis son identifiant. Ne
+   *  vaut que pour ce "fond" (JORF) — d'autres fonds (codes, jurisprudence…)
+   *  ont un autre pattern d'URL, hors du périmètre de cette fonctionnalité
+   *  (actualité du JO seulement, voir CLAUDE.md). */
+  function legifranceArticleUrl(item) {
+    const id = (item && item.id) || "";
+    return id ? "https://www.legifrance.gouv.fr/jorf/id/" + encodeURIComponent(id) : "";
+  }
+
   /* ---------- L'Équipe ----------
      Les flux RSS de L'Équipe (dwh.lequipe.fr) n'ont pas de titre pertinent :
      ils sont tous généré par une même API avec le même titre de base. La
@@ -1552,6 +1626,13 @@
     youtubeApiPlaylistItemsUrl,
     youtubeApiBestThumbnail,
     youtubeApiItemsFromPlaylistResponse,
+    LEGIFRANCE_TOKEN_URL,
+    LEGIFRANCE_API_BASE,
+    legifranceTokenBody,
+    legifranceAccessTokenFromResponse,
+    legifranceLastTextsUrl,
+    legifranceItemsFromResponse,
+    legifranceArticleUrl,
     isLequipeFeedUrl,
     lequipeRubrique,
     lequipeFeedName,

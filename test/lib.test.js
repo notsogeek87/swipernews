@@ -977,6 +977,68 @@ test("youtubeApiItemsFromPlaylistResponse ne garde que les items avec un vrai id
   assert.deepEqual(lib.youtubeApiItemsFromPlaylistResponse(null), []);
 });
 
+test("legifranceTokenBody encode le corps form-encodé de l'échange OAuth2", () => {
+  const body = lib.legifranceTokenBody("mon id", "mon secret");
+  assert.equal(
+    body,
+    "grant_type=client_credentials&client_id=mon%20id&client_secret=mon%20secret&scope=openid"
+  );
+  // Des identifiants absents ne cassent pas l'encodage.
+  assert.equal(
+    lib.legifranceTokenBody(),
+    "grant_type=client_credentials&client_id=&client_secret=&scope=openid"
+  );
+});
+
+test("legifranceAccessTokenFromResponse lit le jeton et calcule son expiration avec une marge", () => {
+  const before = Date.now();
+  const out = lib.legifranceAccessTokenFromResponse({
+    access_token: "abc123",
+    expires_in: 3600,
+  });
+  assert.equal(out.token, "abc123");
+  // expiresAt = maintenant + (3600-30)s, à quelques ms de tolérance près.
+  assert.ok(out.expiresAt >= before + 3570 * 1000);
+  assert.ok(out.expiresAt <= Date.now() + 3570 * 1000 + 5000);
+  // Réponse mal formée ou sans jeton : null, jamais une exception.
+  assert.equal(lib.legifranceAccessTokenFromResponse({}), null);
+  assert.equal(lib.legifranceAccessTokenFromResponse(null), null);
+  assert.equal(lib.legifranceAccessTokenFromResponse({ access_token: 42 }), null);
+});
+
+test("legifranceLastTextsUrl construit l'URL des derniers textes du JO", () => {
+  assert.match(lib.legifranceLastTextsUrl(20), /^https:\/\/api\.piste\.gouv\.fr\//);
+  assert.match(lib.legifranceLastTextsUrl(20), /nbElement=20$/);
+  assert.match(lib.legifranceLastTextsUrl(), /nbElement=20$/); // défaut
+});
+
+test("legifranceItemsFromResponse ne garde que les textes avec un identifiant et un titre", () => {
+  const json = {
+    results: [
+      { id: "JORFTEXT000000000001", titre: "Décret n° 2026-1", resume: "Décret" },
+      // Pas d'identifiant : écarté.
+      { titre: "Sans identifiant" },
+      // Pas de titre : écarté.
+      { id: "JORFTEXT000000000002" },
+    ],
+  };
+  const out = lib.legifranceItemsFromResponse(json);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].id, "JORFTEXT000000000001");
+  assert.equal(out[0].titre, "Décret n° 2026-1");
+  assert.deepEqual(lib.legifranceItemsFromResponse({}), []);
+  assert.deepEqual(lib.legifranceItemsFromResponse(null), []);
+});
+
+test("legifranceArticleUrl construit le lien public legifrance.fr d'un texte JORF", () => {
+  assert.equal(
+    lib.legifranceArticleUrl({ id: "JORFTEXT000000000001" }),
+    "https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000000000001"
+  );
+  assert.equal(lib.legifranceArticleUrl({}), "");
+  assert.equal(lib.legifranceArticleUrl(null), "");
+});
+
 test("les vignettes YouTube déclarent leur taille par leur nom de fichier", () => {
   // Sans ça, imageSizeFromUrl rend 0 sur une URL ytimg, et applyBg part sonder
   // /api/og pour CHAQUE carte vidéo défilée — le défaut déjà corrigé côté

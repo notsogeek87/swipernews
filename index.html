@@ -976,6 +976,13 @@
   <div class="toprow filters" id="filters">
     <button class="filterbtn" id="srcBtn" aria-haspopup="dialog"><span class="filterbtn__i" aria-hidden="true"></span><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true"></span></button>
     <button class="filterbtn" id="catBtn" aria-haspopup="dialog"><span class="filterbtn__i" aria-hidden="true"></span><span class="filterbtn__v"></span><span class="filterbtn__c" aria-hidden="true"></span></button>
+    <!-- Réservée à qui a activé la source Légifrance dans les réglages (voir
+         CONFIG.LEGIF_POIDS/renderFilters) : masquée par défaut pour tout le
+         monde d'autre. Contrairement aux deux pastilles précédentes, elle
+         n'ouvre pas une feuille de choix mais renvoie directement à sa
+         section des réglages (pas de filtrage thématique fiable pour
+         l'instant, voir CLAUDE.md). -->
+    <button class="filterbtn hidden" id="legifBtn" aria-haspopup="dialog"><span class="filterbtn__i" aria-hidden="true"></span><span class="filterbtn__v"></span></button>
   </div>
 </header>
 
@@ -1127,6 +1134,12 @@
          vraie validation, par contenu. -->
     <input id="importFile" type="file" accept=".opml,.xml,.json,application/json,text/xml,application/xml,text/x-opml,application/octet-stream,text/plain" style="display:none">
 
+    <!-- Actualité juridique Légifrance, remplie par renderLegifSettings() (vide
+         hors app packagée : le client_secret ne doit jamais être exposé dans
+         un navigateur, voir CLAUDE.md). Réservée à qui en a l'usage, désactivée
+         par défaut. -->
+    <div data-legifmount></div>
+
     <!-- Réglages du lecteur, remplis par renderReadPref() (vide hors app
          packagée). Un seul point de montage depuis la fusion des panneaux. -->
     <div data-readmount></div>
@@ -1248,9 +1261,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=200"></script>
-<script src="src/learn-core.js?v=200"></script>
-<script src="src/i18n.js?v=200"></script>
+<script src="src/lib.js?v=201"></script>
+<script src="src/learn-core.js?v=201"></script>
+<script src="src/i18n.js?v=201"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1376,12 +1389,25 @@ const CONFIG = {
   // https obligatoire : ce lien part dans CHAQUE partage. En http, redirection
   // au mieux, avertissement « site non sécurisé » ou blocage au pire.
   APP_URL: "https://news.lielu.eu",
+  /* Actualité juridique Légifrance (voir plus bas, réservée au natif) : le
+     Journal officiel publie par rafales, quelques dizaines de textes par
+     jour — bien moins que les actus RSS, d'où un plafond de mémoire « déjà
+     vu » nettement plus bas que SEEN_NEWS_MAX. */
+  SEEN_LEGIF_MAX: 300,
+  LEGIF_FETCH_LIMIT: 20,
+  /* Part CIBLE du flux Légifrance dans le total mélangé (mixLists) : ~1 carte
+     sur 10, quel que soit le cran de dose choisi. Le poids réellement passé à
+     weightedRoundRobin (src/lib.js) est calculé À PARTIR de cette part et de
+     la somme des poids déjà présents (articles+vidéos+Wikipédia) — une valeur
+     ABSOLUE se ferait éclipser côté « Wikipédia seul », où les autres poids
+     sont proches de 0. */
+  LEGIF_POIDS: 0.1,
 };
 
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,dayKey,quarterIndex,statsBuckets,shuffle,
-  seenKey,dropSeen,roundRobin,weightedRoundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,roundRobin,weightedRoundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities,LEGIFRANCE_TOKEN_URL,LEGIFRANCE_API_BASE,legifranceTokenBody,legifranceAccessTokenFromResponse,legifranceLastTextsUrl,legifranceItemsFromResponse,legifranceArticleUrl}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1476,7 +1502,7 @@ const LS_NSRC="fluxswipe.newssrc.v1";
    se redessiner d'un mélange à l'autre (un nouveau lot déplace les
    proportions) — sans conséquence, puisque ces cartes n'ont encore jamais été
    sous les yeux. */
-let feeds=load(),newsItems=[],learnItems=[],items=[];
+let feeds=load(),newsItems=[],learnItems=[],legifItems=[],items=[];
 const markKind=k=>it=>(it.kind===k?it:{...it,kind:k});
 
 /* ---------- Dose d'apprentissage ----------
@@ -1530,9 +1556,30 @@ function persistMix(n){
    en premier argument, or l'ancien code choisissait cet ordre exactement sur
    ce critère), juste rendue explicite plutôt que déduite de l'ordre des
    arguments. */
-function mixLists(news,learn,m){
-  if(!m.news)return learn.slice();
-  if(!news.length)return m.learn?learn.slice():[];
+/* `legif` : le flux Légifrance (voir loadLegifPart), toujours OPTIONNEL — []
+   quand la source est désactivée ou vide, auquel cas TOUT ce qui suit se
+   comporte exactement comme avant son ajout. Contrairement à `news`/`learn`,
+   il ne participe JAMAIS au choix de la tête (`tete` ci-dessous) : ce n'est
+   pas une nature à part entière du mélange, seulement un appoint à un rythme
+   FIXE (CONFIG.LEGIF_POIDS), indépendant de la dose `m` — d'où son poids
+   calculé relativement à la somme de ceux déjà en jeu plutôt qu'une valeur
+   absolue, qui se ferait éclipser côté « Wikipédia seul ». */
+function legifStream(streams,legif){
+  if(!legif||!legif.length)return streams;
+  const somme=streams.reduce((s,x)=>s+x.poids,0)||1;
+  return streams.concat([{items:legif,poids:somme*CONFIG.LEGIF_POIDS/(1-CONFIG.LEGIF_POIDS)}]);
+}
+function mixLists(news,learn,m,legif){
+  if(!m.news){
+    if(!legif||!legif.length)return learn.slice();
+    return weightedRoundRobin(legifStream([{items:learn,poids:1}],legif));
+  }
+  if(!news.length){
+    const base=m.learn?learn:[];
+    if(!legif||!legif.length)return base.slice();
+    if(!base.length)return legif.slice();
+    return weightedRoundRobin(legifStream([{items:base,poids:1}],legif));
+  }
   const wikiLeads=learn.length>0&&m.learn>m.news;
   const tete=wikiLeads?learn[0]:news[0];
   const resteNews=wikiLeads?news:news.slice(1);
@@ -1545,7 +1592,7 @@ function mixLists(news,learn,m){
     {items:videos,poids:total?videos.length/total:0},
   ];
   if(m.learn&&resteLearn.length)streams.push({items:resteLearn,poids:m.learn/m.news});
-  return [tete,...weightedRoundRobin(streams)];
+  return [tete,...weightedRoundRobin(legifStream(streams,legif))];
 }
 /* Recompose le fil. Au-delà de MAX_ITEMS on jette la TÊTE (les plus anciennes
    cartes, déjà lues : le fil ne grandit que par le bas), et on retire des deux
@@ -1572,12 +1619,14 @@ function remix(geleAvant){
   const pris=new Set(fige.map(seenKey));
   const resteNews=newsItems.filter(i=>!pris.has(seenKey(i)));
   const resteLearn=learnItems.filter(i=>!pris.has(seenKey(i)));
-  items=fige.concat(mixLists(resteNews,resteLearn,mixLevel()));
+  const resteLegif=legifItems.filter(i=>!pris.has(seenKey(i)));
+  items=fige.concat(mixLists(resteNews,resteLearn,mixLevel(),resteLegif));
   if(items.length<=CONFIG.MAX_ITEMS)return;
   const partis=new Set(items.slice(0,items.length-CONFIG.MAX_ITEMS).map(seenKey));
   items=items.slice(items.length-CONFIG.MAX_ITEMS);
   newsItems=newsItems.filter(i=>!partis.has(seenKey(i)));
   learnItems=learnItems.filter(i=>!partis.has(seenKey(i)));
+  legifItems=legifItems.filter(i=>!partis.has(seenKey(i)));
 }
 /* Reprend un fil déjà mêlé (cache local, instantané de fil) : on le sépare en
    ses deux réserves pour que la suite puisse continuer à le nourrir, puis on le
@@ -1591,8 +1640,9 @@ function adoptItems(list){
   // reprendre tel quel le ferait réapparaître.
   // dedupNews : un cache écrit par une version antérieure au dédoublonnage peut
   // contenir le même article deux fois ; on ne le ressert pas tel quel.
-  newsItems=dedupNews(list.filter(i=>i.kind!=="learn"&&!(filterSponsored&&sponsorOut.has(i.link))));
+  newsItems=dedupNews(list.filter(i=>i.kind!=="learn"&&i.kind!=="legif"&&!(filterSponsored&&sponsorOut.has(i.link))));
   learnItems=list.filter(i=>i.kind==="learn");
+  legifItems=list.filter(i=>i.kind==="legif");
   remix();
 }
 /* Filtre des actus : les URL des sources retenues. Un TABLEAU, et une seule
@@ -1815,6 +1865,34 @@ function addSeenNews(it){
   clearTimeout(seenNewsPersistT);seenNewsPersistT=setTimeout(persistSeenNews,800);
 }
 
+/* ---------- Actualité juridique Légifrance : mémoire « déjà vu » ----------
+   Séparée de seenNews (voir plus haut) pour la même raison que seenNews est
+   séparée de seen (Wikipédia) : des rythmes de publication très différents
+   s'évinceraient l'un l'autre s'ils partageaient la même mémoire. Le Journal
+   officiel publie par rafales de quelques dizaines de textes par jour — bien
+   moins que les actus RSS, d'où SEEN_LEGIF_MAX, nettement plus bas que
+   SEEN_NEWS_MAX. Pas de cooldown (contrairement à seenNews) : il n'y a qu'une
+   seule « source » ici, pas un tour de rôle entre plusieurs à protéger. */
+const LS_SEEN_LEGIF="fluxswipe.seenlegif.v1";
+let seenLegif=(()=>{try{const a=JSON.parse(localStorage.getItem(LS_SEEN_LEGIF)||"[]");
+    return Array.isArray(a)?new Set(a.filter(x=>typeof x==="string")):new Set();
+  }catch(e){return new Set();}})();
+let seenLegifDirty=false,seenLegifPersistT;
+function persistSeenLegif(){if(!seenLegifDirty)return;seenLegifDirty=false;
+  try{localStorage.setItem(LS_SEEN_LEGIF,JSON.stringify([...seenLegif]));}catch(e){warn("save seen legif",e);}}
+function legifKey(it){return it&&it.link?canonicalLink(it.link):"";}
+function legifSeen(it){const k=legifKey(it);return !!k&&seenLegif.has(k);}
+function addSeenLegif(it){
+  const k=legifKey(it);
+  if(!k||seenLegif.has(k))return;
+  seenLegif.add(k);seenLegifDirty=true;
+  if(seenLegif.size>CONFIG.SEEN_LEGIF_MAX){
+    const plusAncienne=seenLegif.values().next().value;   // ordre d'insertion Set = ordre d'ajout
+    seenLegif.delete(plusAncienne);
+  }
+  clearTimeout(seenLegifPersistT);seenLegifPersistT=setTimeout(persistSeenLegif,800);
+}
+
 /* ---------- Compteur de cartes défilées ----------
    Détail heure/jour/semaine/mois/année, affiché dans la feuille « Mon
    activité » (renderStats, statsBuckets côté src/lib.js). Incrémenté depuis
@@ -1893,7 +1971,7 @@ function sanitizeSaved(raw){
       img:typeof x.img==="string"?x.img:"",
       source:typeof x.source==="string"?x.source:"",
       date:typeof x.date==="string"?x.date:"",
-      kind:x.kind==="learn"?"learn":"news",
+      kind:x.kind==="learn"||x.kind==="legif"?x.kind:"news",
       cat:typeof x.cat==="string"?x.cat:"",
     }));
 }
@@ -1909,7 +1987,7 @@ function toggleSave(it){
   if(i>=0)saved.splice(i,1);
   else{
     saved.unshift({key:k,title:it.title||"",link:it.link,img:it.img||"",source:it.source||"",
-      date:it.date||"",kind:it.kind==="learn"?"learn":"news",cat:it.cat||""});
+      date:it.date||"",kind:it.kind==="learn"||it.kind==="legif"?it.kind:"news",cat:it.cat||""});
     if(saved.length>CONFIG.SAVED_MAX)saved.length=CONFIG.SAVED_MAX;
   }
   persistSaved();
@@ -2069,7 +2147,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="200";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="201";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2263,6 +2341,46 @@ function saveYtApiKey(v){
     if(ytApiKey)localStorage.setItem(LS_YTKEY,ytApiKey);
     else localStorage.removeItem(LS_YTKEY);
   }catch(e){warn("save yt api key",e);}
+}
+
+/* ---------- Actualité juridique Légifrance (secours réservé, natif) ----------
+   DÉSACTIVÉE par défaut : réservée à qui a un usage réel de l'actualité du
+   Journal officiel (avocats, juristes), pas au grand public. L'API Légifrance
+   (plateforme PISTE, DILA) exige un compte développeur PERSONNEL — même
+   principe que la clé API YouTube ci-dessus (jamais de clé d'app partagée,
+   voir CLAUDE.md) — mais DEUX identifiants (client_id + client_secret), et un
+   échange OAuth2 avant tout appel de contenu. Le secret ne devant jamais être
+   exposé dans un navigateur, cette source n'existe que côté natif (voir
+   legifranceRequest/isNativeApp plus bas) : sur le web, `legifEnabled` reste
+   sans effet, la section réglages correspondante n'est même pas rendue (voir
+   renderLegifSettings). */
+const LS_LEGIF_ON="fluxswipe.legifon.v1";
+const LS_LEGIF_ID="fluxswipe.legifclientid.v1";
+const LS_LEGIF_SECRET="fluxswipe.legifsecret.v1";
+let legifEnabled=(()=>{try{return localStorage.getItem(LS_LEGIF_ON)==="1";}catch(e){return false;}})();
+let legifClientId=(()=>{try{return localStorage.getItem(LS_LEGIF_ID)||"";}catch(e){return "";}})();
+let legifClientSecret=(()=>{try{return localStorage.getItem(LS_LEGIF_SECRET)||"";}catch(e){return "";}})();
+/* Activer/désactiver se persiste IMMÉDIATEMENT (comme filterSponsored) : ce
+   n'est qu'un interrupteur, pas un secret à vérifier. */
+function saveLegifEnabled(v){
+  legifEnabled=!!v;
+  try{
+    if(legifEnabled)localStorage.setItem(LS_LEGIF_ON,"1");
+    else localStorage.removeItem(LS_LEGIF_ON);
+  }catch(e){warn("save legif on",e);}
+}
+/* Les identifiants, eux, ne se persistent qu'APRÈS une vérification réussie
+   (voir verifieLegifCreds) — jamais à la volée, même logique que
+   saveYtApiKey mais sur DEUX champs. */
+function saveLegifCreds(id,secret){
+  legifClientId=String(id||"").trim();
+  legifClientSecret=String(secret||"").trim();
+  try{
+    if(legifClientId)localStorage.setItem(LS_LEGIF_ID,legifClientId);
+    else localStorage.removeItem(LS_LEGIF_ID);
+    if(legifClientSecret)localStorage.setItem(LS_LEGIF_SECRET,legifClientSecret);
+    else localStorage.removeItem(LS_LEGIF_SECRET);
+  }catch(e){warn("save legif creds",e);}
 }
 
 /* ---------- Mode « Cacher les articles déjà lus » ----------
@@ -2513,6 +2631,105 @@ async function nativeGet(url,timeoutMs){
   const txt=typeof res.data==="string"?res.data:JSON.stringify(res.data);
   if(txt&&txt.length>200)return txt;
   throw new Error("empty");
+}
+/* ---------- Actualité juridique Légifrance : réseau natif ---------- */
+/* Appel générique pour Légifrance (jeton OAuth2 ET contenu) : contrairement à
+   nativeGet (GET simple, pour les flux RSS), ces deux appels ont besoin d'une
+   méthode POST, d'un corps et d'en-têtes arbitraires — pas une extension de
+   nativeGet, une fonction à part. Aucun repli web : cette fonctionnalité
+   n'existe QUE côté natif (le client_secret ne doit jamais être exposé dans
+   un navigateur, voir CLAUDE.md). */
+async function legifranceRequest(url,{method="GET",body,headers,timeoutMs=CONFIG.FETCH_TIMEOUT}={}){
+  const http=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.CapacitorHttp;
+  if(!http)throw new Error("CapacitorHttp indisponible");
+  const res=await http.request({url,method,data:body,headers,responseType:"json",
+    connectTimeout:timeoutMs,readTimeout:timeoutMs});
+  if(!(res.status>=200&&res.status<300))throw new Error("http "+res.status);
+  return typeof res.data==="string"?JSON.parse(res.data):res.data;
+}
+/* Cache mémoire du jeton — jamais localStorage, un access_token n'a aucune
+   raison de survivre à un redémarrage. Gardé avec le client_id qui l'a obtenu :
+   des identifiants changés (nouveau compte testé dans les réglages) ne
+   doivent jamais réutiliser le jeton d'un autre compte. */
+let legifTokenCache=null;   // {token, expiresAt, clientId}
+async function legifranceGetToken(clientId,secret){
+  if(legifTokenCache&&legifTokenCache.clientId===clientId&&legifTokenCache.expiresAt>Date.now())
+    return legifTokenCache.token;
+  const json=await legifranceRequest(LEGIFRANCE_TOKEN_URL,{
+    method:"POST",
+    body:legifranceTokenBody(clientId,secret),
+    headers:{"Content-Type":"application/x-www-form-urlencoded"},
+  });
+  const out=legifranceAccessTokenFromResponse(json);
+  if(!out)throw new Error("jeton invalide");
+  legifTokenCache={...out,clientId};
+  return out.token;
+}
+/* Bouton « Vérifier » des réglages : tente l'échange OAuth2 complet avec les
+   valeurs SAISIES (pas encore sauvegardées), et ne persiste (saveLegifCreds)
+   qu'en cas de succès — même logique verify-before-save que verifieYtApiKey,
+   sur DEUX champs cette fois. */
+async function verifieLegifCreds(){
+  const idInp=document.querySelector("[data-legifid]"),secretInp=document.querySelector("[data-legifsecret]");
+  const btn=document.querySelector("[data-legifverify]");
+  if(!idInp||!secretInp||!btn)return;
+  const id=idInp.value.trim(),secret=secretInp.value.trim();
+  if(!id||!secret){toast(T("toast.legif.empty"));return;}
+  const label=btn.innerHTML;
+  btn.disabled=true;btn.innerHTML='<span class="addspin" role="status" aria-label="'+escAttr(T("toast.legif.checking"))+'"></span>';
+  toast(T("toast.legif.checking"));
+  try{
+    legifTokenCache=null;               // ne pas retomber sur un jeton d'un essai précédent
+    await legifranceGetToken(id,secret);
+    saveLegifCreds(id,secret);
+    toast(T("toast.legif.valid"));
+    // Des identifiants valides tout juste saisis : contenu tout de suite,
+    // sans attendre le prochain rafraîchissement périmé (même raison que
+    // toggleLegifEnabled — la première activation ne montrait souvent rien,
+    // faute de creds au moment de cet appel-là).
+    if(legifEnabled)loadLegifPart(loadSeq,true);
+  }catch(e){warn("verifieLegifCreds",e);toast(T("toast.legif.invalid"));}
+  finally{btn.disabled=false;btn.innerHTML=label;}
+}
+/* Derniers textes du Journal officiel, mappés vers la forme d'item commune du
+   fil. Erreur (identifiants absents/invalides, réseau, réponse inattendue) →
+   tableau vide + avertissement, jamais d'exception qui remonterait dans
+   loadFeeds (règle non négociable, voir CLAUDE.md). */
+async function fetchLegifItems(){
+  if(!legifEnabled||!isNativeApp||!legifClientId||!legifClientSecret)return [];
+  try{
+    const token=await legifranceGetToken(legifClientId,legifClientSecret);
+    const json=await legifranceRequest(legifranceLastTextsUrl(CONFIG.LEGIF_FETCH_LIMIT),{
+      method:"POST",
+      headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+    });
+    return legifranceItemsFromResponse(json).map(it=>({
+      source:"Légifrance",title:it.titre,desc:it.resume,
+      link:legifranceArticleUrl(it),img:null,date:it.date,
+    })).filter(it=>it.link);
+  }catch(e){warn("fetchLegifItems",e);return [];}
+}
+/* Chargement de la moitié Légifrance : bien plus simple que
+   loadNewsPart/loadLearnPart, à dessein. Ce n'est PAS une nature à part
+   entière du mélange — désactivée par défaut, réservée au natif — elle vient
+   toujours en APPOINT (remix(true) : jamais de jeton de tête, jamais de
+   renouvellement du fil), sans échelle de retentatives ni barre de
+   progression dédiée (même choix que prefetchLearnSpare : l'utilisateur n'a
+   rien demandé). */
+async function loadLegifPart(my,perime){
+  if(!legifEnabled||!isNativeApp)return;
+  if(!perime&&legifItems.length)return;
+  let arr=await fetchLegifItems();
+  if(my!==loadSeq||!arr.length)return;
+  // Ne filtre jamais à vide (même garantie que dropSeen) : autant resservir
+  // des textes déjà vus qu'assécher complètement cet appoint.
+  const frais=arr.filter(it=>!legifSeen(it));
+  if(frais.length)arr=frais;
+  whenFeedIdle(()=>{
+    if(my!==loadSeq)return;
+    legifItems=arr.map(markKind("legif"));
+    remix(true);render();
+  });
 }
 /* `reste` : fonction rendant le temps ENCORE disponible pour cette source (voir
    FEED_BUDGET_MS et fetchFeedRobust). Chaque étape prend le plus petit du délai
@@ -3100,6 +3317,7 @@ async function loadFeeds(force){
      et lui faire manquer le cache CDN ralentirait tout le monde pour rien. */
   loadLearnPart(my,key,perime,0,!!force);
   loadNewsPart(my,key,perime,cached,sameFeed);
+  loadLegifPart(my,perime);
 }
 
 /* Délais des tentatives automatiques après un premier échec (news ET learn) :
@@ -3923,14 +4141,19 @@ function scrollToCard(i){
 function markVisibleSeen(it=currentItem()){
   if(!it)return;
   if(it.kind==="learn")addSeen(it);
+  else if(it.kind==="legif")addSeenLegif(it);
   else if(!videoIdOf(it))addSeenNews(it);
 }
 /* « Vu » au sens de la case à cocher d'openHistory : Wikipédia via `seen`,
-   actus ET vidéos via `newsSeen` — qui applique déjà, sans rien de plus ici,
-   la règle vidéo ci-dessus (vue au LANCEMENT, pas à l'affichage), puisque
-   `addSeenNews` est l'unique écriture commune aux deux. */
+   Légifrance via `legifSeen`, actus ET vidéos via `newsSeen` — qui applique
+   déjà, sans rien de plus ici, la règle vidéo ci-dessus (vue au LANCEMENT, pas
+   à l'affichage), puisque `addSeenNews` est l'unique écriture commune aux
+   deux. */
 function itemSeen(it){
-  return it&&it.kind==="learn"?seen.has(seenKey(it)):newsSeen(it);
+  if(!it)return false;
+  if(it.kind==="learn")return seen.has(seenKey(it));
+  if(it.kind==="legif")return legifSeen(it);
+  return newsSeen(it);
 }
 
 /* ---------- Images de fond paresseuses ----------
@@ -4083,7 +4306,7 @@ function applyBg(el,src){
      `watch?v=…` est cette miniature. Il y a mieux à faire, et c'est gratuit —
      `upscaleImageUrl` sait demander `maxresdefault` (voir YT_THUMB_W,
      src/lib.js), donc l'étape 1 ci-dessous suffit et l'og:image ne sert plus. */
-  const link=(it&&it.kind!=="learn"&&!videoIdOf(it)&&it.link)||"";
+  const link=(it&&it.kind!=="learn"&&it.kind!=="legif"&&!videoIdOf(it)&&it.link)||"";
   const set=(u,tag)=>{
     el.style.backgroundImage='url("'+cssString(u)+'")';
     el.dataset.bgUsed=u;el.dataset.bgKind=tag;
@@ -4449,6 +4672,8 @@ const ICON_RSS=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strok
 const ICON_TAG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>`;
 const ICON_RELOAD=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>`;
 const ICON_LIST=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="9" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="9" y1="18" x2="21" y2="18"></line><line x1="4" y1="6" x2="4.01" y2="6"></line><line x1="4" y1="12" x2="4.01" y2="12"></line><line x1="4" y1="18" x2="4.01" y2="18"></line></svg>`;
+// Balance de justice : pastille de filtre Légifrance (voir renderFilters).
+const ICON_SCALE=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="3" x2="12" y2="21"></line><line x1="5" y1="7" x2="19" y2="7"></line><path d="M5 7l-3 7a3 3 0 0 0 6 0z"></path><path d="M19 7l-3 7a3 3 0 0 0 6 0z"></path><path d="M7 21h10"></path></svg>`;
 const ICON_SETTINGS=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`;
 const ICON_CHEV=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
 // Bouton menu (barre du haut) : trois barres pleines, sans les points d'ICON_LIST
@@ -4485,6 +4710,11 @@ function cardHTML(it,id){
   // dans le même fil, et c'est ce qui les distingue d'un coup d'œil (typographie
   // plus dense, badge de thème, verbe d'action différent).
   const learnCard=it.kind==="learn";
+  // Actualité juridique Légifrance : ni payante ni sponsorisée (site officiel,
+  // sans pub), et son image (toujours absente, voir fetchLegifItems) n'a pas
+  // de page HTML tierce à interroger — écartée des sondes exactement comme
+  // Wikipédia et vidéo, voir applyBg pour la quatrième.
+  const legifCard=it.kind==="legif";
   /* Carte vidéo : la miniature vient du flux (media:thumbnail), la page
      `watch?v=…` n'a rien de mieux à offrir, et une vidéo n'est ni payante ni
      sponsorisée. Elle est donc écartée des trois sondes exactement comme
@@ -4497,23 +4727,25 @@ function cardHTML(it,id){
   // carte proche de l'écran, voir observeMissingImages/checkMissingImage —
   // même filet que pour une image trop petite, jamais essayé jusqu'ici pour
   // une image totalement absente. Sans objet pour Wikipédia (image directe
-  // de l'API, pas de page HTML tierce à interroger).
+  // de l'API, pas de page HTML tierce à interroger) ni pour Légifrance (pas
+  // d'image du tout, voir legifCard ci-dessus).
   const bg=img?`<div class="card__bg" data-bg="${escAttr(img)}"></div>`
-    :(!learnCard&&!vid&&link?`<div class="card__noimg" data-noimg-link="${escAttr(link)}"></div>`:`<div class="card__noimg"></div>`);
+    :(!learnCard&&!legifCard&&!vid&&link?`<div class="card__noimg" data-noimg-link="${escAttr(link)}"></div>`:`<div class="card__noimg"></div>`);
   /* Le ▶ est émis MÊME sans miniature : une vidéo dont le flux n'a pas publié
      de vignette doit rester jouable, sur le fond rayé de .card__noimg. */
   const playBtn=vid?`<button type="button" class="card__play" data-play aria-label="${escAttr(T("card.playVideo"))}">${ICON_PLAY}</button>`:"";
   const openLabel=learnCard?T("card.discover"):T("card.readArticle");
   const openIcon=learnCard?ICON_DISCOVER:ICON_READ;
-  const catB=it.cat&&catLabelT(it.cat)?`<span class="card__cat">${esc(catLabelT(it.cat))}</span>`:"";
+  const catB=legifCard?`<span class="card__cat">${esc(T("card.badge.legif"))}</span>`
+    :(it.cat&&catLabelT(it.cat)?`<span class="card__cat">${esc(catLabelT(it.cat))}</span>`:"");
   // Payant : jamais tranché ici. isPaywallCandidateDomain ne dit que si la
   // vérification (asynchrone, une vraie lecture de la page — voir
   // isPaywalledHtml/checkPaywall) vaut la peine ; data-pw ne marque donc
   // qu'une CANDIDATURE, que checkPaywall confirmera ou non une fois la carte
   // à l'écran. Sans objet pour Wikipédia, jamais payant.
-  const pwCandidate=!learnCard&&!vid&&link&&isPaywallCandidateDomain(link);
+  const pwCandidate=!learnCard&&!legifCard&&!vid&&link&&isPaywallCandidateDomain(link);
   // Sponsorisé par auteur : même principe de candidature, voir checkSponsor.
-  const sponsorCandidate=!learnCard&&!vid&&link&&isSponsorCandidateDomain(link);
+  const sponsorCandidate=!learnCard&&!legifCard&&!vid&&link&&isSponsorCandidateDomain(link);
   /* Sur une carte vidéo le titre LANCE la vidéo au lieu d'ouvrir le lecteur
      d'articles — c'est la cible large qu'atteint le pouce droit (voir le
      commentaire de la délégation de clic plus bas), et elle vaut ici aussi.
@@ -5121,6 +5353,47 @@ function prefRow(name,label,desc,opts,cur,extra){
 /* Bloc « liste de blocage », sous le réglage Publicités. Deux états : aucune
    source choisie (on propose les listes de référence) ou une source active
    (on montre ce qu'elle apporte, et comment s'en défaire). */
+/* ---------- Réglages Légifrance (natif seulement) ----------
+   DÉSACTIVÉE par défaut, réservée à qui a un usage réel de l'actualité
+   juridique (avocats, juristes) — jamais montrée sur le web (voir isNativeApp
+   dans le point de montage ci-dessous) : le client_secret ne doit jamais être
+   exposé dans un navigateur (voir CLAUDE.md). Régénérée entièrement à chaque
+   rendu (comme blocklistHTML) : les valeurs des champs viennent directement
+   de l'état, pas d'une lecture après coup. */
+function renderLegifSettings(){
+  const html=`
+    <h3 class="secttl">⚖️ ${esc(T("sheet.legif.title"))}</h3>
+    <p class="sub">${esc(T("sheet.legif.desc"))}</p>
+    <label class="sponsorrow"><input type="checkbox" data-legifon${legifEnabled?" checked":""}><span>${esc(T("sheet.legif.toggle"))}</span></label>
+    ${legifEnabled?`
+    <div class="addbox">
+      <input type="text" data-legifid autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${escAttr(T("sheet.legif.clientIdPlaceholder"))}" value="${escAttr(legifClientId)}">
+    </div>
+    <div class="addbox">
+      <input type="password" data-legifsecret autocomplete="off" placeholder="${escAttr(T("sheet.legif.clientSecretPlaceholder"))}" value="${escAttr(legifClientSecret)}">
+      <button type="button" data-legifverify>${esc(T("sheet.legif.verify"))}</button>
+    </div>
+    <p class="sub"><a href="https://piste.gouv.fr/" target="_blank" rel="noopener">${esc(T("sheet.legif.link"))}</a></p>`:""}
+  `;
+  document.querySelectorAll("[data-legifmount]").forEach(el=>{
+    el.innerHTML=isNativeApp?html:"";
+  });
+}
+/* Active/désactive la source : persisté IMMÉDIATEMENT (voir saveLegifEnabled),
+   contrairement aux identifiants. Réaffiche la section (les champs
+   apparaissent/disparaissent) et la pastille de filtre, et lance un premier
+   chargement à l'activation — sans attendre le prochain rafraîchissement
+   périmé, sinon la case cochée ne montrerait rien avant AUTO_RELOAD_MS. */
+function toggleLegifEnabled(checked){
+  saveLegifEnabled(checked);
+  renderLegifSettings();
+  renderFilters();
+  if(legifEnabled)loadLegifPart(loadSeq,true);
+}
+document.addEventListener("change",e=>{
+  const chk=e.target.closest("[data-legifon]");
+  if(chk)toggleLegifEnabled(chk.checked);
+});
 function blocklistHTML(){
   const src=BL_SOURCES.find(s=>s.url===blState.url);
   if(!blState.url){
@@ -5211,7 +5484,7 @@ function setLang(l){
   try{localStorage.setItem(LS_LANG,LANG);}catch(e){warn("save lang",e);}
   document.documentElement.lang=LANG;
   applyI18n();
-  renderLangPref();renderReadPref();renderIntGrid();renderList();renderSuggest();renderMixUI();
+  renderLangPref();renderReadPref();renderLegifSettings();renderIntGrid();renderList();renderSuggest();renderMixUI();
   switchFeed();
 }
 // Délégation : les blocs sont réécrits à chaque rendu, un écouteur par bouton
@@ -5221,10 +5494,12 @@ document.addEventListener("click",e=>{
   if(b){setPref(b.dataset.pref,b.dataset.val);return;}
   const src=e.target.closest("[data-blsrc]");
   if(src){syncBlocklist(src.dataset.blsrc,false);return;}
-  if(e.target.closest("[data-bldrop]"))dropBlocklist();
+  if(e.target.closest("[data-bldrop]")){dropBlocklist();return;}
+  if(e.target.closest("[data-legifverify]"))verifieLegifCreds();
 });
 renderLangPref();
 renderReadPref();
+renderLegifSettings();
 /* Rafraîchissement hebdomadaire, en silence : une liste de blocage vieille de
    plusieurs mois laisse passer les régies apparues depuis. Rien ne part si
    aucune source n'a été choisie, ni si le blocage est désactivé. */
@@ -5361,7 +5636,10 @@ function restoreFeed(){
 function survivingLink(m){
   for(let i=Math.max(0,currentIndex());i<items.length;i++){
     const it=items[i];
-    if(it.kind==="learn"?m.learn:m.news)return it.link||"";
+    // Une carte Légifrance survit tant que la source reste activée : elle
+    // n'est pas soumise à la dose (voir mixLists), donc ni m.learn ni m.news.
+    const reste=it.kind==="learn"?m.learn:it.kind==="legif"?legifEnabled:m.news;
+    if(reste)return it.link||"";
   }
   return "";
 }
@@ -5538,7 +5816,7 @@ savedListEl.addEventListener("click",e=>{
    pas : « rien de précis » — le mélange des intérêts choisis, ou un tirage au
    hasard tant qu'aucun ne l'est (voir catKeysForBatch). */
 const filtersEl=document.getElementById("filters");
-const srcBtn=document.getElementById("srcBtn"),catBtn=document.getElementById("catBtn");
+const srcBtn=document.getElementById("srcBtn"),catBtn=document.getElementById("catBtn"),legifBtn=document.getElementById("legifBtn");
 /* Icônes de la barre du haut, posées une seule fois depuis les constantes
    partagées avec les cartes. En HTML elles auraient été un deuxième exemplaire
    des mêmes tracés, à corriger deux fois. */
@@ -5552,6 +5830,7 @@ function setIcons(){
   document.getElementById("menuStatsBtn").querySelector(".menurow__i").innerHTML=ICON_STATS;
   srcBtn.querySelector(".filterbtn__i").innerHTML=ICON_RSS;
   catBtn.querySelector(".filterbtn__i").innerHTML=ICON_TAG;
+  legifBtn.querySelector(".filterbtn__i").innerHTML=ICON_SCALE;
   document.querySelectorAll(".filterbtn__c").forEach(el=>{el.innerHTML=ICON_CHEV;});
 }
 setIcons();
@@ -5604,7 +5883,10 @@ function renderFilters(){
   // filtre est dans le fil : à « actus seules », la pastille des thèmes qui
   // s'efface est le signal le plus clair que la dose a bien changé.
   const on={src:filterChips("src").length>1&&!!m.news,
-            cat:filterChips("cat").length>1&&!!m.learn};
+            cat:filterChips("cat").length>1&&!!m.learn,
+            // Pas de m.news/m.learn ici : Légifrance n'est pas soumis à la
+            // dose (voir mixLists), seulement à l'activation dans les réglages.
+            legif:legifEnabled&&isNativeApp};
   [["src",srcBtn],["cat",catBtn]].forEach(([kind,btn])=>{
     btn.classList.toggle("hidden",!on[kind]);
     if(!on[kind])return;
@@ -5613,7 +5895,15 @@ function renderFilters(){
     btn.classList.toggle("on",kind==="src"?newsSrc.length>0:cat!=="all");
     btn.setAttribute("aria-label",T(kind==="src"?"filter.src.label":"filter.cat.label")+" : "+val);
   });
-  filtersEl.classList.toggle("hidden",!on.src&&!on.cat);
+  // Pas de picker : cette pastille renvoie directement à sa section des
+  // réglages (voir son onclick plus bas), donc pas de valeur variable à
+  // afficher — un libellé fixe suffit.
+  legifBtn.classList.toggle("hidden",!on.legif);
+  if(on.legif){
+    legifBtn.querySelector(".filterbtn__v").textContent=T("filter.legif.label");
+    legifBtn.setAttribute("aria-label",T("filter.legif.label"));
+  }
+  filtersEl.classList.toggle("hidden",!on.src&&!on.cat&&!on.legif);
 }
 /* Liste complète d'un filtre. Elle s'ouvre au toucher parce qu'une rangée
    défilante cachait le reste : avec cinq sources, trois seulement tenaient à
@@ -5706,6 +5996,16 @@ pickApply.onclick=()=>closePicker();
 pickSheet.onclick=e=>{if(e.target===pickSheet)closePicker();};
 srcBtn.onclick=()=>openPicker("src");
 catBtn.onclick=()=>openPicker("cat");
+/* Pas de picker pour Légifrance (v1, voir CLAUDE.md) : la pastille renvoie
+   directement à sa section des réglages. requestAnimationFrame laisse le
+   panneau se poser avant de faire défiler vers elle. */
+legifBtn.onclick=()=>{
+  openSettings();
+  requestAnimationFrame(()=>{
+    const mount=document.querySelector("[data-legifmount]");
+    if(mount)mount.scrollIntoView({block:"start"});
+  });
+};
 /* Les deux filtres se comportent pareil : instantané du fil qu'on quitte, puis
    restauration de celui qu'on ouvre s'il a déjà été vu — sinon chargement. */
 /* learnMoreVide : le compteur d'épuisement appartient au fil qu'on QUITTE. Un
@@ -6023,7 +6323,7 @@ function openSettings(replaceFrom){
   // retrouver l'état réduit — sans quoi un groupe déplié une fois resterait
   // déplié pour le reste de la session.
   feedGroupOpen={rss:false,vid:false};
-  renderMix();renderIntGrid("intGrid");renderList();renderSuggest();renderReadPref();renderLangPref();
+  renderMix();renderIntGrid("intGrid");renderList();renderSuggest();renderReadPref();renderLangPref();renderLegifSettings();
   document.getElementById("sponsorFilterChk").checked=filterSponsored;
   document.getElementById("videoFilterChk").checked=filterVideoOnly;
   document.getElementById("ytApiKeyInput").value=ytApiKey;
