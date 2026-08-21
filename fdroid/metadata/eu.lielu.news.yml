@@ -19,14 +19,13 @@ Builds:
   - versionName: 1.5.3
     versionCode: 105030000
     commit: eeb7a8aff31e61ad78df27fc20a8746304679115
-    subdir: android
+    subdir: android/app
     sudo:
       - echo "deb https://deb.debian.org/debian forky main" > /etc/apt/sources.list.d/forky.list
       - apt-get update
       - apt-get install -y -t forky npm
     gradle:
       - yes
-    output: app/build/outputs/apk/release/app-release-unsigned.apk
     prebuild:
       - npm ci
       - npm run cap:sync

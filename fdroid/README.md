@@ -166,7 +166,7 @@ se fait donc à la main, sur `fdroiddata` :
 | Demande | De qui | Corrigé dans |
 | --- | --- | --- |
 | `commit:` = hash complet, pas le tag `v1.2.0` | duckniii | `eu.lielu.news.yml` |
-| Supprimer `output:` | duckniii | **non applicable** — il est indispensable ici (voir ci-dessous) |
+| Supprimer `output:` | duckniii | fait, en pointant `subdir` sur `android/app` (demande reprise et résolue par linsui — voir ci-dessous) |
 | Ajouter `Binaries` et `AllowedAPKSigningKeys` (build reproductible) | duckniii | `eu.lielu.news.yml` + `.github/workflows/release.yml` |
 | Ajouter un dossier `en-US` dans `fastlane` | duckniii | `fastlane/metadata/android/en-US/` |
 | Utiliser le gabarit « App inclusion » et cocher les cases | duckniii | à faire sur GitLab (voir ci-dessus) |
@@ -174,10 +174,12 @@ se fait donc à la main, sur `fdroiddata` :
 | `prebuild:` au lieu d'`init:`, `scandelete:` plutôt qu'une liste de `scanignore:` | licaon-kter | `eu.lielu.news.yml` |
 | Les binaires de `sharp`/vips ne devraient pas être là | licaon-kter | contournés par `scandelete:` ; à supprimer pour de bon en sortant `@capacitor/assets` des `devDependencies`, une fois la MR acceptée |
 | Ne garder qu'une seule entrée `Builds:` (la dernière), pas l'historique des versions publiées | licaon-kter | `eu.lielu.news.yml` — 1.3.0 et 1.4.1 retirées, seule 1.5.0 reste |
+| Pointer `subdir` sur le module et supprimer `output:` | linsui | `eu.lielu.news.yml` — `subdir: android/app`, voir plus bas |
 
 Le bloc de suggestion de licaon-kter reconduisait `output:` — il l'avait
 simplement recopié du fichier d'alors. Ne pas l'appliquer tel quel : duckniii
-avait justement demandé sa suppression.
+avait justement demandé sa suppression, et c'est finalement en pointant
+`subdir` sur le module (linsui) que le champ a pu disparaître pour de bon.
 
 ## Ce que le premier build F-Droid a appris
 
@@ -186,12 +188,15 @@ mais les sources de `fdroidserver` sont lisibles sur GitLab — c'est la référ
 à consulter en cas de doute sur un champ de recette.
 
 - **`init:` comme `prebuild:` s'exécutent dans `subdir:`**, donc dans
-  `android/`, et non à la racine du dépôt (`INFO: Running 'init' commands in
-  build/eu.lielu.news/android`). `npm ci` fonctionne quand même, npm remontant
-  jusqu'au `package.json` le plus proche ; ne pas « corriger » par un `cd ..`,
-  qui ne marcherait plus si leur outil changeait de répertoire de travail. La
-  recette utilise `prebuild:`, demandé en revue : il s'exécute plus tard, juste
-  avant le scan et la compilation.
+  `android/app/` (le module — voir plus bas pourquoi `subdir` y pointe), et non
+  à la racine du dépôt (`INFO: Running 'init' commands in
+  build/eu.lielu.news/android/app`, la profondeur ayant changé une fois
+  `subdir` déplacé du projet Gradle vers son module). `npm ci` fonctionne quand
+  même, npm remontant jusqu'au `package.json` le plus proche quel que soit le
+  nombre de niveaux ; ne pas « corriger » par un `cd ..`, qui ne marcherait
+  plus si leur outil changeait de répertoire de travail. La recette utilise
+  `prebuild:`, demandé en revue : il s'exécute plus tard, juste avant le scan
+  et la compilation.
 - **Le scanner refuse tout binaire pré-compilé dans l'arbre des sources**, et
   `npm ci` en dépose une poignée dans `node_modules` (sharp, `tsc`, les JAR de
   `@trapezedev/gradle-parse`, les gabarits `.tar.gz` de la CLI Capacitor). Deux
@@ -263,15 +268,27 @@ mais les sources de `fdroidserver` sont lisibles sur GitLab — c'est la référ
   print(ids)   # 0x504b4453 = « Dependency metadata », à ne pas y trouver
   EOF
   ```
-- **`output:` est indispensable, même si on demande de l'enlever.** Le retirer
-  fait échouer le build sur `Failed to find any output apks` — *après* un
-  `BUILD SUCCESSFUL` de Gradle, ce qui égare. Sans ce champ, fdroidserver ne
-  cherche l'APK que dans trois répertoires, tous relatifs à `subdir` (build.py,
+- **`output:` a fini par disparaître, en pointant `subdir` sur le module plutôt
+  que sur la racine du projet Gradle.** Sans `output:`, fdroidserver ne cherche
+  l'APK que dans trois répertoires, tous relatifs à `subdir` (build.py,
   `omethod == 'gradle'`) : `build/outputs/apk/release`, `build/outputs/apk`,
-  `build/apk`. Or un projet Capacitor produit le sien un niveau plus bas, dans
-  le module `app`. Renseigner `output:` bascule sur `omethod == 'raw'`, qui
-  prend le chemin tel quel — c'est le seul moyen de désigner un APK hors de ces
-  trois dossiers.
+  `build/apk`. Un premier essai (`subdir: android`, la racine du projet Gradle)
+  échouait donc sur `Failed to find any output apks` — *après* un
+  `BUILD SUCCESSFUL` de Gradle, ce qui égarait — puisqu'un projet Capacitor
+  produit son APK un niveau plus bas, dans le module `app`. Renseigner
+  `output:` (`omethod == 'raw'`, qui prend le chemin tel quel) corrigeait le
+  symptôme, mais linsui a demandé la vraie solution en revue : pointer `subdir`
+  directement sur `android/app`. fdroidserver calcule
+  `root_dir = build_dir/subdir` et lance gradle, `prebuild` ET la recherche de
+  l'APK avec ce `root_dir` comme répertoire de travail (build.py, common.py) —
+  en désignant le module, les trois chemins par défaut retombent exactement là
+  où Gradle dépose l'APK, sans rien à préciser. Gradle, invoqué depuis un
+  sous-module, retrouve tout seul le `settings.gradle` d'`android/` en
+  remontant les répertoires parents (comportement Gradle documenté, pas une
+  bizarrerie de ce projet) et borne la tâche au module courant. `scanignore:`/
+  `scandelete:`, eux, restent inchangés : ces chemins sont résolus par rapport
+  à la racine du dépôt entier (`build_dir`), pas à `subdir` — `node_modules`
+  vit toujours à la racine, quelle que soit la profondeur de `subdir`.
 - **Leur CI impose la forme canonique de `fdroid rewritemeta`**, au caractère
   près : elle rejoue l'outil et refuse le moindre écart (« These files need
   rewritemeta »). Trois règles s'en déduisent, toutes rencontrées :

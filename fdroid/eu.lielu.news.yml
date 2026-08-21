@@ -77,7 +77,18 @@ Builds:
     # sans rapport avec les tags publics vX.Y.Z. versionCode n'a besoin que de
     # croître, pas d'être continu.
     commit: eeb7a8aff31e61ad78df27fc20a8746304679115
-    subdir: android
+    # `subdir` pointe le MODULE (android/app), pas la racine du projet Gradle
+    # (android/) — demandé en revue par linsui, à la place du couple
+    # subdir: android + output: … essayé avant. fdroidserver calcule
+    # root_dir = build_dir/subdir (common.py, prepare_source) et lance gradle,
+    # prebuild ET la recherche de l'APK avec cwd=root_dir (build.py) : en
+    # pointant subdir sur le module, root_dir/build/outputs/apk/release
+    # désigne exactement où Gradle dépose notre APK, sans avoir à le dire à la
+    # main. Gradle, lancé depuis un sous-module, retrouve tout seul le
+    # settings.gradle d'android/ en remontant les répertoires parents — geste
+    # documenté de longue date, pas une bizarrerie de ce projet — et borne la
+    # tâche au module courant (:app).
+    subdir: android/app
     # Le nodejs de Debian stable est trop vieux : la CLI Capacitor 8 exige
     # Node 22 et refuse Node 20 (d'où le setup-node@22 d'android.yml). D'où
     # forky (testing), suffisamment récent — plutôt qu'un « curl | bash » vers
@@ -89,22 +100,14 @@ Builds:
       - apt-get install -y -t forky npm
     gradle:
       - yes
-    # `output:` est INDISPENSABLE ici, malgré la demande de duckniii de le
-    # supprimer — l'avoir retiré a fait échouer leur build sur « Failed to find
-    # any output apks », Gradle ayant pourtant réussi. Sans ce champ,
-    # fdroidserver ne regarde que trois chemins, tous relatifs à `subdir`
-    # (build.py, omethod == 'gradle') : `build/outputs/apk/release`,
-    # `build/outputs/apk` et `build/apk`. Or notre APK naît un cran plus bas,
-    # dans le module `app`. Renseigner `output:` bascule sur omethod == 'raw',
-    # qui prend le chemin tel quel. C'est pourquoi le bloc de suggestion de
-    # licaon-kter le conservait : ce n'était pas un oubli.
-    output: app/build/outputs/apk/release/app-release-unsigned.apk
     #
     # cap:sync régénère www/ (non versionné) puis le recopie dans le projet
     # natif : sans lui, l'APK embarque un assets/public vide. « prebuild »
-    # s'exécute dans subdir, donc dans android/ — pas à la racine, où vit le
-    # package.json. Ne pas ajouter de « cd .. » pour autant : npm remonte tout
-    # seul jusqu'au package.json le plus proche.
+    # s'exécute dans subdir (android/app), pas à la racine où vit le
+    # package.json — sans que cela pose problème : npm remonte tout seul
+    # jusqu'au package.json le plus proche, quel que soit le nombre de
+    # niveaux, et y exécute le script avec ce répertoire comme cwd. Ne pas
+    # ajouter de « cd .. » pour autant.
     prebuild:
       - npm ci
       - npm run cap:sync
