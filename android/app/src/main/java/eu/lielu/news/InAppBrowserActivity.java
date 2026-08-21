@@ -742,7 +742,24 @@ public class InAppBrowserActivity extends AppCompatActivity {
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);          // sans JS, la moitié des sites d'actu est vide
         s.setDomStorageEnabled(true);
-        s.setLoadWithOverviewMode(true);
+        // setUseWideViewPort(true) fait respecter le <meta viewport> de CHAQUE
+        // page (device-width, initial-scale=1 pour un site de presse moderne) —
+        // c'est ce qui permet une mise en page mobile correcte quand le site en
+        // déclare une. setLoadWithOverviewMode, lui, ajoute une passe distincte :
+        // si le contenu RENDU dépasse la largeur de la vue (un tableau, un
+        // lecteur embarqué, un encart de largeur fixe — fréquent sur France 24,
+        // qui embarque volontiers lecteur vidéo et widgets), WebView réduit
+        // l'échelle de TOUTE LA PAGE pour tout faire tenir, y compris le texte
+        // qui, lui, était déjà correctement mis en page par le viewport du site.
+        // Cette échelle réduite (souvent non entière, ex. 0.8) n'est pas un vrai
+        // pixel-perfect : le texte y est rendu flou, alors que Chrome (qui ne
+        // fait jamais ce repli automatique) affiche la même page nette, quitte à
+        // laisser défiler l'élément trop large horizontalement. On désactive
+        // donc ce repli : les pages avec un vrai viewport (l'immense majorité
+        // des sites d'actu) restent nettes à l'échelle 1, et une page qui n'en a
+        // vraiment aucun retombe sur le viewport large par défaut (980px) sans
+        // être réduite automatiquement — l'utilisateur garde le pincer-zoomer.
+        s.setLoadWithOverviewMode(false);
         s.setUseWideViewPort(true);
         s.setSupportZoom(true);
         s.setBuiltInZoomControls(true);
