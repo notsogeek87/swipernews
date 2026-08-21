@@ -1234,9 +1234,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=197"></script>
-<script src="src/learn-core.js?v=197"></script>
-<script src="src/i18n.js?v=197"></script>
+<script src="src/lib.js?v=198"></script>
+<script src="src/learn-core.js?v=198"></script>
+<script src="src/i18n.js?v=198"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2055,7 +2055,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="197";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="198";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2552,6 +2552,38 @@ function urlDuFlux(feed){return youtubeShortsFeedUrl(feed&&feed.url||"");}
    dépenser le repli rss2json (fetchFeedRobust), et ne pas annoncer la source
    « injoignable » (pump). */
 function fluxShorts(feed){return isYoutubeShortsFeedUrl(urlDuFlux(feed));}
+/* Identifiant de chaîne (UC…) porté par une réponse YouTube déjà reçue, quelle
+   que soit la façon dont la requête a été construite : `<yt:channelId>` est
+   toujours présent, chaîne comme playlist. getElementsByTagNameNS("*",…) :
+   même motif que findImage, un sélecteur CSS sans namespace n'atteint pas un
+   élément préfixé en XML. */
+function idChaineDuFlux(doc){
+  const id=(doc.getElementsByTagNameNS("*","channelId")[0]?.textContent||"").trim();
+  return /^UC[A-Za-z0-9_-]{22}$/.test(id)?id:"";
+}
+/* Migre une source YouTube enregistrée en `user=` vers son channel_id RÉEL, dès
+   qu'on croise l'identifiant dans une réponse déjà reçue — sans requête de
+   plus. `user=` (voir resolveYoutubeChannelFeed) n'est JAMAIS réduit aux
+   Shorts par youtubeShortsFeedUrl, qui ne reconnaît que channel_id/
+   playlist_id : une source restée enregistrée ainsi sert donc TOUTES les
+   vidéos de la chaîne à chaque chargement, Shorts et classiques confondus,
+   au lieu des seuls Shorts — le bug qu'on corrige ici. Restreint au SEUL cas
+   `user=` : une playlist CHOISIE (`playlist_id=PL…`) porte aussi
+   <yt:channelId> (celui de son propriétaire), et la réécrire romprait
+   l'invariant documenté « l'utilisateur a désigné cette playlist-là, on ne la
+   remplace pas ».
+   `feed` vient de `active`/`feeds.filter(...)` : c'est le MÊME objet, l'écrire
+   suffit (même motif que adopteNomDeSource). */
+function migreChaineUser(feed,doc){
+  if(!feed||!isYoutubeFeedUrl(feed.url))return;
+  let params;
+  try{params=new URL(feed.url).searchParams;}catch(e){return;}
+  if(!params.get("user"))return;
+  const id=idChaineDuFlux(doc);
+  if(!id)return;
+  feed.url="https://www.youtube.com/feeds/videos.xml?channel_id="+id;
+  persistFeeds();
+}
 /* rss2json : service dédié qui parse le flux côté serveur et renvoie du JSON (CORS ok) */
 async function fetchFeedRss2Json(feed,timeout=7000){
   const api="https://api.rss2json.com/v1/api.json?count=60&rss_url="+encodeURIComponent(urlDuFlux(feed));
@@ -2685,6 +2717,7 @@ function nomDeSource(feed,titre){
 async function fetchFeed(feed,reste){
   const text=await fetchText(urlDuFlux(feed),reste);
   const doc=new DOMParser().parseFromString(text,"text/xml");
+  migreChaineUser(feed,doc);
   const source=nomDeSource(feed,titreDuFlux(doc,fluxShorts(feed)));
   const nodes=[...doc.querySelectorAll("item, entry")];
   return nodes.map(n=>{
@@ -6232,17 +6265,20 @@ async function addFeed(){const inp=document.getElementById("newUrl");const url=i
   if(!isFeedUrl(url)){toast(T("toast.invalidUrl"));return;}
   pushFeedUrl(url,inp);
 }
-/* Vrai quand `rss` répond réellement un flux exploitable — un flux de chaîne
-   valide a toujours un <title> au niveau feed. Sert à VÉRIFIER une URL avant
-   de l'adopter, quelle que soit la façon dont elle a été devinée : jamais
-   ajouter une source qui ne chargera jamais rien. */
-async function verifieFluxChaine(rss){
+/* Charge et parse `rss`, ou null si la requête échoue ou ne rend pas un flux
+   de chaîne exploitable (toujours un <title> au niveau feed). Sert à VÉRIFIER
+   une URL avant de l'adopter, quelle que soit la façon dont elle a été
+   devinée : jamais ajouter une source qui ne chargera jamais rien. Rend le
+   document, pas juste un booléen, pour que resolveYoutubeChannelFeed puisse
+   en tirer l'identifiant de chaîne (idChaineDuFlux) sans requête de plus. */
+async function docFluxChaine(rss){
   try{
     const text=await fetchText(rss,()=>8000);
     const doc=new DOMParser().parseFromString(text,"text/xml");
-    return !!titreDuFlux(doc,false);
-  }catch(e){return false;}
+    return titreDuFlux(doc,false)?doc:null;
+  }catch(e){return null;}
 }
+async function verifieFluxChaine(rss){return !!(await docFluxChaine(rss));}
 /* Résout l'URL RSS d'une chaîne YouTube depuis l'URL de sa page publique, du
    moins coûteux/fragile au plus :
     1. `/channel/UC…` porte déjà l'identifiant dans l'URL — zéro requête.
@@ -6250,6 +6286,14 @@ async function verifieFluxChaine(rss){
        depuis ce nom SANS jamais charger la page — ça marche pour toute
        chaîne dont le nom actuel correspond à un ancien identifiant
        "utilisateur", ce qui couvre une bonne partie des chaînes existantes.
+       Un `user=` n'est JAMAIS réduit aux Shorts par youtubeShortsFeedUrl (elle
+       ne reconnaît que channel_id/playlist_id) : l'enregistrer tel quel
+       servirait TOUTES les vidéos de la chaîne, pas seulement les Shorts. La
+       réponse porte toujours <yt:channelId>, même construite depuis un
+       identifiant "utilisateur" : on s'en sert ICI, sans requête de plus, pour
+       enregistrer channel_id= à la place (voir idChaineDuFlux). N'est tentée
+       que si l'identifiant n'a pas pu en être tiré — la source reste alors en
+       `user=`, migrée plus tard au premier chargement (migreChaineUser).
     3. SEULEMENT si l'utilisateur a renseigné sa propre clé API (réglage
        avancé, voir ytApiKey) : l'API officielle YouTube Data v3
        (resolveYoutubeChannelIdViaApi). Plus fiable que l'étape suivante —
@@ -6274,7 +6318,11 @@ async function resolveYoutubeChannelFeed(pageUrl){
     const handle=youtubeChannelHandleFromUrl(pageUrl);
     if(handle){
       const rss="https://www.youtube.com/feeds/videos.xml?user="+encodeURIComponent(handle);
-      if(await verifieFluxChaine(rss))return rss;
+      const doc=await docFluxChaine(rss);
+      if(doc){
+        const id=idChaineDuFlux(doc);
+        return id?"https://www.youtube.com/feeds/videos.xml?channel_id="+id:rss;
+      }
     }
     if(ytApiKey){
       const idApi=await resolveYoutubeChannelIdViaApi(handle,ytApiKey);
