@@ -1261,9 +1261,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=201"></script>
-<script src="src/learn-core.js?v=201"></script>
-<script src="src/i18n.js?v=201"></script>
+<script src="src/lib.js?v=202"></script>
+<script src="src/learn-core.js?v=202"></script>
+<script src="src/i18n.js?v=202"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1407,7 +1407,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,dayKey,quarterIndex,statsBuckets,shuffle,
-  seenKey,dropSeen,roundRobin,weightedRoundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities,LEGIFRANCE_TOKEN_URL,LEGIFRANCE_API_BASE,legifranceTokenBody,legifranceAccessTokenFromResponse,legifranceLastTextsUrl,legifranceItemsFromResponse,legifranceArticleUrl}=self.SwiperLib;
+  seenKey,dropSeen,roundRobin,weightedRoundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities,LEGIFRANCE_TOKEN_URL,LEGIFRANCE_API_BASE,legifranceTokenBody,legifranceAccessTokenFromResponse,legifranceLastTextsUrl,legifranceLastNJoBody,legifranceItemsFromResponse,legifranceArticleUrl}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -2147,7 +2147,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="201";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="202";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2691,20 +2691,25 @@ async function verifieLegifCreds(){
   }catch(e){warn("verifieLegifCreds",e);toast(T("toast.legif.invalid"));}
   finally{btn.disabled=false;btn.innerHTML=label;}
 }
-/* Derniers textes du Journal officiel, mappés vers la forme d'item commune du
-   fil. Erreur (identifiants absents/invalides, réseau, réponse inattendue) →
-   tableau vide + avertissement, jamais d'exception qui remonterait dans
-   loadFeeds (règle non négociable, voir CLAUDE.md). */
+/* Dernières éditions du Journal officiel (une carte par ÉDITION, pas par
+   texte individuel — /consult/lastNJo ne descend pas à ce niveau, voir
+   CLAUDE.md pour la décision de granularité), mappées vers la forme d'item
+   commune du fil. Pas de champ résumé dans ce schéma (une édition entière ne
+   se résume pas) : `desc` reste vide. Erreur (identifiants absents/invalides,
+   réseau, réponse inattendue) → tableau vide + avertissement, jamais
+   d'exception qui remonterait dans loadFeeds (règle non négociable, voir
+   CLAUDE.md). */
 async function fetchLegifItems(){
   if(!legifEnabled||!isNativeApp||!legifClientId||!legifClientSecret)return [];
   try{
     const token=await legifranceGetToken(legifClientId,legifClientSecret);
-    const json=await legifranceRequest(legifranceLastTextsUrl(CONFIG.LEGIF_FETCH_LIMIT),{
+    const json=await legifranceRequest(legifranceLastTextsUrl(),{
       method:"POST",
+      body:legifranceLastNJoBody(CONFIG.LEGIF_FETCH_LIMIT),
       headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
     });
     return legifranceItemsFromResponse(json).map(it=>({
-      source:"Légifrance",title:it.titre,desc:it.resume,
+      source:"Légifrance",title:it.titre,desc:"",
       link:legifranceArticleUrl(it),img:null,date:it.date,
     })).filter(it=>it.link);
   }catch(e){warn("fetchLegifItems",e);return [];}

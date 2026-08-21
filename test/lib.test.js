@@ -1006,34 +1006,68 @@ test("legifranceAccessTokenFromResponse lit le jeton et calcule son expiration a
   assert.equal(lib.legifranceAccessTokenFromResponse({ access_token: 42 }), null);
 });
 
-test("legifranceLastTextsUrl construit l'URL des derniers textes du JO", () => {
-  assert.match(lib.legifranceLastTextsUrl(20), /^https:\/\/api\.piste\.gouv\.fr\//);
-  assert.match(lib.legifranceLastTextsUrl(20), /nbElement=20$/);
-  assert.match(lib.legifranceLastTextsUrl(), /nbElement=20$/); // défaut
+test("legifranceLastTextsUrl construit l'URL de l'endpoint, sans paramètre (le corps porte nbElement)", () => {
+  assert.equal(
+    lib.legifranceLastTextsUrl(),
+    "https://api.piste.gouv.fr/dila/legifrance/lf-engine-app/consult/lastNJo"
+  );
 });
 
-test("legifranceItemsFromResponse ne garde que les textes avec un identifiant et un titre", () => {
+test("legifranceLastNJoBody construit le corps JSON {nbElement}", () => {
+  assert.deepEqual(lib.legifranceLastNJoBody(20), { nbElement: 20 });
+  assert.deepEqual(lib.legifranceLastNJoBody(), { nbElement: 20 }); // défaut
+});
+
+test("legifranceItemsFromResponse lit les éditions du JO (containers), pas des textes individuels", () => {
   const json = {
-    results: [
-      { id: "JORFTEXT000000000001", titre: "Décret n° 2026-1", resume: "Décret" },
+    totalNbResult: 3,
+    containers: [
+      {
+        id: "JORFCONT000038052140",
+        titre: "",
+        datePubli: "423532800000",
+        numero: "1261",
+        idEli: "/eli/jo/2019/1/25/0021",
+      },
+      // Titre vide ET numéro absent : pas de titre reconstruible, écarté.
+      { id: "JORFCONT000000000002", titre: "", datePubli: "423532800000" },
       // Pas d'identifiant : écarté.
-      { titre: "Sans identifiant" },
-      // Pas de titre : écarté.
-      { id: "JORFTEXT000000000002" },
+      { titre: "JORF du 2 janvier", numero: "2" },
     ],
   };
   const out = lib.legifranceItemsFromResponse(json);
   assert.equal(out.length, 1);
-  assert.equal(out[0].id, "JORFTEXT000000000001");
-  assert.equal(out[0].titre, "Décret n° 2026-1");
+  assert.equal(out[0].id, "JORFCONT000038052140");
+  // Titre vide dans la réponse : reconstruit depuis numero.
+  assert.equal(out[0].titre, "Journal officiel n°1261");
+  assert.equal(out[0].date, new Date(423532800000).toISOString());
+  assert.equal(out[0].idEli, "/eli/jo/2019/1/25/0021");
   assert.deepEqual(lib.legifranceItemsFromResponse({}), []);
   assert.deepEqual(lib.legifranceItemsFromResponse(null), []);
 });
 
-test("legifranceArticleUrl construit le lien public legifrance.fr d'un texte JORF", () => {
+test("legifranceItemsFromResponse garde un titre déjà renseigné tel quel", () => {
+  const json = {
+    containers: [
+      { id: "JORFCONT000038052140", titre: "JORF n°0001 du 2 janvier 2026", numero: "1" },
+    ],
+  };
+  const out = lib.legifranceItemsFromResponse(json);
+  assert.equal(out[0].titre, "JORF n°0001 du 2 janvier 2026");
+});
+
+test("legifranceArticleUrl privilégie le chemin ELI, sinon retombe sur /jorf/id/", () => {
   assert.equal(
-    lib.legifranceArticleUrl({ id: "JORFTEXT000000000001" }),
-    "https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000000000001"
+    lib.legifranceArticleUrl({
+      id: "JORFCONT000038052140",
+      idEli: "/eli/jo/2019/1/25/0021",
+    }),
+    "https://www.legifrance.gouv.fr/eli/jo/2019/1/25/0021"
+  );
+  // Pas d'idEli : repli sur l'identifiant.
+  assert.equal(
+    lib.legifranceArticleUrl({ id: "JORFCONT000038052140" }),
+    "https://www.legifrance.gouv.fr/jorf/id/JORFCONT000038052140"
   );
   assert.equal(lib.legifranceArticleUrl({}), "");
   assert.equal(lib.legifranceArticleUrl(null), "");

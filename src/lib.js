@@ -1159,39 +1159,54 @@
     return { token, expiresAt: Date.now() + ttlMs };
   }
 
-  /** URL des derniers textes publiés au Journal officiel. Nom d'endpoint et
-   *  paramètres PROVISOIRES : à confirmer sur le Swagger PISTE avant usage
-   *  réel (réseau bloqué vers piste.gouv.fr au moment d'écrire ceci) — posé
-   *  en un seul point pour rester facile à corriger. */
-  function legifranceLastTextsUrl(limit) {
-    return (
-      LEGIFRANCE_API_BASE +
-      "/consult/lastNJo?nbElement=" +
-      encodeURIComponent(limit || 20)
-    );
+  /** URL de l'endpoint "derniers journaux officiels" — POST, sans paramètre
+   *  de requête (le nombre d'éléments va dans le CORPS, voir
+   *  legifranceLastNJoBody : tous les endpoints de contenu PISTE sont en
+   *  POST, schéma confirmé sur le Swagger). */
+  function legifranceLastTextsUrl() {
+    return LEGIFRANCE_API_BASE + "/consult/lastNJo";
   }
 
-  /** Items exploitables d'une réponse "derniers textes du JO" — forme
-   *  PROVISOIRE (voir legifranceLastTextsUrl), à ajuster une fois le schéma
-   *  réel confirmé. Un texte sans identifiant ni titre est écarté plutôt que
-   *  de produire une carte inerte. */
+  /** Corps JSON de la requête `/consult/lastNJo` : `{nbElement: N}`, "nombre
+   *  de JOs à remonter" (doc PISTE). À passer tel quel (objet JS, pas une
+   *  chaîne) à legifranceRequest, qui le sérialise. */
+  function legifranceLastNJoBody(limit) {
+    return { nbElement: limit || 20 };
+  }
+
+  /** Items exploitables d'une réponse `/consult/lastNJo` : chaque entrée de
+   *  `containers` est une ÉDITION du Journal officiel (un jour donné), PAS un
+   *  texte individuel — `/consult/lastNJo` ne descend pas à ce niveau de
+   *  détail (voir CLAUDE.md pour la décision de granularité). `titre` est
+   *  gardé tel quel s'il est exploitable, sinon reconstruit depuis `numero`
+   *  ("Journal officiel n°…") : le schéma ne garantit pas sa présence.
+   *  `datePubli` est un epoch en MILLISECONDES sous forme de chaîne. Un
+   *  conteneur sans identifiant est écarté plutôt que de produire une carte
+   *  inerte. */
   function legifranceItemsFromResponse(json) {
-    const list = json && Array.isArray(json.results) ? json.results : [];
+    const list = json && Array.isArray(json.containers) ? json.containers : [];
     return list
-      .map((it) => ({
-        id: (it && (it.id || it.cid)) || "",
-        titre: collapse((it && (it.titre || it.title)) || ""),
-        resume: collapse((it && (it.resume || it.nature)) || ""),
-        date: (it && (it.datePublication || it.date)) || "",
-      }))
+      .map((it) => {
+        const id = (it && it.id) || "";
+        const numero = (it && it.numero) || "";
+        const titreBrut = collapse((it && it.titre) || "");
+        const titre = titreBrut || (numero ? "Journal officiel n°" + numero : "");
+        const ts = Number(it && it.datePubli);
+        const date = Number.isFinite(ts) && ts > 0 ? new Date(ts).toISOString() : "";
+        const idEli = (it && typeof it.idEli === "string" && it.idEli) || "";
+        return { id, titre, date, idEli };
+      })
       .filter((it) => it.id && it.titre);
   }
 
-  /** URL publique legifrance.fr d'un texte JORF depuis son identifiant. Ne
-   *  vaut que pour ce "fond" (JORF) — d'autres fonds (codes, jurisprudence…)
-   *  ont un autre pattern d'URL, hors du périmètre de cette fonctionnalité
-   *  (actualité du JO seulement, voir CLAUDE.md). */
+  /** URL publique legifrance.fr d'une édition du Journal officiel. Priorité
+   *  au chemin ELI renvoyé par l'API (`idEli`, ex. "/eli/jo/2019/1/25/0021") —
+   *  canonique et déjà exact ; repli sur un identifiant `/jorf/id/{id}`
+   *  seulement quand `idEli` est absent (le schéma ne le marque pas
+   *  obligatoire). */
   function legifranceArticleUrl(item) {
+    const idEli = (item && item.idEli) || "";
+    if (idEli) return "https://www.legifrance.gouv.fr" + idEli;
     const id = (item && item.id) || "";
     return id ? "https://www.legifrance.gouv.fr/jorf/id/" + encodeURIComponent(id) : "";
   }
@@ -1631,6 +1646,7 @@
     legifranceTokenBody,
     legifranceAccessTokenFromResponse,
     legifranceLastTextsUrl,
+    legifranceLastNJoBody,
     legifranceItemsFromResponse,
     legifranceArticleUrl,
     isLequipeFeedUrl,
