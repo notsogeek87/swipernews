@@ -1261,9 +1261,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=202"></script>
-<script src="src/learn-core.js?v=202"></script>
-<script src="src/i18n.js?v=202"></script>
+<script src="src/lib.js?v=203"></script>
+<script src="src/learn-core.js?v=203"></script>
+<script src="src/i18n.js?v=203"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1570,6 +1570,11 @@ function legifStream(streams,legif){
   return streams.concat([{items:legif,poids:somme*CONFIG.LEGIF_POIDS/(1-CONFIG.LEGIF_POIDS)}]);
 }
 function mixLists(news,learn,m,legif){
+  /* Mode exclusif (voir legifOnly) : le fil ne contient QUE Légifrance, peu
+     importe la dose `m` — court-circuite tout le reste. `legifOnly` est lu
+     comme variable de module (même pattern que filterSponsored dans remix()),
+     pas un paramètre de plus : aucun appelant à changer. */
+  if(legifOnly)return (legif||[]).slice();
   if(!m.news){
     if(!legif||!legif.length)return learn.slice();
     return weightedRoundRobin(legifStream([{items:learn,poids:1}],legif));
@@ -2147,7 +2152,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="202";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="203";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2355,9 +2360,16 @@ function saveYtApiKey(v){
    sans effet, la section réglages correspondante n'est même pas rendue (voir
    renderLegifSettings). */
 const LS_LEGIF_ON="fluxswipe.legifon.v1";
+const LS_LEGIF_ONLY="fluxswipe.legifonly.v1";
 const LS_LEGIF_ID="fluxswipe.legifclientid.v1";
 const LS_LEGIF_SECRET="fluxswipe.legifsecret.v1";
 let legifEnabled=(()=>{try{return localStorage.getItem(LS_LEGIF_ON)==="1";}catch(e){return false;}})();
+/* Mode exclusif : le fil ne contient QUE des cartes Légifrance (voir
+   mixLists, qui la lit directement comme variable de module — pas un
+   paramètre de plus). N'a de sens que si legifEnabled est vrai ;
+   toggleLegifEnabled() la remet à faux dès que la source entière est
+   désactivée, sinon elle resterait armée pour la prochaine activation. */
+let legifOnly=(()=>{try{return localStorage.getItem(LS_LEGIF_ONLY)==="1";}catch(e){return false;}})();
 let legifClientId=(()=>{try{return localStorage.getItem(LS_LEGIF_ID)||"";}catch(e){return "";}})();
 let legifClientSecret=(()=>{try{return localStorage.getItem(LS_LEGIF_SECRET)||"";}catch(e){return "";}})();
 /* Activer/désactiver se persiste IMMÉDIATEMENT (comme filterSponsored) : ce
@@ -2368,6 +2380,13 @@ function saveLegifEnabled(v){
     if(legifEnabled)localStorage.setItem(LS_LEGIF_ON,"1");
     else localStorage.removeItem(LS_LEGIF_ON);
   }catch(e){warn("save legif on",e);}
+}
+function saveLegifOnly(v){
+  legifOnly=!!v;
+  try{
+    if(legifOnly)localStorage.setItem(LS_LEGIF_ONLY,"1");
+    else localStorage.removeItem(LS_LEGIF_ONLY);
+  }catch(e){warn("save legif only",e);}
 }
 /* Les identifiants, eux, ne se persistent qu'APRÈS une vérification réussie
    (voir verifieLegifCreds) — jamais à la volée, même logique que
@@ -2725,7 +2744,15 @@ async function loadLegifPart(my,perime){
   if(!legifEnabled||!isNativeApp)return;
   if(!perime&&legifItems.length)return;
   let arr=await fetchLegifItems();
-  if(my!==loadSeq||!arr.length)return;
+  if(my!==loadSeq)return;
+  if(!arr.length){
+    // Mode exclusif et rien à montrer d'autre (pas de cache, pas de fil déjà
+    // affiché) : sans ça, un échec (identifiants pas encore vérifiés, réseau
+    // coupé) laissait le fil silencieusement vide, sans le moindre message —
+    // voir showEmpty("no-feeds") pour le même besoin côté actus.
+    if(legifOnly&&!items.length)showEmpty("legif-empty");
+    return;
+  }
   // Ne filtre jamais à vide (même garantie que dropSeen) : autant resservir
   // des textes déjà vus qu'assécher complètement cet appoint.
   const frais=arr.filter(it=>!legifSeen(it));
@@ -3403,7 +3430,7 @@ function takeLearnSpare(key){
    sans l'avoir sollicitée inquiète plus que ça ne renseigne. */
 async function prefetchLearnSpare(key){
   if(!learnSpareArme||learnSpareVol||learnSpare)return;
-  if(!mixLevel().learn)return;      // dose « actus seules » : rien à mettre de côté
+  if(!mixLevel().learn||legifOnly)return;      // dose « actus seules », ou mode exclusif Légifrance : rien à mettre de côté
   learnSpareVol=true;
   try{
     // `frais` : la réserve est un lot RÉCLAMÉ d'avance, elle doit porter la même
@@ -3426,7 +3453,7 @@ async function prefetchLearnSpare(key){
    passer outre la garde de la ligne suivante SANS pour autant se transformer en
    renouvellement — sinon un appoint qui a d'abord échoué remonterait en tête. */
 async function loadLearnPart(my,key,perime,attempt=0,frais=false,renouv=perime){
-  if(!mixLevel().learn)return;      // dose « actus seules » : Wikipédia n'est pas appelé
+  if(!mixLevel().learn||legifOnly)return;      // dose « actus seules », ou mode exclusif Légifrance : Wikipédia n'est pas appelé
   if(!perime&&learnItems.length)return;
   // Même signal que côté actus (voir loadNewsPart) : sans lui, un rechargement
   // Wikipédia en arrière-plan (dose augmentée, réserve qui se tarit en
@@ -3567,9 +3594,10 @@ async function loadLearnPart(my,key,perime,attempt=0,frais=false,renouv=perime){
 const AUTO_RELOAD_MS=30*60*1000;
 let lastNewsLoad=cacheTime(feedKey());   // repris du cache : survit à la fermeture de l'app
 async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
-  // Dose « Wikipédia seul » : aucun flux n'est interrogé. Le fil ne contient
-  // aucune actu, aller les chercher serait du réseau pour rien.
-  if(!mixLevel().news){newsSettled=true;return;}
+  // Dose « Wikipédia seul », ou mode exclusif Légifrance : aucun flux n'est
+  // interrogé. Le fil ne contient aucune actu, aller les chercher serait du
+  // réseau pour rien.
+  if(!mixLevel().news||legifOnly){newsSettled=true;return;}
   /* Seuil de fraîcheur : rien à aller chercher, on garde ce qui est à l'écran
      (cache tout juste peint, ou fil déjà affiché). Aucun appel aux sources.
      `newsItems.length` est la garde qui manquait : `sameFeed` dit seulement
@@ -4631,6 +4659,11 @@ function renderLoadMoreCard(){
    rendu — les cartes déjà affichées sont réutilisées telles quelles (render
    réconcilie par lien), et remix() jette la tête du fil au-delà de MAX_ITEMS. */
 async function loadMore(){
+  // Mode exclusif Légifrance : pas de réserve Wikipédia à réapprovisionner.
+  // /consult/lastNJo n'a pas de pagination (voir loadLegifPart) — un fil
+  // Légifrance exclusif est donc FINI, renouvelé au rafraîchissement suivant,
+  // comme la dose « actus seules », pas un défilement infini.
+  if(legifOnly)return;
   if(loadingMore)return;
   loadingMore=true;
   renderLoadMoreCard();          // affiche l'attente tout de suite, sans attendre la réponse
@@ -5206,7 +5239,7 @@ function onScrollFrame(){
   // les écritures de style d'updateRail().
   if(loadingMore||!items.length)return;
   const nearEnd=top+h*3>=feedEl.scrollHeight;
-  const lowOnLearn=learnMoreVide<LEARN_MORE_VIDE_MAX&&!!mixLevel().learn&&learnCardsAhead(idx)<10;
+  const lowOnLearn=learnMoreVide<LEARN_MORE_VIDE_MAX&&!!mixLevel().learn&&!legifOnly&&learnCardsAhead(idx)<10;
   if(nearEnd||lowOnLearn)loadMore();
 }
 feedEl.addEventListener("scroll",()=>{
@@ -5371,6 +5404,7 @@ function renderLegifSettings(){
     <p class="sub">${esc(T("sheet.legif.desc"))}</p>
     <label class="sponsorrow"><input type="checkbox" data-legifon${legifEnabled?" checked":""}><span>${esc(T("sheet.legif.toggle"))}</span></label>
     ${legifEnabled?`
+    <label class="sponsorrow"><input type="checkbox" data-legifonly${legifOnly?" checked":""}><span>${esc(T("sheet.legif.onlyToggle"))}</span></label>
     <div class="addbox">
       <input type="text" data-legifid autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${escAttr(T("sheet.legif.clientIdPlaceholder"))}" value="${escAttr(legifClientId)}">
     </div>
@@ -5391,13 +5425,29 @@ function renderLegifSettings(){
    périmé, sinon la case cochée ne montrerait rien avant AUTO_RELOAD_MS. */
 function toggleLegifEnabled(checked){
   saveLegifEnabled(checked);
+  // Désactiver la source entière n'a pas de sens en laissant le mode
+  // exclusif armé pour la prochaine activation — et le fil ne doit pas
+  // traîner de cartes Légifrance jusqu'à leur évacuation naturelle.
+  if(!legifEnabled){saveLegifOnly(false);legifItems=[];}
   renderLegifSettings();
   renderFilters();
   if(legifEnabled)loadLegifPart(loadSeq,true);
+  else applyMix();
+}
+/* Mode exclusif : réutilise applyMix() tel quel (remix(true)+render(), et le
+   rechargement des actus/Wikipédia si leurs réserves sont vides — le cas
+   normal du retour à false, puisque loadNewsPart/loadLearnPart ne les
+   alimentent pas tant que le mode est actif). */
+function toggleLegifOnly(checked){
+  saveLegifOnly(checked);
+  renderFilters();
+  applyMix();
 }
 document.addEventListener("change",e=>{
   const chk=e.target.closest("[data-legifon]");
-  if(chk)toggleLegifEnabled(chk.checked);
+  if(chk){toggleLegifEnabled(chk.checked);return;}
+  const chkOnly=e.target.closest("[data-legifonly]");
+  if(chkOnly)toggleLegifOnly(chkOnly.checked);
 });
 function blocklistHTML(){
   const src=BL_SOURCES.find(s=>s.url===blState.url);
@@ -5641,9 +5691,12 @@ function restoreFeed(){
 function survivingLink(m){
   for(let i=Math.max(0,currentIndex());i<items.length;i++){
     const it=items[i];
-    // Une carte Légifrance survit tant que la source reste activée : elle
-    // n'est pas soumise à la dose (voir mixLists), donc ni m.learn ni m.news.
-    const reste=it.kind==="learn"?m.learn:it.kind==="legif"?legifEnabled:m.news;
+    // Mode exclusif : seule une carte Légifrance peut survivre, peu importe
+    // `m`. Sinon, une carte Légifrance survit tant que la source reste
+    // activée : elle n'est pas soumise à la dose (voir mixLists), donc ni
+    // m.learn ni m.news.
+    const reste=legifOnly?it.kind==="legif"
+      :(it.kind==="learn"?m.learn:it.kind==="legif"?legifEnabled:m.news);
     if(reste)return it.link||"";
   }
   return "";
@@ -5887,8 +5940,8 @@ function renderFilters(){
   // d'une source cochée, au moins un centre d'intérêt) ET si la moitié qu'elle
   // filtre est dans le fil : à « actus seules », la pastille des thèmes qui
   // s'efface est le signal le plus clair que la dose a bien changé.
-  const on={src:filterChips("src").length>1&&!!m.news,
-            cat:filterChips("cat").length>1&&!!m.learn,
+  const on={src:filterChips("src").length>1&&!!m.news&&!legifOnly,
+            cat:filterChips("cat").length>1&&!!m.learn&&!legifOnly,
             // Pas de m.news/m.learn ici : Légifrance n'est pas soumis à la
             // dose (voir mixLists), seulement à l'activation dans les réglages.
             legif:legifEnabled&&isNativeApp};
@@ -6809,6 +6862,11 @@ function showEmpty(reason){
     // fournit le fil à lui seul.
     t.textContent=T("empty.noFeeds.title");
     m.textContent=T("empty.noFeeds.msg");
+  }else if(reason==="legif-empty"){
+    // Mode exclusif Légifrance, rien à montrer d'autre : identifiants pas
+    // encore vérifiés, ou réseau coupé (voir loadLegifPart).
+    t.textContent=T("empty.legifEmpty.title");
+    m.textContent=T("empty.legifEmpty.msg");
   }else{
     t.textContent=T("empty.unavailable.title");
     m.textContent=T("empty.unavailable.msg");

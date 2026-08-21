@@ -149,6 +149,9 @@
       "empty.unavailable.title": "Fil indisponible",
       "empty.unavailable.msg":
         "Ni tes flux ni Wikipédia n'ont répondu (hors-ligne, ou proxy indisponible). Réessaie, ou vérifie tes sources.",
+      "empty.legifEmpty.title": "Actualité juridique indisponible",
+      "empty.legifEmpty.msg":
+        "Vérifie tes identifiants API PISTE dans les réglages, ou ta connexion, puis réessaie.",
 
       "welcome.aria": "Bienvenue sur SwiperNews",
       "welcome.title": "Bienvenue sur SwiperNews",
@@ -212,6 +215,7 @@
       "sheet.legif.desc":
         "Réservé à qui en a l'usage (avocats, juristes) : les derniers textes publiés au Journal officiel, à un rythme fixe dans le fil. Nécessite tes propres identifiants API PISTE (gratuits, sur inscription) — jamais partagés avec personne d'autre, et jamais envoyés ailleurs qu'à l'API Légifrance elle-même.",
       "sheet.legif.toggle": "Activer l'actualité juridique",
+      "sheet.legif.onlyToggle": "N'afficher que l'actualité juridique",
       "sheet.legif.clientIdPlaceholder": "Identifiant client (client_id)",
       "sheet.legif.clientSecretPlaceholder": "Secret client (client_secret)",
       "sheet.legif.verify": "Vérifier",
@@ -477,6 +481,9 @@
       "empty.unavailable.title": "Feed unavailable",
       "empty.unavailable.msg":
         "Neither your feeds nor Wikipedia responded (offline, or the proxy is unavailable). Try again, or check your sources.",
+      "empty.legifEmpty.title": "Legal news unavailable",
+      "empty.legifEmpty.msg":
+        "Check your PISTE API credentials in settings, or your connection, then try again.",
 
       "welcome.aria": "Welcome to SwiperNews",
       "welcome.title": "Welcome to SwiperNews",
@@ -540,6 +547,7 @@
       "sheet.legif.desc":
         "For those who actually need it (lawyers, legal professionals): the latest texts published in France's official gazette, at a fixed pace in the feed. Requires your own PISTE API credentials (free, by signup) — never shared with anyone else, and never sent anywhere but the Légifrance API itself.",
       "sheet.legif.toggle": "Enable legal news",
+      "sheet.legif.onlyToggle": "Show legal news only",
       "sheet.legif.clientIdPlaceholder": "Client ID (client_id)",
       "sheet.legif.clientSecretPlaceholder": "Client secret (client_secret)",
       "sheet.legif.verify": "Verify",
