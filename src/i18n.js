@@ -332,6 +332,10 @@
       "card.playVideo": "Lire la vidéo",
       "card.openYoutube": "Ouvrir sur YouTube",
       "card.closeVideo": "Fermer la vidéo",
+      // Libellé de la pastille (card__open) d'une carte vidéo : distinct de
+      // card.playVideo (aria-label du ▶, titre de l'iframe), qui reste tel
+      // quel ailleurs — seul ce texte visible devait changer.
+      "card.watch": "Regarder",
       "card.demo": "Article de démo",
       "card.paywall.title": "Accès payant probable",
     },
@@ -634,6 +638,7 @@
       "card.playVideo": "Play video",
       "card.openYoutube": "Open on YouTube",
       "card.closeVideo": "Close video",
+      "card.watch": "Watch",
       "card.demo": "Demo article",
       "card.paywall.title": "Likely paywalled",
 
