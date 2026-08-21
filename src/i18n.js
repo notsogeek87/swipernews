@@ -43,6 +43,8 @@
       "top.history.aria": "Liste des articles",
       "top.saved.title": "Tes articles enregistrés",
       "top.saved.aria": "Enregistrés",
+      "top.legifOnly.title": "Légifrance seul",
+      "top.legifOnly.aria": "Basculer en mode Légifrance seul",
       "top.menu.title": "Menu",
       "top.menu.aria": "Menu",
 
@@ -376,6 +378,8 @@
       "top.history.aria": "Article list",
       "top.saved.title": "Your saved articles",
       "top.saved.aria": "Saved",
+      "top.legifOnly.title": "Legal news only",
+      "top.legifOnly.aria": "Switch to legal-news-only mode",
       "top.menu.title": "Menu",
       "top.menu.aria": "Menu",
 
