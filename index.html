@@ -1248,9 +1248,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=200"></script>
-<script src="src/learn-core.js?v=200"></script>
-<script src="src/i18n.js?v=200"></script>
+<script src="src/lib.js?v=201"></script>
+<script src="src/learn-core.js?v=201"></script>
+<script src="src/i18n.js?v=201"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2069,7 +2069,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="200";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="201";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -4714,9 +4714,11 @@ document.getElementById("shareBtn").onclick=e=>{
   if(it)shareItem(it);
 };
 
-/* Chaque partage inclut l'article ET un lien promo vers l'app */
+/* Chaque partage inclut l'article ET une mention promo de l'app, sans lien
+   (news.lielu.eu n'a rien à faire dans un partage d'article — l'app, elle,
+   n'a pas de page de présentation à offrir à qui reçoit le lien). */
 const APP_URL=CONFIG.APP_URL;
-const APP_TAG=`📲 Lu sur SwiperNews — l'actu & la culture en swipe : ${APP_URL}`;
+const APP_TAG=`📲 Lu sur SwiperNews — l'actu & la culture en swipe`;
 function shareParts(it){
   const link=it.link&&it.link!=="#"?it.link:"";
   const full=[it.title,link,APP_TAG].filter(Boolean).join("\n\n");  // titre + lien article + promo
@@ -4749,7 +4751,6 @@ async function shareItem(it){
    shareItem (natif packagé, puis navigator.share) ; le repli, lui, se contente
    de copier le texte — un flux se partage rarement vers un réseau social, la
    grille de destinations de openShareMenu serait hors-sujet ici. */
-const FEED_SHARE_TAG=`📲 Ajoute-le dans SwiperNews — l'actu & la culture en swipe : ${APP_URL}`;
 /* Lien « un geste ». Le schéma personnalisé (swipernews://) tout seul a été
    essayé d'abord — le plus simple, pas d'App Links https, donc pas
    d'assetlinks.json à signer avec la clé de RELEASE (invérifiable ici, voir
@@ -4800,7 +4801,7 @@ async function shareFeed(i){
   const f=feeds[i];
   if(!f)return;
   const reachable=await addLinkReachable();
-  const text=[f.name,f.url,reachable?T("share.feed.tapToAdd"):null,reachable?feedDeepLink(f):null,FEED_SHARE_TAG]
+  const text=[f.name,f.url,reachable?T("share.feed.tapToAdd"):null,reachable?feedDeepLink(f):null]
     .filter(Boolean).join("\n\n");
   const iab=iabPlugin();
   if(isNativeApp&&iab&&iab.share){
