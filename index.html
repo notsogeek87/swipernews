@@ -108,8 +108,9 @@
 
   /* Carte vidéo. Le ▶ couvre TOUTE la carte pour que n'importe où sur l'image
      lance la lecture, mais il reste en z-index 1 : .card__body est en 2 et plus
-     loin dans le DOM, donc la pastille « Ouvrir sur YouTube » et le titre gardent
-     leur cible par-dessus. Le lecteur prend la même boîte que .card__bg. */
+     loin dans le DOM, donc la pastille « Lire la vidéo » et le titre gardent
+     leur cible par-dessus — les trois lancent la MÊME lecture sur place, jamais
+     une redirection. Le lecteur prend la même boîte que .card__bg. */
   .card__video{position:absolute;inset:0;width:100%;height:100%;border:0;z-index:1;background:#000}
   .card__play{position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;
     background:none;border:0;padding:0;color:#fff;cursor:pointer;-webkit-tap-highlight-color:transparent;
@@ -136,8 +137,15 @@
     right:16px;z-index:3;width:40px;height:40px;border-radius:50%;
     background:rgba(0,0,0,.55);border:0;color:#fff;font-size:18px;line-height:1;
     display:flex;align-items:center;justify-content:center;cursor:pointer;
-    -webkit-tap-highlight-color:transparent}
+    -webkit-tap-highlight-color:transparent;transition:opacity .4s ease}
   .card__vclose:active{transform:scale(.92)}
+  /* Posée par startVideo() après un court délai : l'immense majorité des
+     lectures se déroulent SANS ce mur, et un rond plein posé sur la vidéo
+     pendant toute sa durée gênait la vue pour rien. L'opacité baisse, jamais
+     `pointer-events` : la cible reste entière, seul son rendu s'estompe — un
+     iframe cross-origin n'expose aucun clic à la page qui l'englobe (voir plus
+     haut), donc rien ne peut fiablement la faire réapparaître au toucher. */
+  .card__vclose.dim{opacity:.32}
   .card__body{position:relative;z-index:2;padding:28px 22px calc(44px + env(safe-area-inset-bottom));
     transition:opacity .18s ease}
   /* Flou LOCAL derrière le texte, solidaire du bloc : il couvre exactement le
@@ -1226,9 +1234,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=195"></script>
-<script src="src/learn-core.js?v=195"></script>
-<script src="src/i18n.js?v=195"></script>
+<script src="src/lib.js?v=196"></script>
+<script src="src/learn-core.js?v=196"></script>
+<script src="src/i18n.js?v=196"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2047,7 +2055,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="195";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="196";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -4448,8 +4456,8 @@ function cardHTML(it,id){
   /* Le ▶ est émis MÊME sans miniature : une vidéo dont le flux n'a pas publié
      de vignette doit rester jouable, sur le fond rayé de .card__noimg. */
   const playBtn=vid?`<button type="button" class="card__play" data-play aria-label="${escAttr(T("card.playVideo"))}">${ICON_PLAY}</button>`:"";
-  const openLabel=vid?T("card.openYoutube"):learnCard?T("card.discover"):T("card.readArticle");
-  const openIcon=vid?ICON_PLAY:learnCard?ICON_DISCOVER:ICON_READ;
+  const openLabel=learnCard?T("card.discover"):T("card.readArticle");
+  const openIcon=learnCard?ICON_DISCOVER:ICON_READ;
   const catB=it.cat&&catLabelT(it.cat)?`<span class="card__cat">${esc(catLabelT(it.cat))}</span>`:"";
   // Payant : jamais tranché ici. isPaywallCandidateDomain ne dit que si la
   // vérification (asynchrone, une vraie lecture de la page — voir
@@ -4476,7 +4484,9 @@ function cardHTML(it,id){
       ${it.desc?`<p class="card__desc">${esc(it.desc)}</p>`:""}
       <div class="card__meta">${it.date?`<span>${relTime(it.date)}</span>`:""}</div>
       <div class="card__actions">
-        ${link?`<a class="card__open" data-open${vid?" data-video":""} href="${escAttr(link)}" target="_blank" rel="noopener">${openIcon}<span>${openLabel}</span></a>`:`<span class="card__open" style="background:transparent;box-shadow:none;border:1px solid var(--redline);color:var(--ash)">${T("card.demo")}</span>`}
+        ${vid?`<button type="button" class="card__open" data-play>${ICON_PLAY}<span>${T("card.playVideo")}</span></button>`
+          :link?`<a class="card__open" data-open href="${escAttr(link)}" target="_blank" rel="noopener">${openIcon}<span>${openLabel}</span></a>`
+          :`<span class="card__open" style="background:transparent;box-shadow:none;border:1px solid var(--redline);color:var(--ash)">${T("card.demo")}</span>`}
       </div>
     </div>
   </article>`;
@@ -4527,8 +4537,13 @@ function pushVideoState(){
 function popVideoState(){
   try{if(history.state&&history.state.snVideo)history.back();}catch(e){warn("history back",e);}
 }
+// Minuterie du fondu de .card__vclose (voir son commentaire CSS) : posée par
+// startVideo(), annulée par stopVideo() pour ne jamais courir après une carte
+// qui a déjà quitté la lecture.
+let vcloseDimTimer=null;
 function stopVideo(){
   if(!playingCard)return;
+  clearTimeout(vcloseDimTimer);
   const f=playingCard.querySelector(".card__video");
   if(f)f.remove();               // retirer l'iframe suffit à couper l'image ET le son
   const c=playingCard.querySelector(".card__vclose");
@@ -4569,6 +4584,10 @@ function startVideo(card){
   closeBtn.textContent="✕";
   closeBtn.onclick=e=>{e.stopPropagation();e.preventDefault();stopVideo();};
   card.appendChild(closeBtn);
+  // Estompé après un court délai (voir .card__vclose.dim en CSS) : la cible
+  // reste entière, seule sa présence visuelle s'efface le temps d'une lecture
+  // qui se passe bien.
+  vcloseDimTimer=setTimeout(()=>closeBtn.classList.add("dim"),2200);
   card.classList.add("card--playing");
   playingCard=card;
   disableCaptions(f);
@@ -4614,20 +4633,13 @@ feedEl.addEventListener("click",e=>{
   // titre. Le titre est cliquable parce que la pastille, alignée à gauche comme
   // le texte, est hors d'atteinte du pouce quand le téléphone est tenu de la
   // main droite — alors que le titre, lui, barre toute la largeur.
-  // (Sur une carte vidéo, le titre n'est plus un lien : il lance la vidéo.)
+  // (Sur une carte vidéo, ni le titre ni la pastille ne sont des liens : les
+  // deux passent par [data-play] ci-dessus, donc jamais par cette branche —
+  // « vu » y est déjà acquis au lancement, voir startVideo.)
   const openLink=e.target.closest("a[data-open]");
   if(openLink&&openLink.href){
     const card=openLink.closest(".card"),t=card&&card.querySelector(".card__title");
-    /* « Ouvrir sur YouTube » compte aussi comme un lancement : on part la
-       regarder, ailleurs mais on la regarde. La reproposer en tête de la file
-       de sa chaîne au prochain rafraîchissement serait le même défaut que si on
-       l'avait lue sur la carte. Rien de tel pour un ARTICLE : là, « vu » est
-       déjà acquis à l'affichage (voir markVisibleSeen). */
-    if("video" in openLink.dataset&&card){
-      const it=cardReg.get(+card.dataset.id);
-      if(it)addSeenNews(it);
-    }
-    if(openArticle(openLink.href,t?t.textContent:"",{noReader:"video" in openLink.dataset,external:"video" in openLink.dataset}))e.preventDefault();
+    if(openArticle(openLink.href,t?t.textContent:""))e.preventDefault();
   }
 });
 /* Rail unique : il agit sur la carte visible (une seule instance pour toute
