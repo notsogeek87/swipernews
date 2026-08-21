@@ -14,9 +14,7 @@
   h1{font-size:22px;margin:0 0 12px}
   p{color:#baadab;margin:0 0 16px}
   a.btn{display:inline-block;background:#fa5838;color:#190501;font-weight:700;text-decoration:none;
-    padding:14px 22px;border-radius:999px;margin:8px 0 20px}
-  a.back{color:#fcac9c;text-decoration:none;font-size:14px}
-  a.back:hover{text-decoration:underline}
+    padding:14px 22px;border-radius:999px;margin:8px 0 4px}
 </style>
 </head>
 <body>
@@ -25,7 +23,6 @@
   <h1 id="h1">Nous contacter</h1>
   <p id="p1">Une question, un bug à signaler, un retour sur l'app ? Écrivez-nous directement :</p>
   <a class="btn" href="mailto:contact@lielu.eu">contact@lielu.eu</a>
-  <p><a class="back" id="back" href="/">← Retour à SwiperNews</a></p>
 </div>
 <script>
 // Même détection minimale qu'add.html : pas de couche i18n complète pour
@@ -36,7 +33,6 @@
     document.title="Contact us — SwiperNews";
     document.getElementById("h1").textContent="Contact us";
     document.getElementById("p1").textContent="A question, a bug to report, feedback on the app? Write to us directly:";
-    document.getElementById("back").textContent="← Back to SwiperNews";
   }
 })();
 </script>
