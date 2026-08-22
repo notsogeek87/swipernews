@@ -497,9 +497,10 @@ genre de script dérape.
   second argument de `titreDuFlux`, qui prend alors `feed > entry > author >
   name` — le seul endroit du flux où vit le nom de la chaîne. Sans lui, toutes
   les chaînes s'appelleraient « YT · Shorts », soit exactement le défaut qu'on
-  avait corrigé. Effet de bord voulu : le tour de rôle des actus regroupe par
-  `it.source`, donc cinq chaînes suivies ont maintenant cinq parts au lieu
-  d'une seule partagée sous « youtube.com ».
+  avait corrigé. Le tour de rôle des actus, lui, ne regroupe PAS par
+  `it.source` pour YouTube : toutes les chaînes suivies partagent une seule
+  file (voir plus bas, « une file par NOM de source ») — sinon chaque nom
+  distinct obtiendrait sa propre part.
 - `persistFeeds()` vs `save()` — `save()` pose `feedsDirty` et re-rend les
   filtres ; RENOMMER une source ne change pas la liste de ce qu'on interroge, et
   passer par `save()` ferait recharger tout le fil au prochain « Voir mon fil »
@@ -772,6 +773,22 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
     recréer à la main le déséquilibre qu'on corrige.
   Contrepartie assumée : le fil n'est plus « le plus récent d'abord » de bout en
   bout — la carte 2 peut avoir six heures pendant que la 25 en a dix.
+  **EXCEPTION à « une file par nom » : toutes les chaînes YouTube suivies
+  partagent une seule et même file** (`rebuild`, `ytNames`), quel que soit
+  leur nombre — la seule exception, identifiée à l'URL réellement interrogée
+  (`isYoutubeFeedUrl`), jamais au nom affiché (rien n'oblige un nom de source
+  RSS à ne pas commencer par « YT · »). Chaque chaîne a son propre nom (voir
+  `nomDeSource` plus haut), donc sans cette exception chaque chaîne suivie
+  obtient sa propre part au même titre qu'un site de presse entier : à quinze
+  chaînes suivies pour cinq sites, YouTube occupait 75 % du fil actus — signalé
+  par un utilisateur qui suit beaucoup de petites chaînes. `diversiteCollectee`
+  (voir `NEWS_DIVERSITY_MIN`) applique la MÊME exception à sa propre notion de
+  « sources distinctes », et son plafond (`groupesActifs`, plus haut dans
+  `loadNewsPart`) compte lui aussi une seule chaîne YouTube — sans ce
+  plafond, `active.length` (qui compte chaque chaîne séparément) resterait
+  au-dessus de ce que la diversité fusionnée peut jamais atteindre dès qu'il y
+  a plus d'une chaîne suivie et peu de sites de presse, et la garde
+  n'aboutirait alors plus jamais avant `NEWS_DEADLINE_HARD_MS`.
 - **Les actus lues sont MÉMORISÉES, et repoussées en fin de file — jamais
   retirées.** La mémoire « déjà vu » ne valait que pour Wikipédia, au motif
   écrit dans `markVisibleSeen` qu'« une actu sort naturellement du fil quand
