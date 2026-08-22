@@ -2345,6 +2345,188 @@ const scenarios = {
     console.log("erreurs :", errors);
     await browser.close();
   },
+
+  /* 30. Séries de cartes VIDÉO d'affilée quand on swipe dès la première carte
+     affichée (rafraîchissement AUTOMATIQUE), avec des chaînes YouTube qui
+     répondent plus vite que les sites de presse — cas réel signalé.
+     mixLists (voir remix, index.html) entrelace déjà vidéo et article au
+     prorata de ce que chacun a à offrir (weightedRoundRobin, src/lib.js) —
+     mais UNIQUEMENT dans la portion pas encore figée. Si le tout premier tour
+     de rôle est peint avant qu'un seul article ne soit arrivé (typiquement :
+     seules des chaînes vidéo rapides ont répondu), la portion consommée
+     pendant que l'utilisateur glisse déjà reste alors purement vidéo, sans
+     plus jamais repasser par mixLists une fois figée. Le pendant, pour la
+     NATURE des cartes, de `melangeprecoce` (pour la diversité des SOURCES) :
+     même mécanisme, même correctif (armerEcheance exige maintenant aussi la
+     présence des DEUX natures avant de figer, voir `melangeAttendu`). */
+  async seriesvideo() {
+    const VID = 20,
+      PRESSE = 5;
+    // Vraies URL de flux YouTube (channel_id=UC…) : `melangeAttendu`
+    // (index.html) juge de la NATURE d'une source via isYoutubeFeedUrl, qui
+    // n'y voit rien sur un domaine de complaisance. urlDuFlux() réécrit
+    // ensuite la requête RÉELLE vers la playlist Shorts (UUSH…) — voir
+    // youtubeShortsFeedUrl (src/lib.js) — d'où la table suffixe→i ci-dessous
+    // pour reconnaître la chaîne d'origine dans l'URL effectivement appelée.
+    const chanSuffix = (i) => ("chan" + i).padEnd(22, "0");
+    const suffixToI = new Map(Array.from({ length: VID }, (_, i) => [chanSuffix(i), i]));
+    const feeds = [
+      ...Array.from({ length: VID }, (_, i) => ({
+        url: `https://www.youtube.com/feeds/videos.xml?channel_id=UC${chanSuffix(i)}`,
+        name: "YT · Chaîne" + i,
+        on: true,
+      })),
+      ...Array.from({ length: PRESSE }, (_, i) => ({
+        url: `https://presse${i}.test/rss`,
+        name: "Presse " + i,
+        on: true,
+      })),
+    ];
+    const rssVideo = (i) =>
+      `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+<title>Shorts</title>
+${Array.from({ length: 12 }, (_, k) => {
+  const id = ("vid" + i + "_" + k).padEnd(11, "0").slice(0, 11);
+  return (
+    `<entry><id>yt:video:${id}</id><yt:videoId>${id}</yt:videoId>` +
+    `<title>Vidéo c${i} n${k}</title>` +
+    `<link rel="alternate" href="https://www.youtube.com/watch?v=${id}"/>` +
+    `<author><name>Chaîne${i}</name><uri>https://www.youtube.com/channel/UC${chanSuffix(i)}</uri></author>` +
+    `<published>${new Date(Date.now() - (i * 12 + k) * 5 * 60e3).toISOString()}</published>` +
+    `<media:group><media:title>Vidéo c${i} n${k}</media:title>` +
+    `<media:thumbnail url="https://i.ytimg.com/vi/${id}/hqdefault.jpg" width="480" height="360"/>` +
+    `<media:description>${"texte ".repeat(20)}</media:description></media:group></entry>`
+  );
+}).join("\n")}
+</feed>`;
+    const rssPresse = (i) =>
+      `<?xml version="1.0"?><rss version="2.0"><channel><title>Presse${i}</title>${Array.from(
+        { length: 12 },
+        (_, k) =>
+          `<item><title>Presse p${i} n${k}</title><link>https://presse${i}.test/n/${k}</link>` +
+          `<description>${"texte ".repeat(20)}</description><pubDate>` +
+          `${new Date(Date.now() - (i * 12 + k) * 5 * 60e3).toUTCString()}</pubDate></item>`
+      ).join("")}</channel></rss>`;
+    const KEY = "mix|fr|all|all:sciences,histoire|s";
+    const vieux = feeds.map((f, i) => ({
+      kind: "news",
+      source: f.name,
+      title: "VIEUX " + f.name,
+      desc: "ancien",
+      link: `https://x.test/vieux/${i}`,
+      img: "",
+      date: new Date(Date.now() - 40 * 60e3).toUTCString(),
+    }));
+    const { browser, page, errors } = await boot({
+      storage: {
+        ...READY,
+        "fluxswipe.feeds.v1": JSON.stringify(feeds),
+        "fluxswipe.cache.v1": JSON.stringify({
+          [KEY]: { t: Date.now() - 35 * 60e3, items: vieux },
+        }),
+      },
+    });
+    await page.route(/\/api\/feed\?url=|presse\d+\.test/, async (r) => {
+      const raw = r.request().url();
+      // Le web passe par le backend même origine (`/api/feed?url=`, voir
+      // PROXIES dans index.html), qui encode la cible en `encodeURIComponent`
+      // — les `/` d'une vraie URL YouTube y deviennent `%2F` : il faut décoder
+      // avant de reconnaître channel_id/playlist_id.
+      const m = raw.match(/[?&]url=([^&]+)/);
+      const u = m ? decodeURIComponent(m[1]) : raw;
+      const mp = u.match(/presse(\d+)\.test/);
+      if (mp) {
+        await new Promise((z) => setTimeout(z, 3000)); // site de presse lent
+        return r
+          .fulfill({
+            status: 200,
+            contentType: "application/xml",
+            body: rssPresse(+mp[1]),
+          })
+          .catch(() => {});
+      }
+      const mv = u.match(/playlist_id=UUSH([A-Za-z0-9_-]{22})/);
+      const i = mv ? suffixToI.get(mv[1]) : undefined;
+      if (i === undefined) return r.fallback();
+      await new Promise((z) => setTimeout(z, 100)); // chaîne YouTube rapide
+      return r
+        .fulfill({ status: 200, contentType: "application/xml", body: rssVideo(i) })
+        .catch(() => {});
+    });
+    await page.addInitScript(() => {
+      window.__J = [];
+      const t0 = Date.now();
+      addEventListener("DOMContentLoaded", () => {
+        const r = window.render;
+        window.render = function (top) {
+          const out = r.apply(this, arguments);
+          const kind = (it) => (it.kind === "learn" ? "w" : videoIdOf(it) ? "v" : "a");
+          window.__J.push(
+            `${Date.now() - t0}ms render(top=${!!top}) news=${newsItems.length} first10=` +
+              newsItems.slice(0, 10).map(kind).join("")
+          );
+          return out;
+        };
+      });
+    });
+    await page.goto(URL_APP);
+    // Le doigt glisse dès la première carte affichée, sans jamais attendre la
+    // fin du chargement — voir melangeprecoce pour le même principe.
+    let dernierIndex = 0;
+    for (let i = 0; i < 200; i++) {
+      const st = await page.evaluate(() => ({
+        n: feedEl.children.length,
+        sync: document.getElementById("syncbar").classList.contains("on"),
+      }));
+      if (st.n > dernierIndex + 2) {
+        dernierIndex++;
+        await page.evaluate((idx) => {
+          feedEl.scrollTop = feedEl.children[idx].offsetTop;
+          onCardChange();
+        }, dernierIndex);
+      }
+      if (!st.sync && i > 30) break;
+      await page.waitForTimeout(100);
+    }
+    const r = await page.evaluate(
+      ({ dernierIndex }) => {
+        // La fenêtre déjà FIGÉE (voir remix, `fige`) : ce que l'utilisateur a
+        // déjà sous les yeux ou vient de dépasser, donc ce que mixLists ne
+        // recompose plus.
+        const fenetre = items.slice(0, dernierIndex + 3);
+        const kind = (it) =>
+          it.kind === "learn" ? "wiki" : videoIdOf(it) ? "video" : "article";
+        let run = 0,
+          max = 0,
+          prev;
+        for (const it of fenetre) {
+          const k = kind(it);
+          run = k === prev ? run + 1 : 1;
+          prev = k;
+          if (k === "video" && run > max) max = run;
+        }
+        return {
+          total: fenetre.length,
+          videos: fenetre.filter((it) => kind(it) === "video").length,
+          max,
+        };
+      },
+      { dernierIndex }
+    );
+    console.log(
+      `swipe simulé jusqu'à l'index ${dernierIndex} — ${r.total} cartes déjà figées (${r.videos} vidéos), plus longue série vidéo : ${r.max}`
+    );
+    console.log(
+      r.max <= 3
+        ? "  → jamais de longue série vidéo d'affilée dans la portion déjà figée ✓"
+        : "  ← série vidéo trop longue dans la portion déjà figée (régression)"
+    );
+    console.log("--- journal des rendus");
+    console.log((await page.evaluate(() => window.__J)).join("\n"));
+    console.log("erreurs :", errors);
+    await browser.close();
+  },
 };
 
 const which = process.argv[2];
