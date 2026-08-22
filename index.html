@@ -1248,9 +1248,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=210"></script>
-<script src="src/learn-core.js?v=210"></script>
-<script src="src/i18n.js?v=210"></script>
+<script src="src/lib.js?v=211"></script>
+<script src="src/learn-core.js?v=211"></script>
+<script src="src/i18n.js?v=211"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2092,7 +2092,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="210";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="211";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -3510,46 +3510,16 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
      (forceTop, la reprise de lecture, les scénarios `forcetop` et `resume`) :
      la PREMIÈRE carte reste l'article globalement le plus récent — les files
      sont classées par la date de leur tête. */
-  function rebuild(top){
-    /* Ordre d'itération STABLE : celui de `active`, jamais celui des réponses.
-       dedupNews garde la PREMIÈRE occurrence et fusionne les suivantes dedans,
-       donc l'ordre d'arrivée décidait à quelle source était attribué un article
-       publié par deux flux — et donc, maintenant, dans quelle file il tombe.
-       Avec l'ordre des réponses, sa position changeait d'une repeinture à
-       l'autre pour une raison purement réseau. */
-    let all=[];
-    // Sources dont les articles COLLECTÉS viennent d'une chaîne YouTube (au sens
-    // de l'URL réellement interrogée, `isYoutubeFeedUrl` — jamais du nom
-    // affiché, que rien n'oblige à commencer par « YT · »). `nomDeSource`
-    // donne le MÊME nom à tous les items d'une même chaîne : un item suffit.
-    const ytNames=new Set();
-    for(const f of active){
-      const l=collected.get(f.url);if(!l)continue;
-      all=all.concat(l);
-      if(l.length&&isYoutubeFeedUrl(f.url))ytNames.add(l[0].source);
-    }
-    // Sponsoring d'auteur déjà confirmé sur un chargement précédent : `collected`
-    // le contient toujours (le flux RSS ne le déclare pas), c'est ici qu'il se
-    // retire — sinon chaque repeinture le ramenait. Voir sponsorOut.
-    if(filterSponsored&&sponsorOut.size)all=all.filter(i=>!sponsorOut.has(i.link));
-    // ICI et pas par flux : c'est justement ENTRE les flux que le même article
-    // se répète (le « à la une » d'un site et sa rubrique servent le même
-    // papier). Avant la mise en files, donc avant le plafond MAX_NEWS — sinon
-    // les doublons mangeraient des places à des articles distincts.
-    all=dedupNews(all);
-    /* Une file par SOURCE, au sens du NOM affiché (`it.source`) et non de l'URL.
-       Quelqu'un qui coche cinq rubriques du même journal a coché cinq fois le
-       même nom : lui donner cinq parts reviendrait à recréer, à la main, le
-       déséquilibre qu'on est en train de corriger. Une étiquette, une part.
-       EXCEPTION délibérée : les chaînes YouTube partagent TOUTES une seule
-       file (`ytNames`, ci-dessus), quel que soit leur nombre. Chacune a son
-       propre nom (voir `nomDeSource`), donc sans cette exception chaque chaîne
-       suivie obtient sa propre part au même titre qu'un site de presse entier —
-       à quinze chaînes suivies pour cinq sites, YouTube occupe alors 75 % du
-       fil actus, un déséquilibre demandé en retour par un utilisateur. */
+  /* Répartit une liste d'actus en files par SOURCE (au sens du nom affiché,
+     `it.source`, pas de l'URL — cocher cinq rubriques du même journal ne
+     doit pas donner cinq parts), puis les sert à tour de rôle. Fabrique
+     commune aux DEUX natures (articles / vidéos, voir rebuild) : chacune
+     doit rester équitable ENTRE SES PROPRES sources avant que les deux
+     natures ne s'alternent entre elles. */
+  function tourDeRoleSources(liste){
     const files=new Map();
-    for(const it of all){
-      const k=ytNames.has(it.source)?"\0yt":(it.source||"");
+    for(const it of liste){
+      const k=it.source||"";
       let f=files.get(k);
       if(!f){f=[];files.set(k,f);}
       f.push(it);
@@ -3587,11 +3557,11 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
     for(const q of queues)q.sort((a,b)=>
       (hideSeen?(newsSeen(a)?1:0)-(newsSeen(b)?1:0):0)||itemTime(b)-itemTime(a));
     /* Files classées par la date de leur TÊTE — laquelle est maintenant le plus
-       récent NON LU de chaque source. La carte 1 du fil est donc l'article le
-       plus récent qu'on n'a pas encore eu sous les yeux, et non le plus récent
-       dans l'absolu : à quoi bon rouvrir l'app sur la carte qu'on vient de
-       lire. Au premier chargement d'une session neuve, rien n'étant lu, les
-       deux définitions coïncident. */
+       récent NON LU de chaque source. La tête de cette nature est donc son
+       article (ou sa vidéo) le plus récent qu'on n'a pas encore eu sous les
+       yeux, et non le plus récent dans l'absolu : à quoi bon rouvrir l'app sur
+       la carte qu'on vient de lire. Au premier chargement d'une session
+       neuve, rien n'étant lu, les deux définitions coïncident. */
     queues.sort((a,b)=>itemTime(b[0])-itemTime(a[0]));
     /* Ce tri ne doit garantir que la PREMIÈRE file : au-delà, l'ordre par date
        de tête sert aussi d'ordre de service du tour de rôle (voir roundRobin),
@@ -3601,10 +3571,58 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
        consécutivement et ressortaient groupées, plusieurs vidéos d'affilée,
        plutôt que mélangées au reste. dedupAndRank mélange déjà l'ordre de ses
        files pour Wikipédia (src/lib.js) ; ici on ne peut pas mélanger la file
-       de tête (elle doit rester la carte 1), donc on la préserve et on ne
-       mélange que le reste. */
+       de tête (elle doit rester en tête), donc on la préserve et on ne mélange
+       que le reste. */
     queues.push(...shuffle(queues.splice(1)));
-    newsItems=roundRobin(queues,[],CONFIG.MAX_NEWS);
+    return roundRobin(queues,[],CONFIG.MAX_NEWS);
+  }
+  function rebuild(top){
+    /* Ordre d'itération STABLE : celui de `active`, jamais celui des réponses.
+       dedupNews garde la PREMIÈRE occurrence et fusionne les suivantes dedans,
+       donc l'ordre d'arrivée décidait à quelle source était attribué un article
+       publié par deux flux — et donc, maintenant, dans quelle file il tombe.
+       Avec l'ordre des réponses, sa position changeait d'une repeinture à
+       l'autre pour une raison purement réseau. */
+    let all=[];
+    // Sources dont les articles COLLECTÉS viennent d'une chaîne YouTube (au sens
+    // de l'URL réellement interrogée, `isYoutubeFeedUrl` — jamais du nom
+    // affiché, que rien n'oblige à commencer par « YT · »). `nomDeSource`
+    // donne le MÊME nom à tous les items d'une même chaîne : un item suffit.
+    const ytNames=new Set();
+    for(const f of active){
+      const l=collected.get(f.url);if(!l)continue;
+      all=all.concat(l);
+      if(l.length&&isYoutubeFeedUrl(f.url))ytNames.add(l[0].source);
+    }
+    // Sponsoring d'auteur déjà confirmé sur un chargement précédent : `collected`
+    // le contient toujours (le flux RSS ne le déclare pas), c'est ici qu'il se
+    // retire — sinon chaque repeinture le ramenait. Voir sponsorOut.
+    if(filterSponsored&&sponsorOut.size)all=all.filter(i=>!sponsorOut.has(i.link));
+    // ICI et pas par flux : c'est justement ENTRE les flux que le même article
+    // se répète (le « à la une » d'un site et sa rubrique servent le même
+    // papier). Avant la mise en files, donc avant le plafond MAX_NEWS — sinon
+    // les doublons mangeraient des places à des articles distincts.
+    all=dedupNews(all);
+    /* DEUX groupes, jamais un tour de rôle unique entre toutes les sources :
+       articles (RSS) d'un côté, vidéos (YouTube) de l'autre. Chaque groupe est
+       d'abord réparti équitablement ENTRE SES PROPRES sources (tourDeRoleSources,
+       inchangé : toujours une file par nom de source), puis les deux groupes
+       ALTERNENT carte à carte, un article puis une vidéo, quel que soit le
+       nombre de sources de chaque côté — demandé en retour par un utilisateur
+       suivant beaucoup de chaînes YouTube et peu de sites de presse : un tour
+       de rôle plat entre TOUTES les sources (chaînes comprises) donnait encore
+       une part de vidéo proportionnelle au nombre de sites cochés (1 vidéo
+       pour 5 articles à cinq sites suivis), jamais la stricte alternance
+       demandée. Sans chaîne YouTube suivie (ou sans site de presse), l'un des
+       deux groupes est simplement vide et roundRobin sert l'autre en entier —
+       comportement identique à avant cette alternance. */
+    const arts=tourDeRoleSources(all.filter(it=>!ytNames.has(it.source)));
+    const vids=tourDeRoleSources(all.filter(it=>ytNames.has(it.source)));
+    // Le groupe dont la tête est la plus récente passe en premier : c'est ce
+    // qui garde la carte 1 sur l'actu globalement la plus récente (voir plus
+    // haut), qu'elle soit un article ou une vidéo.
+    const groupes=itemTime(vids[0])>itemTime(arts[0])?[vids,arts]:[arts,vids];
+    newsItems=roundRobin(groupes,[],CONFIG.MAX_NEWS);
     remix(!top);
   }
 
@@ -3698,10 +3716,14 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
      navigateur, banc `lentnews`).
      L'indicateur de chargement, lui, reste allumé : le chargement n'est pas
      terminé, il est seulement devenu lisible. */
-  // Sources distinctes déjà rapportées, pour la garde de diversité ci-dessous
-  // (voir NEWS_DIVERSITY_MIN) — même clé que rebuild() (toutes les chaînes
-  // YouTube comptent pour UNE seule source, voir ytNames plus haut), sinon la
-  // garde et le tour de rôle ne compteraient pas les mêmes files.
+  // Sources d'ARTICLES distinctes déjà rapportées, pour la garde de diversité
+  // ci-dessous (voir NEWS_DIVERSITY_MIN). Les chaînes YouTube n'y comptent
+  // plus DU TOUT (voir `vid` ci-dessous) : depuis que rebuild() alterne un
+  // article puis une vidéo (deux groupes indépendants, jamais un tour de rôle
+  // plat entre toutes les sources), leur part est déjà bornée par construction
+  // — ce que cette garde doit encore éviter, c'est de figer le tout premier
+  // tour de rôle sur une poignée de SITES DE PRESSE (les plus rapides à
+  // répondre), pas sur un nombre de chaînes.
   // `vid`/`art` : au moins une carte de chaque NATURE (vidéo/article) est-elle
   // déjà arrivée ? mixLists (voir remix) entrelace déjà vidéo et article au
   // prorata de ce que chacun a à offrir — mais seulement dans la portion
@@ -3716,8 +3738,9 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
     let vid=false,art=false;
     for(const [url,l] of collected.entries()){
       if(!l.length)continue;
-      noms.add(isYoutubeFeedUrl(url)?"\0yt":(l[0].source||""));
-      if(videoIdOf(l[0]))vid=true;else art=true;
+      if(isYoutubeFeedUrl(url)){vid=true;continue;}
+      noms.add(l[0].source||"");
+      art=true;
     }
     return {sources:noms.size,vid,art};
   }
@@ -3725,15 +3748,15 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
   // YouTube suivie, ou au contraire aucun site de presse), rien à exiger de
   // plus que la diversité de sources ci-dessus.
   const melangeAttendu=active.some(f=>isYoutubeFeedUrl(f.url))&&active.some(f=>!isYoutubeFeedUrl(f.url));
-  // Plafond RÉEL du nombre de files que rebuild() peut produire avec ce lot —
-  // toutes les chaînes YouTube actives ne comptant que pour UNE (voir ytNames
-  // dans rebuild). Sans ce plafond, `active.length` (qui, lui, compte chaque
-  // chaîne séparément) reste au-dessus de ce que diversiteCollectee() peut
-  // jamais atteindre dès qu'il y a plus d'une chaîne suivie et peu de sites de
-  // presse — la garde de diversité ne serait alors plus JAMAIS satisfaite avant
-  // l'échéance dure, et chaque chargement attendrait NEWS_DEADLINE_HARD_MS pour
-  // rien.
-  const groupesActifs=new Set(active.map(f=>isYoutubeFeedUrl(f.url)?"\0yt":(f.name||""))).size;
+  // Plafond RÉEL du nombre de sites de presse distincts que ce lot peut
+  // fournir — les chaînes YouTube, exclues de `diversiteCollectee` ci-dessus,
+  // n'y comptent pas non plus. Sans ce plafond, `active.length` (qui compte
+  // aussi les chaînes) reste au-dessus de ce que la diversité d'articles peut
+  // jamais atteindre dès qu'il y a plus de chaînes YouTube que de sites de
+  // presse cochés — la garde ne serait alors plus JAMAIS satisfaite avant
+  // l'échéance dure, et chaque chargement attendrait NEWS_DEADLINE_HARD_MS
+  // pour rien.
+  const groupesActifs=new Set(active.filter(f=>!isYoutubeFeedUrl(f.url)).map(f=>f.name||"")).size;
   function armerEcheance(){
     const depart=Date.now();
     function verifier(){
