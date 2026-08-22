@@ -1248,9 +1248,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=206"></script>
-<script src="src/learn-core.js?v=206"></script>
-<script src="src/i18n.js?v=206"></script>
+<script src="src/lib.js?v=207"></script>
+<script src="src/learn-core.js?v=207"></script>
+<script src="src/i18n.js?v=207"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2092,7 +2092,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="206";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="207";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -4719,7 +4719,13 @@ function startVideo(card){
   closeBtn.className="card__vclose";
   closeBtn.setAttribute("aria-label",T("card.closeVideo"));
   closeBtn.textContent="✕";
-  closeBtn.onclick=e=>{e.stopPropagation();e.preventDefault();stopVideo();};
+  // showTop() explicite : l'iframe cross-origin (youtube-nocookie.com) avale
+  // tous ses clics et ne les laisse jamais remonter à feedEl, seul déclencheur
+  // ordinaire du retour de la barre (voir plus bas) — sans cet appel, fermer
+  // une vidéo pendant que la barre est masquée (swipe juste avant ▶) la
+  // laissait invisible pour de bon, aucun tap sur l'iframe ne pouvant plus la
+  // ramener.
+  closeBtn.onclick=e=>{e.stopPropagation();e.preventDefault();stopVideo();showTop();};
   card.appendChild(closeBtn);
   // Estompé après un court délai (voir .card__vclose.dim en CSS) : la cible
   // reste entière, seule sa présence visuelle s'efface le temps d'une lecture
@@ -5127,8 +5133,10 @@ function popDialogState(){
    pour que popDialogState ne croie jamais avoir une entrée à consommer. */
 try{if(history.state&&history.state.snSheet)history.replaceState(null,"");}catch(e){}
 addEventListener("popstate",()=>{
-  // Vidéo en lecture : le retour la ferme et revient à la carte
-  if(playingCard){stopVideo();return;}
+  // Vidéo en lecture : le retour la ferme et revient à la carte. showTop() pour
+  // la même raison que card__vclose ci-dessus (voir son commentaire) : sans
+  // lui, une barre masquée avant la lecture restait invisible après ce retour.
+  if(playingCard){stopVideo();showTop();return;}
   const s=document.querySelector(".sheet.open");
   if(s){if(s===pickSheet)closePicker(true);else closeDialog(s,true);return;}
   const menu=document.querySelector(".sharemenu.open");
