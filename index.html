@@ -1248,9 +1248,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=205"></script>
-<script src="src/learn-core.js?v=205"></script>
-<script src="src/i18n.js?v=205"></script>
+<script src="src/lib.js?v=206"></script>
+<script src="src/learn-core.js?v=206"></script>
+<script src="src/i18n.js?v=206"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2092,7 +2092,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="205";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="206";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -5608,11 +5608,19 @@ savedSheet.onclick=e=>{if(e.target===savedSheet)closeDialog(savedSheet);};
 savedListEl.addEventListener("click",e=>{
   const del=e.target.closest("[data-sd]");
   if(del){unsave(del.dataset.sd);return;}
-  // a[data-open] : même mécanique que le fil (voir plus haut), sauf qu'il n'y
-  // a ici aucune carte dont marquer la vidéo « vue » — ouvrir depuis la liste
-  // des enregistrés n'est pas la parcourir.
+  // a[data-open] : même mécanique que le fil (voir plus haut). Pour une VIDÉO,
+  // ce clic EST le lancement (mêmes conséquences que ▶ sur la carte : lien
+  // externe, YouTube) — donc la marquer vue ici aussi, sinon elle n'a aucune
+  // autre occasion de l'être et revient sans fin tant qu'elle n'a jamais été
+  // lancée DEPUIS le fil (voir markVisibleSeen/startVideo). Un article, lui,
+  // ne se marque toujours qu'en le parcourant dans le fil : rien à faire ici.
   const open=e.target.closest("a[data-open]");
   if(open&&open.href){
+    if("video" in open.dataset){
+      const row=open.closest("[data-sk]");
+      const x=row&&saved.find(s=>s.key===row.dataset.sk);
+      if(x)addSeenNews(x);
+    }
     const t=open.querySelector(".histrow__ttl");
     if(openArticle(open.href,t?t.textContent:"",{noReader:"video" in open.dataset,external:"video" in open.dataset}))e.preventDefault();
   }
