@@ -977,6 +977,58 @@ test("youtubeApiItemsFromPlaylistResponse ne garde que les items avec un vrai id
   assert.deepEqual(lib.youtubeApiItemsFromPlaylistResponse(null), []);
 });
 
+test("youtubeApiVideosDurationUrl construit l'URL videos.list, jusqu'à 50 identifiants", () => {
+  const url = lib.youtubeApiVideosDurationUrl(["abc", "def"], "MACLE");
+  assert.match(
+    url,
+    /^https:\/\/www\.googleapis\.com\/youtube\/v3\/videos\?part=contentDetails&id=/
+  );
+  assert.match(url, /id=abc%2Cdef&/);
+  assert.match(url, /key=MACLE$/);
+  // Plus de 50 identifiants : tronqué à 50, jamais une requête qui déborde.
+  const beaucoup = Array.from({ length: 60 }, (_, i) => "id" + i);
+  const many = lib.youtubeApiVideosDurationUrl(beaucoup, "K");
+  const ids = decodeURIComponent(many.match(/id=([^&]*)/)[1]).split(",");
+  assert.equal(ids.length, 50);
+  assert.deepEqual(
+    lib.youtubeApiVideosDurationUrl([null, "", "x"], "K").includes("id=x"),
+    true
+  );
+});
+
+test("youtubeIsoDurationSeconds parse une durée ISO 8601 YouTube", () => {
+  assert.equal(lib.youtubeIsoDurationSeconds("PT14M8S"), 14 * 60 + 8);
+  assert.equal(lib.youtubeIsoDurationSeconds("PT45S"), 45);
+  assert.equal(lib.youtubeIsoDurationSeconds("PT1H2M3S"), 3600 + 120 + 3);
+  assert.equal(lib.youtubeIsoDurationSeconds("P1DT1H"), 24 * 3600 + 3600);
+  // Mal formée, absente ou vide : NaN, jamais une durée inventée.
+  assert.ok(Number.isNaN(lib.youtubeIsoDurationSeconds("pas une durée")));
+  assert.ok(Number.isNaN(lib.youtubeIsoDurationSeconds("")));
+  assert.ok(Number.isNaN(lib.youtubeIsoDurationSeconds(null)));
+  assert.ok(Number.isNaN(lib.youtubeIsoDurationSeconds("P")));
+});
+
+test("youtubeApiDurationsFromResponse ne garde que les durées CONFIRMÉES, par identifiant", () => {
+  const json = {
+    items: [
+      { id: "short1", contentDetails: { duration: "PT45S" } },
+      // Le documentaire de 14 min infiltré dans une playlist Shorts.
+      { id: "long1", contentDetails: { duration: "PT14M8S" } },
+      // Durée absente ou mal formée : n'apparaît pas dans le résultat.
+      { id: "sansduree", contentDetails: {} },
+      { id: "malformee", contentDetails: { duration: "n'importe quoi" } },
+      // Pas d'identifiant exploitable : écarté.
+      { contentDetails: { duration: "PT10S" } },
+    ],
+  };
+  assert.deepEqual(lib.youtubeApiDurationsFromResponse(json), {
+    short1: 45,
+    long1: 14 * 60 + 8,
+  });
+  assert.deepEqual(lib.youtubeApiDurationsFromResponse({}), {});
+  assert.deepEqual(lib.youtubeApiDurationsFromResponse(null), {});
+});
+
 test("les vignettes YouTube déclarent leur taille par leur nom de fichier", () => {
   // Sans ça, imageSizeFromUrl rend 0 sur une URL ytimg, et applyBg part sonder
   // /api/og pour CHAQUE carte vidéo défilée — le défaut déjà corrigé côté

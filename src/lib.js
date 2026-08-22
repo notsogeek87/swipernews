@@ -1122,6 +1122,75 @@
       .filter((it) => it && it.title);
   }
 
+  /* ---------- Vérification de durée (Shorts) ----------
+     La playlist Shorts auto-générée (`UUSH…`) est un TRI fait par YouTube lui-
+     même, pas par nous (voir plus haut) — et ce tri n'est pas garanti sans
+     faille : une vidéo classique peut s'y trouver mélangée (mesuré : un
+     documentaire de 14 min dans le flux Shorts d'une chaîne ARTE). Rien dans
+     le flux RSS ne porte la durée, donc aucune vérification locale n'est
+     possible sans requête. Ce filtre est un SECOURS optionnel, seulement
+     tenté quand l'utilisateur a renseigné sa propre clé API (voir ytApiKey,
+     index.html) — jamais de requête de plus sans elle. */
+
+  /** Seuil de durée, en secondes, au-delà duquel une vidéo n'est plus un
+   *  Short. YouTube annonce officiellement 3 min (180 s) depuis son extension
+   *  de 2024 (60 s avant), mais des Shorts dépassant ce chiffre s'observent
+   *  en pratique (créateur qui republie un format plus long en Short, marge
+   *  que YouTube tolère). Ce filtre n'a qu'UN rôle : écarter une vidéo
+   *  CLASSIQUE infiltrée dans la playlist Shorts (documentaire de plusieurs
+   *  dizaines de minutes) — pas trancher un cas limite. Le seuil est donc
+   *  volontairement large (10 min) : mieux vaut laisser passer un Short
+   *  inhabituellement long que perdre un vrai Short parce que YouTube tolère
+   *  plus que ce qu'il annonce. */
+  const YT_SHORT_MAX_DURATION_S = 600;
+
+  /** URL `videos.list` : la durée (`contentDetails.duration`, ISO 8601) de
+   *  jusqu'à 50 vidéos en UNE requête (l'API l'accepte en identifiants
+   *  séparés par des virgules) — jamais une requête par vidéo. */
+  function youtubeApiVideosDurationUrl(ids, key) {
+    const list = (Array.isArray(ids) ? ids : []).filter(Boolean).slice(0, 50);
+    return (
+      "https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=" +
+      encodeURIComponent(list.join(",")) +
+      "&key=" +
+      encodeURIComponent(key || "")
+    );
+  }
+
+  /** Durée d'une durée ISO 8601 (`PT14M8S`, `PT45S`, `PT1H2M3S`…) en secondes,
+   *  ou `NaN` si la chaîne ne s'y conforme pas. Les champs jour/heure/minute/
+   *  seconde suffisent : une vidéo YouTube ne porte jamais d'année ni de mois
+   *  dans sa durée. */
+  function youtubeIsoDurationSeconds(iso) {
+    const m = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(
+      String(iso == null ? "" : iso).trim()
+    );
+    if (!m || (!m[1] && !m[2] && !m[3] && !m[4])) return NaN;
+    const days = Number(m[1] || 0),
+      hours = Number(m[2] || 0),
+      mins = Number(m[3] || 0),
+      secs = Number(m[4] || 0);
+    return ((days * 24 + hours) * 60 + mins) * 60 + secs;
+  }
+
+  /** Durées CONFIRMÉES d'une réponse `videos.list`, par identifiant de vidéo
+   *  (`{id: secondes}`). Une entrée absente ou dont la durée ne se parse pas
+   *  n'apparaît pas dans le résultat — jamais une valeur "inconnue" à part,
+   *  même motif que le filtre d'âge des actus (index.html, YT_MAX_AGE_MS) :
+   *  seule une durée confirmée peut écarter une vidéo, jamais son absence. */
+  function youtubeApiDurationsFromResponse(json) {
+    const items = json && Array.isArray(json.items) ? json.items : [];
+    const out = {};
+    for (const it of items) {
+      const id = it && it.id;
+      const iso = it && it.contentDetails && it.contentDetails.duration;
+      if (!id || typeof id !== "string") continue;
+      const s = youtubeIsoDurationSeconds(iso);
+      if (!isNaN(s)) out[id] = s;
+    }
+    return out;
+  }
+
   /* ---------- L'Équipe ----------
      Les flux RSS de L'Équipe (dwh.lequipe.fr) n'ont pas de titre pertinent :
      ils sont tous généré par une même API avec le même titre de base. La
@@ -1552,6 +1621,10 @@
     youtubeApiPlaylistItemsUrl,
     youtubeApiBestThumbnail,
     youtubeApiItemsFromPlaylistResponse,
+    YT_SHORT_MAX_DURATION_S,
+    youtubeApiVideosDurationUrl,
+    youtubeIsoDurationSeconds,
+    youtubeApiDurationsFromResponse,
     isLequipeFeedUrl,
     lequipeRubrique,
     lequipeFeedName,

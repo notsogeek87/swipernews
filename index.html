@@ -1248,9 +1248,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=201"></script>
-<script src="src/learn-core.js?v=201"></script>
-<script src="src/i18n.js?v=201"></script>
+<script src="src/lib.js?v=202"></script>
+<script src="src/learn-core.js?v=202"></script>
+<script src="src/i18n.js?v=202"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1381,7 +1381,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,dayKey,quarterIndex,statsBuckets,shuffle,
-  seenKey,dropSeen,roundRobin,weightedRoundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,roundRobin,weightedRoundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,YT_SHORT_MAX_DURATION_S,youtubeApiVideosDurationUrl,youtubeApiDurationsFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -2069,7 +2069,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="201";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="202";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -2648,6 +2648,29 @@ async function fetchFeedYoutubeApi(feed,key){
     link:it.link,img:it.img,date:it.date,tags:""
   }));
 }
+/* Écarte, d'un lot Shorts, les vidéos dont la durée CONFIRMÉE dépasse
+   YT_SHORT_MAX_DURATION_S — secours de fluxShorts/urlDuFlux : la playlist
+   Shorts auto-générée est un tri fait par YouTube, pas par nous, et il n'est
+   pas garanti sans faille (mesuré : un documentaire de 14 min mélangé au
+   flux Shorts d'une chaîne). Rien dans le flux RSS ne porte la durée, donc ce
+   filtre coûte UNE requête `videos.list` par chargement — seulement tentée
+   si l'utilisateur a renseigné sa propre clé (voir ytApiKey), jamais sans
+   elle. Toute panne (clé invalide, quota, réseau) laisse le lot INCHANGÉ :
+   comme pour l'âge (CONFIG.YT_MAX_AGE_MS), seule une durée confirmée trop
+   longue écarte une vidéo, jamais l'impossibilité de la vérifier. */
+async function filtreDureeShorts(items,key){
+  const ids=items.map(i=>youtubeId(i.link)).filter(Boolean);
+  if(!ids.length)return items;
+  let json;
+  try{json=await fetchYoutubeApiJson(youtubeApiVideosDurationUrl(ids,key));}
+  catch(e){return items;}
+  const durees=youtubeApiDurationsFromResponse(json);
+  return items.filter(i=>{
+    const id=youtubeId(i.link);
+    const s=id?durees[id]:undefined;
+    return s===undefined||s<=YT_SHORT_MAX_DURATION_S;
+  });
+}
 /* Récupération robuste d'un flux : backend/proxys + XML d'abord, puis repli rss2json.
    Filtre sponsorisé/bons plans appliqué ICI, après le repli : un flux
    entièrement composé de ce genre d'articles ne doit pas déclencher le repli
@@ -2695,6 +2718,13 @@ async function fetchFeedRobust(feed){
   if(isYoutubeFeedUrl(feed.url)){
     const seuil=Date.now()-CONFIG.YT_MAX_AGE_MS;
     result=result.filter(i=>{const t=Date.parse(i.date);return isNaN(t)||t>=seuil;});
+  }
+  // Secours de vérification de durée (voir filtreDureeShorts) : seulement pour
+  // un lot Shorts, seulement si l'utilisateur a sa propre clé, et seulement
+  // s'il reste du budget — jamais au prix d'une source qui répond déjà lentement.
+  if(result.length&&fluxShorts(feed)&&ytApiKey&&reste()){
+    try{result=await filtreDureeShorts(result,ytApiKey);}
+    catch(e){warn("vérification durée Shorts",e);}
   }
   return result;
 }

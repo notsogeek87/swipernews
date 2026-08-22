@@ -838,6 +838,22 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   le code HTTP à travers les six transports de `fetchText`, ce qui ne vaut pas
   ce cas — et ne coûte qu'un message inexact sur une source qui, de toute
   façon, ne servira aucune carte.
+  Second angle mort, mesuré cette fois (pas seulement redouté) : la playlist
+  `UUSH…` elle-même n'est pas toujours pure — une vidéo classique (documentaire
+  ARTE de 14 min) s'y est trouvée mélangée pour une chaîne dont la source était
+  pourtant déjà en `channel_id=` (donc rien à voir avec la migration `user=`
+  ci-dessous). Le tri reste entièrement celui de YouTube : aucun champ du flux
+  RSS ne porte la durée, donc aucune vérification locale n'est possible sans
+  requête de plus. `filtreDureeShorts()` (index.html) est le secours,
+  **optionnel** : seulement si l'utilisateur a renseigné sa propre clé API
+  (`ytApiKey`), une seule requête `videos.list` par chargement (tous les
+  identifiants du lot en une fois, jamais un par vidéo) écarte les vidéos dont
+  la durée CONFIRMÉE dépasse `YT_SHORT_MAX_DURATION_S` (`src/lib.js`, 600 s).
+  Seuil volontairement large : YouTube annonce 3 min depuis 2024, mais des
+  Shorts plus longs s'observent en pratique — ce filtre n'a qu'à écarter une
+  vidéo manifestement classique, jamais à trancher un cas limite, et une durée
+  qu'on n'a pas pu vérifier (panne, pas de clé, quota) ne fait jamais sortir
+  une vidéo, même règle que le filtre d'âge juste en dessous.
 - **Une carte vidéo est une FAÇADE tant qu'on n'a pas appuyé sur ▶.** Miniature du
   flux + bouton ; l'iframe n'est créée qu'au toucher, et rien n'est demandé à
   Google pour une carte simplement croisée. Passer en lecture automatique (à la
