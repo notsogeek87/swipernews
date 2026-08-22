@@ -19,7 +19,7 @@
 //
 // À CHAQUE modification de index.html ou de src/*.js : incrémenter APP_VERSION
 // dans index.html ET CACHE ci-dessous (garder les deux numéros alignés).
-const CACHE = "flux-v207";
+const CACHE = "flux-v208";
 
 // Mis en cache à l'installation : uniquement ce qui ne dépend pas de la version.
 // Les logos portent `?v=` comme les modules `src/*.js` : `/logo-*.png` est

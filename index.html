@@ -1248,9 +1248,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=207"></script>
-<script src="src/learn-core.js?v=207"></script>
-<script src="src/i18n.js?v=207"></script>
+<script src="src/lib.js?v=208"></script>
+<script src="src/learn-core.js?v=208"></script>
+<script src="src/i18n.js?v=208"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2092,7 +2092,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="207";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="208";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -3106,6 +3106,17 @@ async function loadFeeds(force){
   // articles et tronquerait un fil plus complet, faisant disparaître la carte
   // en cours de lecture.
   let cached=sameFeed?null:cacheLoad(key);
+  let cacheAge=cached?Date.now()-cacheTime(key):0;
+  /* Périmé PAR L'ÂGE, détecté ICI, avant toute peinture : peindre un cache
+     qu'on sait déjà au-delà du seuil ferait apparaître la vieille carte une
+     fraction de seconde avant que le lot neuf ne la remplace d'un coup — deux
+     cartes perçues comme un sursaut, précisément le cas « ouverture après
+     30 min ». Le traiter comme absent (`cached=null`) réutilise tel quel le
+     chemin juste en dessous (écran de chargement), au lieu d'une repeinture
+     bruyante suivie d'un remplacement. `force` (↻ explicite) garde son
+     comportement inchangé : peindre puis remplacer, l'action vient de
+     l'utilisateur donc rien ne le surprend. */
+  if(cached&&!force&&cacheAge>=AUTO_RELOAD_MS){cached=null;cacheAge=0;}
   /* Le cache ne peint que VITE : il n'a pas à décider si le fil se charge. Tout
      ce qui échoue ici est donc rattrapé, et le chargement réseau suit quand
      même — c'est la seule chose qui garantit qu'aucune donnée locale, quelle
@@ -3135,7 +3146,7 @@ async function loadFeeds(force){
      Le tirage neuf écarte ce qui est déjà vu (dropSeen, mémoire persistante) :
      un fil rafraîchi est donc réellement neuf, pas un nouveau tirage au hasard
      dans ce qu'on vient de lire. */
-  const age=Date.now()-(cached?cacheTime(key):lastNewsLoad);
+  const age=cached?cacheAge:Date.now()-lastNewsLoad;
   const perime=!!force||!(cached||sameFeed)||age>=AUTO_RELOAD_MS;
   /* Reprise de lecture : elle ne vaut QUE dans la fenêtre de fraîcheur.
      Rouvrir l'app avant AUTO_RELOAD_MS ne déclenche aucun appel réseau, le fil
