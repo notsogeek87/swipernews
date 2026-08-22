@@ -1248,9 +1248,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=202"></script>
-<script src="src/learn-core.js?v=202"></script>
-<script src="src/i18n.js?v=202"></script>
+<script src="src/lib.js?v=203"></script>
+<script src="src/learn-core.js?v=203"></script>
+<script src="src/i18n.js?v=203"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1444,7 +1444,6 @@ const DEMO_LEARN = [
 const DEFAULT_FEEDS = [
   {name:"France Info", url:"https://www.francetvinfo.fr/titres.rss", on:true},
   {name:"Le Monde", url:"https://www.lemonde.fr/rss/une.xml", on:true},
-  {name:"France 24", url:"https://www.france24.com/fr/rss", on:true},
   {name:"20 Minutes", url:"https://www.20minutes.fr/feeds/rss-une.xml", on:true},
 ];
 /* Sources proposées en un tap dans le panneau (RSS finis → plus de sources = plus d'articles). */
@@ -2069,7 +2068,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="202";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="203";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
