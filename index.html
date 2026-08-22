@@ -1248,9 +1248,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=203"></script>
-<script src="src/learn-core.js?v=203"></script>
-<script src="src/i18n.js?v=203"></script>
+<script src="src/lib.js?v=204"></script>
+<script src="src/learn-core.js?v=204"></script>
+<script src="src/i18n.js?v=204"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1328,6 +1328,30 @@ const CONFIG = {
      c'est elle qui rend un rafraîchissement rapide À L'ÉCRAN, indépendamment
      du temps qu'il met à se terminer VRAIMENT. */
   NEWS_DEADLINE_MS: 2500,
+  /* Sources DISTINCTES exigées avant que l'échéance ci-dessus ne fige le
+     premier tour de rôle (voir armerEcheance). Sans ce plancher, l'échéance
+     peint « ce qu'on a » même si ce n'est qu'une poignée de sources — dans les
+     faits, souvent des chaînes YouTube, qui répondent plus vite et plus
+     régulièrement que la plupart des flux de presse — et remix() FIGE ensuite
+     ce mélange biaisé pour toute la portion déjà affichée (le gel protège tout
+     ce qui a déjà défilé sous les yeux, pas seulement la carte suivante). Un
+     rafraîchissement AUTOMATIQUE (personne ne regarde de barre de
+     chargement) fait glisser l'utilisateur dès la première carte, et fige
+     donc ce biais tôt ; un rafraîchissement FORCÉ laisse le temps à plus de
+     sources de répondre avant que quiconque ne swipe, d'où le fil bien
+     mélangé qu'on observe alors — même code, seul le moment du premier swipe
+     diffère. Voir NEWS_DEADLINE_HARD_MS pour la garantie que cette exigence
+     ne bloque jamais l'affichage indéfiniment. */
+  NEWS_DIVERSITY_MIN: 5,
+  // Intervalle de nouvelle vérification quand la diversité manque encore à
+  // l'échéance : court, pour ne pas ajouter un délai perceptible une fois le
+  // seuil enfin atteint.
+  NEWS_DEADLINE_RECHECK_MS: 400,
+  // Plafond, décompté depuis l'échéance normale : passé ce délai, on peint
+  // quand même — diversité suffisante ou non — plutôt que de laisser un lot
+  // pauvre en sources rapides (peu de sources au total, la plupart lentes)
+  // bloquer l'affichage en attendant une diversité qui ne viendra pas.
+  NEWS_DEADLINE_HARD_MS: 6000,
   /* Budget total accordé à UNE source, tous replis compris (backend, proxys
      publics, rss2json). Sans lui, une source morte cumulait les délais de
      chacun — 7 s + 7 s + 7 s — en gardant son emplacement de parallélisme
@@ -2068,7 +2092,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="203";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="204";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -3648,13 +3672,30 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
      navigateur, banc `lentnews`).
      L'indicateur de chargement, lui, reste allumé : le chargement n'est pas
      terminé, il est seulement devenu lisible. */
+  // Sources distinctes déjà rapportées, pour la garde de diversité ci-dessous
+  // (voir NEWS_DIVERSITY_MIN) — même clé que rebuild() (it.source), sinon la
+  // garde et le tour de rôle ne compteraient pas les mêmes files.
+  function diversiteCollectee(){
+    const noms=new Set();
+    for(const l of collected.values())if(l.length)noms.add(l[0].source||"");
+    return noms.size;
+  }
   function armerEcheance(){
-    echeanceT=setTimeout(()=>{
-      echeanceT=null;echeancePassee=true;
-      if(my!==loadSeq||enTeteFait||!collected.size)return;   // rien reçu : scheduleRender s'en chargera
+    const depart=Date.now();
+    function verifier(){
+      echeanceT=null;
+      if(my!==loadSeq||enTeteFait)return;
+      if(!collected.size){echeancePassee=true;return;}   // rien reçu : scheduleRender s'en chargera
+      const seuil=Math.min(active.length,CONFIG.NEWS_DIVERSITY_MIN);
+      if(diversiteCollectee()<seuil&&Date.now()-depart<CONFIG.NEWS_DEADLINE_HARD_MS){
+        echeanceT=setTimeout(verifier,CONFIG.NEWS_DEADLINE_RECHECK_MS);
+        return;
+      }
+      echeancePassee=true;
       if(renderT){clearTimeout(renderT);renderT=null;}
       paint(true,false);
-    },CONFIG.NEWS_DEADLINE_MS);
+    }
+    echeanceT=setTimeout(verifier,CONFIG.NEWS_DEADLINE_MS);
   }
 
   // Récupération par lots bornés plutôt que tout en parallèle.

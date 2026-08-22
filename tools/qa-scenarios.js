@@ -2224,6 +2224,127 @@ const scenarios = {
     console.log("erreurs :", errors);
     await browser.close();
   },
+
+  /* 29. Le mélange des GENRES d'actus (chaînes YouTube vs presse classique)
+     quand l'utilisateur glisse dès la première carte, SANS attendre la fin du
+     chargement — le cas d'un rafraîchissement AUTOMATIQUE (30 min, filet,
+     retour au premier plan), où rien à l'écran ne dit qu'un chargement est en
+     cours. `remix()` fige tout ce qui a déjà défilé sous les yeux (pas
+     seulement la carte suivante) : si le tout premier tour de rôle n'est
+     construit qu'à partir des quelques sources les plus rapides (ici les
+     "rapides", en pratique souvent des chaînes YouTube), ce déséquilibre reste
+     figé pour toute la portion du fil déjà consommée — même une fois les
+     sources lentes arrivées. Voir NEWS_DIVERSITY_MIN dans CONFIG.
+     Un rafraîchissement FORCÉ, où l'utilisateur attend la barre de
+     chargement avant de swiper, ne rencontre jamais ce problème : bien plus
+     de sources ont répondu avant le premier geste. */
+  async melangeprecoce() {
+    const FAST = 4,
+      SLOW = 10;
+    const feeds = [
+      ...Array.from({ length: FAST }, (_, i) => ({
+        url: `https://fast${i}.test/rss`,
+        name: "YT · Rapide" + i,
+        on: true,
+      })),
+      ...Array.from({ length: SLOW }, (_, i) => ({
+        url: `https://slow${i}.test/rss`,
+        name: "Presse " + i,
+        on: true,
+      })),
+    ];
+    const rss = (nom) =>
+      `<?xml version="1.0"?><rss version="2.0"><channel><title>${nom}</title>${Array.from(
+        { length: 12 },
+        (_, k) =>
+          `<item><title>${nom} article ${k}</title><link>https://x.test/${encodeURIComponent(nom)}/${k}</link>` +
+          `<description>${"texte ".repeat(20)}</description><pubDate>` +
+          `${new Date(Date.now() - k * 5 * 60e3).toUTCString()}</pubDate></item>`
+      ).join("")}</channel></rss>`;
+    const KEY = "mix|fr|all|all:sciences,histoire|s";
+    const vieux = feeds.map((f, i) => ({
+      kind: "news",
+      source: f.name,
+      title: "VIEUX " + f.name,
+      desc: "ancien",
+      link: `https://x.test/vieux/${i}`,
+      img: "",
+      date: new Date(Date.now() - 40 * 60e3).toUTCString(),
+    }));
+    const { browser, page, errors } = await boot({
+      storage: {
+        ...READY,
+        "fluxswipe.feeds.v1": JSON.stringify(feeds),
+        "fluxswipe.cache.v1": JSON.stringify({
+          [KEY]: { t: Date.now() - 35 * 60e3, items: vieux },
+        }),
+      },
+    });
+    await page.route(/fast\d+\.test|slow\d+\.test/, async (r) => {
+      const u = r.request().url();
+      const mf = u.match(/fast(\d+)\.test/);
+      const ms = u.match(/slow(\d+)\.test/);
+      const nom = mf ? "YT · Rapide" + mf[1] : "Presse " + ms[1];
+      const lat = mf ? 100 : 3000; // rapide (type chaîne YouTube) vs lent (presse)
+      await new Promise((z) => setTimeout(z, lat));
+      return r
+        .fulfill({ status: 200, contentType: "application/xml", body: rss(nom) })
+        .catch(() => {});
+    });
+    await page.goto(URL_APP);
+    // Le doigt glisse dès la première carte affichée, sans jamais attendre la
+    // fin du chargement (ni même l'échéance) — voir teteouverture pour le même
+    // principe de simulation.
+    let dernierIndex = 0;
+    for (let i = 0; i < 200; i++) {
+      const st = await page.evaluate(() => ({
+        n: feedEl.children.length,
+        sync: document.getElementById("syncbar").classList.contains("on"),
+      }));
+      if (st.n > dernierIndex + 2) {
+        dernierIndex++;
+        await page.evaluate((idx) => {
+          feedEl.scrollTop = feedEl.children[idx].offsetTop;
+          onCardChange();
+        }, dernierIndex);
+      }
+      if (!st.sync && i > 30) break;
+      await page.waitForTimeout(100);
+    }
+    const r = await page.evaluate(
+      ({ dernierIndex }) => {
+        const fenetre = items
+          .slice(0, dernierIndex + 3)
+          .filter((it) => it.kind !== "learn");
+        const distinctes = new Set(fenetre.map((it) => it.source));
+        const lentesVues = [...distinctes].filter((s) => /^Presse /.test(s)).length;
+        const rapidesVues = [...distinctes].filter((s) => /^YT · /.test(s)).length;
+        return {
+          total: fenetre.length,
+          distinctes: distinctes.size,
+          lentesVues,
+          rapidesVues,
+        };
+      },
+      { dernierIndex }
+    );
+    console.log(
+      `swipe simulé jusqu'à l'index ${dernierIndex} — ${r.total} cartes actus dans cette fenêtre`
+    );
+    console.log(
+      `sources distinctes déjà figées : ${r.distinctes} (rapides vues : ${r.rapidesVues}/${FAST}, lentes vues : ${r.lentesVues}/${SLOW}, attendu : ${SLOW})`
+    );
+    // Sans la garde de diversité, seules 3 des 10 sources lentes sur 10 (mesuré)
+    // avaient eu le temps de répondre avant que le swipe simulé ne les fige
+    // hors du fil visible — le seuil ci-dessous doit rester bien au-dessus.
+    console.log(
+      r.lentesVues >= SLOW - 1
+        ? "  → sources lentes quasi toutes représentées, mélange non biaisé ✓"
+        : "  ← trop peu de sources lentes, fenêtre biaisée vers les rapides (régression)"
+    );
+    console.log("erreurs :", errors);
+    await browser.close();
+  },
 };
 
 const which = process.argv[2];
