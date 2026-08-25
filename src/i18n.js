@@ -168,9 +168,11 @@
       "apptheme.label": "Couleurs",
       "apptheme.desc.flamme":
         "L'habillage d'origine : braises sur fond noir, un accent corail vif.",
+      "apptheme.desc.bleu": "Même vivacité que Flamme, en bleu plutôt qu'en corail.",
       "apptheme.desc.sobre":
         "Mêmes contrastes, en couleurs éteintes — sans l'accent vif.",
       "apptheme.opt.flamme": "Flamme",
+      "apptheme.opt.bleu": "Bleuté",
       "apptheme.opt.sobre": "Sobre",
 
       "sheet.mix.title": "🎚️ Dose d'apprentissage",
@@ -498,8 +500,10 @@
       "sheet.theme.sub": "The feed's color scheme.",
       "apptheme.label": "Colors",
       "apptheme.desc.flamme": "The original look: embers on black, a vivid coral accent.",
+      "apptheme.desc.bleu": "Same intensity as Flamme, in blue instead of coral.",
       "apptheme.desc.sobre": "Same contrast, muted colors — no vivid accent.",
       "apptheme.opt.flamme": "Flamme",
+      "apptheme.opt.bleu": "Bleuté",
       "apptheme.opt.sobre": "Sobre",
 
       "sheet.mix.title": "🎚️ Learning dose",

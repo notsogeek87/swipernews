@@ -68,15 +68,25 @@
     --font-mono:'Fabrikatmono','JetBrains Mono','IBM Plex Mono','Berkeley Mono',ui-monospace,
       'SFMono-Regular',Consolas,'Liberation Mono',monospace;
   }
-  /* Habillage alternatif « Sobre », réglable dans Réglages ⚙ (voir
-     renderThemePref/setAppTheme). Même structure que Flamme ci-dessus (fond
-     quasi noir, un seul accent, coins techniques) — tout le reste de la page
-     est déjà bâti sur ces mêmes variables, donc rien d'autre à toucher — mais
-     désaturée : accent bleu-gris éteint plutôt que corail vif, bordures grises
-     plutôt que rouge « signal ». Répond au retour « les couleurs sont flash »
-     sans rien retirer à qui préfère l'habillage d'origine, qui reste le
-     défaut. Spécificité de `[data-apptheme]` sur `:root` volontairement plus
-     élevée que `:root` seul, pour ne pas dépendre de l'ordre des règles. */
+  /* Habillages alternatifs, réglables dans Réglages ⚙ (voir
+     renderThemePref/setAppTheme). Même structure que Flamme ci-dessus dans les
+     deux cas (fond quasi noir, un seul accent, coins techniques) — tout le
+     reste de la page est déjà bâti sur ces mêmes variables, donc rien d'autre
+     à toucher. Spécificité de `[data-apptheme]` sur `:root` volontairement
+     plus élevée que `:root` seul, pour ne pas dépendre de l'ordre des règles.
+     « Bleuté » garde la même vivacité que Flamme (accent saturé, fond très
+     sombre mais teinté plutôt que neutre) — seule la teinte change, du corail
+     au bleu — quand « Sobre », plus loin, désature complètement l'accent :
+     les trois habillages forment un dégradé d'intensité, pas juste un
+     nuancier, l'entre-deux répondant à qui trouve Flamme trop vif mais Sobre
+     trop éteint. Aucun des deux ne retire rien à qui préfère l'habillage
+     d'origine, qui reste le défaut. */
+  :root[data-apptheme="bleu"]{
+    --bg:#050b16;--surface:#0d1b30;--molten:#12294a;--redline:#1f4a7a;
+    --flare:#4da3ff;--blush:#a8d4ff;--ink:#f2f7ff;--ash:#7f93ab;
+    --redline-rgb:31,74,122;--blush-rgb:168,212,255;
+    --shadow-ember:inset 0 0 20px rgba(18,41,74,.7);
+  }
   :root[data-apptheme="sobre"]{
     --bg:#15161a;--surface:#232429;--molten:#33353c;--redline:#43454d;
     --flare:#8fa3b8;--blush:#c3ccd6;--ink:#eef0f3;--ash:#9296a1;
@@ -1289,9 +1299,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=214"></script>
-<script src="src/learn-core.js?v=214"></script>
-<script src="src/i18n.js?v=214"></script>
+<script src="src/lib.js?v=215"></script>
+<script src="src/learn-core.js?v=215"></script>
+<script src="src/i18n.js?v=215"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1504,7 +1514,7 @@ applyI18n();
    sélecteur additionnel, d'où retirer l'attribut plutôt que le poser à
    "flamme" dans applyAppTheme(). */
 const LS_APPTHEME="fluxswipe.apptheme.v1";
-const APP_THEMES=["flamme","sobre"];
+const APP_THEMES=["flamme","bleu","sobre"];
 let appTheme=(()=>{try{const v=localStorage.getItem(LS_APPTHEME);return APP_THEMES.includes(v)?v:APP_THEMES[0];}catch(e){return APP_THEMES[0];}})();
 /* Le <meta name="theme-color"> (couleur de la barre d'état/l'UI du
    navigateur) est lu depuis --bg calculé plutôt que dupliqué en dur ici : la
@@ -2155,7 +2165,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="214";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="215";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
