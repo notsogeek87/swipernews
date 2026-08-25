@@ -33,6 +33,7 @@
     var SELECTORS = [
       "#onetrust-consent-sdk", "#onetrust-banner-sdk", "#ot-sdk-container", ".onetrust-pc-dark-filter",
       "#didomi-host", "#didomi-notice", "#didomi-popup", ".didomi-popup-backdrop",
+      "#sd-cmp",
       ".qc-cmp2-container", ".qc-cmp-ui-container", "#qc-cmp2-container",
       "div[id^='sp_message_container']", "iframe[id^='sp_message_iframe']",
       "#CybotCookiebotDialog", "#CybotCookiebotDialogBodyUnderlay", "#CookiebotWidget",
