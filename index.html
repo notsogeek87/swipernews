@@ -1131,6 +1131,19 @@
          packagée). Un seul point de montage depuis la fusion des panneaux. -->
     <div data-readmount></div>
 
+    <!-- Sauvegarde COMPLÈTE : contrairement à l'OPML/JSON de la section
+         Sources (qui ne portent que les flux), ce fichier reprend tout ce qui
+         est configurable dans l'app — dose, centres d'intérêt, sources, clé
+         API YouTube, réglages du lecteur — pour changer d'appareil sans tout
+         reconfigurer à la main. Voir settingsSnapshot()/applySettingsImport(). -->
+    <h3 class="secttl" data-i18n="sheet.backup.title">💾 Sauvegarde complète</h3>
+    <p class="sub" data-i18n="sheet.backup.sub">Exporte ou importe TOUS tes réglages en un seul fichier — pratique pour changer d'appareil.</p>
+    <div class="iorow">
+      <button class="iobtn" id="exportAllBtn" data-i18n="sheet.backup.export">↓ Exporter tous les réglages</button>
+      <button class="iobtn" id="importAllBtn" data-i18n="sheet.backup.import">↑ Importer tous les réglages</button>
+    </div>
+    <input id="importAllFile" type="file" accept=".json,application/json,text/plain" style="display:none">
+
     <button class="applybtn" id="applySettings" data-i18n="sheet.apply">Voir mon fil</button>
     <!-- Pied de panneau : la version, et rien d'autre. Rempli par
          renderAbout(), voir le commentaire qui l'accompagne pour ce qui s'y
@@ -1248,9 +1261,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=211"></script>
-<script src="src/learn-core.js?v=211"></script>
-<script src="src/i18n.js?v=211"></script>
+<script src="src/lib.js?v=212"></script>
+<script src="src/learn-core.js?v=212"></script>
+<script src="src/i18n.js?v=212"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2092,7 +2105,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="211";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="212";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -5395,6 +5408,9 @@ document.getElementById("exportOpml").onclick=()=>exportFeeds("opml");
 document.getElementById("exportJson").onclick=()=>exportFeeds("json");
 document.getElementById("importBtn").onclick=()=>document.getElementById("importFile").click();
 document.getElementById("importFile").onchange=importFromFile;
+document.getElementById("exportAllBtn").onclick=exportSettings;
+document.getElementById("importAllBtn").onclick=()=>document.getElementById("importAllFile").click();
+document.getElementById("importAllFile").onchange=importAllFromFile;
 // État vide
 document.getElementById("emptyRetry").onclick=()=>loadFeeds(true);
 // Appel DIRECT (pas via le menu, jamais ouvert ici) : openSettings() sans
@@ -6645,6 +6661,143 @@ function importFromFile(ev){
      fichier n'émettait plus d'événement `change`. L'import semblait mort
      jusqu'au rechargement de l'app. */
   reader.onerror=()=>{warn("import",reader.error);toast(T("toast.unreadableFile"));ev.target.value="";};
+  reader.readAsText(file);
+}
+/* ---------- Sauvegarde complète (tous les réglages, pas seulement les flux) ----------
+   Reprend CHAQUE réglage utilisateur : dose, intérêts Wikipédia, filtre
+   d'intérêt courant, sources d'actu (et leur filtre courant), clé API
+   YouTube, filtres sponsorisé/vidéo, mode « cacher les articles déjà lus »,
+   et les réglages du lecteur natif (mode, taille, thème, bandeaux, pubs,
+   liste de blocage choisie). Volontairement HORS de ce fichier : tout ce qui
+   est de la DONNÉE plutôt qu'un réglage — historique lu (seen/seenNews),
+   statistiques, articles enregistrés, position de lecture, cache réseau —
+   rien de tout ça n'a de sens à transporter d'un appareil à l'autre. */
+function settingsSnapshot(){
+  return {
+    app:"swipernews",type:"settings",version:1,
+    lang:LANG,
+    mix:mixScore,
+    interests,
+    cat,
+    newsSrc,
+    feeds,
+    filterSponsored,
+    filterVideoOnly,
+    hideSeen,
+    ytApiKey,
+    readPref,
+    readSize:rSizePref,
+    readTheme:rThemePref,
+    cookieBanner:cmpPref,
+    ads:adsPref,
+    blocklistUrl:(blState&&blState.url)||"",
+  };
+}
+async function exportSettings(){
+  const stamp=new Date().toISOString().slice(0,10);
+  const name=`swipernews-reglages-${stamp}.json`;
+  const body=JSON.stringify(settingsSnapshot(),null,2);
+  try{
+    await download(name,body,"application/json");
+  }catch(e){warn("export settings",e);toast(T("toast.exportFailed"));return;}
+  if(!isNativeApp)toast(T("toast.settingsExported"));
+}
+/* Écrit directement dans localStorage, sous les MÊMES clés et le MÊME
+   encodage que ce que chaque réglage lit déjà au démarrage (voir les IIFE de
+   LANG, mixScore, interests, cat, newsSrc, feeds, readPref…) — et laisse ces
+   lectures déjà validées (LANGS.includes, clampMix, sanitizeFeeds…) faire le
+   tri après le rechargement plutôt que de dupliquer chaque garde ici. Chaque
+   champ est vérifié séparément et les autres restent posés même si un champ
+   du fichier est absent, du mauvais type ou hors énumération : un fichier
+   partiel (exporté depuis le web, sans réglages de lecteur) applique quand
+   même ce qu'il porte, jamais tout ou rien. Rend le nombre de réglages
+   effectivement posés — 0 pour un fichier sans rien d'exploitable. */
+function applySettingsImport(obj){
+  if(!obj||typeof obj!=="object")return 0;
+  let n=0;
+  if(typeof obj.lang==="string"&&LANGS.includes(obj.lang)){
+    localStorage.setItem(LS_LANG,obj.lang);n++;
+  }
+  if(Number.isInteger(obj.mix)&&obj.mix===clampMix(obj.mix)){
+    localStorage.setItem(LS_MIX,String(obj.mix));n++;
+  }
+  if(Array.isArray(obj.interests)){
+    const ints=[...new Set(obj.interests.filter(k=>typeof k==="string").map(migrateCat))]
+      .filter(k=>CATEGORIES.some(c=>c.key===k));
+    localStorage.setItem(LS_INT,JSON.stringify(ints));n++;
+  }
+  if(typeof obj.cat==="string"){
+    const k=obj.cat==="random"?"all":migrateCat(obj.cat);
+    if(k==="all"||CATEGORIES.some(c=>c.key===k)){localStorage.setItem(LS_CAT,k);n++;}
+  }
+  if(Array.isArray(obj.feeds)){
+    const ok=sanitizeFeeds(obj.feeds);
+    if(ok){localStorage.setItem(LS_KEY,JSON.stringify(ok));n++;}
+  }
+  if(Array.isArray(obj.newsSrc)&&obj.newsSrc.every(x=>typeof x==="string")){
+    localStorage.setItem(LS_NSRC,JSON.stringify(obj.newsSrc));n++;
+  }
+  if(typeof obj.filterSponsored==="boolean"){
+    localStorage.setItem(LS_SPONSOR,obj.filterSponsored?"1":"0");n++;
+  }
+  if(typeof obj.filterVideoOnly==="boolean"){
+    localStorage.setItem(LS_VIDEO_ONLY,obj.filterVideoOnly?"1":"0");n++;
+  }
+  if(typeof obj.hideSeen==="boolean"){
+    localStorage.setItem(LS_HIDE_SEEN,obj.hideSeen?"1":"0");n++;
+  }
+  if(typeof obj.ytApiKey==="string"){
+    if(obj.ytApiKey.trim())localStorage.setItem(LS_YTKEY,obj.ytApiKey.trim());
+    else localStorage.removeItem(LS_YTKEY);
+    n++;
+  }
+  if(typeof obj.readPref==="string"&&READ_MODES.includes(obj.readPref)){
+    localStorage.setItem(LS_READ,obj.readPref);n++;
+  }
+  if(typeof obj.readSize==="string"&&READ_SIZES.includes(obj.readSize)){
+    localStorage.setItem(LS_RSIZE,obj.readSize);n++;
+  }
+  if(typeof obj.readTheme==="string"&&READ_THEMES.includes(obj.readTheme)){
+    localStorage.setItem(LS_RTHEME,obj.readTheme);n++;
+  }
+  if(obj.cookieBanner==="show"||obj.cookieBanner==="hide"){
+    localStorage.setItem(LS_CMP,obj.cookieBanner);n++;
+  }
+  if(obj.ads==="allow"||obj.ads==="block"){
+    localStorage.setItem(LS_ADS,obj.ads);n++;
+  }
+  if(typeof obj.blocklistUrl==="string"&&BL_SOURCES.some(s=>s.url===obj.blocklistUrl)){
+    // `at`/`count` volontairement absents : une URL neuve pour cet appareil
+    // n'a encore rien de téléchargé, le rafraîchissement hebdomadaire au
+    // démarrage (voir plus haut, BL_REFRESH) s'en charge tout seul.
+    localStorage.setItem(LS_BL,JSON.stringify({url:obj.blocklistUrl}));n++;
+  }
+  return n;
+}
+/* Recharge la page après import : les réglages posés ci-dessus sont lus par
+   des IIFE exécutées une seule fois, au chargement du script (comme LANG,
+   mixScore, feeds…) — les réappliquer en mémoire sans recharger demanderait
+   de dupliquer les effets de bord de CHAQUE setter (setLang, setMixScore,
+   setCat, setNewsSrc…), pour un geste explicite et rare. Le fichier venant
+   d'être lu en mémoire (FileReader), rien n'est perdu au rechargement. */
+function importAllFromFile(ev){
+  const file=ev.target.files&&ev.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const obj=JSON.parse(String(reader.result||""));
+      const n=applySettingsImport(obj);
+      if(n>0){
+        toast(T("toast.settingsImported"));
+        setTimeout(()=>location.reload(),1000);
+      }else{
+        toast(T("toast.noSettingsInFile"));
+      }
+    }catch(e){toast(T("toast.unreadableFile"));}
+    finally{ev.target.value="";}
+  };
+  reader.onerror=()=>{warn("import settings",reader.error);toast(T("toast.unreadableFile"));ev.target.value="";};
   reader.readAsText(file);
 }
 // parseJsonFeeds / parseOpmlFeeds / hostOf : voir src/lib.js

@@ -208,6 +208,12 @@
       "sheet.sources.ytkey.verify": "Vérifier",
       "sheet.sources.ytkey.link": "Comment obtenir une clé gratuite ↗",
 
+      "sheet.backup.title": "💾 Sauvegarde complète",
+      "sheet.backup.sub":
+        "Exporte ou importe TOUS tes réglages en un seul fichier (dose, centres d'intérêt, sources, clé API YouTube, réglages du lecteur) — pratique pour changer d'appareil.",
+      "sheet.backup.export": "↓ Exporter tous les réglages",
+      "sheet.backup.import": "↑ Importer tous les réglages",
+
       "sheet.apply": "Voir mon fil",
 
       "lang.title": "🌐 Langue",
@@ -311,6 +317,9 @@
       "toast.feedsImportedOne": "{n} source importée",
       "toast.feedsImportedMany": "{n} sources importées",
       "toast.feedsAlreadyPresent": "Sources déjà présentes",
+      "toast.settingsExported": "Réglages exportés",
+      "toast.settingsImported": "Réglages importés — rechargement…",
+      "toast.noSettingsInFile": "Aucun réglage reconnu dans ce fichier",
       "toast.feedAdded": "{name} ajouté",
       "toast.updateReady": "Nouvelle version prête",
       "toast.ytkey.empty": "Colle une clé avant de vérifier",
@@ -521,6 +530,12 @@
       "sheet.sources.ytkey.verify": "Verify",
       "sheet.sources.ytkey.link": "How to get a free key ↗",
 
+      "sheet.backup.title": "💾 Full backup",
+      "sheet.backup.sub":
+        "Export or import ALL your settings in one file (mix, interests, sources, YouTube API key, reader settings) — handy when switching devices.",
+      "sheet.backup.export": "↓ Export all settings",
+      "sheet.backup.import": "↑ Import all settings",
+
       "sheet.apply": "See my feed",
 
       "lang.title": "🌐 Language",
@@ -621,6 +636,9 @@
       "toast.feedsImportedOne": "{n} feed imported",
       "toast.feedsImportedMany": "{n} feeds imported",
       "toast.feedsAlreadyPresent": "Sources already present",
+      "toast.settingsExported": "Settings exported",
+      "toast.settingsImported": "Settings imported — reloading…",
+      "toast.noSettingsInFile": "No usable setting found in this file",
       "toast.feedAdded": "{name} added",
       "toast.updateReady": "New version ready",
       "toast.ytkey.empty": "Paste a key before verifying",
