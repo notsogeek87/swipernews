@@ -48,6 +48,21 @@
 
       "menu.title": "Menu",
       "menu.stats": "Mon activité",
+      "menu.changelog": "Nouveautés",
+
+      "changelog.title": "Nouveautés",
+      "changelog.sub": "Ce qui a changé dans SwiperNews.",
+      "changelog.version": "Version {v}",
+      "changelog.v218.item1":
+        "🆕 Cette page : à chaque mise à jour, un résumé de ce qui a changé.",
+      "changelog.v218.item2":
+        "🎨 Un troisième thème de couleurs, « Bleuté », entre Flamme et Sobre.",
+      "changelog.v218.item3":
+        "📤 Réglages : export et import de toute la configuration en un seul fichier.",
+      "changelog.v218.item4":
+        "↻ Le bouton Actualiser est sorti du menu, à un seul geste dans la barre du haut.",
+      "changelog.v218.item5":
+        "💾 L'export de tes sources ou réglages ouvre le vrai sélecteur d'enregistrement du système.",
 
       "stats.title": "Mon activité",
       "stats.sub": "Cartes défilées, tous types confondus.",
@@ -383,6 +398,20 @@
 
       "menu.title": "Menu",
       "menu.stats": "My activity",
+      "menu.changelog": "What's new",
+
+      "changelog.title": "What's new",
+      "changelog.sub": "What changed in SwiperNews.",
+      "changelog.version": "Version {v}",
+      "changelog.v218.item1": "🆕 This page: a recap of what changed with every update.",
+      "changelog.v218.item2":
+        "🎨 A third color theme, “Blue,” alongside Flame and Plain.",
+      "changelog.v218.item3":
+        "📤 Settings: export and import your whole configuration in one file.",
+      "changelog.v218.item4":
+        "↻ The Refresh button moved out of the menu, one tap away in the top bar.",
+      "changelog.v218.item5":
+        "💾 Exporting your sources or settings now opens the system's real save picker.",
 
       "stats.title": "My activity",
       "stats.sub": "Cards scrolled, all types combined.",
