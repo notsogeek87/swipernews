@@ -321,6 +321,8 @@
       "toast.youtubeResolving": "Recherche du flux YouTube…",
       "toast.youtubeChannelNotFound":
         "Impossible de déterminer le flux RSS de cette chaîne.",
+      "toast.feedDiscovering": "Recherche du flux…",
+      "toast.feedNotFound": "Impossible de trouver le flux RSS de ce site.",
       "toast.noFeedsExport": "Aucune source à exporter",
       "toast.exportFailed": "Export impossible",
       "toast.feedsExported": "Sources exportées",
@@ -650,6 +652,8 @@
       "toast.invalidUrl": "Invalid URL",
       "toast.youtubeResolving": "Looking up the YouTube feed…",
       "toast.youtubeChannelNotFound": "Could not determine this channel's RSS feed.",
+      "toast.feedDiscovering": "Looking up the feed…",
+      "toast.feedNotFound": "Could not find this site's RSS feed.",
       "toast.noFeedsExport": "No source to export",
       "toast.exportFailed": "Export failed",
       "toast.feedsExported": "Sources exported",

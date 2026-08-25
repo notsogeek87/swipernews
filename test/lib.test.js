@@ -813,35 +813,49 @@ test("youtubeChannelHandleFromUrl tire le nom d'une page /@nom, /c/… ou /user/
   assert.equal(lib.youtubeChannelHandleFromUrl(null), "");
 });
 
-test("youtubeRssLinkFromHtml lit le <link rel=alternate> annoncé par la page", () => {
+test("feedLinkFromHtml lit le <link rel=alternate> annoncé par la page", () => {
   const url =
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCabcdefghijklmnopqrstuv";
   assert.equal(
-    lib.youtubeRssLinkFromHtml(
+    lib.feedLinkFromHtml(
       `<html><head><link rel="alternate" type="application/rss+xml" title="RSS" href="${url}"></head></html>`
     ),
     url
   );
   // Ordre des attributs différent : ne doit rien changer.
   assert.equal(
-    lib.youtubeRssLinkFromHtml(
+    lib.feedLinkFromHtml(
       `<link href="${url}" type="application/rss+xml" rel="alternate">`
     ),
     url
   );
   // Entité HTML dans le href (le & d'une URL de flux est échappé en HTML).
   assert.equal(
-    lib.youtubeRssLinkFromHtml(
+    lib.feedLinkFromHtml(
       '<link rel="alternate" type="application/rss+xml" href="https://www.youtube.com/feeds/videos.xml?a=1&amp;channel_id=UCabc">'
     ),
     "https://www.youtube.com/feeds/videos.xml?a=1&channel_id=UCabc"
   );
   // Pas de balise de ce type : rien à en tirer.
   assert.equal(
-    lib.youtubeRssLinkFromHtml("<html><head><title>Chaîne</title></head></html>"),
+    lib.feedLinkFromHtml("<html><head><title>Chaîne</title></head></html>"),
     ""
   );
-  assert.equal(lib.youtubeRssLinkFromHtml(""), "");
+  assert.equal(lib.feedLinkFromHtml(""), "");
+});
+
+test("commonFeedUrlCandidates propose les chemins conventionnels sur l'origine", () => {
+  assert.deepEqual(lib.commonFeedUrlCandidates("https://exemple.fr/blog/article"), [
+    "https://exemple.fr/feed",
+    "https://exemple.fr/rss.xml",
+    "https://exemple.fr/feed.xml",
+    "https://exemple.fr/atom.xml",
+    "https://exemple.fr/rss",
+  ]);
+  // Protocole ni http ni https : rien à essayer.
+  assert.deepEqual(lib.commonFeedUrlCandidates("ftp://exemple.fr"), []);
+  assert.deepEqual(lib.commonFeedUrlCandidates(""), []);
+  assert.deepEqual(lib.commonFeedUrlCandidates(null), []);
 });
 
 test("youtubeChannelIdFromHtml cherche le channelId par ordre de confiance", () => {

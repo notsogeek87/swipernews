@@ -958,9 +958,12 @@
   }
 
   /** `href` du `<link rel="alternate" type="application/rss+xml">` annoncé par
-   *  la page, ou "". L'ordre des attributs sur la balise n'est pas garanti,
-   *  d'où deux contrôles séparés plutôt qu'une seule regex rigide. */
-  function youtubeRssLinkFromHtml(html) {
+   *  une page HTML quelconque, ou "". Générique (rien de spécifique à
+   *  YouTube) : sert aussi bien à résoudre une chaîne qu'à découvrir le flux
+   *  d'un site ordinaire depuis l'URL de sa page d'accueil. L'ordre des
+   *  attributs sur la balise n'est pas garanti, d'où deux contrôles séparés
+   *  plutôt qu'une seule regex rigide. */
+  function feedLinkFromHtml(html) {
     const tags = String(html || "").match(/<link\b[^>]*>/gi) || [];
     for (const tag of tags) {
       if (!/rel=["']alternate["']/i.test(tag)) continue;
@@ -994,7 +997,7 @@
    *  le lien RSS qu'elle annonce s'il est exploitable, sinon celle construite
    *  depuis son channelId, sinon "". */
   function youtubeFeedUrlFromChannelHtml(html) {
-    const link = youtubeRssLinkFromHtml(html);
+    const link = feedLinkFromHtml(html);
     if (link && isYoutubeFeedUrl(link)) return link;
     const id = youtubeChannelIdFromHtml(html);
     return id ? "https://www.youtube.com/feeds/videos.xml?channel_id=" + id : "";
@@ -1526,6 +1529,20 @@
     }
   }
 
+  /** Chemins de flux conventionnels, du plus courant au moins courant, à
+   *  essayer sur l'origine d'une page qui n'annonce rien elle-même (voir
+   *  feedLinkFromHtml) — [] si `pageUrl` n'est pas http(s) exploitable. */
+  const COMMON_FEED_PATHS = ["/feed", "/rss.xml", "/feed.xml", "/atom.xml", "/rss"];
+  function commonFeedUrlCandidates(pageUrl) {
+    try {
+      const u = new URL(String(pageUrl || ""));
+      if (u.protocol !== "http:" && u.protocol !== "https:") return [];
+      return COMMON_FEED_PATHS.map((p) => u.origin + p);
+    } catch (_) {
+      return [];
+    }
+  }
+
   /** Sources depuis un export JSON (tableau, ou objet {feeds:[...]}) . */
   function parseJsonFeeds(text) {
     const data = JSON.parse(text);
@@ -1579,6 +1596,7 @@
     stripHtml,
     clampText,
     isFeedUrl,
+    commonFeedUrlCandidates,
     imgFromHtml,
     safeLink,
     safeImg,
@@ -1611,7 +1629,7 @@
     isYoutubeChannelPageUrl,
     youtubeChannelIdFromChannelUrl,
     youtubeChannelHandleFromUrl,
-    youtubeRssLinkFromHtml,
+    feedLinkFromHtml,
     youtubeChannelIdFromHtml,
     youtubeFeedUrlFromChannelHtml,
     youtubeApiChannelsByHandleUrl,

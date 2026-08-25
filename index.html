@@ -1301,9 +1301,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=217"></script>
-<script src="src/learn-core.js?v=217"></script>
-<script src="src/i18n.js?v=217"></script>
+<script src="src/lib.js?v=218"></script>
+<script src="src/learn-core.js?v=218"></script>
+<script src="src/i18n.js?v=218"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1311,7 +1311,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","roundRobin","weightedRoundRobin","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeShortsFeedUrl","isYoutubeShortsFeedUrl","youtubeFeedName","isLequipeFeedUrl","lequipeRubrique","lequipeFeedName"],
+  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","roundRobin","weightedRoundRobin","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeShortsFeedUrl","isYoutubeShortsFeedUrl","youtubeFeedName","isLequipeFeedUrl","lequipeRubrique","lequipeFeedName","feedLinkFromHtml","commonFeedUrlCandidates"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket","perCatLimit"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -1458,7 +1458,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,dayKey,quarterIndex,statsBuckets,shuffle,
-  seenKey,dropSeen,roundRobin,weightedRoundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,YT_SHORT_MAX_DURATION_S,youtubeApiVideosDurationUrl,youtubeApiDurationsFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities}=self.SwiperLib;
+  seenKey,dropSeen,roundRobin,weightedRoundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,YT_SHORT_MAX_DURATION_S,youtubeApiVideosDurationUrl,youtubeApiDurationsFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities,feedLinkFromHtml,commonFeedUrlCandidates}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1545,17 +1545,35 @@ const DEFAULT_FEEDS = [
   {name:"Le Monde", url:"https://www.lemonde.fr/rss/une.xml", on:true},
   {name:"20 Minutes", url:"https://www.20minutes.fr/feeds/rss-une.xml", on:true},
 ];
-/* Sources proposées en un tap dans le panneau (RSS finis → plus de sources = plus d'articles). */
+/* Sources proposées en un tap dans le panneau (RSS finis → plus de sources =
+   plus d'articles), groupées par catégorie — reste ici (pas dans src/),
+   contrairement à CATEGORIES (src/learn-core.js) : rien côté api/*.js n'en a
+   besoin. */
 const SUGGESTED_FEEDS = [
-  {name:"Le Monde", url:"https://www.lemonde.fr/rss/une.xml"},
-  {name:"France 24", url:"https://www.france24.com/fr/rss"},
-  {name:"20 Minutes", url:"https://www.20minutes.fr/feeds/rss-une.xml"},
-  {name:"Le Figaro", url:"https://www.lefigaro.fr/rss/figaro_actualites.xml"},
-  {name:"Libération", url:"https://www.liberation.fr/rss/"},
-  {name:"Courrier International", url:"https://www.courrierinternational.com/feed/all/rss.xml"},
-  {name:"Numerama · Tech", url:"https://www.numerama.com/feed/"},
-  {name:"Futura · Sciences", url:"https://www.futura-sciences.com/rss/actualites.xml"},
-  {name:"L'Équipe · Sport", url:"https://www.lequipe.fr/rss/actu_rss.xml"},
+  {key:"general", label:"📰 Généralistes", feeds:[
+    {name:"Le Monde", url:"https://www.lemonde.fr/rss/une.xml"},
+    {name:"20 Minutes", url:"https://www.20minutes.fr/feeds/rss-une.xml"},
+    {name:"Le Figaro", url:"https://www.lefigaro.fr/rss/figaro_actualites.xml"},
+    {name:"Libération", url:"https://www.liberation.fr/rss/"},
+    {name:"Courrier International", url:"https://www.courrierinternational.com/feed/all/rss.xml"},
+  ]},
+  {key:"tech", label:"💻 Tech", feeds:[
+    {name:"Numerama", url:"https://www.numerama.com/feed/"},
+    {name:"Clubic", url:"https://www.clubic.com/feed/news.rss"},
+  ]},
+  {key:"sciences", label:"🔬 Sciences", feeds:[
+    {name:"Futura Sciences", url:"https://www.futura-sciences.com/rss/actualites.xml"},
+    {name:"Sciences et Avenir", url:"https://www.sciencesetavenir.fr/rss.xml"},
+  ]},
+  {key:"sport", label:"⚽ Sport", feeds:[
+    {name:"L'Équipe", url:"https://www.lequipe.fr/rss/actu_rss.xml"},
+  ]},
+  {key:"eco", label:"💶 Économie", feeds:[
+    {name:"Les Échos", url:"https://www.lesechos.fr/rss/rss_une.xml"},
+  ]},
+  {key:"regional", label:"📍 Régional", feeds:[
+    {name:"Ouest-France", url:"https://www.ouest-france.fr/rss-en-continu.xml"},
+  ]},
 ];
 const LS_KEY="fluxswipe.feeds.v1";
 const LS_CAT="fluxswipe.cat.v1";
@@ -2167,7 +2185,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="217";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="218";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -6279,6 +6297,8 @@ document.addEventListener("focusin",e=>{
 // script en plein chargement, empêchant tout clic ultérieur sur Réglages de
 // fonctionner pour le reste de la session.
 let feedGroupOpen={rss:false,vid:false};
+// Même mécanique que feedGroupOpen, pour les catégories de renderSuggest().
+let suggestGroupOpen={};
 // Même raison qu'au-dessus (feedGroupOpen) : renderList() la lit dès le
 // premier rendu de la liste, avant que sa déclaration plus bas (près de
 // delFeed, qui l'écrit) n'ait pu s'exécuter.
@@ -6291,6 +6311,7 @@ function openSettings(replaceFrom){
   // retrouver l'état réduit — sans quoi un groupe déplié une fois resterait
   // déplié pour le reste de la session.
   feedGroupOpen={rss:false,vid:false};
+  suggestGroupOpen={};
   renderMix();renderIntGrid("intGrid");renderList();renderSuggest();renderReadPref();renderLangPref();renderThemePref();
   document.getElementById("sponsorFilterChk").checked=filterSponsored;
   document.getElementById("videoFilterChk").checked=filterVideoOnly;
@@ -6466,16 +6487,25 @@ function renderList(){const lbl=feedLabels(feeds);
     d.addEventListener("toggle",()=>{feedGroupOpen[d.dataset.group]=d.open;});
   });
 }
-/* Suggestions : chips « + Source » pour celles pas encore présentes (plus de sources = plus d'articles) */
+/* Suggestions : chips « + Source » pour celles pas encore présentes (plus de
+   sources = plus d'articles), regroupées par catégorie. Réutilise le motif
+   .feedgroup/.intgrid déjà posé par renderList() pour actus/vidéos — empilé
+   verticalement, jamais une rangée qui défile horizontalement. */
 function renderSuggest(){
   const box=document.getElementById("suggestBox");
   const have=new Set(feeds.map(f=>f.url));
-  const avail=SUGGESTED_FEEDS.filter(s=>!have.has(s.url));
-  if(!avail.length){box.innerHTML="";return;}
+  const cats=SUGGESTED_FEEDS.map(c=>({...c,feeds:c.feeds.filter(s=>!have.has(s.url))})).filter(c=>c.feeds.length);
+  if(!cats.length){box.innerHTML="";return;}
+  const chip=s=>`<button class="intchip" data-suggest="${escAttr(s.url)}" data-name="${escAttr(s.name)}">+ ${esc(s.name)}</button>`;
   box.innerHTML=`<p class="sub" style="margin:16px 0 8px">${esc(T("sheet.sources.suggestTitle"))}</p>`+
-    `<div class="intgrid">`+avail.map(s=>
-      `<button class="intchip" data-suggest="${escAttr(s.url)}" data-name="${escAttr(s.name)}">+ ${esc(s.name)}</button>`
-    ).join("")+`</div>`;
+    cats.map(c=>`
+  <details class="feedgroup" data-cat="${c.key}"${suggestGroupOpen[c.key]?" open":""}>
+    <summary><span>${esc(c.label)}</span><span class="feedgroup__count">${c.feeds.length}</span><span class="feedgroup__chev">${ICON_CHEV}</span></summary>
+    <div class="intgrid">${c.feeds.map(chip).join("")}</div>
+  </details>`).join("");
+  document.querySelectorAll("#suggestBox details.feedgroup").forEach(d=>{
+    d.addEventListener("toggle",()=>{suggestGroupOpen[d.dataset.cat]=d.open;});
+  });
 }
 function toggleFeed(i){feeds[i].on=!feeds[i].on;save();}
 /* Confirmation à deux appuis, PAS de sheet/dialog séparé (pas d'entrée
@@ -6502,7 +6532,7 @@ function delFeed(i){
 }
 /* Dédoublonnage, stockage, re-rendu : commun à une URL déjà valide, qu'elle
    ait été saisie telle quelle ou résolue depuis une page de chaîne YouTube. */
-function pushFeedUrl(url,inp){
+function pushFeedUrl(url,inp,name){
   /* Deux fois la même URL n'était refusé nulle part ici (le tap sur une
      suggestion et l'import OPML, eux, vérifient déjà). Ce doublon coûte une
      requête par chargement pour rien : `collected` est indexé PAR URL
@@ -6510,24 +6540,27 @@ function pushFeedUrl(url,inp){
      quoi que ce soit — et le filtre de sources, qui désigne lui aussi une URL,
      ne peut pas distinguer deux lignes identiques. */
   if(feeds.some(f=>f.url===url)){toast(T("toast.feedsAlreadyPresent"));inp.value="";return;}
-  feeds.push({name:hostOf(url),url,on:true});save();inp.value="";renderList();renderSuggest();
+  // `name` : le vrai titre du flux, déjà récupéré par addFeed() au moment de
+  // sa vérification — sinon (chemin YouTube, 2 arguments) on retombe sur le
+  // nom d'hôte, corrigé ensuite en arrière-plan par nommerChaine().
+  feeds.push({name:name||hostOf(url),url,on:true});save();inp.value="";renderList();renderSuggest();
   // Chaîne YouTube : le nom n'est nulle part dans l'URL, il faut le demander au
   // flux. En arrière-plan — l'ajout reste instantané, et un échec ne coûte que
   // le nom d'hôte, exactement comme avant.
   if(isYoutubeFeedUrl(url))nommerChaine(url);
 }
-/* État « en train de résoudre une chaîne YouTube » du bouton d'ajout : le
-   toast de resolveYoutubeChannelFeed s'efface après 1,8 s, largement avant
-   que la résolution (plusieurs requêtes en cascade) n'ait fini — sans rien
+/* État « en train de résoudre un flux » du bouton d'ajout (chaîne YouTube ou
+   découverte générique sur un site quelconque) : le toast s'efface avant que
+   la résolution (plusieurs requêtes en cascade) n'ait fini — sans rien
    d'autre, l'utilisateur ne voit plus aucun signe que quelque chose se passe.
    Le bouton porte donc lui-même l'état, pour toute la durée : désactivé, son
    libellé remplacé par un petit indicateur de chargement (voir .addspin) ;
    l'URL saisie reste visible mais l'entrée se verrouille aussi, pour ne pas
    laisser modifier ou soumettre une seconde fois une valeur déjà en vol. */
-function resolutionChaineEnCours(on){
+function resolutionFluxEnCours(on,label){
   const inp=document.getElementById("newUrl"),btn=document.getElementById("addFeedBtn");
   inp.disabled=on;btn.disabled=on;
-  if(on){btn.dataset.label=btn.innerHTML;btn.innerHTML='<span class="addspin" role="status" aria-label="'+escAttr(T("toast.youtubeResolving"))+'"></span>';}
+  if(on){btn.dataset.label=btn.innerHTML;btn.innerHTML='<span class="addspin" role="status" aria-label="'+escAttr(label)+'"></span>';}
   else if(btn.dataset.label!==undefined){btn.innerHTML=btn.dataset.label;delete btn.dataset.label;}
 }
 async function addFeed(){const inp=document.getElementById("newUrl");const url=inp.value.trim();
@@ -6536,16 +6569,33 @@ async function addFeed(){const inp=document.getElementById("newUrl");const url=i
   // ne jamais rien charger ensuite). Voir resolveYoutubeChannelFeed.
   if(isYoutubeChannelPageUrl(url)){
     toast(T("toast.youtubeResolving"));
-    resolutionChaineEnCours(true);
+    resolutionFluxEnCours(true,T("toast.youtubeResolving"));
     let rss;
     try{rss=await resolveYoutubeChannelFeed(url);}
-    finally{resolutionChaineEnCours(false);}
+    finally{resolutionFluxEnCours(false);}
     if(!rss){toast(T("toast.youtubeChannelNotFound"));return;}
     pushFeedUrl(rss,inp);
     return;
   }
   if(!isFeedUrl(url)){toast(T("toast.invalidUrl"));return;}
-  pushFeedUrl(url,inp);
+  if(feeds.some(f=>f.url===url)){toast(T("toast.feedsAlreadyPresent"));return;}
+  // L'URL saisie est peut-être déjà un flux : on la vérifie directement
+  // avant de tenter la découverte générique, pour ne jamais payer un
+  // aller-retour HTML superflu sur le cas le plus courant (coller l'URL RSS
+  // exacte reste aussi rapide qu'avant, à une vérification près — voir
+  // toast.feedNotFound plus bas pour la contrepartie assumée).
+  resolutionFluxEnCours(true,T("toast.feedDiscovering"));
+  try{
+    let doc=await docFluxChaine(url);
+    let rss=url;
+    if(!doc){
+      toast(T("toast.feedDiscovering"));
+      rss=await decouvreFlux(url);
+      if(rss)doc=await docFluxChaine(rss);
+    }
+    if(!doc){toast(T("toast.feedNotFound"));return;}
+    pushFeedUrl(rss,inp,titreDuFlux(doc,false));
+  }finally{resolutionFluxEnCours(false);}
 }
 /* Charge et parse `rss`, ou null si la requête échoue ou ne rend pas un flux
    de chaîne exploitable (toujours un <title> au niveau feed). Sert à VÉRIFIER
@@ -6618,6 +6668,34 @@ async function resolveYoutubeChannelFeed(pageUrl){
     if(!rss)return "";
     return (await verifieFluxChaine(rss))?rss:"";
   }catch(e){warn("résolution chaîne YouTube",e);return "";}
+}
+/* Devine l'URL du flux RSS/Atom d'un site depuis l'URL d'une de ses pages
+   (le plus souvent l'accueil) — généralisation de resolveYoutubeChannelFeed
+   à N'IMPORTE QUEL site, même principe : chaque candidat est vérifié par une
+   vraie requête avant adoption, jamais une devinette seule.
+    1. Le <link rel="alternate" type="application/rss+xml"> annoncé par la
+       page (feedLinkFromHtml, src/lib.js) — le plus fiable, la plupart des
+       sites le posent.
+    2. À défaut, une poignée de chemins conventionnels
+       (commonFeedUrlCandidates, src/lib.js), lancés EN PARALLÈLE
+       (Promise.any, comme PROXIES dans fetchText) : les essayer l'un après
+       l'autre coûterait jusqu'à cinq fois le délai d'un repli qui échoue déjà
+       souvent.
+   Rend "" si rien n'a abouti. */
+async function decouvreFlux(pageUrl){
+  try{
+    const html=await fetchText(pageUrl,()=>8000);
+    const link=feedLinkFromHtml(html);
+    if(link&&await verifieFluxChaine(link))return link;
+  }catch(e){}
+  const cands=commonFeedUrlCandidates(pageUrl);
+  if(!cands.length)return "";
+  try{
+    return await Promise.any(cands.map(async c=>{
+      if(await verifieFluxChaine(c))return c;
+      throw new Error("no");
+    }));
+  }catch(e){return "";}
 }
 /* Requête JSON à l'API YouTube Data v3 : direct d'abord (CORS ouvert chez
    Google pour cette API, comme pour Wikipédia — voir srcWikipedia), repli sur
