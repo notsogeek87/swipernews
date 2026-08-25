@@ -74,7 +74,7 @@
   /* position:relative — les cartes sont ainsi positionnées PAR RAPPORT au fil,
      donc card.offsetTop donne directement l'offset dans le contenu défilable
      (c'est ce qui sert à repérer la carte courante et à restaurer la position). */
-  #feed{height:100dvh;width:100%;overflow-y:scroll;scroll-snap-type:y mandatory;
+  #feed{height:100vh;height:100dvh;width:100%;overflow-y:scroll;scroll-snap-type:y mandatory;
     -webkit-overflow-scrolling:touch;scrollbar-width:none;position:relative}
   #feed::-webkit-scrollbar{display:none}
 
@@ -82,9 +82,9 @@
      images de fond pour les cartes hors écran. Sans cela, un fil de 120 cartes
      plein écran garde 120 images décodées en mémoire GPU.
      contain-intrinsic-size évite l'effondrement de la hauteur de défilement. */
-  .card{height:100dvh;width:100%;scroll-snap-align:start;scroll-snap-stop:always;
+  .card{height:100vh;height:100dvh;width:100%;scroll-snap-align:start;scroll-snap-stop:always;
     position:relative;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;
-    content-visibility:auto;contain-intrinsic-size:auto 100dvh}
+    content-visibility:auto;contain-intrinsic-size:auto 100vh;contain-intrinsic-size:auto 100dvh}
   /* Carte de fin PROVISOIRE, ajoutée par renderLoadMoreCard() tant que loadMore()
      est en vol : sans elle, swiper au-delà de la dernière carte réelle ne menait
      nulle part (scroll-snap sans cible suivante) jusqu'à l'arrivée silencieuse du
@@ -518,7 +518,7 @@
   .sheet.open{display:flex}
   .sheet__panel{background:var(--surface);width:100%;border-radius:var(--radius-md) var(--radius-md) 0 0;
     padding:22px 20px calc(28px + env(safe-area-inset-bottom));
-    max-height:82dvh;overflow-y:auto;border:1px solid var(--redline);border-bottom:none}
+    max-height:82vh;max-height:82dvh;overflow-y:auto;border:1px solid var(--redline);border-bottom:none}
   .sheet__panel:focus{outline:none}
   .sheet__grip{width:44px;height:5px;border-radius:var(--radius-sm);background:var(--ash);opacity:.4;margin:0 auto 20px}
   .sheet h2{font-family:var(--font-sans);font-size:20px;font-weight:700;margin-bottom:4px;letter-spacing:-.02em}
@@ -1261,9 +1261,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=212"></script>
-<script src="src/learn-core.js?v=212"></script>
-<script src="src/i18n.js?v=212"></script>
+<script src="src/lib.js?v=213"></script>
+<script src="src/learn-core.js?v=213"></script>
+<script src="src/i18n.js?v=213"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2105,7 +2105,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="212";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="213";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
