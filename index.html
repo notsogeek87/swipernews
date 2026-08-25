@@ -982,18 +982,21 @@
 <div class="syncbar" id="syncbar" aria-hidden="true"></div>
 
 <header class="top">
-  <!-- Rangée 1 : la marque À GAUCHE, le bouton menu À DROITE. Ce dernier
-       portait 4 icônes (Articles en mémoire, Enregistrés, Actualiser,
-       Réglages) posées à plat — une rangée qui grossissait à chaque nouvelle
-       action de la barre. Un seul bouton menu ouvre maintenant menuSheet, qui
-       les liste toutes (+ « Mon activité », voir statsSheet) : la rangée
-       n'accueille plus jamais plus d'une icône, quel que soit le nombre
-       d'actions.
+  <!-- Rangée 1 : la marque À GAUCHE, les boutons À DROITE. Le menu portait 4
+       icônes (Articles en mémoire, Enregistrés, Actualiser, Réglages) posées
+       à plat — une rangée qui grossissait à chaque nouvelle action de la
+       barre. Un seul bouton menu ouvre maintenant menuSheet, qui liste les 3
+       restantes (+ « Mon activité », voir statsSheet) : la rangée n'accueille
+       jamais plus de deux icônes, quel que soit le nombre d'actions dans le
+       menu. reloadBtn, lui, est ressorti du menu et posé ICI, juste à gauche
+       du bouton menu : une action assez fréquente pour rester à un seul
+       geste, sans détour par le tiroir.
        Les icônes sont posées par setIcons() depuis les mêmes constantes que
        les cartes : une seule famille de tracés dans toute l'app. -->
   <div class="topline">
     <div class="brand"><span class="brand__logo"><img src="logo-192.png?v=42" alt="" width="28" height="28"></span><span class="brand__text" data-text="SwiperNews">SwiperNews</span></div>
     <div class="actions">
+      <button id="reloadBtn" class="iconbtn" data-i18n-attr="title:top.reload.title,aria-label:top.reload.aria"></button>
       <button id="menuBtn" class="iconbtn" aria-haspopup="dialog" data-i18n-attr="title:top.menu.title,aria-label:top.menu.aria"></button>
     </div>
   </div>
@@ -1023,7 +1026,6 @@
     <div class="menulist">
       <button type="button" class="menurow" id="histBtn"><span class="menurow__i"></span><span data-i18n="top.history.aria">Liste des articles</span></button>
       <button type="button" class="menurow" id="savedBtn"><span class="menurow__i"></span><span data-i18n="top.saved.aria">Enregistrés</span></button>
-      <button type="button" class="menurow" id="reloadBtn"><span class="menurow__i"></span><span data-i18n="top.reload.aria">Actualiser</span></button>
       <button type="button" class="menurow" id="menuStatsBtn"><span class="menurow__i"></span><span data-i18n="menu.stats">Mon activité</span></button>
       <button type="button" class="menurow" id="openSheet"><span class="menurow__i"></span><span data-i18n="top.settings.aria">Réglages</span></button>
     </div>
@@ -1299,9 +1301,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=215"></script>
-<script src="src/learn-core.js?v=215"></script>
-<script src="src/i18n.js?v=215"></script>
+<script src="src/lib.js?v=216"></script>
+<script src="src/learn-core.js?v=216"></script>
+<script src="src/i18n.js?v=216"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2165,7 +2167,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="215";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="216";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -5327,10 +5329,9 @@ document.getElementById("menuBtn").onclick=()=>openDialog(menuSheet);
 menuSheet.onclick=e=>{if(e.target===menuSheet)closeDialog(menuSheet);};
 statsSheet.onclick=e=>{if(e.target===statsSheet)closeDialog(statsSheet);};
 document.getElementById("openSheet").onclick=()=>openSettings(menuSheet);
-// reloadBtn n'ouvre aucun panneau ensuite : fermeture NORMALE du menu (elle
-// consomme bien l'unique entrée d'historique posée à son ouverture), pas
-// replaceDialog.
-document.getElementById("reloadBtn").onclick=()=>{closeDialog(menuSheet);toast(T("toast.refreshing"));loadFeeds(true);};
+// reloadBtn vit maintenant dans la rangée 1, hors du menu : pas de dialog à
+// fermer, juste l'action.
+document.getElementById("reloadBtn").onclick=()=>{toast(T("toast.refreshing"));loadFeeds(true);};
 
 /* ---------- Réglage « Ouvrir les articles » (app packagée) ----------
    Un seul point de montage depuis la fusion des panneaux (querySelectorAll
@@ -5810,7 +5811,7 @@ function setIcons(){
   document.getElementById("histBtn").querySelector(".menurow__i").innerHTML=ICON_LIST;
   document.getElementById("savedBtn").querySelector(".menurow__i").innerHTML=ICON_SAVE;
   saveBtn.innerHTML=ICON_SAVE;   // état réel posé par updateRail(), dès la 1re carte
-  document.getElementById("reloadBtn").querySelector(".menurow__i").innerHTML=ICON_RELOAD;
+  document.getElementById("reloadBtn").innerHTML=ICON_RELOAD;
   document.getElementById("openSheet").querySelector(".menurow__i").innerHTML=ICON_SETTINGS;
   document.getElementById("menuStatsBtn").querySelector(".menurow__i").innerHTML=ICON_STATS;
   srcBtn.querySelector(".filterbtn__i").innerHTML=ICON_RSS;
