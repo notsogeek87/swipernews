@@ -1052,9 +1052,24 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   vers `blob:`, et Capacitor s'en désintéresse explicitement
   (`Bridge.launchIntent` rend `false` pour les schémas `data` et `blob`). Seule
   la WebView du lecteur a un `DownloadListener` ; celle du pont n'en a pas.
-  Écrire un fichier depuis l'app passe donc par `InAppBrowserPlugin.saveFile`,
-  qui l'écrit dans le cache, l'expose via le `FileProvider` du manifeste et
-  ouvre `ACTION_SEND`. Le chemin navigateur reste celui du web.
+  Écrire un fichier depuis l'app passe donc par `InAppBrowserPlugin.saveFile`.
+  Le chemin navigateur reste celui du web.
+  **`saveFile` ouvre le sélecteur d'enregistrement du système
+  (`ACTION_CREATE_DOCUMENT`, Storage Access Framework), pas une feuille de
+  partage `ACTION_SEND`.** Une première version écrivait dans le cache de
+  l'app, l'exposait via le `FileProvider` du manifeste et ouvrait `ACTION_SEND` —
+  ça propose des applications à qui ENVOYER le fichier, pas un emplacement où
+  l'ENREGISTRER ; symptôme remonté par un utilisateur : « impossible de
+  vraiment l'enregistrer », le choix dépendant des apps installées et aucune
+  n'étant un simple dossier. `ACTION_CREATE_DOCUMENT` est le vrai dialogue
+  « Enregistrer » du système (Téléchargements, stockage de l'appareil,
+  Drive…) ; le résultat (l'URI choisie, ou rien si annulé) revient par
+  `startActivityForResult`/`@ActivityCallback` de Capacitor, et l'écriture se
+  fait par flux directement dedans — plus rien n'est laissé sur le disque de
+  l'app, donc plus de `FileProvider` ni de `file_paths.xml` pour ce chemin.
+  Annuler le sélecteur rejette l'appel avec `"annulé"` : `exportFeeds`/
+  `exportSettings` le distinguent d'un vrai échec pour ne pas afficher
+  « Échec de l'export » sur une simple annulation.
 - **Le mode lecture s'applique dès que le DOM est PARSÉ, pas quand la page a
   fini de CHARGER.** Il ne peut pas s'appliquer plus tôt (analyseur en cours ⇒
   article tronqué), mais attendre `onPageFinished`, qui répond à l'événement

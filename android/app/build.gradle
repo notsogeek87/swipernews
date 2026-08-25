@@ -102,11 +102,6 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
-    // FileProvider, pour passer le fichier d'export à la feuille de partage
-    // (InAppBrowserPlugin.saveFile). La version est celle que Capacitor déclare
-    // déjà (variables.gradle) : rien de neuf n'entre dans le paquet, on rend
-    // seulement la dépendance explicite plutôt que transitive.
-    implementation "androidx.core:core:$androidxCoreVersion"
     // Navigateur intégré : WebSettingsCompat.setAlgorithmicDarkeningAllowed, pour
     // que les articles s'affichent en sombre comme le reste de l'app. La version
     // est celle que Capacitor déclare déjà (variables.gradle) — aucune

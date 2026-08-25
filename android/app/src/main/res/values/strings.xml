@@ -7,8 +7,6 @@
 
     <!-- Feuille de partage du système (InAppBrowserPlugin.share) -->
     <string name="share_chooser">Partager l\'article</string>
-    <!-- Export des sources : la même feuille, pour enregistrer le fichier -->
-    <string name="export_chooser">Enregistrer les sources</string>
 
     <!-- Navigateur intégré (InAppBrowserActivity) -->
     <string name="reader_close">Fermer l\'article</string>

@@ -3,13 +3,11 @@ package eu.lielu.news;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
-import android.net.Uri;
 import android.os.Build;
 
-import androidx.core.content.FileProvider;
+import androidx.activity.result.ActivityResult;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +16,7 @@ import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 /**
@@ -102,7 +101,7 @@ public class InAppBrowserPlugin extends Plugin {
     }
 
     /**
-     * Écrit un fichier et le passe à la feuille de partage du système.
+     * Enregistre un fichier via le sélecteur système (Storage Access Framework).
      *
      * <p>L'export des sources (OPML, JSON) reposait sur un {@code <a download>}
      * et une URL {@code blob:}. Ça marche dans un navigateur ; pas ici. La
@@ -114,11 +113,15 @@ public class InAppBrowserPlugin extends Plugin {
      * le clic ne produisait donc rien du tout, et le toast « Sources exportées »
      * mentait.
      *
-     * <p>Le fichier est écrit dans le cache de l'app, exposé par le
-     * {@code FileProvider} déjà déclaré au manifeste, puis proposé en
-     * {@code ACTION_SEND} : à l'utilisateur de choisir Fichiers, Drive, une
-     * messagerie… Rien n'est écrit hors du bac à sable de l'app, donc aucune
-     * permission de stockage.
+     * <p>{@code ACTION_CREATE_DOCUMENT} — pas {@code ACTION_SEND} : la première
+     * version passait par une feuille de PARTAGE (fichier écrit dans le cache de
+     * l'app, exposé via {@code FileProvider}), qui propose des applications à qui
+     * ENVOYER le fichier mais n'enregistre nulle part par elle-même — exactement
+     * le symptôme remonté (« impossible de vraiment l'enregistrer », selon les
+     * apps installées, jamais un simple choix de dossier). Le sélecteur SAF est le
+     * vrai dialogue « Enregistrer » du système : Téléchargements, stockage de
+     * l'appareil, Drive…, et l'écriture se fait par flux directement dans l'URI
+     * choisie, sans rien laisser sur le disque de l'app.
      */
     @PluginMethod
     public void saveFile(PluginCall call) {
@@ -137,36 +140,35 @@ public class InAppBrowserPlugin extends Plugin {
             call.reject("activité indisponible");
             return;
         }
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType(mime);
+        intent.putExtra(Intent.EXTRA_TITLE, name);
         try {
-            File dir = new File(getContext().getCacheDir(), "exports");
-            if (!dir.isDirectory() && !dir.mkdirs()) {
-                call.reject("dossier d'export non créé");
+            startActivityForResult(call, intent, "handleSaveFileResult");
+        } catch (ActivityNotFoundException e) {
+            call.reject("aucune application pour enregistrer le fichier");
+        }
+    }
+
+    /** Callback de {@link #saveFile}, une fois l'emplacement choisi (ou l'annulation). */
+    @ActivityCallback
+    private void handleSaveFileResult(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null
+            || result.getData().getData() == null) {
+            call.reject("annulé");
+            return;
+        }
+        String data = call.getString("data");
+        try (OutputStream os = getContext().getContentResolver()
+                .openOutputStream(result.getData().getData())) {
+            if (os == null) {
+                call.reject("écriture impossible");
                 return;
             }
-            // Un export chasse l'autre : le cache ne doit pas accumuler les
-            // sources de l'utilisateur, même à l'abri dans le bac à sable.
-            File[] previous = dir.listFiles();
-            if (previous != null) for (File f : previous) f.delete();
-
-            File out = new File(dir, name);
-            try (OutputStream os = new FileOutputStream(out)) {
-                os.write(data.getBytes(StandardCharsets.UTF_8));
-            }
-            Uri uri = FileProvider.getUriForFile(
-                getContext(), getContext().getPackageName() + ".fileprovider", out);
-
-            Intent send = new Intent(Intent.ACTION_SEND);
-            send.setType(mime);
-            send.putExtra(Intent.EXTRA_STREAM, uri);
-            send.putExtra(Intent.EXTRA_SUBJECT, name);
-            // Sans ce drapeau, l'application choisie reçoit une URI qu'elle n'a
-            // pas le droit de lire.
-            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            activity.startActivity(
-                Intent.createChooser(send, activity.getString(R.string.export_chooser)));
+            os.write(data.getBytes(StandardCharsets.UTF_8));
             call.resolve();
-        } catch (ActivityNotFoundException e) {
-            call.reject("aucune application pour recevoir le fichier");
         } catch (IOException e) {
             String msg = e.getMessage();
             call.reject(msg == null ? "écriture impossible" : msg);

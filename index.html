@@ -1301,9 +1301,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=216"></script>
-<script src="src/learn-core.js?v=216"></script>
-<script src="src/i18n.js?v=216"></script>
+<script src="src/lib.js?v=217"></script>
+<script src="src/learn-core.js?v=217"></script>
+<script src="src/i18n.js?v=217"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2167,7 +2167,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="216";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="217";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -6674,13 +6674,15 @@ async function nommerChaine(url){
 }
 
 /* ---------- Import / Export des sources ---------- */
-/* Rend true quand le fichier est parti, false sinon — l'appelant n'annonce
-   rien tant qu'il n'a pas la réponse.
+/* Rend true quand le fichier est vraiment enregistré, rejette sinon — l'appelant
+   n'annonce rien tant qu'il n'a pas la réponse.
    Dans l'APK, le chemin du navigateur ne marche PAS : la WebView d'Android
    n'implémente pas l'attribut download, ne navigue pas vers une URL blob:, et
    Capacitor s'en désintéresse explicitement (Bridge.launchIntent rend false
    pour blob:). Le clic ne produisait donc rien — d'où le passage par le pont,
-   qui écrit le fichier et ouvre la feuille de partage du système. */
+   qui ouvre le sélecteur d'enregistrement du système (Storage Access
+   Framework — Téléchargements, stockage de l'appareil, Drive…) et écrit
+   dans l'emplacement choisi ; annuler ce sélecteur rejette avec "annulé". */
 async function download(filename,content,mime){
   const iab=iabPlugin();
   if(isNativeApp&&iab&&iab.saveFile){
@@ -6717,11 +6719,10 @@ ${rows}
   try{
     await download(name,body,mime);
   }catch(e){
+    if(e&&e.message==="annulé")return;   // sélecteur d'enregistrement annulé : rien à dire
     warn("export",e);toast(T("toast.exportFailed"));return;
   }
-  // Dans l'APK, la feuille de partage vient de s'ouvrir : elle dit déjà ce qui
-  // se passe, et un toast se glisserait devant.
-  if(!isNativeApp)toast(T("toast.feedsExported"));
+  toast(T("toast.feedsExported"));
 }
 function importFromFile(ev){
   const file=ev.target.files&&ev.target.files[0];
@@ -6782,8 +6783,11 @@ async function exportSettings(){
   const body=JSON.stringify(settingsSnapshot(),null,2);
   try{
     await download(name,body,"application/json");
-  }catch(e){warn("export settings",e);toast(T("toast.exportFailed"));return;}
-  if(!isNativeApp)toast(T("toast.settingsExported"));
+  }catch(e){
+    if(e&&e.message==="annulé")return;   // sélecteur d'enregistrement annulé : rien à dire
+    warn("export settings",e);toast(T("toast.exportFailed"));return;
+  }
+  toast(T("toast.settingsExported"));
 }
 /* Écrit directement dans localStorage, sous les MÊMES clés et le MÊME
    encodage que ce que chaque réglage lit déjà au démarrage (voir les IIFE de
