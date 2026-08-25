@@ -333,6 +333,20 @@ genre de script dérape.
   quand le lien doit garder son comportement normal (`target="_blank"`).
 - `renderReadPref()` / `PREFS` / `setPref()` — les réglages du lecteur, rendus
   dans le point de montage `[data-readmount]` du panneau unique.
+- `appTheme` / `APP_THEMES` / `renderThemePref()` / `setAppTheme()` — l'habillage
+  de couleurs (`[data-thememount]`), en réponse au retour « les couleurs sont
+  flash ». Hors de `PREFS`/`setPref()` pour la même raison que `LANG` : un
+  effet de bord propre (`applyAppTheme()` pose `data-apptheme` sur `<html>` et
+  recalcule `<meta name="theme-color">` depuis `--bg` calculé, jamais dupliqué
+  en JS). Toute la page étant déjà bâtie sur les variables de `:root` (voir le
+  `<style>`), un thème alternatif n'est qu'un bloc `:root[data-apptheme="…"]`
+  qui les redéclare — sauf pour les nombreux `rgba(…)` qui varient l'opacité
+  d'un accent (survols, séparateurs `.secttl`/`.prefrow`/…) : une fonction CSS
+  n'accepte pas une couleur entière en paramètre, d'où `--redline-rgb` et
+  `--blush-rgb`, le triplet R,G,B seul, à côté de `--redline`/`--blush` et
+  redéclaré avec eux dans chaque thème. `"flamme"` (l'habillage d'origine,
+  toujours le défaut) n'a pas d'attribut : c'est déjà `:root` sans sélecteur
+  additionnel.
 - `newsItems` / `learnItems` / `remix()` — les DEUX réserves du fil et leur
   entrelacement. `items` n'est jamais construit à la main : il est toujours
   `mixLists(newsItems, learnItems, mixLevel())`, qui s'appuie sur `interleave`

@@ -163,6 +163,16 @@
       "sheet.subtitle":
         "Tes actus et des articles Wikipédia, en alternance dans un seul fil.",
 
+      "sheet.theme.title": "🎨 Thème",
+      "sheet.theme.sub": "L'habillage de couleurs du fil.",
+      "apptheme.label": "Couleurs",
+      "apptheme.desc.flamme":
+        "L'habillage d'origine : braises sur fond noir, un accent corail vif.",
+      "apptheme.desc.sobre":
+        "Mêmes contrastes, en couleurs éteintes — sans l'accent vif.",
+      "apptheme.opt.flamme": "Flamme",
+      "apptheme.opt.sobre": "Sobre",
+
       "sheet.mix.title": "🎚️ Dose d'apprentissage",
       "dose.title": "Dose d'apprentissage",
       "dose.sub": "Combien d'articles Wikipédia se glissent entre tes actus.",
@@ -483,6 +493,14 @@
       "sheet.aria": "Your feed's settings",
       "sheet.title": "Your feed",
       "sheet.subtitle": "Your news and Wikipedia articles, alternating in a single feed.",
+
+      "sheet.theme.title": "🎨 Theme",
+      "sheet.theme.sub": "The feed's color scheme.",
+      "apptheme.label": "Colors",
+      "apptheme.desc.flamme": "The original look: embers on black, a vivid coral accent.",
+      "apptheme.desc.sobre": "Same contrast, muted colors — no vivid accent.",
+      "apptheme.opt.flamme": "Flamme",
+      "apptheme.opt.sobre": "Sobre",
 
       "sheet.mix.title": "🎚️ Learning dose",
       "dose.title": "Learning dose",

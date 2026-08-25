@@ -43,6 +43,13 @@
   :root{
     --bg:#190501;--surface:#340a01;--molten:#631303;--redline:#951c04;
     --flare:#fa5838;--blush:#fcac9c;--ink:#f7f6ff;--ash:#baadab;--black:#000;
+    /* Mêmes couleurs que --redline/--blush ci-dessus, mais en triplet R,G,B
+       (sans fonction ni alpha) : c'est la seule façon de garder les nombreux
+       `rgba(…,X)` du fichier (survols, séparateurs — l'alpha varie, la teinte
+       non) réglables par thème, une fonction CSS n'acceptant pas une couleur
+       entière en paramètre. Redéclarées ensemble avec --redline/--blush dans
+       chaque thème ci-dessous : les deux formes doivent rester synchronisées. */
+    --redline-rgb:149,28,4;--blush-rgb:252,172,156;
     --radius-sm:4px;--radius-md:8px;
     /* Ce que le système dessine PAR-DESSUS le haut de la page : barre d'état et
        poinçon/encoche de caméra. Zéro par défaut ; l'app packagée le remplit
@@ -60,6 +67,21 @@
     --font-sans:'Matter','Inter','Söhne','Geist Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
     --font-mono:'Fabrikatmono','JetBrains Mono','IBM Plex Mono','Berkeley Mono',ui-monospace,
       'SFMono-Regular',Consolas,'Liberation Mono',monospace;
+  }
+  /* Habillage alternatif « Sobre », réglable dans Réglages ⚙ (voir
+     renderThemePref/setAppTheme). Même structure que Flamme ci-dessus (fond
+     quasi noir, un seul accent, coins techniques) — tout le reste de la page
+     est déjà bâti sur ces mêmes variables, donc rien d'autre à toucher — mais
+     désaturée : accent bleu-gris éteint plutôt que corail vif, bordures grises
+     plutôt que rouge « signal ». Répond au retour « les couleurs sont flash »
+     sans rien retirer à qui préfère l'habillage d'origine, qui reste le
+     défaut. Spécificité de `[data-apptheme]` sur `:root` volontairement plus
+     élevée que `:root` seul, pour ne pas dépendre de l'ordre des règles. */
+  :root[data-apptheme="sobre"]{
+    --bg:#15161a;--surface:#232429;--molten:#33353c;--redline:#43454d;
+    --flare:#8fa3b8;--blush:#c3ccd6;--ink:#eef0f3;--ash:#9296a1;
+    --redline-rgb:67,69,77;--blush-rgb:195,204,214;
+    --shadow-ember:inset 0 0 20px rgba(51,53,60,.6);
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--font-sans);
@@ -260,7 +282,7 @@
   .rail button{background:transparent;border:1.5px solid var(--redline);color:var(--ink);
     width:46px;height:46px;border-radius:var(--radius-sm);cursor:pointer;
     display:grid;place-items:center;transition:transform .15s,background .2s}
-  .rail button:hover{background:rgba(149,28,4,.15)}
+  .rail button:hover{background:rgba(var(--redline-rgb),.15)}
   .rail button:active{transform:scale(.88)}
   .rail button svg{width:20px;height:20px;display:block}
   /* Enregistré : même accent corail que les autres états « on » de l'app
@@ -359,7 +381,7 @@
   .top .actions button{background:transparent;border:1.5px solid var(--redline);color:var(--ink);
     padding:9px 14px;border-radius:var(--radius-sm);font-family:var(--font-sans);font-weight:500;font-size:13px;
     letter-spacing:-.01em;cursor:pointer;transition:background .2s}
-  .top .actions button:hover{background:rgba(149,28,4,.15)}
+  .top .actions button:hover{background:rgba(var(--redline-rgb),.15)}
   .iconbtn{width:38px;height:38px;padding:0!important;display:grid;place-items:center}
   /* Toutes les icônes de la barre à la même boîte : c'est ce qui les aligne
      entre elles, ce qu'aucun glyphe de police ne garantit (chacun a sa propre
@@ -391,7 +413,7 @@
      repos (« Toutes »/« Tous ») la pastille reste fantôme — l'état par défaut
      ne doit pas se signaler comme un réglage en cours. */
   .filterbtn.on{background:var(--surface);color:var(--flare)}
-  .filterbtn:hover{background:rgba(149,28,4,.15)}
+  .filterbtn:hover{background:rgba(var(--redline-rgb),.15)}
   .filterbtn:active{transform:scale(.97)}
   /* Le nom d'une source est le titre de son flux, que personne ne choisit :
      « Courrier international - Actualités France et Monde, vidéos, infographies »
@@ -458,7 +480,7 @@
   .intchip.on{background:var(--flare);border-color:var(--flare);color:var(--bg);font-weight:700}
   /* « Warm Blush » : le lavis décoratif que la charte réserve aux zones de
      respiration — ici pour l'encart d'accueil, jamais sous forme de texte coloré. */
-  .intro{background:rgba(252,172,156,.12);border:1px solid var(--redline);color:var(--ink);
+  .intro{background:rgba(var(--blush-rgb),.12);border:1px solid var(--redline);color:var(--ink);
     font-size:14px;line-height:1.45;padding:13px 15px;border-radius:var(--radius-md);margin-bottom:18px}
 
   /* En-tête du panneau d'accueil (logo + titre) : seul endroit où le logo
@@ -528,7 +550,7 @@
      l'un finit et où l'autre commence. Même filet que les autres séparateurs du
      panneau, jamais d'ombre ni de fond : la structure vient du liseré. */
   .secttl{font-family:var(--font-sans);font-size:16px;font-weight:700;letter-spacing:-.02em;
-    margin-top:24px;padding-top:20px;border-top:1px solid rgba(149,28,4,.3)}
+    margin-top:24px;padding-top:20px;border-top:1px solid rgba(var(--redline-rgb),.3)}
   .secttl+p.sub{margin-top:4px}
   /* Sous-groupe RÉEL de #feedList (RSS classique / chaînes YouTube), un
      <details> natif comme .ytadv plus bas — jamais un .secttl, ce n'est pas
@@ -547,7 +569,7 @@
   .feedgroup__chev{flex:0 0 auto;margin-left:auto;display:block;transition:transform .15s ease}
   .feedgroup__chev svg{width:14px;height:14px;display:block}
   .feedgroup[open] .feedgroup__chev{transform:rotate(180deg)}
-  .feedrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(149,28,4,.3)}
+  .feedrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(var(--redline-rgb),.3)}
   .feedrow input[type=checkbox]{width:20px;height:20px;accent-color:var(--flare)}
   .feedrow .name{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   /* Signale une source injoignable au dernier chargement, là où on peut la
@@ -600,11 +622,11 @@
     border:2px solid var(--surface);border-top-color:var(--flare);
     border-radius:calc(var(--radius-sm) / 3);animation:spin .9s linear infinite}
   .applybtn{width:100%;margin-top:16px;padding:15px;font-size:16px}
-  .iorow{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;padding-top:18px;border-top:1px solid rgba(149,28,4,.3)}
+  .iorow{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;padding-top:18px;border-top:1px solid rgba(var(--redline-rgb),.3)}
   .iobtn{flex:1 1 auto;min-width:120px;background:transparent;border:1.5px solid var(--redline);color:var(--ink);
     font-family:var(--font-sans);font-weight:500;letter-spacing:-.01em;font-size:13px;padding:12px 14px;border-radius:var(--radius-sm);cursor:pointer;
     transition:background .2s}
-  .iobtn:hover{background:rgba(149,28,4,.15)}
+  .iobtn:hover{background:rgba(var(--redline-rgb),.15)}
   .iobtn:active{transform:scale(.97)}
   /* Secours optionnel (clé API YouTube) : replié par défaut, discret — un
      <details> plutôt qu'une section pleine, pour ne pas donner à un réglage
@@ -635,9 +657,9 @@
      vignette n'est qu'un repère, à taille fixe pour que tous les titres
      commencent sur la même verticale et que l'œil descende en ligne droite. */
   .histrow{display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;
-    background:transparent;border:none;border-bottom:1px solid rgba(149,28,4,.3);
+    background:transparent;border:none;border-bottom:1px solid rgba(var(--redline-rgb),.3);
     color:var(--ink);font-family:var(--font-sans);padding:12px 2px;cursor:pointer}
-  .histrow:hover{background:rgba(149,28,4,.12)}
+  .histrow:hover{background:rgba(var(--redline-rgb),.12)}
   .histrow:active{transform:scale(.99)}
   .histrow__th{flex:0 0 auto;width:58px;height:58px;border-radius:var(--radius-sm);
     background:var(--surface);object-fit:cover;display:block;border:1px solid var(--redline)}
@@ -657,7 +679,7 @@
   .histrow--past{opacity:.5}
   /* La carte sous les yeux : repère de position dans la liste. Aplat + titre
      corail, pas une simple nuance de teinte (voir .intchip.on). */
-  .histrow--now{background:rgba(149,28,4,.18)}
+  .histrow--now{background:rgba(var(--redline-rgb),.18)}
   .histrow--now .histrow__ttl{color:var(--flare)}
   /* Déjà lu (itemSeen) : contour seulement, jamais un aplat comme .histrow--now
      — réservé au repère de position, pas à un simple état. INDÉPENDANT de la
@@ -711,10 +733,10 @@
      ne sont que des actions, rien à prévisualiser. */
   .menulist{display:flex;flex-direction:column;margin-top:6px}
   .menurow{display:flex;align-items:center;gap:14px;width:100%;text-align:left;
-    background:transparent;border:none;border-bottom:1px solid rgba(149,28,4,.3);
+    background:transparent;border:none;border-bottom:1px solid rgba(var(--redline-rgb),.3);
     color:var(--ink);font-family:var(--font-sans);font-size:15px;font-weight:500;
     padding:14px 2px;cursor:pointer}
-  .menurow:hover{background:rgba(149,28,4,.12)}
+  .menurow:hover{background:rgba(var(--redline-rgb),.12)}
   .menurow:active{transform:scale(.99)}
   .menurow:last-child{border-bottom:none}
   .menurow__i{flex:0 0 auto;width:24px;height:24px;display:grid;place-items:center;color:var(--flare)}
@@ -797,7 +819,7 @@
   .statstablebtn:focus-visible{outline:2px solid var(--flare);outline-offset:2px}
   .statstablewrap{margin-top:6px;overflow-x:auto}
   .statstable{width:100%;border-collapse:collapse;font-size:13px}
-  .statstable th,.statstable td{text-align:left;padding:7px 4px;border-bottom:1px solid rgba(149,28,4,.3)}
+  .statstable th,.statstable td{text-align:left;padding:7px 4px;border-bottom:1px solid rgba(var(--redline-rgb),.3)}
   .statstable th{color:var(--ash);font-weight:600;font-size:12px}
   .statstable td:last-child,.statstable th:last-child{text-align:right;font-family:var(--font-mono);letter-spacing:-.03em}
 
@@ -818,7 +840,7 @@
      la phrase, le sélecteur passait tantôt à droite, tantôt dessous, et deux
      réglages voisins ne s'alignaient plus. */
   .prefrow{display:flex;flex-direction:column;align-items:flex-start;gap:11px;
-    margin-top:18px;padding-top:18px;border-top:1px solid rgba(149,28,4,.3)}
+    margin-top:18px;padding-top:18px;border-top:1px solid rgba(var(--redline-rgb),.3)}
   .prefrow__txt{min-width:0}
   .prefrow__txt b{display:block;font-weight:600;font-size:15px;margin-bottom:3px}
   .prefrow__txt span{display:block;color:var(--ash);font-size:12.5px;line-height:1.4}
@@ -883,7 +905,7 @@
   .sharedest{display:flex;align-items:center;justify-content:center;text-align:center;text-decoration:none;
     background:transparent;border:1.5px solid var(--redline);color:var(--ink);font-family:var(--font-sans);font-weight:500;
     letter-spacing:-.01em;font-size:14px;padding:16px 12px;border-radius:var(--radius-sm);cursor:pointer;transition:background .2s}
-  .sharedest:hover{background:rgba(149,28,4,.15)}
+  .sharedest:hover{background:rgba(var(--redline-rgb),.15)}
   .sharedest:active{transform:scale(.97)}
 
   /* Bannière d'incitation à installer la PWA */
@@ -1080,6 +1102,12 @@
          de montage, sur le même modèle que la dose et les réglages du lecteur. -->
     <div data-langmount></div>
 
+    <!-- Thème des couleurs (voir renderThemePref/setAppTheme) : même point de
+         montage unique que les autres réglages ci-dessus/dessous. -->
+    <h3 class="secttl" data-i18n="sheet.theme.title">🎨 Thème</h3>
+    <p class="sub" data-i18n="sheet.theme.sub">L'habillage de couleurs du fil.</p>
+    <div data-thememount></div>
+
     <h3 class="secttl" data-i18n="sheet.mix.title">🎚️ Dose d'apprentissage</h3>
     <p class="sub" data-i18n="dose.sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
     <div data-mixmount></div>
@@ -1261,9 +1289,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=213"></script>
-<script src="src/learn-core.js?v=213"></script>
-<script src="src/i18n.js?v=213"></script>
+<script src="src/lib.js?v=214"></script>
+<script src="src/learn-core.js?v=214"></script>
+<script src="src/i18n.js?v=214"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1467,6 +1495,28 @@ function applyI18n(){
 }
 document.documentElement.lang=LANG;
 applyI18n();
+
+/* ---------- Thème de couleurs de l'app ----------
+   Purement cosmétique : toute la page est déjà bâtie sur les variables de
+   :root (voir le <style>), donc changer de thème ne touche qu'un attribut sur
+   <html> — aucune autre logique n'en dépend, contrairement à LANG. "flamme"
+   (l'habillage d'origine) n'a pas besoin d'attribut : c'est déjà :root sans
+   sélecteur additionnel, d'où retirer l'attribut plutôt que le poser à
+   "flamme" dans applyAppTheme(). */
+const LS_APPTHEME="fluxswipe.apptheme.v1";
+const APP_THEMES=["flamme","sobre"];
+let appTheme=(()=>{try{const v=localStorage.getItem(LS_APPTHEME);return APP_THEMES.includes(v)?v:APP_THEMES[0];}catch(e){return APP_THEMES[0];}})();
+/* Le <meta name="theme-color"> (couleur de la barre d'état/l'UI du
+   navigateur) est lu depuis --bg calculé plutôt que dupliqué en dur ici : la
+   couleur exacte de chaque thème ne vit qu'à un seul endroit, le <style>. */
+function applyAppTheme(){
+  if(appTheme==="flamme")document.documentElement.removeAttribute("data-apptheme");
+  else document.documentElement.dataset.apptheme=appTheme;
+  const meta=document.querySelector('meta[name="theme-color"]');
+  const bg=getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+  if(meta&&bg)meta.setAttribute("content",bg);
+}
+applyAppTheme();
 
 /* ---------- Articles Wikipédia de démo (repli hors-ligne) ---------- */
 const DEMO_LEARN = [
@@ -2105,7 +2155,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="213";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="214";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 // App packagée (Capacitor) : window.Capacitor est injecté par le runtime natif
 // dans la WebView. L'app n'appelle PAS le backend Vercel (aucune dépendance à
 // news.lielu.eu pour les données) : Wikipédia s'appelle déjà en direct dans un
@@ -5352,6 +5402,14 @@ function renderLangPref(){
     LANGS.map(l=>({v:l,t:T("lang.opt."+l)})),LANG);
   document.querySelectorAll("[data-langmount]").forEach(el=>{el.innerHTML=html;});
 }
+/* Thème de couleurs : même position (avant PREFS) et même forme que
+   renderLangPref(), pour la même raison — l'effet de bord (attribut sur
+   <html>, voir setAppTheme) l'écarte de PREFS/setPref, communs au reste. */
+function renderThemePref(){
+  const html=prefRow("apptheme",T("apptheme.label"),T("apptheme.desc."+appTheme),
+    APP_THEMES.map(v=>({v,t:T("apptheme.opt."+v)})),appTheme);
+  document.querySelectorAll("[data-thememount]").forEach(el=>{el.innerHTML=html;});
+}
 const PREFS={
   read:{get:()=>readPref,set:v=>{readPref=v;},key:LS_READ,vals:READ_MODES},
   cmp: {get:()=>cmpPref, set:v=>{cmpPref=v;}, key:LS_CMP, vals:["hide","show"]},
@@ -5361,6 +5419,7 @@ const PREFS={
 };
 function setPref(name,v){
   if(name==="lang"){setLang(v);return;}   // effets de bord propres : voir setLang
+  if(name==="apptheme"){setAppTheme(v);return;}   // idem : attribut sur <html>
   const p=PREFS[name];
   if(!p)return;
   const next=p.vals.includes(v)?v:p.vals[0];   // valeur inconnue → on retombe sur le défaut
@@ -5382,8 +5441,19 @@ function setLang(l){
   try{localStorage.setItem(LS_LANG,LANG);}catch(e){warn("save lang",e);}
   document.documentElement.lang=LANG;
   applyI18n();
-  renderLangPref();renderReadPref();renderIntGrid();renderList();renderSuggest();renderMixUI();
+  renderLangPref();renderReadPref();renderThemePref();renderIntGrid();renderList();renderSuggest();renderMixUI();
   switchFeed();
+}
+/* Contrairement à setLang(), ne touche à AUCUN état du fil : c'est pour ça
+   qu'elle vit à côté plutôt que dans PREFS (voir setPref) — juste l'attribut
+   sur <html>, la couleur de barre d'état, et le panneau qui l'affiche. */
+function setAppTheme(v){
+  const next=APP_THEMES.includes(v)?v:APP_THEMES[0];
+  if(next===appTheme)return;
+  appTheme=next;
+  try{localStorage.setItem(LS_APPTHEME,appTheme);}catch(e){warn("save apptheme",e);}
+  applyAppTheme();
+  renderThemePref();
 }
 // Délégation : les blocs sont réécrits à chaque rendu, un écouteur par bouton
 // serait à ré-attacher à chaque fois.
@@ -5396,6 +5466,7 @@ document.addEventListener("click",e=>{
 });
 renderLangPref();
 renderReadPref();
+renderThemePref();
 /* Rafraîchissement hebdomadaire, en silence : une liste de blocage vieille de
    plusieurs mois laisse passer les régies apparues depuis. Rien ne part si
    aucune source n'a été choisie, ni si le blocage est désactivé. */
@@ -6209,7 +6280,7 @@ function openSettings(replaceFrom){
   // retrouver l'état réduit — sans quoi un groupe déplié une fois resterait
   // déplié pour le reste de la session.
   feedGroupOpen={rss:false,vid:false};
-  renderMix();renderIntGrid("intGrid");renderList();renderSuggest();renderReadPref();renderLangPref();
+  renderMix();renderIntGrid("intGrid");renderList();renderSuggest();renderReadPref();renderLangPref();renderThemePref();
   document.getElementById("sponsorFilterChk").checked=filterSponsored;
   document.getElementById("videoFilterChk").checked=filterVideoOnly;
   document.getElementById("ytApiKeyInput").value=ytApiKey;
@@ -6676,6 +6747,7 @@ function settingsSnapshot(){
   return {
     app:"swipernews",type:"settings",version:1,
     lang:LANG,
+    appTheme,
     mix:mixScore,
     interests,
     cat,
@@ -6717,6 +6789,9 @@ function applySettingsImport(obj){
   let n=0;
   if(typeof obj.lang==="string"&&LANGS.includes(obj.lang)){
     localStorage.setItem(LS_LANG,obj.lang);n++;
+  }
+  if(typeof obj.appTheme==="string"&&APP_THEMES.includes(obj.appTheme)){
+    localStorage.setItem(LS_APPTHEME,obj.appTheme);n++;
   }
   if(Number.isInteger(obj.mix)&&obj.mix===clampMix(obj.mix)){
     localStorage.setItem(LS_MIX,String(obj.mix));n++;
