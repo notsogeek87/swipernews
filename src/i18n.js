@@ -532,8 +532,8 @@
       "apptheme.desc.bleu": "Same intensity as Flamme, in blue instead of coral.",
       "apptheme.desc.sobre": "Same contrast, muted colors — no vivid accent.",
       "apptheme.opt.flamme": "Flamme",
-      "apptheme.opt.bleu": "Bleuté",
-      "apptheme.opt.sobre": "Sobre",
+      "apptheme.opt.bleu": "Blue",
+      "apptheme.opt.sobre": "Muted",
 
       "sheet.mix.title": "🎚️ Learning dose",
       "dose.title": "Learning dose",
