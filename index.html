@@ -1129,9 +1129,12 @@
     <div data-langmount></div>
 
     <!-- Thème des couleurs (voir renderThemePref/setAppTheme) : même point de
-         montage unique que les autres réglages ci-dessus/dessous. -->
-    <h3 class="secttl" data-i18n="sheet.theme.title">🎨 Thème</h3>
-    <p class="sub" data-i18n="sheet.theme.sub">L'habillage de couleurs du fil.</p>
+         montage unique que les autres réglages ci-dessus/dessous, et même
+         absence de secttl/sub séparé que data-langmount juste au-dessus —
+         prefRow() porte déjà son propre libellé + description de l'option en
+         cours (apptheme.label), un secttl "Thème" par-dessus ne faisait que
+         répéter la même idée deux fois de suite (retour utilisateur : "ça
+         fait doublon"). -->
     <div data-thememount></div>
 
     <h3 class="secttl" data-i18n="sheet.mix.title">🎚️ Dose d'apprentissage</h3>
@@ -1254,16 +1257,19 @@
 </div>
 
 <!-- Mon activité : ouverte depuis menuSheet (menuStatsBtn), jamais autrement.
-     Compte les cartes défilées (bumpCardScroll, depuis onCardChange).
+     Deux compteurs, chacun son bouton dans STATS_HTML : les cartes défilées
+     (bumpCardScroll, depuis onCardChange) et les articles ouverts
+     (bumpArticleOpen, depuis les clics sur a[data-open]).
      renderStats() construit tout le contenu dans le point de montage : un
-     chiffre vedette + sa comparaison à la période précédente, cinq onglets de
-     période (heure/jour/semaine/mois/année), le détail de la période choisie
-     en graphique ET en tableau — voir le commentaire de STATS_HTML. -->
+     chiffre vedette + sa comparaison à la période précédente, pour la
+     métrique et la période choisies (deux onglets, puis cinq onglets
+     heure/jour/semaine/mois/année), le détail de la période choisie en
+     graphique ET en tableau — voir le commentaire de STATS_HTML. -->
 <div class="sheet" id="statsSheet" role="dialog" aria-modal="true" aria-labelledby="statsTitle">
   <div class="sheet__panel" tabindex="-1">
     <div class="sheet__grip"></div>
     <h2 id="statsTitle" data-i18n="stats.title">Mon activité</h2>
-    <p class="sub" data-i18n="stats.sub">Cartes défilées, tous types confondus.</p>
+    <p class="sub" data-i18n="stats.sub">Ton activité dans l'app, par période.</p>
     <div data-statsmount></div>
   </div>
 </div>
@@ -1344,9 +1350,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=221"></script>
-<script src="src/learn-core.js?v=221"></script>
-<script src="src/i18n.js?v=221"></script>
+<script src="src/lib.js?v=222"></script>
+<script src="src/learn-core.js?v=222"></script>
+<script src="src/i18n.js?v=222"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1544,8 +1550,9 @@ function applyI18n(){
   // Contenu généré : il n'a pas de data-i18n à relire (voir renderAbout).
   if(typeof renderAbout==="function")renderAbout();
   // window.__statsReady : même piège que __aboutReady juste au-dessus — le 1er
-  // appel d'applyI18n() tourne avant que `cardStats` (let, plus bas) ne soit
-  // initialisé ; sans ce drapeau, ReferenceError (zone morte temporelle).
+  // appel d'applyI18n() tourne avant que `cardCounter`/`openCounter` (const,
+  // plus bas) ne soient initialisés ; sans ce drapeau, ReferenceError (zone
+  // morte temporelle).
   if(typeof renderStats==="function"&&window.__statsReady)renderStats();
 }
 document.documentElement.lang=LANG;
@@ -1991,6 +1998,7 @@ function addSeenNews(it){
      dès que `dayKey(now)` change, sans quoi une réouverture après minuit
      resservirait les quarts de la veille sous l'étiquette du jour neuf. */
 const LS_STATS="fluxswipe.cardstats.v1";
+const LS_OPENSTATS="fluxswipe.openstats.v1";   // même forme, second compteur — voir makeStatsCounter
 const STATS_DAYS_MAX=400;
 function sanitizeStats(raw){
   const days={};
@@ -2010,25 +2018,58 @@ function sanitizeStats(raw){
   }
   return {days,today};
 }
-let cardStats=(()=>{try{return sanitizeStats(JSON.parse(localStorage.getItem(LS_STATS)||"{}"));}
-  catch(e){return {days:{},today:{day:"",slots:{}}};}})();
-let statsDirty=false,statsPersistT;
-function persistStats(){if(!statsDirty)return;statsDirty=false;
-  try{localStorage.setItem(LS_STATS,JSON.stringify(cardStats));}catch(e){warn("save stats",e);}}
-function bumpCardScroll(){
-  const now=new Date(),dk=dayKey(now),qi=quarterIndex(now);
-  if(cardStats.today.day!==dk)cardStats.today={day:dk,slots:{}};
-  cardStats.today.slots[qi]=(cardStats.today.slots[qi]||0)+1;
-  cardStats.days[dk]=(cardStats.days[dk]||0)+1;
-  const keys=Object.keys(cardStats.days);
-  if(keys.length>STATS_DAYS_MAX){                     // garde les jours les plus RÉCENTS
-    keys.sort();
-    for(const k of keys.slice(0,keys.length-STATS_DAYS_MAX))delete cardStats.days[k];
-  }
-  statsDirty=true;clearTimeout(statsPersistT);statsPersistT=setTimeout(persistStats,800);
+/* Fabrique un compteur heure/jour/semaine/mois/année, forme partagée par les
+   DEUX statistiques de « Mon activité » (cartes défilées, articles ouverts —
+   voir bumpCardScroll/bumpArticleOpen) : même granularité days/today, même
+   purge à STATS_DAYS_MAX, même debounce d'écriture. Reprendre cette usine au
+   lieu de dupliquer bumpCardScroll est ce qui a permis d'ajouter le second
+   compteur sans réécrire sa logique. */
+function makeStatsCounter(key){
+  const c={data:(()=>{try{return sanitizeStats(JSON.parse(localStorage.getItem(key)||"{}"));}
+    catch(e){return {days:{},today:{day:"",slots:{}}};}})(),dirty:false,t:null};
+  c.persist=()=>{if(!c.dirty)return;c.dirty=false;
+    try{localStorage.setItem(key,JSON.stringify(c.data));}catch(e){warn("save stats",e);}};
+  c.bump=()=>{
+    const now=new Date(),dk=dayKey(now),qi=quarterIndex(now);
+    if(c.data.today.day!==dk)c.data.today={day:dk,slots:{}};
+    c.data.today.slots[qi]=(c.data.today.slots[qi]||0)+1;
+    c.data.days[dk]=(c.data.days[dk]||0)+1;
+    const keys=Object.keys(c.data.days);
+    if(keys.length>STATS_DAYS_MAX){                    // garde les jours les plus RÉCENTS
+      keys.sort();
+      for(const k of keys.slice(0,keys.length-STATS_DAYS_MAX))delete c.data.days[k];
+    }
+    c.dirty=true;clearTimeout(c.t);c.t=setTimeout(c.persist,800);
+  };
+  c.reset=()=>{c.data={days:{},today:{day:"",slots:{}}};c.dirty=true;clearTimeout(c.t);c.persist();};
+  return c;
 }
-// cardStats est initialisé : renderStats() peut désormais lire ses totaux sans
-// lever de ReferenceError (même piège que __aboutReady, voir plus bas).
+/* ---------- Compteur de cartes défilées ----------
+   Détail heure/jour/semaine/mois/année, affiché dans la feuille « Mon
+   activité » (renderStats, statsBuckets côté src/lib.js). Incrémenté depuis
+   onCardChange, au même endroit et avec le même garde que markVisibleSeen
+   (samePending) : chaque VRAIE transition de carte compte une fois, jamais
+   deux. Contrairement à markVisibleSeen, il ne fait pas d'exception pour les
+   vidéos — une vidéo croisée sans être lancée reste une carte défilée, au
+   sens de ce compteur. */
+const cardCounter=makeStatsCounter(LS_STATS);
+function bumpCardScroll(){cardCounter.bump();}
+/* ---------- Compteur d'articles ouverts ----------
+   Retour utilisateur : « Mon activité » ne comptait que les cartes défilées,
+   pas les articles réellement OUVERTS — deux gestes différents (défiler
+   devant une carte n'est pas la lire). Incrémenté aux DEUX points d'entrée
+   réels d'un article, chacun un vrai clic sur `a[data-open]` : la carte du
+   fil et la feuille « Articles enregistrés ». Volontairement PAS depuis
+   « Articles en mémoire » (histList), qui ne fait que défiler jusqu'à la
+   carte dans le fil sans rouvrir l'article — voir son commentaire. Compte
+   aussi une vidéo ouverte via ces liens (« Ouvrir sur YouTube ») : c'est bien
+   un article/contenu qu'on quitte l'app pour aller lire, au sens de ce
+   compteur — distinct de « vu », qui a sa propre règle pour les vidéos. */
+const openCounter=makeStatsCounter(LS_OPENSTATS);
+function bumpArticleOpen(){openCounter.bump();}
+// Les deux compteurs sont initialisés : renderStats() peut désormais lire
+// leurs totaux sans lever de ReferenceError (même piège que __aboutReady,
+// voir plus bas).
 window.__statsReady=true;
 
 /* ---------- Articles enregistrés ----------
@@ -2228,7 +2269,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="221";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="222";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2239,6 +2280,8 @@ const APP_VERSION="221";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:222,date:"2026-08-26",items:[
+    "changelog.v222.item1","changelog.v222.item2"]},
   {v:221,date:"2026-08-26",items:[
     "changelog.v221.item1","changelog.v221.item2"]},
   {v:220,date:"2026-08-26",items:[
@@ -5007,6 +5050,7 @@ feedEl.addEventListener("click",e=>{
   const openLink=e.target.closest("a[data-open]");
   if(openLink&&openLink.href){
     const card=openLink.closest(".card"),t=card&&card.querySelector(".card__title");
+    bumpArticleOpen();
     if(openArticle(openLink.href,t?t.textContent:""))e.preventDefault();
   }
 });
@@ -5894,6 +5938,7 @@ savedListEl.addEventListener("click",e=>{
       if(x)addSeenNews(x);
     }
     const t=open.querySelector(".histrow__ttl");
+    bumpArticleOpen();
     if(openArticle(open.href,t?t.textContent:"",{noReader:"video" in open.dataset,external:"video" in open.dataset}))e.preventDefault();
   }
 });
@@ -6169,13 +6214,19 @@ document.addEventListener("change",e=>{
   renderMix();
 });
 
-/* Mon activité (statsSheet) : UN chiffre vedette pour la période choisie
-   (onglets heure/jour/semaine/mois/année, sélecteur ARIA « tablist ») + sa
-   comparaison à la période civile précédente, puis le détail de CETTE
-   période en graphique de barres ET en tableau (bouton « Voir les
-   données »). Remplace l'ancien affichage des cinq fenêtres à plat, qui
-   juxtaposait des échelles incomparables sans jamais répondre à « suis-je
-   plus actif que d'habitude, LÀ, sur cette période ? ».
+/* Mon activité (statsSheet) : UN chiffre vedette pour LA MÉTRIQUE (cartes
+   défilées / articles ouverts, sélecteur ARIA « tablist » séparé,
+   `statsMetric`) et la période choisies (onglets heure/jour/semaine/mois/
+   année, second « tablist », `statsPeriod`) + sa comparaison à la période
+   civile précédente, puis le détail de CETTE période en graphique de barres
+   ET en tableau (bouton « Voir les données »). Remplace l'ancien affichage
+   des cinq fenêtres à plat, qui juxtaposait des échelles incomparables sans
+   jamais répondre à « suis-je plus actif que d'habitude, LÀ, sur cette
+   période ? ». Le sélecteur de métrique est venu ensuite (retour
+   utilisateur : « pas juste les scrolls ») — deux compteurs séparés
+   (cardCounter/openCounter, voir plus haut) plutôt qu'un empilement des deux
+   nombres l'un sous l'autre, pour garder un SEUL chiffre vedette lisible
+   d'un coup d'œil.
    Mêmes principes que renderMix pour le point de montage : un seul gabarit,
    posé une seule fois (`firstPaint`) ; tabs et bouton tableau, STATIQUES
    après cette 1re pose, gardent leurs gestionnaires DIRECTEMENT (posés dans
@@ -6188,12 +6239,16 @@ document.addEventListener("change",e=>{
    qu'à la 1re OUVERTURE, bien après le passage initial d'applyI18n() sur le
    document — un `data-i18n` y resterait ignoré jusqu'au prochain changement
    de langue, même raison que pour .mix__ends. */
-const STATS_HTML=`<div class="statshero" aria-live="polite">
+const STATS_HTML=`<div class="statstabs statsmetrictabs" role="tablist">
+  <button type="button" class="statstab" role="tab" data-m="cards"></button>
+  <button type="button" class="statstab" role="tab" data-m="opens"></button>
+</div>
+<div class="statshero" aria-live="polite">
   <b class="statshero__n"></b>
   <span class="statshero__l"></span>
   <span class="statshero__cmp"></span>
 </div>
-<div class="statstabs" role="tablist">
+<div class="statstabs statsperiodtabs" role="tablist">
   <button type="button" class="statstab" role="tab" data-p="hour"></button>
   <button type="button" class="statstab" role="tab" data-p="day"></button>
   <button type="button" class="statstab" role="tab" data-p="week"></button>
@@ -6213,6 +6268,7 @@ const STATS_HTML=`<div class="statshero" aria-live="polite">
 </div>
 <button type="button" class="statsresetbtn"></button>`;
 let statsPeriod="day";     // dernière période choisie DANS la session, pas persistée
+let statsMetric="cards";   // idem : quel compteur regarder (cardCounter/openCounter)
 let statsTableOpen=false;  // idem, garde son état d'un onglet à l'autre
 let statsResetArmed=false,statsResetT;   // même mécanique à double appui que delFeed (voir plus bas)
 /* +N/-N (compte) ou +N/-N % (proportion) selon la période : sur une heure ou
@@ -6248,14 +6304,14 @@ function statsBucketLabel(period,i){
    d'écran par `aria-label`, au toucher/clavier par .statsreadout (`focusin`
    délégué plus bas), et dans le tableau — jamais seulement au survol de la
    souris. */
-function statsChartHTML(period,buckets){
+function statsChartHTML(period,buckets,unit){
   const dense=buckets.length>12;
   const max=Math.max(1,...buckets.map((b)=>b.value));
   return buckets
     .map((b)=>{
       const h=Math.max(4,Math.round((b.value/max)*110));   // 110 doit rester d'accord avec .statsbar__col{height:110px}
       const label=statsBucketLabel(period,b.i);
-      const aria=T("stats.barAria",{label,n:b.value});
+      const aria=T("stats.barAria",{label,n:b.value,unit});
       return (
         `<button type="button" class="statsbar" data-label="${escAttr(label)}" data-n="${b.value}" aria-label="${escAttr(aria)}">`+
         (dense?"":`<b class="statsbar__n">${esc(String(b.value))}</b>`)+
@@ -6272,13 +6328,22 @@ function statsTableHTML(period,buckets){
     .join("");
 }
 function renderStats(){
-  const {buckets,total,prevTotal}=statsBuckets(statsPeriod,cardStats.days,cardStats.today,new Date());
+  const counter=statsMetric==="opens"?openCounter:cardCounter;
+  const {buckets,total,prevTotal}=statsBuckets(statsPeriod,counter.data.days,counter.data.today,new Date());
   const dense=buckets.length>12;
+  const unit=T("stats.unit."+statsMetric),metric=T("stats.metric."+statsMetric);
   document.querySelectorAll("[data-statsmount]").forEach(mount=>{
     const firstPaint=!mount.firstElementChild;
     if(firstPaint)mount.innerHTML=STATS_HTML;
-    mount.querySelector(".statstabs").setAttribute("aria-label",T("stats.periodLabel"));
-    mount.querySelectorAll(".statstab").forEach(tab=>{
+    mount.querySelector(".statsmetrictabs").setAttribute("aria-label",T("stats.metricLabel"));
+    mount.querySelectorAll(".statsmetrictabs .statstab").forEach(tab=>{
+      const m=tab.dataset.m,sel=m===statsMetric;
+      tab.textContent=T("stats.metric."+m);
+      tab.setAttribute("aria-selected",sel?"true":"false");
+      tab.tabIndex=sel?0:-1;
+    });
+    mount.querySelector(".statsperiodtabs").setAttribute("aria-label",T("stats.periodLabel"));
+    mount.querySelectorAll(".statsperiodtabs .statstab").forEach(tab=>{
       const p=tab.dataset.p,sel=p===statsPeriod;
       tab.textContent=T("stats.tab."+p);
       tab.setAttribute("aria-selected",sel?"true":"false");
@@ -6289,8 +6354,8 @@ function renderStats(){
     mount.querySelector(".statshero__cmp").textContent=statsCmpText(statsPeriod,total,prevTotal);
     const chart=mount.querySelector(".statschart");
     chart.className="statschart"+(dense?" statschart--dense":"");
-    chart.setAttribute("aria-label",T("stats.chart.aria."+statsPeriod));
-    chart.innerHTML=statsChartHTML(statsPeriod,buckets);
+    chart.setAttribute("aria-label",T("stats.chart.aria."+statsPeriod,{metric}));
+    chart.innerHTML=statsChartHTML(statsPeriod,buckets,unit);
     // Axe à 4 graduations, réservé à la vue dense (voir statsChartHTML) :
     // indices espacés régulièrement sur les buckets, jamais tronqués puisque
     // libres de la largeur d'une colonne de barre.
@@ -6314,32 +6379,40 @@ function renderStats(){
     tableBtn.setAttribute("aria-expanded",statsTableOpen?"true":"false");
     mount.querySelector(".statstablewrap").classList.toggle("hidden",!statsTableOpen);
     mount.querySelector(".statstable caption").textContent=
-      T("stats.table.caption",{period:T("stats.tab."+statsPeriod)});
+      T("stats.table.caption",{metric,period:T("stats.tab."+statsPeriod)});
     mount.querySelector(".statstable thead th:first-child").textContent=T("stats.table.period");
-    mount.querySelector(".statstable thead th:last-child").textContent=T("stats.table.count");
+    mount.querySelector(".statstable thead th:last-child").textContent=unit.charAt(0).toUpperCase()+unit.slice(1);
     mount.querySelector(".statstable tbody").innerHTML=statsTableHTML(statsPeriod,buckets);
     const resetBtn=mount.querySelector(".statsresetbtn");
     resetBtn.textContent=T(statsResetArmed?"stats.reset.confirm":"stats.reset");
     resetBtn.classList.toggle("statsresetbtn--armed",statsResetArmed);
     if(firstPaint){
-      mount.querySelectorAll(".statstab").forEach(tab=>{
+      mount.querySelectorAll(".statsmetrictabs .statstab").forEach(tab=>{
+        tab.onclick=()=>{statsMetric=tab.dataset.m;renderStats();};
+      });
+      mount.querySelector(".statsmetrictabs").addEventListener("keydown",statsMetricTabsKeydown);
+      mount.querySelectorAll(".statsperiodtabs .statstab").forEach(tab=>{
         tab.onclick=()=>{statsPeriod=tab.dataset.p;renderStats();};
       });
-      mount.querySelector(".statstabs").addEventListener("keydown",statsTabsKeydown);
+      mount.querySelector(".statsperiodtabs").addEventListener("keydown",statsTabsKeydown);
       tableBtn.onclick=()=>{statsTableOpen=!statsTableOpen;renderStats();};
       resetBtn.onclick=resetStats;
     }
   });
 }
-/* Réinitialise cardStats (days ET today), à double appui — même mécanique
-   que delFeed (voir plus bas) : le 1er appui arme (le bouton change de
-   libellé et de couleur), le 2e dans les 3 s confirme, sinon il se désarme
-   tout seul. Utile pour de vrai (recommencer un suivi propre), et sert aussi
-   de filet en cas de compteur qui semblerait faux — voir CLAUDE.md pour le
-   cas d'une mise à jour EN COURS DE JOURNÉE qui laisse le détail par heure
-   à 0 pendant que le total reste bon (rien à réinitialiser dans ce cas
-   précis, ça se résorbe tout seul le lendemain, mais le bouton reste la
-   sortie la plus simple à proposer). */
+/* Réinitialise LES DEUX compteurs (cartes défilées ET articles ouverts, days
+   ET today pour chacun), à double appui — même mécanique que delFeed (voir
+   plus bas) : le 1er appui arme (le bouton change de libellé et de couleur),
+   le 2e dans les 3 s confirme, sinon il se désarme tout seul. Un seul bouton
+   pour les deux : « Mon activité » se réinitialise comme un tout, pas
+   statistique par statistique — sinon un compteur remis à zéro à côté de
+   l'autre resterait un état incohérent (« aujourd'hui » différent selon
+   l'onglet choisi) que rien dans l'interface n'explique. Utile pour de vrai
+   (recommencer un suivi propre), et sert aussi de filet en cas de compteur
+   qui semblerait faux — voir CLAUDE.md pour le cas d'une mise à jour EN COURS
+   DE JOURNÉE qui laisse le détail par heure à 0 pendant que le total reste
+   bon (rien à réinitialiser dans ce cas précis, ça se résorbe tout seul le
+   lendemain, mais le bouton reste la sortie la plus simple à proposer). */
 function resetStats(){
   clearTimeout(statsResetT);
   if(!statsResetArmed){
@@ -6349,8 +6422,7 @@ function resetStats(){
     return;
   }
   statsResetArmed=false;
-  cardStats={days:{},today:{day:"",slots:{}}};
-  statsDirty=true;clearTimeout(statsPersistT);persistStats();   // écriture immédiate, pas d'attente des 800 ms habituels
+  cardCounter.reset();openCounter.reset();   // écriture immédiate, pas d'attente des 800 ms habituels
   toast(T("toast.statsReset"));
   renderStats();
 }
@@ -6375,16 +6447,38 @@ function statsTabsKeydown(e){
   renderStats();
   tabs[j].focus();
 }
+// Même mécanique que statsTabsKeydown, pour les DEUX onglets du sélecteur de
+// métrique (cartes défilées / articles ouverts) — un tablist ARIA distinct,
+// séparé de celui des périodes, jamais mêlés dans la même navigation
+// clavier : Flèches/Origine/Fin doivent rester dans le groupe où le focus se
+// trouve déjà.
+function statsMetricTabsKeydown(e){
+  const tabs=[...e.currentTarget.querySelectorAll(".statstab")];
+  const i=tabs.indexOf(document.activeElement);
+  if(i<0)return;
+  let j=-1;
+  if(e.key==="ArrowRight")j=(i+1)%tabs.length;
+  else if(e.key==="ArrowLeft")j=(i-1+tabs.length)%tabs.length;
+  else if(e.key==="Home")j=0;
+  else if(e.key==="End")j=tabs.length-1;
+  else return;
+  e.preventDefault();
+  statsMetric=tabs[j].dataset.m;
+  renderStats();
+  tabs[j].focus();
+}
 // Confirme au TOUCHER/CLAVIER la valeur d'une barre (statsreadout, voir sa
 // CSS) — les barres du graphique sont reconstruites à chaque rendu
 // (statsChartHTML), donc un écouteur direct serait perdu à chaque changement
 // d'onglet ; la délégation sur `document`, posée une seule fois, survit à
-// n'importe quel nombre de reconstructions.
+// n'importe quel nombre de reconstructions. `statsMetric` est lu au moment
+// du focus, pas figé à la construction de la barre : il ne peut de toute
+// façon pas avoir changé sans un re-rendu qui aurait, lui, détruit la barre.
 document.addEventListener("focusin",e=>{
   const bar=e.target.closest("#statsSheet .statsbar");
   if(!bar)return;
   const readout=document.querySelector("#statsSheet .statsreadout");
-  if(readout)readout.textContent=T("stats.readout",{label:bar.dataset.label,n:bar.dataset.n});
+  if(readout)readout.textContent=T("stats.readout",{label:bar.dataset.label,n:bar.dataset.n,unit:T("stats.unit."+statsMetric)});
 });
 // Déclaré ici, loin de renderList() (sa lecture principale, plus bas) : sinon
 // « let » en zone morte temporelle jusqu'à cette ligne, alors qu'openSettings()
