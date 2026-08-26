@@ -1329,9 +1329,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=219"></script>
-<script src="src/learn-core.js?v=219"></script>
-<script src="src/i18n.js?v=219"></script>
+<script src="src/lib.js?v=220"></script>
+<script src="src/learn-core.js?v=220"></script>
+<script src="src/i18n.js?v=220"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2195,7 +2195,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="219";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="220";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2206,6 +2206,8 @@ const APP_VERSION="219";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:220,date:"2026-08-26",items:[
+    "changelog.v220.item1","changelog.v220.item2"]},
   {v:218,date:"2026-08-25",items:[
     "changelog.v218.item1","changelog.v218.item2","changelog.v218.item3",
     "changelog.v218.item4","changelog.v218.item5"]},
@@ -5508,7 +5510,7 @@ function setLang(l){
   try{localStorage.setItem(LS_LANG,LANG);}catch(e){warn("save lang",e);}
   document.documentElement.lang=LANG;
   applyI18n();
-  renderLangPref();renderReadPref();renderThemePref();renderIntGrid();renderList();renderSuggest();renderMixUI();
+  renderLangPref();renderReadPref();renderThemePref();renderIntGrid("intGrid");renderList();renderSuggest();renderMixUI();
   switchFeed();
 }
 /* Contrairement à setLang(), ne touche à AUCUN état du fil : c'est pour ça
@@ -6064,6 +6066,12 @@ function setNewsSrc(liste){
 
 /* ---------- Panneau unique : intérêts + sources + lecture ---------- */
 let pendingInt=new Set();
+// Intérêts au moment de l'ouverture du panneau de réglages : depuis que la
+// grille "intGrid" persiste à chaque case cochée (voir renderIntGrid), plus
+// rien ne distingue "avant" de "interests" à l'intérieur d'applySettings —
+// ce repère séparé lui permet toujours de savoir si ça a bougé DEPUIS
+// L'OUVERTURE, pour décider de recharger le fil et de réinitialiser `cat`.
+let intAtOpen="";
 /* Aperçu de la dose : les douze premières cartes du fil qu'elle donnerait,
    calculées avec la MÊME fonction que le fil réel — une imitation dessinée à
    la main finirait par mentir. */
@@ -6342,6 +6350,7 @@ let feedGroupOpen={rss:false,vid:false};
 let delConfirm=null,delConfirmT;
 function openSettings(replaceFrom){
   pendingInt=new Set(interests);
+  intAtOpen=interests.join(",");
   // Repliés à CHAQUE ouverture du panneau, pas seulement au 1er chargement :
   // feedGroupOpen survit sinon d'un ajout/suppression à l'autre DANS la même
   // ouverture (c'est le but), mais fermer puis rouvrir la feuille doit
@@ -6412,6 +6421,19 @@ function renderIntGrid(gridId){
     const k=b.dataset.k;
     if(pendingInt.has(k))pendingInt.delete(k);else pendingInt.add(k);
     b.classList.toggle("on");
+    // La grille du panneau de réglages persiste À CHAQUE case cochée, comme
+    // les sources (save()) : sinon fermer le panneau autrement qu'avec
+    // "Voir mon fil" (toucher le fond, retour arrière) perdait la sélection
+    // en silence — irritant relevé par un utilisateur, alors que la dose et
+    // les sources, elles, survivaient déjà à ces fermetures. La grille
+    // d'accueil (welcomeIntGrid) garde elle son report à startWelcome() : au
+    // tout 1er lancement, fermer sans valider doit continuer à équivaloir à
+    // « aucun intérêt choisi », pas à figer un choix à moitié fait.
+    if(gridId==="intGrid"){
+      interests=CATEGORIES.filter(c=>pendingInt.has(c.key)).map(c=>c.key); // garde l'ordre défini
+      try{localStorage.setItem(LS_INT,JSON.stringify(interests));}catch(e){warn("save interests",e);}
+      renderFilters();   // même geste que save() : la pastille des thèmes suit sans attendre "Voir mon fil"
+    }
   });
 }
 /* Accueil du 1er lancement (voir le commentaire au-dessus de #welcomeSheet
@@ -6443,17 +6465,17 @@ document.getElementById("welcomeStart").onclick=startWelcome;
 // quand même loadFeeds() via sa garde !feedLoadStarted — interests reste
 // alors [], qui vaut "random" (voir catKeysForBatch), un repli raisonnable.
 welcomeSheet.onclick=e=>{if(e.target===welcomeSheet)closeDialog(welcomeSheet);};
-/* Validation du panneau : les intérêts et les sources sont maintenant réglés
-   au même endroit, ils s'appliquent donc d'un seul geste. Les sources, elles,
-   sont déjà enregistrées au fil des clics (save()) — c'est le rechargement du
-   fil qui attend ce bouton, pour ne pas repartir en réseau à chaque case
-   cochée. */
+/* Validation du panneau : intérêts (renderIntGrid) et sources (save()) sont
+   déjà enregistrés au fil des clics, comme la dose (applyMix()) — fermer le
+   panneau par un autre chemin (toucher le fond, retour arrière) ne perd donc
+   plus rien. C'est le RECHARGEMENT DU FIL qui attend ce bouton, pour ne pas
+   repartir en réseau à chaque case cochée. */
 function applySettings(){
-  const avant=interests.join(",");
-  interests=CATEGORIES.filter(c=>pendingInt.has(c.key)).map(c=>c.key); // garde l'ordre défini
-  try{localStorage.setItem(LS_INT,JSON.stringify(interests));}catch(e){}
-  const bouge=feedsDirty||interests.join(",")!==avant;
-  if(interests.join(",")!==avant){
+  // interests est déjà à jour et déjà enregistré : chaque case de "intGrid"
+  // le fait au clic (voir renderIntGrid). `intAtOpen`, pris à l'ouverture,
+  // dit si ça a bougé DEPUIS — seule chose qui reste à ce bouton.
+  const bouge=feedsDirty||interests.join(",")!==intAtOpen;
+  if(interests.join(",")!==intAtOpen){
     // Le thème filtré peut ne plus faire partie des intérêts : on repart du
     // mélange, seule valeur toujours valable.
     cat="all";try{localStorage.setItem(LS_CAT,cat);}catch(e){}
