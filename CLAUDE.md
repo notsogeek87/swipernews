@@ -460,6 +460,24 @@ genre de script dérape.
   graphique à zéro partout alors que le total ne l'est pas. Se résorbe tout
   seul le lendemain (nouveau jour, nouveau `today` écrit dans le format
   courant) ; le bouton permet de repartir propre tout de suite si on préfère.
+- `CHANGELOG` / `openChangelogIfNew()` / `renderChangelog()` — la feuille
+  « Nouveautés » (`changelogSheet`), accessible en permanence depuis le menu
+  (`changelogBtn`) et ouverte AUTOMATIQUEMENT dès qu'`APP_VERSION` a changé
+  depuis la dernière ouverture. `CHANGELOG` est une liste manuelle
+  `{v,date,items}` (plus récent en tête, `items` = clés i18n) — pas une entrée
+  par bump d'`APP_VERSION` (la plupart ne changent rien de visible), une par
+  mise à jour qui vaut la peine d'être annoncée. `changelogLastSeen()`
+  (`fluxswipe.changelog.seen.v1`) distingue trois cas au démarrage : jamais de
+  clé ET premier lancement (`firstRun`) → rien à montrer, `welcomeSheet` fait
+  déjà l'accueil, on se contente d'enregistrer `APP_VERSION` en silence
+  (sinon un utilisateur qui vient d'installer l'app verrait un historique
+  qu'il n'a pas vécu) ; jamais de clé mais un fil déjà en place (utilisateur
+  EXISTANT qui reçoit cette fonctionnalité pour la première fois) → on montre
+  seulement `CHANGELOG[0]`, pas tout l'historique ; une clé plus ancienne que
+  la version courante → toutes les entrées plus récentes qu'elle, au cas où
+  l'app soit restée fermée pendant plusieurs mises à jour. Marqué vu au même
+  sens que `markVisibleSeen`/`bumpCardScroll` (« affiché », pas « lu ») : dès
+  l'ouverture, pas à la fermeture.
 - `openHistory()` / `histRowHTML()` — la feuille « Articles en mémoire »
   (bouton liste de la barre du haut) : une VUE de `items`, refaite à chaque
   ouverture, qui ramène sur une carte dépassée d'un swipe de trop. Rien n'est

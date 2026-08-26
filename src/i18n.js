@@ -48,6 +48,29 @@
 
       "menu.title": "Menu",
       "menu.stats": "Mon activité",
+      "menu.changelog": "Nouveautés",
+
+      "changelog.title": "Nouveautés",
+      "changelog.sub": "Ce qui a changé dans SwiperNews.",
+      "changelog.version": "Version {v}",
+      "changelog.v221.item1":
+        "🔎 Plus besoin de connaître l'URL RSS d'un site : colle son adresse, l'app trouve le flux toute seule.",
+      "changelog.v221.item2":
+        "📚 Le catalogue de sources suggérées s'agrandit et se range par catégorie (tech, sciences, sport, économie, régional…).",
+      "changelog.v220.item1":
+        "⚙️ Les centres d'intérêt s'enregistrent maintenant dès que tu coches une case, sans devoir valider tout en bas du panneau.",
+      "changelog.v220.item2":
+        "🌐 Correctif : changer de langue dans les réglages pouvait bloquer le fil dans l'ancienne langue.",
+      "changelog.v218.item1":
+        "🆕 Cette page : à chaque mise à jour, un résumé de ce qui a changé.",
+      "changelog.v218.item2":
+        "🎨 Un troisième thème de couleurs, « Bleuté », entre Flamme et Sobre.",
+      "changelog.v218.item3":
+        "📤 Réglages : export et import de toute la configuration en un seul fichier.",
+      "changelog.v218.item4":
+        "↻ Le bouton Actualiser est sorti du menu, à un seul geste dans la barre du haut.",
+      "changelog.v218.item5":
+        "💾 L'export de tes sources ou réglages ouvre le vrai sélecteur d'enregistrement du système.",
 
       "stats.title": "Mon activité",
       "stats.sub": "Cartes défilées, tous types confondus.",
@@ -200,7 +223,11 @@
       "sheet.sources.title": "📰 Sources d'actualité",
       "sheet.sources.sub": "Coche les flux à afficher, ajoute ceux que tu veux.",
       "sheet.sources.filterSponsored": "Filtrer les articles sponsorisés et bons plans",
-      "sheet.sources.filterVideoOnly": "Afficher uniquement les vidéos",
+      "sheet.sources.filterVideoOnly": "Afficher les Shorts YouTube uniquement",
+      "sheet.sources.noVideoFeed.title": "Pas de chaîne YouTube",
+      "sheet.sources.noVideoFeed.msg":
+        "Ce filtre ne montre que les Shorts de tes chaînes YouTube — tu n'en as ajouté aucune. Ajoutes-en une pour l'utiliser.",
+      "sheet.sources.noVideoFeed.cta": "Ajouter une chaîne YouTube",
       "sheet.sources.groupRss": "Flux RSS",
       "sheet.sources.groupVideo": "Chaînes YouTube",
       "sheet.sources.placeholder": "https://exemple.com/rss",
@@ -385,6 +412,28 @@
 
       "menu.title": "Menu",
       "menu.stats": "My activity",
+      "menu.changelog": "What's new",
+
+      "changelog.title": "What's new",
+      "changelog.sub": "What changed in SwiperNews.",
+      "changelog.version": "Version {v}",
+      "changelog.v221.item1":
+        "🔎 No need to know a site's RSS URL anymore: paste its address, the app finds the feed on its own.",
+      "changelog.v221.item2":
+        "📚 The suggested-sources catalog grew and is now sorted by category (tech, science, sports, economy, regional…).",
+      "changelog.v220.item1":
+        "⚙️ Interests now save the moment you tap a topic, no more scrolling to the bottom to confirm.",
+      "changelog.v220.item2":
+        "🌐 Fixed: switching language in settings could leave the feed stuck in the old one.",
+      "changelog.v218.item1": "🆕 This page: a recap of what changed with every update.",
+      "changelog.v218.item2":
+        "🎨 A third color theme, “Blue,” alongside Flame and Plain.",
+      "changelog.v218.item3":
+        "📤 Settings: export and import your whole configuration in one file.",
+      "changelog.v218.item4":
+        "↻ The Refresh button moved out of the menu, one tap away in the top bar.",
+      "changelog.v218.item5":
+        "💾 Exporting your sources or settings now opens the system's real save picker.",
 
       "stats.title": "My activity",
       "stats.sub": "Cards scrolled, all types combined.",
@@ -505,8 +554,8 @@
       "apptheme.desc.bleu": "Same intensity as Flamme, in blue instead of coral.",
       "apptheme.desc.sobre": "Same contrast, muted colors — no vivid accent.",
       "apptheme.opt.flamme": "Flamme",
-      "apptheme.opt.bleu": "Bleuté",
-      "apptheme.opt.sobre": "Sobre",
+      "apptheme.opt.bleu": "Blue",
+      "apptheme.opt.sobre": "Plain",
 
       "sheet.mix.title": "🎚️ Learning dose",
       "dose.title": "Learning dose",
@@ -534,7 +583,11 @@
       "sheet.sources.title": "📰 News sources",
       "sheet.sources.sub": "Check the feeds to show, add whichever you like.",
       "sheet.sources.filterSponsored": "Filter out sponsored articles and deals",
-      "sheet.sources.filterVideoOnly": "Show videos only",
+      "sheet.sources.filterVideoOnly": "Show YouTube Shorts only",
+      "sheet.sources.noVideoFeed.title": "No YouTube channel",
+      "sheet.sources.noVideoFeed.msg":
+        "This filter only shows Shorts from your YouTube channels, and you haven't added any yet. Add one to use it.",
+      "sheet.sources.noVideoFeed.cta": "Add a YouTube channel",
       "sheet.sources.groupRss": "RSS feeds",
       "sheet.sources.groupVideo": "YouTube channels",
       "sheet.sources.placeholder": "https://example.com/rss",
