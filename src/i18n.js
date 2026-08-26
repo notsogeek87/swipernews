@@ -53,6 +53,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v223.item1":
+        "⬅️ Correctif (Android) : le retour sans panneau ouvert ne faisait plus rien. Il quitte maintenant l'app, avec un double appui pour confirmer.",
       "changelog.v222.item1":
         "📊 Mon activité distingue maintenant les cartes défilées des articles vraiment ouverts — un onglet pour choisir.",
       "changelog.v222.item2":
@@ -349,6 +351,7 @@
       "toast.copyFailed": "Copie impossible",
       "toast.refreshing": "Actualisation…",
       "toast.statsReset": "Statistiques réinitialisées",
+      "toast.backExit": "Appuie de nouveau sur retour pour quitter",
       "toast.invalidUrl": "URL invalide",
       "toast.youtubeResolving": "Recherche du flux YouTube…",
       "toast.youtubeChannelNotFound":
@@ -422,6 +425,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v223.item1":
+        "⬅️ Fixed (Android): back with no panel open used to do nothing. It now exits the app, with a double-press to confirm.",
       "changelog.v222.item1":
         "📊 My activity now tells cards scrolled apart from articles actually opened — a tab to pick which.",
       "changelog.v222.item2":
@@ -713,6 +718,7 @@
       "toast.copyFailed": "Copy failed",
       "toast.refreshing": "Refreshing…",
       "toast.statsReset": "Activity stats reset",
+      "toast.backExit": "Press back again to exit",
       "toast.invalidUrl": "Invalid URL",
       "toast.youtubeResolving": "Looking up the YouTube feed…",
       "toast.youtubeChannelNotFound": "Could not determine this channel's RSS feed.",

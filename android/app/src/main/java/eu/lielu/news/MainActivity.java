@@ -2,6 +2,8 @@ package eu.lielu.news;
 
 import android.os.Bundle;
 
+import androidx.activity.OnBackPressedCallback;
+
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -38,6 +40,29 @@ public class MainActivity extends BridgeActivity {
             + "if(typeof refreshIfStale===\"function\")refreshIfStale();"
             + "}catch(e){}})();";
 
+    /**
+     * Message affiché au 1er retour sans panneau ouvert (voir le callback plus
+     * bas) — le VRAI toast JS de l'app (voir toast()/T() dans index.html), pas
+     * un Toast Android natif : rester cohérent avec le reste de l'interface
+     * (style, langue) plutôt qu'ajouter un second système d'avertissement.
+     * typeof-guardé comme RESUME_JS : peut s'exécuter avant que ces fonctions
+     * n'existent (chargement pas fini) ou après leur destruction (onDestroy en
+     * vol) — un appui perdu dans ce cas précis est sans conséquence.
+     */
+    private static final String BACK_TOAST_JS =
+        "(function(){try{"
+            + "if(typeof toast===\"function\"&&typeof T===\"function\")toast(T(\"toast.backExit\"));"
+            + "}catch(e){}})();";
+
+    /**
+     * Fenêtre pendant laquelle un 2e retour confirme la sortie — même ordre de
+     * grandeur que le double-appui de resetStats()/delFeed() côté web (voir
+     * CLAUDE.md), pour rester cohérent avec les autres confirmations à 2 appuis
+     * de l'app.
+     */
+    private static final long EXIT_CONFIRM_WINDOW_MS = 2000;
+    private long backArmedAt = 0;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         // Avant super.onCreate : c'est lui qui construit le pont et fige la liste
@@ -58,6 +83,47 @@ public class MainActivity extends BridgeActivity {
         if (getBridge() != null && getBridge().getWebView() != null) {
             getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
         }
+
+        // Retour système sans AUCUNE gestion explicite : compter sur le
+        // comportement par défaut de Capacitor (aucun écouteur "backButton" côté
+        // JS, voir index.html) laissait le retour ne RIEN faire quand aucun
+        // panneau n'était ouvert — signalé par un utilisateur (bouton ET geste de
+        // retour, aucun panneau ouvert). Repris ici avec le même callback
+        // moderne (OnBackPressedCallback) que InAppBrowserActivity, qui lui
+        // fonctionnait déjà : c'est ce qui manque au retour prédictif
+        // d'Android 13+ pour être délivré à une Activity qui ne l'écoute pas
+        // explicitement.
+        //
+        // Panneau ouvert (réglages, filtre, Articles en mémoire…) : ce sont ses
+        // propres history.pushState()/popstate côté JS (pushDialogState, voir
+        // index.html) qui gèrent la fermeture — webView.canGoBack() devient vrai
+        // tant qu'une de ces entrées est en attente, donc goBack() suffit à la
+        // consommer sans rien connaître du panneau lui-même côté natif.
+        //
+        // Aucun panneau ouvert : double retour pour quitter, comme la plupart
+        // des apps Android — le 1er arme une fenêtre de EXIT_CONFIRM_WINDOW_MS
+        // et affiche un toast, le 2e dans cette fenêtre laisse le comportement
+        // par défaut fermer l'Activity.
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (getBridge() != null && getBridge().getWebView() != null
+                    && getBridge().getWebView().canGoBack()) {
+                    getBridge().getWebView().goBack();
+                    return;
+                }
+                long now = System.currentTimeMillis();
+                if (now - backArmedAt < EXIT_CONFIRM_WINDOW_MS) {
+                    setEnabled(false);   // laisse le comportement par défaut quitter l'app
+                    getOnBackPressedDispatcher().onBackPressed();
+                    return;
+                }
+                backArmedAt = now;
+                if (getBridge() != null && getBridge().getWebView() != null) {
+                    getBridge().getWebView().evaluateJavascript(BACK_TOAST_JS, null);
+                }
+            }
+        });
     }
 
     @Override
