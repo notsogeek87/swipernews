@@ -102,8 +102,26 @@ public class MainActivity extends BridgeActivity {
         //
         // Aucun panneau ouvert : double retour pour quitter, comme la plupart
         // des apps Android — le 1er arme une fenêtre de EXIT_CONFIRM_WINDOW_MS
-        // et affiche un toast, le 2e dans cette fenêtre laisse le comportement
-        // par défaut fermer l'Activity.
+        // et affiche un toast.
+        //
+        // Le 2e appui appelait initialement setEnabled(false) puis relayait à
+        // getOnBackPressedDispatcher().onBackPressed(), en calquant le motif
+        // d'InAppBrowserActivity plus haut — MAIS BridgeActivity (Capacitor)
+        // surcharge très probablement onBackPressed() avec SA propre logique
+        // par défaut (qui ne finish() rien en l'absence d'écouteur "backButton"
+        // JS, cf. plus haut) : le relais retombait donc dans le même no-op que
+        // le bug d'origine. InAppBrowserActivity, elle, n'a jamais ce problème
+        // : elle étend AppCompatActivity, pas BridgeActivity, donc son propre
+        // relais retombe sur le vrai finish() par défaut d'une Activity
+        // normale. Constaté par un utilisateur : le toast ne s'affichait
+        // qu'une fois (setEnabled(false) désactivait le callback pour de bon,
+        // aucun 2e cycle possible) et l'app ne quittait JAMAIS, même à 2
+        // appuis. On quitte donc nous-mêmes, sans passer par un quelconque
+        // relais : moveTaskToBack(true) plutôt que finish(), pour laisser le
+        // PROCESSUS vivant (l'app revient donc instantanément au premier plan
+        // suivant — cohérent avec la reprise de lecture déjà quasi instantanée
+        // du reste de l'app) au lieu de tout détruire et devoir tout
+        // recharger.
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
@@ -114,8 +132,7 @@ public class MainActivity extends BridgeActivity {
                 }
                 long now = System.currentTimeMillis();
                 if (now - backArmedAt < EXIT_CONFIRM_WINDOW_MS) {
-                    setEnabled(false);   // laisse le comportement par défaut quitter l'app
-                    getOnBackPressedDispatcher().onBackPressed();
+                    moveTaskToBack(true);
                     return;
                 }
                 backArmedAt = now;
