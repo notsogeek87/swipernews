@@ -53,6 +53,10 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v220.item1":
+        "⚙️ Les centres d'intérêt s'enregistrent maintenant dès que tu coches une case, sans devoir valider tout en bas du panneau.",
+      "changelog.v220.item2":
+        "🌐 Correctif : changer de langue dans les réglages pouvait bloquer le fil dans l'ancienne langue.",
       "changelog.v218.item1":
         "🆕 Cette page : à chaque mise à jour, un résumé de ce qui a changé.",
       "changelog.v218.item2":
@@ -407,6 +411,10 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v220.item1":
+        "⚙️ Interests now save the moment you tap a topic, no more scrolling to the bottom to confirm.",
+      "changelog.v220.item2":
+        "🌐 Fixed: switching language in settings could leave the feed stuck in the old one.",
       "changelog.v218.item1": "🆕 This page: a recap of what changed with every update.",
       "changelog.v218.item2":
         "🎨 A third color theme, “Blue,” alongside Flame and Plain.",
@@ -537,7 +545,7 @@
       "apptheme.desc.sobre": "Same contrast, muted colors — no vivid accent.",
       "apptheme.opt.flamme": "Flamme",
       "apptheme.opt.bleu": "Blue",
-      "apptheme.opt.sobre": "Muted",
+      "apptheme.opt.sobre": "Plain",
 
       "sheet.mix.title": "🎚️ Learning dose",
       "dose.title": "Learning dose",
