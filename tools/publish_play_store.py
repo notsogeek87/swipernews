@@ -59,9 +59,14 @@ def main():
     version_code = bundle["versionCode"]
     print(f"Bundle uploadé : versionCode {version_code}")
 
-    # includeRestOfWorld couvre tous les pays où l'app est disponible côté
-    # Play Console — équivalent du réglage manuel « Tous les pays » vu dans
-    # l'interface, mais porté explicitement par CETTE release.
+    # PAS de countryTargeting ici : l'API le rejette explicitement pour un
+    # status "completed" (« Country targeting is only supported for staged
+    # releases » — seul un déploiement progressif, userFraction < 1, peut le
+    # porter). Une release complète hérite de la disponibilité par pays de
+    # l'app (Présence sur le Store), déjà réglée — ce n'est pas ce qui a causé
+    # « Release in track targeting no countries » avec l'action précédente ;
+    # cette erreur-là venait d'ailleurs (elle ne posait AUCUN champ pays du
+    # tout, ni countryTargeting ni le format attendu par l'API pour l'hériter).
     edits.tracks().update(
         editId=edit_id,
         packageName=args.package,
@@ -71,7 +76,6 @@ def main():
                 {
                     "versionCodes": [str(version_code)],
                     "status": args.status,
-                    "countryTargeting": {"includeRestOfWorld": True},
                 }
             ]
         },
