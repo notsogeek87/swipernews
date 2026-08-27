@@ -1,13 +1,22 @@
 name: Play Store AAB
 
-# Build ET publication automatique sur Google Play (canal Tests fermés,
-# track API "alpha" — nom historique de Google pour ce canal, indépendant du
-# libellé "Tests fermés" affiché dans Play Console). Séparé d'android.yml/
-# release.yml : ceux-là produisent des .apk signés de la clé du PROJET (celle
-# que F-Droid vérifie, AllowedAPKSigningKeys). Play Store, lui, utilise le
-# modèle Play App Signing : on signe seulement d'une clé d'UPLOAD
-# (PLAY_STORE_*, distincte), que Google re-signe ensuite de sa propre clé —
-# les deux clés ne se mélangent jamais.
+# Build ET publication automatique sur Google Play, canal Tests fermés.
+# --track Swipernews, PAS "alpha" : "alpha" est le nom historique de Google
+# pour un canal de tests fermés, mais Play Console a nommé CE canal d'après
+# le nom de l'app au moment de sa création — "alpha" existe bien côté API
+# (tracks.list() le renvoie) mais est un canal à part, vide, sans release ni
+# pays configurés. S'y adresser committait dans le vide et renvoyait
+# systématiquement « Release in track targeting no countries », qui n'a donc
+# jamais eu de rapport avec countryTargeting (essayé en vain, voir
+# l'historique git de tools/publish_play_store.py) : le nom du canal était
+# simplement faux. Vérifié par un diagnostic tracks.list() ajouté exprès
+# (même fichier) — à relancer si ce canal est un jour renommé ou recréé.
+#
+# Séparé d'android.yml/release.yml : ceux-là produisent des .apk signés de la
+# clé du PROJET (celle que F-Droid vérifie, AllowedAPKSigningKeys). Play
+# Store, lui, utilise le modèle Play App Signing : on signe seulement d'une
+# clé d'UPLOAD (PLAY_STORE_*, distincte), que Google re-signe ensuite de sa
+# propre clé — les deux clés ne se mélangent jamais.
 #
 # Déclenchement manuel (workflow_dispatch) : publier à chaque push serait
 # trop agressif pour des testeurs externes (chaque commit, même mineur,
@@ -30,12 +39,11 @@ name: Play Store AAB
 # seul workflow.
 #
 # La publication passe par tools/publish_play_store.py, pas par l'Action
-# r0adkll/upload-google-play (essayée d'abord) : celle-ci ne fixe jamais le
-# ciblage pays d'une release qu'elle crée — l'API renvoie alors « Release in
-# track targeting no countries » au moment de committer l'edit, même sur un
-# canal qui affiche déjà 177 pays actifs de releases précédentes faites à la
-# main dans Play Console. Le script fixe countryTargeting explicitement sur
-# chaque release publiée, voir son commentaire.
+# r0adkll/upload-google-play (essayée d'abord) : celle-ci ne permet pas de
+# lister les tracks réels ni de diagnostiquer facilement — ce qui a coûté
+# plusieurs itérations avant de trouver le vrai problème ci-dessus. Le script
+# n'utilise PAS countryTargeting (confirmé invalide hors production par
+# l'API elle-même, quel que soit le status testé).
 on:
   workflow_dispatch:
 
@@ -150,4 +158,4 @@ jobs:
           python3 tools/publish_play_store.py \
             --package eu.lielu.news \
             --aab "${{ steps.build.outputs.aab }}" \
-            --track alpha
+            --track Swipernews

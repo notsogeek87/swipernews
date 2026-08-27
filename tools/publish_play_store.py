@@ -2,17 +2,17 @@
 """Publie un .aab sur un canal de test Google Play, via l'API Play Developer.
 
     PLAY_STORE_SERVICE_ACCOUNT_JSON='...' python3 tools/publish_play_store.py \
-        --package eu.lielu.news --aab swipernews-1.5.7.aab --track alpha
+        --package eu.lielu.news --aab swipernews-1.5.7.aab --track Swipernews
 
-Remplace l'action GitHub r0adkll/upload-google-play, sans rapport avec la
-vraie cause trouvée : « Release in track targeting no countries » n'est PAS
-résolu en posant countryTargeting sur la release (l'API le refuse d'ailleurs
-explicitement hors production, quel que soit le status — confirmé par deux
-erreurs différentes en testant). La cause réelle reste à déterminer : le
-diagnostic ci-dessous (tracks.list, countryavailability.get avant/après,
-tracks.get avant/après) sert précisément à trancher entre les hypothèses
-avant de tenter un nouveau correctif à l'aveugle — voir l'historique git de
-ce fichier pour le détail des tentatives déjà écartées.
+Remplace l'action GitHub r0adkll/upload-google-play : elle ne permet pas de
+lister les tracks réels de l'app, ce qui a coûté plusieurs itérations avant
+de trouver la vraie cause d'un « Release in track targeting no countries »
+systématique — le canal visé (--track alpha) n'était simplement pas le bon.
+Play Console nomme le premier canal de tests fermés créé d'après le nom de
+l'app au moment de sa création ("Swipernews" ici), pas "alpha" (le nom
+historique de Google, qui existe bien côté API mais reste un canal à part,
+vide). Trouvé en ajoutant edits.tracks().list() juste après edits.insert() —
+à relancer en diagnostic si ce canal est un jour renommé ou recréé.
 
 Dépendances (installées à la volée par le workflow, pas dans package.json —
 ce script ne s'exécute que dans ce job CI, jamais dans l'app ni les tests) :
@@ -23,27 +23,11 @@ import json
 import os
 import sys
 
-from googleapiclient.errors import HttpError
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 SCOPES = ["https://www.googleapis.com/auth/androidpublisher"]
-
-
-def dump(label, obj):
-    print(f"--- {label} ---")
-    print(json.dumps(obj, indent=2, ensure_ascii=False))
-
-
-def try_call(label, fn):
-    """Un diagnostic qui échoue ne doit jamais masquer les autres : on
-    affiche l'erreur HTTP telle quelle et on continue."""
-    try:
-        dump(label, fn())
-    except HttpError as e:
-        print(f"--- {label} : ÉCHEC ---")
-        print(e)
 
 
 def main():
@@ -64,30 +48,13 @@ def main():
     edits = api.edits()
 
     edit_id = edits.insert(body={}, packageName=args.package).execute()["id"]
-    print(f"Edit créé : {edit_id}")
 
-    # 1. Les tracks tels que l'API les connaît VRAIMENT — vérifie que "alpha"
-    #    est le bon identifiant et pas un track personnalisé sous un autre nom.
-    try_call(
-        "tracks.list()",
-        lambda: edits.tracks().list(packageName=args.package, editId=edit_id).execute(),
-    )
-
-    # 2. Disponibilité pays AVANT toute modification, sur le track visé.
-    try_call(
-        "countryavailability.get() AVANT update",
-        lambda: edits.countryavailability()
-        .get(packageName=args.package, editId=edit_id, track=args.track)
-        .execute(),
-    )
-
-    # 3. État du track avant remplacement.
-    try_call(
-        "tracks.get() AVANT update",
-        lambda: edits.tracks()
-        .get(packageName=args.package, editId=edit_id, track=args.track)
-        .execute(),
-    )
+    # Vérification bon marché avant d'aller plus loin : un nom de track faux
+    # échouerait sinon seulement au commit, après l'upload complet du bundle.
+    tracks = edits.tracks().list(packageName=args.package, editId=edit_id).execute()
+    known = [t["track"] for t in tracks.get("tracks", [])]
+    if args.track not in known:
+        sys.exit(f"Track « {args.track} » introuvable. Tracks connus : {known}")
 
     # mimetype explicite : la détection automatique de MediaFileUpload se base
     # sur le module mimetypes de Python, qui ne connaît pas .aab (contrairement
@@ -100,35 +67,15 @@ def main():
     version_code = str(bundle["versionCode"])
     print(f"Bundle uploadé : versionCode {version_code}")
 
-    # PAS de countryTargeting : confirmé invalide hors production (voir le
-    # commentaire de module). release "normale", status completed.
-    release = {"versionCodes": [version_code], "status": args.status}
-    track_result = edits.tracks().update(
+    # PAS de countryTargeting : invalide hors production quel que soit le
+    # status (confirmé par l'API elle-même en le testant).
+    edits.tracks().update(
         editId=edit_id,
         packageName=args.package,
         track=args.track,
-        body={"releases": [release]},
+        body={"releases": [{"versionCodes": [version_code], "status": args.status}]},
     ).execute()
-    dump("tracks.update() résultat", track_result)
 
-    # 5. Disponibilité pays APRÈS update — compare avec l'étape 2 : si les
-    #    pays étaient là avant et ont disparu ici, update() les a écrasés.
-    try_call(
-        "countryavailability.get() APRÈS update",
-        lambda: edits.countryavailability()
-        .get(packageName=args.package, editId=edit_id, track=args.track)
-        .execute(),
-    )
-
-    # 6. État final du track juste avant de committer.
-    try_call(
-        "tracks.get() JUSTE AVANT commit",
-        lambda: edits.tracks()
-        .get(packageName=args.package, editId=edit_id, track=args.track)
-        .execute(),
-    )
-
-    # 7. Le commit lui-même, dernier maillon — celui qui échoue jusqu'ici.
     edits.commit(editId=edit_id, packageName=args.package).execute()
     print(f"Publié sur le canal « {args.track} » : versionCode {version_code}")
 
