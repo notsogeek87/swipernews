@@ -24,6 +24,7 @@ import sys
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 
 SCOPES = ["https://www.googleapis.com/auth/androidpublisher"]
 
@@ -47,8 +48,13 @@ def main():
 
     edit_id = edits.insert(body={}, packageName=args.package).execute()["id"]
 
+    # mimetype explicite : la détection automatique de MediaFileUpload se base
+    # sur le module mimetypes de Python, qui ne connaît pas .aab (contrairement
+    # à .zip dont c'est pourtant le format sous-jacent) — sans ça, l'upload
+    # échoue avec UnknownFileType avant même de contacter l'API.
+    media = MediaFileUpload(args.aab, mimetype="application/octet-stream")
     bundle = edits.bundles().upload(
-        editId=edit_id, packageName=args.package, media_body=args.aab
+        editId=edit_id, packageName=args.package, media_body=media
     ).execute()
     version_code = bundle["versionCode"]
     print(f"Bundle uploadé : versionCode {version_code}")
