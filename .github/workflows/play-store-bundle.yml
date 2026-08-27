@@ -27,9 +27,15 @@ name: Play Store AAB
 # android/build.gradle ou android/app/build.gradle, partagés avec F-Droid et
 # android.yml — un nouveau plugin y ajouterait une résolution réseau à CHAQUE
 # build, y compris ceux de F-Droid, pour un besoin qui ne concerne que ce
-# seul workflow. La publication passe donc par une Action dédiée
-# (r0adkll/upload-google-play), qui parle à l'API Play Console directement
-# depuis CE job, sans toucher au projet Android.
+# seul workflow.
+#
+# La publication passe par tools/publish_play_store.py, pas par l'Action
+# r0adkll/upload-google-play (essayée d'abord) : celle-ci ne fixe jamais le
+# ciblage pays d'une release qu'elle crée — l'API renvoie alors « Release in
+# track targeting no countries » au moment de committer l'edit, même sur un
+# canal qui affiche déjà 177 pays actifs de releases précédentes faites à la
+# main dans Play Console. Le script fixe countryTargeting explicitement sur
+# chaque release publiée, voir son commentaire.
 on:
   workflow_dispatch:
 
@@ -126,14 +132,22 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # Publie directement sur le canal Tests fermés (track API "alpha").
-      # serviceAccountJsonPlainText prend le secret tel quel, sans écrire de
-      # fichier à la main : moins de surface pour laisser traîner la clé.
+      # google-api-python-client/google-auth : hors package.json, ce script ne
+      # tourne que dans ce job, jamais dans l'app ni les tests (voir tools/
+      # gen_logo.py pour la même logique avec Pillow).
+      - name: Installe le client Google Play
+        run: pip install --quiet google-api-python-client google-auth
+
       - name: Publie sur Google Play (Tests fermés)
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
-          packageName: eu.lielu.news
-          releaseFile: ${{ steps.build.outputs.aab }}
-          track: alpha
-          status: completed
+        env:
+          PLAY_STORE_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          if [ -z "$PLAY_STORE_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::Secret PLAY_STORE_SERVICE_ACCOUNT_JSON manquant."
+            exit 1
+          fi
+          python3 tools/publish_play_store.py \
+            --package eu.lielu.news \
+            --aab "${{ steps.build.outputs.aab }}" \
+            --track alpha
