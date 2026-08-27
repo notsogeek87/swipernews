@@ -4,14 +4,13 @@
     PLAY_STORE_SERVICE_ACCOUNT_JSON='...' python3 tools/publish_play_store.py \
         --package eu.lielu.news --aab swipernews-1.5.7.aab --track alpha
 
-Remplace l'action GitHub r0adkll/upload-google-play : celle-ci ne fixe jamais
-le ciblage pays d'une release qu'elle crée, quel que soit ce qui est déjà
-configuré dans Play Console pour le canal — l'API renvoie alors « Release in
-track targeting no countries » au moment de committer l'edit, même sur un
-canal qui affiche déjà 177 pays actifs (releases précédentes, faites à la
-main). Un appel direct à l'API permet de fixer countryTargeting explicitement
-sur CETTE release, plutôt que de dépendre d'un héritage que l'API ne fait
-visiblement pas toute seule.
+Remplace l'action GitHub r0adkll/upload-google-play, sans rapport avec la
+vraie cause trouvée : « Release in track targeting no countries » n'est PAS
+résolu en posant countryTargeting sur la release (l'API le refuse d'ailleurs
+explicitement hors production, quel que soit le status — confirmé par deux
+erreurs différentes en testant). La cause réelle est la disponibilité de
+l'app par pays (Présence sur le Store), jamais configurée — voir CLAUDE.md ou
+l'historique git de ce fichier pour le détail des tentatives écartées.
 
 Dépendances (installées à la volée par le workflow, pas dans package.json —
 ce script ne s'exécute que dans ce job CI, jamais dans l'app ni les tests) :
@@ -59,20 +58,26 @@ def main():
     version_code = bundle["versionCode"]
     print(f"Bundle uploadé : versionCode {version_code}")
 
-    # DIAGNOSTIC : status="completed" échoue systématiquement au commit avec
-    # « Release in track targeting no countries », countryTargeting présent ou
-    # non, pays du canal reconfigurés ou non (voir l'historique des tentatives
-    # dans l'historique git de ce fichier). Le SEUL scénario que l'API
-    # documente explicitement pour countryTargeting est inProgress + une
-    # release ÉCHELONNÉE (userFraction < 1) — on le teste ici en dernier
-    # recours, avant d'établir que le blocage est réellement ailleurs.
-    release = {"versionCodes": [str(version_code)], "status": "inProgress", "userFraction": 0.99}
-    release["countryTargeting"] = {"includeRestOfWorld": True}
+    # PAS de countryTargeting : confirmé par l'API elle-même, sur ce projet,
+    # que ce champ est invalide hors production, quel que soit le status
+    # (« Country targeting is only supported for staged releases » avec
+    # completed, puis « A staged release with country targeting is only
+    # supported on the production track » avec inProgress+userFraction). La
+    # cause du blocage « Release in track targeting no countries » est donc
+    # ailleurs : la disponibilité de l'app par pays (Présence sur le Store),
+    # pas un champ à poser ici.
     edits.tracks().update(
         editId=edit_id,
         packageName=args.package,
         track=args.track,
-        body={"releases": [release]},
+        body={
+            "releases": [
+                {
+                    "versionCodes": [str(version_code)],
+                    "status": args.status,
+                }
+            ]
+        },
     ).execute()
 
     edits.commit(editId=edit_id, packageName=args.package).execute()
