@@ -59,26 +59,20 @@ def main():
     version_code = bundle["versionCode"]
     print(f"Bundle uploadé : versionCode {version_code}")
 
-    # PAS de countryTargeting ici : l'API le rejette explicitement pour un
-    # status "completed" (« Country targeting is only supported for staged
-    # releases » — seul un déploiement progressif, userFraction < 1, peut le
-    # porter). Une release complète hérite de la disponibilité par pays de
-    # l'app (Présence sur le Store), déjà réglée — ce n'est pas ce qui a causé
-    # « Release in track targeting no countries » avec l'action précédente ;
-    # cette erreur-là venait d'ailleurs (elle ne posait AUCUN champ pays du
-    # tout, ni countryTargeting ni le format attendu par l'API pour l'hériter).
+    # DIAGNOSTIC : status="completed" échoue systématiquement au commit avec
+    # « Release in track targeting no countries », countryTargeting présent ou
+    # non, pays du canal reconfigurés ou non (voir l'historique des tentatives
+    # dans l'historique git de ce fichier). Le SEUL scénario que l'API
+    # documente explicitement pour countryTargeting est inProgress + une
+    # release ÉCHELONNÉE (userFraction < 1) — on le teste ici en dernier
+    # recours, avant d'établir que le blocage est réellement ailleurs.
+    release = {"versionCodes": [str(version_code)], "status": "inProgress", "userFraction": 0.99}
+    release["countryTargeting"] = {"includeRestOfWorld": True}
     edits.tracks().update(
         editId=edit_id,
         packageName=args.package,
         track=args.track,
-        body={
-            "releases": [
-                {
-                    "versionCodes": [str(version_code)],
-                    "status": args.status,
-                }
-            ]
-        },
+        body={"releases": [release]},
     ).execute()
 
     edits.commit(editId=edit_id, packageName=args.package).execute()
