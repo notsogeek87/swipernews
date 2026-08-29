@@ -610,6 +610,20 @@
     return out;
   }
 
+  /** Découpe une liste (déjà entrelacée, voir interleave/mixLists) en groupes
+   *  consécutifs de `n` éléments — le dernier groupe peut être plus court.
+   *  `n<1` ou non entier retombe sur 1 (chaque article seul, le comportement
+   *  d'origine : une carte, un article). Sert le réglage « Articles par carte »
+   *  (index.html, cardsPerSwipe) : le premier élément d'un groupe reste
+   *  l'article « héros » de la carte (image, titre, rail…), les suivants
+   *  s'affichent en aperçu compact — voir applyExtras/pvRowHTML. */
+  function groupItems(list, n) {
+    const size = Number.isInteger(n) && n >= 1 ? n : 1;
+    const out = [];
+    for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+    return out;
+  }
+
   /** Extrait le contenu d'une balise <meta>, quel que soit l'ordre des attributs.
    *  Utilisé côté serveur (api/og.js) pour lire og:image sur la page d'un article,
    *  et côté app packagée (index.html) pour la même extraction faite en direct
@@ -1649,6 +1663,7 @@
     feedDiscriminator,
     feedLabels,
     interleave,
+    groupItems,
     isPromotionalItem,
     isPaywallCandidateDomain,
     isPaywalledHtml,

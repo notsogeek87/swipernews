@@ -1118,6 +1118,23 @@ test("interleave est stable sur les préfixes (le fil déjà lu ne bouge pas)", 
   assert.deepEqual(lib.interleave(["n1"], ["w1"], 0), ["n1", "w1"]);
 });
 
+test("groupItems découpe en groupes consécutifs, le dernier peut être plus court", () => {
+  const list = ["a", "b", "c", "d", "e"];
+  assert.deepEqual(lib.groupItems(list, 2), [["a", "b"], ["c", "d"], ["e"]]);
+  assert.deepEqual(lib.groupItems(list, 5), [["a", "b", "c", "d", "e"]]);
+  assert.deepEqual(lib.groupItems(list, 8), [["a", "b", "c", "d", "e"]]);
+  assert.deepEqual(lib.groupItems([], 3), []);
+});
+
+test("groupItems(list,1) équivaut au comportement d'origine : un article par groupe", () => {
+  const list = ["a", "b", "c"];
+  assert.deepEqual(lib.groupItems(list, 1), [["a"], ["b"], ["c"]]);
+  // n invalide (0, négatif, non entier) retombe sur 1, jamais de boucle infinie.
+  assert.deepEqual(lib.groupItems(list, 0), [["a"], ["b"], ["c"]]);
+  assert.deepEqual(lib.groupItems(list, -2), [["a"], ["b"], ["c"]]);
+  assert.deepEqual(lib.groupItems(list, 2.5), [["a"], ["b"], ["c"]]);
+});
+
 /* ---------- Dédoublonnage des actus entre flux ---------- */
 
 const art = (o) =>

@@ -154,7 +154,7 @@
      position:fixed hors du fil — enregistrer/partager n'ayant pas de sens
      pendant la lecture, startVideo() l'efface pour toute sa durée (voir
      .rail--away plus bas). */
-  .card--playing .card__body,.card--playing .card__play{opacity:0;pointer-events:none}
+  .card--playing .card__body,.card--playing .card__play,.card--playing .card__pv{opacity:0;pointer-events:none}
   /* Échappatoire posée par startVideo()/retirée par stopVideo() — voir son
      commentaire : YouTube bloque parfois la lecture derrière un mur « confirmez
      que vous n'êtes pas un robot » (réputation de l'IP, rien que l'app puisse
@@ -269,6 +269,37 @@
   .card__paywall{display:inline-flex;align-items:center;justify-content:center;
     flex:0 0 auto;color:var(--ash);opacity:.8}
   .card__paywall svg{width:16px;height:16px}
+
+  /* Articles par carte > 1 (réglage cardsPerSwipe, voir applyExtras/pvRowHTML
+     dans index.html) : le héros garde .card__bg/.card__body EXACTEMENT comme
+     à N=1 (image, titre, rail, sondes…) — description et date s'effacent
+     pour laisser la place aux (N-1) lignes d'aperçu, posées SOUS le bloc de
+     texte. .card garde déjà justify-content:flex-end (voir plus haut) : les
+     deux blocs, en flux normal, se tassent donc naturellement en bas de la
+     carte, l'aperçu sous le texte. min-height:0 + overflow-y:auto sur
+     .card__pv (jamais sur .card__body, qui garde sa taille intrinsèque) :
+     si le contenu dépasse les 100vh disponibles (beaucoup d'articles sans
+     image, donc un bloc de texte haut), c'est la liste d'aperçu qui rétrécit
+     et défile sur elle-même plutôt que de faire déborder la carte. */
+  .card--multi .card__desc,.card--multi .card__meta{display:none}
+  .card__pv{position:relative;z-index:2;flex:0 1 auto;min-height:0;overflow-y:auto;
+    -webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:8px;
+    padding:0 22px calc(20px + env(safe-area-inset-bottom))}
+  .pvrow{display:flex;align-items:center;gap:12px;background:rgba(0,0,0,.4);
+    border:1px solid rgba(255,255,255,.14);border-radius:var(--radius-sm);
+    padding:8px 10px;text-decoration:none;color:inherit;-webkit-tap-highlight-color:transparent;
+    transition:transform .12s}
+  .pvrow:active{transform:scale(.98)}
+  .pvrow__thumb{position:relative;flex:0 0 auto;width:52px;height:52px;border-radius:8px;
+    overflow:hidden;background:var(--surface);display:flex;align-items:center;justify-content:center}
+  .pvrow__thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .pvrow__play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff}
+  .pvrow__play svg{width:20px;height:20px;filter:drop-shadow(0 1px 4px rgba(0,0,0,.6))}
+  .pvrow__body{min-width:0;flex:1 1 auto;display:flex;flex-direction:column;gap:3px}
+  .pvrow__source{font-family:var(--font-mono);font-size:10.5px;letter-spacing:-.03em;
+    text-transform:uppercase;color:var(--flare);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pvrow__title{font-size:13.5px;line-height:1.3;font-weight:600;color:var(--ink);
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
   /* Rail UNIQUE en position:fixed, hors des cartes. Auparavant chaque carte
      portait son propre rail avec backdrop-filter:blur(12px) — l'un des effets
@@ -1107,6 +1138,9 @@
          seul état (mixScore), donc les deux curseurs ne peuvent pas
          diverger — glisser ici change déjà la dose pour de vrai. -->
     <div data-mixmount></div>
+    <!-- Même point de montage que le panneau de réglages (voir renderCardsPref) :
+         un seul balisage, un seul état (cardsPerSwipe). -->
+    <div data-cardsmount></div>
     <h3 class="secttl" data-i18n="sheet.interests.title">🎓 Centres d'intérêt</h3>
     <p class="sub" data-i18n="welcome.interests.sub">Choisis les thèmes qui t'intéressent — ou aucun, pour un peu de tout. Modifiable à tout moment depuis les réglages ⚙.</p>
     <div class="intgrid" id="welcomeIntGrid"></div>
@@ -1140,6 +1174,11 @@
     <h3 class="secttl" data-i18n="sheet.mix.title">🎚️ Dose d'apprentissage</h3>
     <p class="sub" data-i18n="dose.sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
     <div data-mixmount></div>
+
+    <!-- Articles par carte (voir renderCardsPref/prefRow, comme apptheme/lang
+         ci-dessus) : pas de secttl/sub séparé, prefRow porte déjà son propre
+         libellé + description de l'option en cours. -->
+    <div data-cardsmount></div>
 
     <h3 class="secttl" data-i18n="sheet.interests.title">🎓 Centres d'intérêt</h3>
     <p class="sub" data-i18n="sheet.interests.sub">Les thèmes des articles Wikipédia glissés entre tes actus.</p>
@@ -1350,9 +1389,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=223"></script>
-<script src="src/learn-core.js?v=223"></script>
-<script src="src/i18n.js?v=223"></script>
+<script src="src/lib.js?v=224"></script>
+<script src="src/learn-core.js?v=224"></script>
+<script src="src/i18n.js?v=224"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1507,7 +1546,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,dayKey,quarterIndex,statsBuckets,shuffle,
-  seenKey,dropSeen,roundRobin,weightedRoundRobin,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,YT_SHORT_MAX_DURATION_S,youtubeApiVideosDurationUrl,youtubeApiDurationsFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities,feedLinkFromHtml,commonFeedUrlCandidates}=self.SwiperLib;
+  seenKey,dropSeen,roundRobin,weightedRoundRobin,groupItems,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,YT_SHORT_MAX_DURATION_S,youtubeApiVideosDurationUrl,youtubeApiDurationsFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities,feedLinkFromHtml,commonFeedUrlCandidates}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -1679,6 +1718,25 @@ const mixLevel=()=>MIX_LEVELS[mixScore];
 function persistMix(n){
   mixScore=clampMix(n);
   try{localStorage.setItem(LS_MIX,String(mixScore));}catch(e){warn("save mix",e);}
+}
+/* Articles par carte : 1 à 5, réglable à l'accueil du 1er lancement comme
+   dans les réglages (voir renderCardsPref, prefRow, [data-cardsmount]).
+   1 = comportement d'origine, une carte plein écran par article — c'est le
+   seul cas couvert par le banc de QA (tools/qa-scenarios.js) et par les 32
+   scénarios qui en dépendent (resume, tête, vidéo…), donc c'est le défaut.
+   Au-delà, `groupItems` (src/lib.js) découpe le fil déjà entrelacé en
+   groupes de N : le PREMIER de chaque groupe reste la carte « héros »
+   inchangée (image, titre, rail, sondes…), les suivants s'affichent en
+   aperçu compact au bas de la MÊME carte — voir applyExtras/pvRowHTML,
+   cardsPerSwipe est donc lu par render() mais ne change rien d'autre à
+   l'état du fil (aucun appel réseau, comme applyMix). */
+const LS_CARDSPERSWIPE="fluxswipe.cardspercard.v1";
+const CARDS_PER_SWIPE_DEFAULT=1;
+const clampCardsPerSwipe=n=>(Number.isInteger(n)&&n>=1&&n<=5)?n:CARDS_PER_SWIPE_DEFAULT;
+let cardsPerSwipe=(()=>{try{return clampCardsPerSwipe(parseInt(localStorage.getItem(LS_CARDSPERSWIPE),10));}catch(e){return CARDS_PER_SWIPE_DEFAULT;}})();
+function persistCardsPerSwipe(n){
+  cardsPerSwipe=clampCardsPerSwipe(n);
+  try{localStorage.setItem(LS_CARDSPERSWIPE,String(cardsPerSwipe));}catch(e){warn("save cardspercard",e);}
 }
 /* Mélange selon la dose : une seule règle, partagée par le fil et par son
    aperçu dans les réglages. Un seul passage pour les TROIS flux (vidéo,
@@ -2269,7 +2327,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="223";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="224";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2280,6 +2338,8 @@ const APP_VERSION="223";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:224,date:"2026-08-29",items:[
+    "changelog.v224.item1"]},
   {v:223,date:"2026-08-26",items:[
     "changelog.v223.item1"]},
   {v:222,date:"2026-08-26",items:[
@@ -4187,6 +4247,13 @@ let loadingMore=false;
 // tableau, ce qui permet de retirer d'anciennes cartes du DOM sans tout casser.
 const cardReg=new Map();
 let cardSeq=0;
+/* Articles par carte > 1 (cardsPerSwipe) : id de carte -> articles
+   SUPPLÉMENTAIRES du groupe (au-delà du héros, déjà dans cardReg), affichés
+   en aperçu compact. Séparé de cardReg exprès : cardReg reste « id -> UN
+   article » partout ailleurs (rail, sondes, vidéo…), qui n'ont pas à savoir
+   que le fil peut être groupé — voir applyExtras. Vide en permanence quand
+   cardsPerSwipe===1 (défaut). */
+const cardExtras=new Map();
 /* Article porté par la carte d'index `i` dans le fil, sans relire la géométrie :
    c'est ce qui permet à onCardChange() de ne calculer l'index qu'une fois pour
    ses trois usages. */
@@ -4281,6 +4348,19 @@ function markVisibleSeen(it=currentItem()){
   if(!it)return;
   if(it.kind==="learn")addSeen(it);
   else if(!videoIdOf(it))addSeenNews(it);
+}
+/* Marquage « vu » pour un article ouvert depuis une ligne d'aperçu (cardsPerSwipe>1,
+   voir pvRowHTML) : il n'est JAMAIS le héros d'aucune carte, donc jamais vu
+   par markVisibleSeen (qui ne regarde que currentItem()) — le tap est son
+   seul signal d'engagement, exactement comme le lancement d'une vidéo
+   (startVideo) l'est pour markVisibleSeen : d'où vidéo INCLUSE ici, à
+   l'inverse de markVisibleSeen qui l'exclut (déjà marquée ailleurs, au
+   lancement sur la carte). Une ligne croisée mais jamais touchée reste donc
+   non-vue et peut revenir en aperçu au prochain rendu — comme une vidéo
+   jamais lancée, assumé. */
+function markPreviewOpened(it){
+  if(!it)return;
+  if(it.kind==="learn")addSeen(it);else addSeenNews(it);
 }
 /* « Vu » au sens de la case à cocher d'openHistory : Wikipédia via `seen`,
    actus ET vidéos via `newsSeen` — qui applique déjà, sans rien de plus ici,
@@ -4632,13 +4712,59 @@ function unobserveCard(card){
    changeait d'identité à chaque réponse. On réancre donc sur le lien de la
    carte visible — et, au démarrage seulement, sur l'article de la session
    précédente. */
-/* Crée l'élément d'une carte et l'enregistre. */
-function makeCardEl(it){
+/* Crée l'élément d'une carte et l'enregistre. `extras` : les articles
+   suivants du groupe (cardsPerSwipe>1), voir applyExtras. */
+function makeCardEl(it,extras){
   const id=cardSeq++;
   cardReg.set(id,it);
   const tpl=document.createElement("template");
   tpl.innerHTML=cardHTML(it,id);
-  return tpl.content.firstElementChild;
+  const el=tpl.content.firstElementChild;
+  applyExtras(el,extras);
+  return el;
+}
+/* Pose ou retire le bloc d'aperçu (.card__pv) d'une carte : appelé à la
+   création (makeCardEl) ET à chaque réconciliation d'une carte déjà en place
+   (render()), puisque la composition d'un groupe peut changer d'un rendu à
+   l'autre même quand son héros, lui, ne bouge pas. Coût nul quand `extras`
+   est vide et l'a toujours été (cas cardsPerSwipe===1, l'immense majorité) :
+   aucune lecture ni écriture du DOM. */
+function applyExtras(el,extras){
+  const id=+el.dataset.id;
+  if(extras&&extras.length){
+    cardExtras.set(id,extras);
+    el.classList.add("card--multi");
+    let pv=el.querySelector(".card__pv");
+    if(!pv){pv=document.createElement("div");pv.className="card__pv";el.appendChild(pv);}
+    pv.innerHTML=extras.map(pvRowHTML).join("");
+  }else if(cardExtras.has(id)){
+    cardExtras.delete(id);
+    el.classList.remove("card--multi");
+    const pv=el.querySelector(".card__pv");
+    if(pv)pv.remove();
+  }
+}
+/* Ligne compacte d'un article SUPPLÉMENTAIRE au sein d'une carte groupée
+   (cardsPerSwipe>1) : contrairement au héros elle n'a ni image de fond
+   plein écran, ni rail, ni sondes payant/sponsorisé/image manquante — juste
+   de quoi identifier l'article et l'ouvrir, comme une ligne d'« Articles en
+   mémoire » (histRowHTML) mais posée dans le fil. Vidéo : l'aperçu ne peut
+   pas jouer sur place (un seul lecteur à la fois dans le fil, voir
+   startVideo) donc un tap ouvre directement l'article, jamais en mode
+   lecture (data-vid déclenche noReader dans la délégation de clic). */
+function pvRowHTML(it){
+  const img=safeImg(it.img,location.href);
+  const link=it.link?safeLink(it.link,location.href):"";
+  const vid=videoIdOf(it);
+  const tag=link?"a":"div";
+  const attrs=link?` data-pv data-open href="${escAttr(link)}" target="_blank" rel="noopener"`:` data-pv`;
+  return `<${tag} class="pvrow"${vid?` data-vid="${escAttr(vid)}"`:""}${attrs}>
+    <span class="pvrow__thumb">${img?`<img src="${escAttr(img)}" alt="" loading="lazy">`:""}${vid?`<span class="pvrow__play">${ICON_PLAY}</span>`:""}</span>
+    <span class="pvrow__body">
+      <span class="pvrow__source">${esc(it.source)}</span>
+      <span class="pvrow__title">${esc(it.title)}</span>
+    </span>
+  </${tag}>`;
 }
 /* Reconstruit le fil en gardant l'utilisateur SUR SON ARTICLE, et en
    RÉUTILISANT les cartes déjà affichées.
@@ -4672,12 +4798,21 @@ function render(forceTop,altAnchor){
     if(it&&it.link&&!existing.has(it.link))existing.set(it.link,el);
   }
 
+  /* Articles par carte (cardsPerSwipe) : le fil déjà entrelacé (`items`) est
+     découpé en groupes de N — groupItems (src/lib.js). Le PREMIER article de
+     chaque groupe reste le « héros » de la carte (réconcilié par lien,
+     exactement comme avant cardsPerSwipe : à N=1 chaque groupe est un
+     singleton, comportement inchangé au bit près), les suivants sont ses
+     `extras`, posés par applyExtras. */
+  const groups=groupItems(items,cardsPerSwipe);
   let cursor=feedEl.firstElementChild;
-  for(const it of items){
-    const el=it.link?existing.get(it.link):null;
+  for(const grp of groups){
+    const hero=grp[0],extras=grp.slice(1);
+    const el=hero.link?existing.get(hero.link):null;
     if(el){
-      existing.delete(it.link);
-      cardReg.set(+el.dataset.id,it);           // rafraîchit l'article associé
+      existing.delete(hero.link);
+      cardReg.set(+el.dataset.id,hero);         // rafraîchit l'article associé
+      applyExtras(el,extras);
       if(el===cursor){cursor=cursor.nextElementSibling;continue;}   // déjà en place
       /* Arrêt n°3, le moins évident : réinsérer un nœud qui contient une
          <iframe> DÉTRUIT son contexte de navigation, donc la recharge — et
@@ -4688,24 +4823,28 @@ function render(forceTop,altAnchor){
       if(el===playingCard)stopVideo();
       feedEl.insertBefore(el,cursor);           // simple déplacement, pas de recréation
     }else{
-      feedEl.insertBefore(makeCardEl(it),cursor);
+      feedEl.insertBefore(makeCardEl(hero,extras),cursor);
     }
   }
   // Tout ce qui reste après le curseur n'est plus dans le fil.
   while(cursor){
     const next=cursor.nextElementSibling;
     cardReg.delete(+cursor.dataset.id);
+    cardExtras.delete(+cursor.dataset.id);
     unobserveCard(cursor);
     cursor.remove();
     cursor=next;
   }
+  // Index dans `items` (granularité article) -> index de carte dans le fil
+  // (granularité groupe, voir groupItems ci-dessus) : à N=1 c'est l'identité.
+  const groupIndexOf=flatI=>Math.floor(flatI/Math.max(1,cardsPerSwipe));
   let top=0;
   if(forceTop){
     resumePending=false;                        // ordre explicite : pas de reprise à ignorer
   }else if(anchor){
     let i=items.findIndex(it=>it.link===anchor);
     if(i<0&&altAnchor)i=items.findIndex(it=>it.link===altAnchor);
-    if(i>=0)top=scrollToCard(i);
+    if(i>=0)top=scrollToCard(groupIndexOf(i));
     resumePending=false;                        // l'utilisateur a pris la main
   }else if(resumePending&&items.length){
     // Reprise de session : le fil se remplit progressivement, on réessaie
@@ -4715,7 +4854,7 @@ function render(forceTop,altAnchor){
       "i="+(link?resolveResume(link):"n/a"));
     if(!link)resumePending=false;
     else{const i=resolveResume(link);
-      if(i>0){top=scrollToCard(i);resumePending=false;}
+      if(i>0){top=scrollToCard(groupIndexOf(i));resumePending=false;}
       else if(i===0)resumePending=false;}       // i===-1 : pas encore là → on réessaiera
   }
   // Aucune cible retenue (nouveau fil, changement de filtre…) : on repart en haut.
@@ -5051,9 +5190,25 @@ feedEl.addEventListener("click",e=>{
   // « vu » y est déjà acquis au lancement, voir startVideo.)
   const openLink=e.target.closest("a[data-open]");
   if(openLink&&openLink.href){
-    const card=openLink.closest(".card"),t=card&&card.querySelector(".card__title");
+    const card=openLink.closest(".card");
+    // Ligne d'aperçu (cardsPerSwipe>1, voir pvRowHTML) : ni rail ni sondes,
+    // et « vu » se marque au tap plutôt qu'au défilement — voir
+    // markPreviewOpened. Sans lien (isolée du DOM au moment du clic), on
+    // retombe sur .card__title comme pour le héros.
+    const pv=openLink.classList.contains("pvrow")?openLink:null;
+    const t=pv?pv.querySelector(".pvrow__title"):(card&&card.querySelector(".card__title"));
     bumpArticleOpen();
-    if(openArticle(openLink.href,t?t.textContent:""))e.preventDefault();
+    if(pv&&card){
+      const extras=cardExtras.get(+card.dataset.id)||[];
+      const hit=extras.find(x=>x.link&&safeLink(x.link,location.href)===openLink.getAttribute("href"));
+      if(hit)markPreviewOpened(hit);
+    }
+    // noReader pour une vidéo d'aperçu : le mode lecture n'est jamais tenté
+    // sur une vidéo (voir CLAUDE.md), et ici il n'y a de toute façon aucune
+    // lecture SUR la carte possible (un seul lecteur à la fois, voir
+    // startVideo) — un tap ouvre directement, comme "Ouvrir sur YouTube".
+    const opts=pv&&pv.dataset.vid?{noReader:true}:undefined;
+    if(openArticle(openLink.href,t?t.textContent:"",opts))e.preventDefault();
   }
 });
 /* Rail unique : il agit sur la carte visible (une seule instance pour toute
@@ -5574,6 +5729,23 @@ function renderThemePref(){
     APP_THEMES.map(v=>({v,t:T("apptheme.opt."+v)})),appTheme);
   document.querySelectorAll("[data-thememount]").forEach(el=>{el.innerHTML=html;});
 }
+/* Articles par carte : même position et même forme que renderThemePref() —
+   effet de bord sur le fil affiché (render(), voir setCardsPerSwipe), donc
+   hors PREFS/setPref comme lang/apptheme. Monté dans l'accueil du 1er
+   lancement ET dans les réglages (voir [data-cardsmount], même mécanique que
+   [data-mixmount]/renderMix : un seul balisage, un seul état). */
+function renderCardsPref(){
+  const html=prefRow("cardsPerSwipe",T("cards.label"),T("cards.desc."+cardsPerSwipe),
+    ["1","2","3","4","5"].map(v=>({v,t:v})),String(cardsPerSwipe));
+  document.querySelectorAll("[data-cardsmount]").forEach(el=>{el.innerHTML=html;});
+}
+function setCardsPerSwipe(v){
+  const n=clampCardsPerSwipe(parseInt(v,10));
+  if(n===cardsPerSwipe)return;
+  persistCardsPerSwipe(n);
+  renderCardsPref();
+  render();   // recompose les cartes groupées ; aucun appel réseau (comme applyMix)
+}
 const PREFS={
   read:{get:()=>readPref,set:v=>{readPref=v;},key:LS_READ,vals:READ_MODES},
   cmp: {get:()=>cmpPref, set:v=>{cmpPref=v;}, key:LS_CMP, vals:["hide","show"]},
@@ -5584,6 +5756,7 @@ const PREFS={
 function setPref(name,v){
   if(name==="lang"){setLang(v);return;}   // effets de bord propres : voir setLang
   if(name==="apptheme"){setAppTheme(v);return;}   // idem : attribut sur <html>
+  if(name==="cardsPerSwipe"){setCardsPerSwipe(v);return;}   // idem : recompose le fil
   const p=PREFS[name];
   if(!p)return;
   const next=p.vals.includes(v)?v:p.vals[0];   // valeur inconnue → on retombe sur le défaut
@@ -5631,6 +5804,7 @@ document.addEventListener("click",e=>{
 renderLangPref();
 renderReadPref();
 renderThemePref();
+renderCardsPref();
 /* Rafraîchissement hebdomadaire, en silence : une liste de blocage vieille de
    plusieurs mois laisse passer les régies apparues depuis. Rien ne part si
    aucune source n'a été choisie, ni si le blocage est désactivé. */
@@ -6590,7 +6764,7 @@ function renderIntGrid(gridId){
    pour toute feuille refermée sans avoir chargé) — pas de loadFeeds() ici. */
 function openWelcome(){
   pendingInt=new Set(interests);
-  renderMix();renderIntGrid("welcomeIntGrid");
+  renderMix();renderCardsPref();renderIntGrid("welcomeIntGrid");
   openDialog(welcomeSheet);
 }
 function startWelcome(){
@@ -7096,6 +7270,7 @@ function settingsSnapshot(){
     lang:LANG,
     appTheme,
     mix:mixScore,
+    cardsPerSwipe,
     interests,
     cat,
     newsSrc,
@@ -7145,6 +7320,9 @@ function applySettingsImport(obj){
   }
   if(Number.isInteger(obj.mix)&&obj.mix===clampMix(obj.mix)){
     localStorage.setItem(LS_MIX,String(obj.mix));n++;
+  }
+  if(Number.isInteger(obj.cardsPerSwipe)&&obj.cardsPerSwipe===clampCardsPerSwipe(obj.cardsPerSwipe)){
+    localStorage.setItem(LS_CARDSPERSWIPE,String(obj.cardsPerSwipe));n++;
   }
   if(Array.isArray(obj.interests)){
     const ints=[...new Set(obj.interests.filter(k=>typeof k==="string").map(migrateCat))]

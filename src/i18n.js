@@ -53,6 +53,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v224.item1":
+        "🗂️ Choisis combien d'articles apparaissent par carte (1 à 5), dès l'accueil ou dans les réglages.",
       "changelog.v223.item1":
         "⬅️ Correctif (Android) : le retour sans panneau ouvert ne faisait plus rien. Il quitte maintenant l'app, avec un double appui pour confirmer.",
       "changelog.v222.item1":
@@ -223,6 +225,13 @@
       "mix.level.4.desc": "Trois articles pour une actu.",
       "mix.level.5.label": "Wikipédia seul",
       "mix.level.5.desc": "Que des articles, sans tes flux.",
+
+      "cards.label": "🗂️ Articles par carte",
+      "cards.desc.1": "Une carte, un article — le fonctionnement d'origine.",
+      "cards.desc.2": "Deux articles empilés à chaque balayage.",
+      "cards.desc.3": "Trois articles empilés à chaque balayage.",
+      "cards.desc.4": "Quatre articles empilés à chaque balayage.",
+      "cards.desc.5": "Cinq articles empilés à chaque balayage.",
 
       "sheet.interests.title": "🎓 Centres d'intérêt",
       "sheet.interests.sub": "Les thèmes des articles Wikipédia glissés entre tes actus.",
@@ -425,6 +434,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v224.item1":
+        "🗂️ Choose how many articles appear per card (1 to 5), from onboarding or settings.",
       "changelog.v223.item1":
         "⬅️ Fixed (Android): back with no panel open used to do nothing. It now exits the app, with a double-press to confirm.",
       "changelog.v222.item1":
@@ -591,6 +602,13 @@
       "mix.level.4.desc": "Three articles for one news item.",
       "mix.level.5.label": "Wikipedia only",
       "mix.level.5.desc": "Just articles, without your feeds.",
+
+      "cards.label": "🗂️ Articles per card",
+      "cards.desc.1": "One card, one article — the original behaviour.",
+      "cards.desc.2": "Two articles stacked on each swipe.",
+      "cards.desc.3": "Three articles stacked on each swipe.",
+      "cards.desc.4": "Four articles stacked on each swipe.",
+      "cards.desc.5": "Five articles stacked on each swipe.",
 
       "sheet.interests.title": "🎓 Interests",
       "sheet.interests.sub":
