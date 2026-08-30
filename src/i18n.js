@@ -352,6 +352,7 @@
       "notif.desc.off": "Aucune vérification en arrière-plan.",
       "notif.opt.on": "Activées",
       "notif.opt.off": "Désactivées",
+      "notif.nudge.title": "Notifications",
       "notif.nudge.txt":
         "Tu n'as pas activé les notifications de nouveaux articles — tu veux les allumer maintenant ?",
       "notif.nudge.enable": "Activer les notifications",
@@ -754,6 +755,7 @@
       "notif.desc.off": "No background check.",
       "notif.opt.on": "On",
       "notif.opt.off": "Off",
+      "notif.nudge.title": "Notifications",
       "notif.nudge.txt":
         "You haven't turned on new-article notifications — want to enable them now?",
       "notif.nudge.enable": "Enable notifications",

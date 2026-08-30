@@ -1478,6 +1478,22 @@
   </div>
 </div>
 
+<!-- Rappel « active les notifications », app packagée seulement, proposé au
+     PLUS UNE fois au 1er lancement (voir NOTIF_INTRO_VERSION, notifNudgeSeen) —
+     juste après l'accueil, par replaceDialog depuis welcomeSheet (même
+     principe que noVideoSheet ci-dessus). Un utilisateur déjà en place voit un
+     rappel équivalent mais accolé au journal des nouveautés (renderNotifNudge,
+     openChangelogIfNew) : les deux partagent le MÊME marqueur "déjà proposé",
+     jamais les deux à la fois. -->
+<div class="sheet" id="notifNudgeSheet" role="dialog" aria-modal="true" aria-labelledby="notifNudgeTitle">
+  <div class="sheet__panel" tabindex="-1">
+    <div class="sheet__grip"></div>
+    <h2 id="notifNudgeTitle" data-i18n="notif.nudge.title">Notifications</h2>
+    <p class="sub" data-i18n="notif.nudge.txt">Tu n'as pas activé les notifications de nouveaux articles — tu veux les allumer maintenant ?</p>
+    <button class="applybtn" id="notifNudgeEnable" data-i18n="notif.nudge.enable">Activer les notifications</button>
+  </div>
+</div>
+
 <div class="installbar hidden" id="installBar">
   <div class="installbar__icon">◆</div>
   <div class="installbar__txt">
@@ -1501,9 +1517,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=240"></script>
-<script src="src/learn-core.js?v=240"></script>
-<script src="src/i18n.js?v=240"></script>
+<script src="src/lib.js?v=241"></script>
+<script src="src/learn-core.js?v=241"></script>
+<script src="src/i18n.js?v=241"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2466,7 +2482,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="240";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="241";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2674,18 +2690,25 @@ let adsPref=(()=>{try{return localStorage.getItem(LS_ADS)==="block"?"block":"all
    subir. */
 const LS_NOTIF="fluxswipe.notif.v1";
 let notifPref=(()=>{try{return localStorage.getItem(LS_NOTIF)==="on"?"on":"off";}catch(e){return "off";}})();
-/* Rappel ponctuel « active les notifications », accolé au journal des
-   nouveautés (voir renderNotifNudge/openChangelogIfNew plus bas) — PAS un
-   panneau à part, une seule question ne mérite pas une couche de plus.
-   NOTIF_INTRO_VERSION identifie la version qui a introduit la fonctionnalité
-   (voir CHANGELOG) : le rappel ne doit apparaître QUE pour un utilisateur
-   EXISTANT qui vient de recevoir CETTE mise à jour précise, jamais à chaque
-   nouveauté suivante — reproposer à chaque mise à jour serait exactement le
-   harcèlement que ce réglage opt-in évite déjà (voir le commentaire
-   ci-dessus). D'où un marqueur « déjà proposé » séparé de celui du
-   changelog : « vu le changelog » et « vu le rappel » ne doivent pas se
-   confondre, un utilisateur peut rouvrir le journal plus tard (menu) sans
-   qu'on lui reproposse le rappel qu'il a déjà eu. */
+/* Rappel ponctuel « active les notifications », proposé au PLUS une fois,
+   sous DEUX formes SANS RAPPORT hiérarchique — un utilisateur ne voit jamais
+   les deux :
+   - 1er lancement (installation neuve) : #notifNudgeSheet, un panneau à part
+     ouvert par replaceDialog juste après l'accueil (voir startWelcome) ;
+   - utilisateur déjà en place qui reçoit la mise à jour introduisant la
+     fonctionnalité : accolé au journal des nouveautés déjà ouvert
+     (renderNotifNudge/openChangelogIfNew plus bas), PAS un panneau de plus —
+     il y en a déjà un à l'écran pour cette annonce précise.
+   NOTIF_INTRO_VERSION (2e cas seulement) identifie la version qui a introduit
+   la fonctionnalité (voir CHANGELOG) : le rappel ne doit apparaître QUE pour
+   un utilisateur EXISTANT qui vient de recevoir CETTE mise à jour précise,
+   jamais à chaque nouveauté suivante — reproposer à chaque mise à jour serait
+   exactement le harcèlement que ce réglage opt-in évite déjà (voir le
+   commentaire ci-dessus). D'où un marqueur « déjà proposé » PARTAGÉ entre les
+   deux formes, séparé de celui du changelog : « vu le changelog » et « vu le
+   rappel » ne doivent pas se confondre, un utilisateur peut rouvrir le
+   journal plus tard (menu) sans qu'on lui reproposse le rappel qu'il a déjà
+   eu — sous une forme ou l'autre. */
 const NOTIF_INTRO_VERSION=239;
 const LS_NOTIF_NUDGE="fluxswipe.notifnudge.seen.v1";
 function notifNudgeSeen(){try{return localStorage.getItem(LS_NOTIF_NUDGE)==="1";}catch(e){return false;}}
@@ -6069,12 +6092,15 @@ document.addEventListener("keydown",e=>{
   else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
 });
 const menuSheet=document.getElementById("menuSheet"),statsSheet=document.getElementById("statsSheet"),
-  changelogSheet=document.getElementById("changelogSheet"),noVideoSheet=document.getElementById("noVideoSheet");
+  changelogSheet=document.getElementById("changelogSheet"),noVideoSheet=document.getElementById("noVideoSheet"),
+  notifNudgeSheet=document.getElementById("notifNudgeSheet");
 document.getElementById("menuBtn").onclick=()=>openDialog(menuSheet);
 menuSheet.onclick=e=>{if(e.target===menuSheet)closeDialog(menuSheet);};
 statsSheet.onclick=e=>{if(e.target===statsSheet)closeDialog(statsSheet);};
 changelogSheet.onclick=e=>{if(e.target===changelogSheet)closeDialog(changelogSheet);};
 noVideoSheet.onclick=e=>{if(e.target===noVideoSheet)closeDialog(noVideoSheet);};
+notifNudgeSheet.onclick=e=>{if(e.target===notifNudgeSheet)closeDialog(notifNudgeSheet);};
+document.getElementById("notifNudgeEnable").onclick=()=>{setPref("notif","on");closeDialog(notifNudgeSheet);};
 /* CTA de noVideoSheet : bascule directement sur les réglages (même mécanique
    replaceDialog que la notice elle-même) et pose le focus dans le champ
    d'ajout de source — « direct vers l'ajout », pas juste vers le panneau. Le
@@ -7287,11 +7313,13 @@ function openChangelogIfNew(){
   const entries=last===null?CHANGELOG.slice(0,1):CHANGELOG.filter(e=>e.v>last);
   if(!entries.length){markChangelogSeen();return;}
   renderChangelog(entries);
-  /* Rappel notifs : seulement pour un utilisateur EXISTANT (last!==null —
-     jamais au tout premier lancement, welcomeSheet suffit déjà), qui vient
-     de recevoir la mise à jour qui introduit la fonctionnalité (l'entrée
-     NOTIF_INTRO_VERSION fait partie de ce qu'on lui montre), qui ne l'a pas
-     déjà activée, et à qui on ne l'a encore JAMAIS proposé. */
+  /* Rappel notifs : seulement pour un utilisateur EXISTANT (last!==null — le
+     1er lancement a SA PROPRE forme du même rappel, voir startWelcome et
+     #notifNudgeSheet, jamais celle-ci en plus), qui vient de recevoir la
+     mise à jour qui introduit la fonctionnalité (l'entrée NOTIF_INTRO_VERSION
+     fait partie de ce qu'on lui montre), qui ne l'a pas déjà activée, et à
+     qui on ne l'a encore JAMAIS proposé (notifNudgeSeen, marqueur PARTAGÉ
+     entre les deux formes). */
   const showNudge=last!==null&&isNativeApp&&notifPref==="off"&&!notifNudgeSeen()
     &&entries.some(e=>e.v===NOTIF_INTRO_VERSION);
   renderNotifNudge(showNudge);
@@ -7346,7 +7374,20 @@ function startWelcome(){
   // fil déjà à jour) : comme applySettings(), on force si les intérêts ont
   // vraiment changé depuis l'ouverture.
   if(interests.join(",")!==avant||!feedLoadStarted)loadFeeds(true);
-  closeDialog(welcomeSheet);                    // ne relancera pas un 2e chargement
+  /* Rappel notifs juste après l'accueil, au PLUS une fois (voir
+     NOTIF_INTRO_VERSION/notifNudgeSeen) : replaceDialog, jamais
+     closeDialog+openDialog — welcomeSheet a déjà posé son entrée
+     d'historique, en repousser une seconde casserait "une seule couche à la
+     fois" (pushDialogState), et l'history.back() de closeDialog est
+     asynchrone : un openDialog immédiatement après se ferait défaire par son
+     popstate encore en vol dès qu'il arrive (même piège que menuSheet→sheet,
+     voir replaceDialog). */
+  if(isNativeApp&&notifPref==="off"&&!notifNudgeSeen()){
+    markNotifNudgeSeen();
+    replaceDialog(welcomeSheet,notifNudgeSheet);
+  }else{
+    closeDialog(welcomeSheet);                  // ne relancera pas un 2e chargement
+  }
   try{window.dispatchEvent(new Event("interests-validated"));}catch(e){} // autorise la bannière d'install
 }
 document.getElementById("welcomeStart").onclick=startWelcome;
