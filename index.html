@@ -1479,7 +1479,7 @@
 </div>
 
 <!-- Rappel « active les notifications », app packagée seulement, proposé au
-     1er lancement (voir notifNudgeSeen) — juste après l'accueil, par
+     1er lancement (voir notifNudgeAnswered) — juste après l'accueil, par
      replaceDialog depuis welcomeSheet (même principe que noVideoSheet
      ci-dessus). Un utilisateur déjà en place voit le même panneau, ou sa
      variante accolée au journal des nouveautés s'il en ouvre un
@@ -1487,7 +1487,7 @@
      marqueur "déjà proposé", jamais les deux à la fois. Reproposé au
      lancement SUIVANT tant qu'aucun des deux boutons n'a été touché (un tap
      en dehors ou le retour arrière ne valent pas réponse) — voir
-     markNotifNudgeSeen, posé par Activer ET par Plus tard, jamais à
+     markNotifNudgeAnswered, posé par Activer ET par Plus tard, jamais à
      l'affichage. -->
 <div class="sheet" id="notifNudgeSheet" role="dialog" aria-modal="true" aria-labelledby="notifNudgeTitle">
   <div class="sheet__panel" tabindex="-1">
@@ -1522,9 +1522,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=244"></script>
-<script src="src/learn-core.js?v=244"></script>
-<script src="src/i18n.js?v=244"></script>
+<script src="src/lib.js?v=245"></script>
+<script src="src/learn-core.js?v=245"></script>
+<script src="src/i18n.js?v=245"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2487,7 +2487,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="244";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="245";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2722,10 +2722,17 @@ let notifPref=(()=>{try{return localStorage.getItem(LS_NOTIF)==="on"?"on":"off";
    auquel il a déjà répondu — sous une forme ou l'autre. Tant qu'il n'a pas
    répondu, openChangelogIfNew() (tous les lancements) et/ou startWelcome()
    (le tout premier) le reproposent naturellement, sans rien à tenir à jour
-   en plus. */
-const LS_NOTIF_NUDGE="fluxswipe.notifnudge.seen.v1";
-function notifNudgeSeen(){try{return localStorage.getItem(LS_NOTIF_NUDGE)==="1";}catch(e){return false;}}
-function markNotifNudgeSeen(){try{localStorage.setItem(LS_NOTIF_NUDGE,"1");}catch(e){}}
+   en plus.
+   Clé RENOMMÉE (…notifnudge.seen.v1 → …notifnudge.answered.v1), pas juste
+   les fonctions : une première version posait ce marqueur à l'AFFICHAGE
+   (voir juste au-dessus), donc quiconque avait déjà croisé le rappel une
+   fois — même sans avoir cliqué quoi que ce soit — l'avait sur son appareil
+   à "1" pour de bon. Continuer à lire l'ancienne clé aurait laissé ces
+   utilisateurs sans jamais revoir le rappel, silencieusement, malgré le
+   correctif ; une clé neuve leur redonne une vraie chance d'y répondre. */
+const LS_NOTIF_NUDGE="fluxswipe.notifnudge.answered.v1";
+function notifNudgeAnswered(){try{return localStorage.getItem(LS_NOTIF_NUDGE)==="1";}catch(e){return false;}}
+function markNotifNudgeAnswered(){try{localStorage.setItem(LS_NOTIF_NUDGE,"1");}catch(e){}}
 
 /* Filtre des articles sponsorisés ET bons plans dans le FLUX (pas les pubs de
    la page ouverte, voir reader_ads.js pour ça) — un seul réglage pour les
@@ -6138,8 +6145,8 @@ statsSheet.onclick=e=>{if(e.target===statsSheet)closeDialog(statsSheet);};
 changelogSheet.onclick=e=>{if(e.target===changelogSheet)closeDialog(changelogSheet);};
 noVideoSheet.onclick=e=>{if(e.target===noVideoSheet)closeDialog(noVideoSheet);};
 notifNudgeSheet.onclick=e=>{if(e.target===notifNudgeSheet)closeDialog(notifNudgeSheet);};
-document.getElementById("notifNudgeEnable").onclick=()=>{markNotifNudgeSeen();setPref("notif","on");closeDialog(notifNudgeSheet);};
-document.getElementById("notifNudgeDecline").onclick=()=>{markNotifNudgeSeen();closeDialog(notifNudgeSheet);};
+document.getElementById("notifNudgeEnable").onclick=()=>{markNotifNudgeAnswered();setPref("notif","on");closeDialog(notifNudgeSheet);};
+document.getElementById("notifNudgeDecline").onclick=()=>{markNotifNudgeAnswered();closeDialog(notifNudgeSheet);};
 /* CTA de noVideoSheet : bascule directement sur les réglages (même mécanique
    replaceDialog que la notice elle-même) et pose le focus dans le champ
    d'ajout de source — « direct vers l'ajout », pas juste vers le panneau. Le
@@ -6384,8 +6391,8 @@ document.addEventListener("click",e=>{
   const src=e.target.closest("[data-blsrc]");
   if(src){syncBlocklist(src.dataset.blsrc,false);return;}
   if(e.target.closest("[data-bldrop]"))dropBlocklist();
-  if(e.target.closest("[data-notifnudge-enable]")){markNotifNudgeSeen();setPref("notif","on");renderNotifNudge(false);}
-  if(e.target.closest("[data-notifnudge-decline]")){markNotifNudgeSeen();renderNotifNudge(false);}
+  if(e.target.closest("[data-notifnudge-enable]")){markNotifNudgeAnswered();setPref("notif","on");renderNotifNudge(false);}
+  if(e.target.closest("[data-notifnudge-decline]")){markNotifNudgeAnswered();renderNotifNudge(false);}
 });
 renderLangPref();
 renderReadPref();
@@ -7366,15 +7373,16 @@ function openChangelogIfNew(){
      #notifNudgeSheet, jamais celle-ci en plus), qui n'a pas activé les
      notifs, et qui n'a pas encore RÉPONDU — peu importe si CE passage-ci a
      par ailleurs une nouveauté à montrer.
-     « Répondu » : notifNudgeSeen() n'est plus posé ICI (à l'affichage), mais
-     dans les deux boutons eux-mêmes (Activer / Plus tard, voir plus bas) —
+     « Répondu » : markNotifNudgeAnswered() n'est plus appelé ICI (à
+     l'affichage), mais dans les deux boutons eux-mêmes (Activer / Plus tard,
+     voir plus bas) —
      sans quoi un simple tap en dehors, ou le bouton retour, valait
      acceptation silencieuse d'un « non » qu'on n'avait pas vraiment demandé,
      et le rappel ne revenait plus JAMAIS. Comme cette fonction tourne à
      CHAQUE lancement pour un utilisateur existant, ne rien marquer ici suffit
      à le reproposer au prochain lancement tant qu'aucun des deux boutons n'a
      été touché. */
-  const showNudge=last!==null&&isNativeApp&&notifPref==="off"&&!notifNudgeSeen();
+  const showNudge=last!==null&&isNativeApp&&notifPref==="off"&&!notifNudgeAnswered();
   if(!entries.length){
     markChangelogSeen();
     // Rien à annoncer dans le journal : le rappel, s'il est dû, prend alors
@@ -7435,7 +7443,7 @@ function startWelcome(){
   // fil déjà à jour) : comme applySettings(), on force si les intérêts ont
   // vraiment changé depuis l'ouverture.
   if(interests.join(",")!==avant||!feedLoadStarted)loadFeeds(true);
-  /* Rappel notifs juste après l'accueil (voir notifNudgeSeen — posé par les
+  /* Rappel notifs juste après l'accueil (voir notifNudgeAnswered — posé par les
      boutons Activer/Plus tard du panneau lui-même, PAS ici : un simple tap en
      dehors ou le bouton retour ne doivent pas valoir « non » silencieux, voir
      openChangelogIfNew pour le même choix côté utilisateur déjà en place, qui
@@ -7447,7 +7455,7 @@ function startWelcome(){
      est asynchrone : un openDialog immédiatement après se ferait défaire par
      son popstate encore en vol dès qu'il arrive (même piège que
      menuSheet→sheet, voir replaceDialog). */
-  if(isNativeApp&&notifPref==="off"&&!notifNudgeSeen()){
+  if(isNativeApp&&notifPref==="off"&&!notifNudgeAnswered()){
     replaceDialog(welcomeSheet,notifNudgeSheet);
   }else{
     closeDialog(welcomeSheet);                  // ne relancera pas un 2e chargement
