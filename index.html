@@ -298,24 +298,22 @@
      une carte héros, où le fond de l'image ne fait rien d'autre que ce même
      geste. Le reste de la ligne (miniature, marges) est donc une zone morte
      volontaire, pas un oubli — et c'est elle qui, associée à pointer-events
-     sur .top (voir plus bas), rend la barre du haut traversable au clic. La
-     réserve visuelle qui la dégage, elle, vit sur .pvrow:first-child, pas ici
-     (voir plus bas) : la barre étant FIXE à l'écran, elle chevauche le haut
-     de CHAQUE carte à parts égales une fois active, pas seulement la
-     première du fil — la réserve doit donc suivre la même règle. */
+     sur .top (voir plus bas), rend la barre du haut traversable au clic.
+     PAS de réserve de hauteur pour autant sur la 1re ligne : essayée un
+     temps, elle dégageait bien la barre mais mangeait une part fixe (~130-
+     150px, inset compris) de CHAQUE carte à parts égales — proportionnellement
+     énorme dès que les lignes sont déjà courtes (cardsPerSwipe élevé), rendu
+     signalé comme un vrai gâchis d'espace. pointer-events (voir .top)
+     suffit déjà à ce qu'aucun tap ne se perde ; ce qui reste, c'est que le
+     TEXTE de la 1re ligne peut se retrouver visuellement sous les pastilles
+     de la barre le temps qu'un utilisateur la réaffiche exprès en tapant
+     dessus — la barre est masquée par défaut pendant le défilement (voir
+     .top--away), ce carre de figure est donc rare et se referme au tap
+     suivant, contrepartie jugée préférable à l'espace perdu en permanence. */
   .pvrow{position:relative;flex:1 1 0;min-height:0;display:flex;align-items:center;
     gap:14px;padding:10px 18px;background:var(--surface);
     border-bottom:1px solid rgba(255,255,255,.08)}
   .pvrow:last-child{border-bottom:0}
-  /* Dégage la barre du haut EN PLUS de pointer-events (voir .top) : celle-ci
-     ne porte pas qu'un dégradé mais aussi des pastilles à fond plein
-     (filtres) — un texte dessous restait donc illisible même une fois le
-     clic rendu traversant. Posé sur la ligne elle-même (jamais sur le
-     conteneur .card__pv) : la réserve hérite du fond déjà coloré de la ligne
-     (background ci-dessus), et se lit comme « la 1re ligne est un peu plus
-     haute », pas comme un bandeau vide flottant au-dessus d'elle — c'est ce
-     second rendu, essayé d'abord, qui ressemblait à un bug. */
-  .pvrow:first-child{padding-top:calc(10px + 113px + max(env(safe-area-inset-top),var(--systop,0px),var(--systop-min,0px)))}
   /* Miniature à taille FIXE (jamais étirée sur la hauteur de la ligne, très
      variable selon cardsPerSwipe — de ~150px à 5 articles à ~450px à 2) :
      un format carré souple (clamp) plutôt qu'un ancien essai en bande
@@ -423,13 +421,12 @@
   .top.top--away{transform:translateY(-115%);opacity:0;pointer-events:none}  /* masqué pendant le swipe */
   /* Le calque de la barre elle-même (dégradé, marges entre boutons) laisse
      passer le clic à travers lui jusqu'à la carte en dessous — SEULS ses
-     boutons (rechargement, menu, filtres) le captent. La 1re ligne d'une
-     carte à parts égales s'en écarte déjà (.pvrow:first-child, voir plus
-     haut) : ceci est le filet, pas la protection principale — au cas où un
-     appui atteindrait quand même le bord de la barre (petit écran, texte
-     qui déborde un peu). Une carte héros n'a jamais eu ce problème (son
-     texte reste ancré en bas, jamais sous la barre), donc rien à côté de
-     .top elle-même n'a besoin de ce traitement. */
+     boutons (rechargement, menu, filtres) le captent. C'est la SEULE
+     protection pour la 1re ligne d'une carte à parts égales (voir le
+     commentaire de .pvrow) : pas de réserve de hauteur en plus, qui gâchait
+     trop d'espace sur des lignes déjà courtes. Une carte héros n'a jamais eu
+     ce problème (son texte reste ancré en bas, jamais sous la barre), donc
+     rien à côté de .top elle-même n'a besoin de ce traitement. */
   .top button{pointer-events:auto}
   .topline{display:flex;align-items:center;justify-content:space-between;gap:8px}
   /* Rangée des filtres, et d'eux seuls. C'est la marque qui cède la place aux
@@ -1443,9 +1440,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=229"></script>
-<script src="src/learn-core.js?v=229"></script>
-<script src="src/i18n.js?v=229"></script>
+<script src="src/lib.js?v=230"></script>
+<script src="src/learn-core.js?v=230"></script>
+<script src="src/i18n.js?v=230"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2391,7 +2388,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="229";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="230";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
