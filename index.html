@@ -1434,6 +1434,9 @@
     <h2 id="changelogTitle" data-i18n="changelog.title">Nouveautés</h2>
     <p class="sub" data-i18n="changelog.sub">Ce qui a changé dans SwiperNews.</p>
     <div data-changelogmount></div>
+    <!-- Rappel « active les notifications », rempli par renderNotifNudge() —
+         vide la plupart du temps, voir NOTIF_INTRO_VERSION plus haut. -->
+    <div data-notifnudge></div>
   </div>
 </div>
 
@@ -1498,9 +1501,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=239"></script>
-<script src="src/learn-core.js?v=239"></script>
-<script src="src/i18n.js?v=239"></script>
+<script src="src/lib.js?v=240"></script>
+<script src="src/learn-core.js?v=240"></script>
+<script src="src/i18n.js?v=240"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2463,7 +2466,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="239";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="240";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2671,6 +2674,22 @@ let adsPref=(()=>{try{return localStorage.getItem(LS_ADS)==="block"?"block":"all
    subir. */
 const LS_NOTIF="fluxswipe.notif.v1";
 let notifPref=(()=>{try{return localStorage.getItem(LS_NOTIF)==="on"?"on":"off";}catch(e){return "off";}})();
+/* Rappel ponctuel « active les notifications », accolé au journal des
+   nouveautés (voir renderNotifNudge/openChangelogIfNew plus bas) — PAS un
+   panneau à part, une seule question ne mérite pas une couche de plus.
+   NOTIF_INTRO_VERSION identifie la version qui a introduit la fonctionnalité
+   (voir CHANGELOG) : le rappel ne doit apparaître QUE pour un utilisateur
+   EXISTANT qui vient de recevoir CETTE mise à jour précise, jamais à chaque
+   nouveauté suivante — reproposer à chaque mise à jour serait exactement le
+   harcèlement que ce réglage opt-in évite déjà (voir le commentaire
+   ci-dessus). D'où un marqueur « déjà proposé » séparé de celui du
+   changelog : « vu le changelog » et « vu le rappel » ne doivent pas se
+   confondre, un utilisateur peut rouvrir le journal plus tard (menu) sans
+   qu'on lui reproposse le rappel qu'il a déjà eu. */
+const NOTIF_INTRO_VERSION=239;
+const LS_NOTIF_NUDGE="fluxswipe.notifnudge.seen.v1";
+function notifNudgeSeen(){try{return localStorage.getItem(LS_NOTIF_NUDGE)==="1";}catch(e){return false;}}
+function markNotifNudgeSeen(){try{localStorage.setItem(LS_NOTIF_NUDGE,"1");}catch(e){}}
 
 /* Filtre des articles sponsorisés ET bons plans dans le FLUX (pas les pubs de
    la page ouverte, voir reader_ads.js pour ça) — un seul réglage pour les
@@ -6300,6 +6319,7 @@ document.addEventListener("click",e=>{
   const src=e.target.closest("[data-blsrc]");
   if(src){syncBlocklist(src.dataset.blsrc,false);return;}
   if(e.target.closest("[data-bldrop]"))dropBlocklist();
+  if(e.target.closest("[data-notifnudge-enable]")){setPref("notif","on");renderNotifNudge(false);}
 });
 renderLangPref();
 renderReadPref();
@@ -7233,10 +7253,20 @@ function renderChangelog(entries){
       </div>`).join("");
   });
 }
+/* Contenu du rappel « active les notifications » — voir NOTIF_INTRO_VERSION.
+   `show` faux : mount vidé (cas normal, la quasi-totalité des ouvertures). */
+function renderNotifNudge(show){
+  const html=show?`<p class="sub">${esc(T("notif.nudge.txt"))}</p>
+    <button type="button" class="applybtn" data-notifnudge-enable>${esc(T("notif.nudge.enable"))}</button>`:"";
+  document.querySelectorAll("[data-notifnudge]").forEach(el=>{el.innerHTML=html;});
+}
 // Depuis le menu : le journal ENTIER, qu'on l'ait déjà vu ou non — retrouver
-// une nouveauté passée est le point de cette entrée de menu.
+// une nouveauté passée est le point de cette entrée de menu. Jamais le
+// rappel notifs ici : il n'a droit qu'à sa seule apparition automatique
+// (voir openChangelogIfNew), pas à chaque consultation volontaire du journal.
 function openChangelog(replaceFrom){
   renderChangelog(CHANGELOG);
+  renderNotifNudge(false);
   if(replaceFrom)replaceDialog(replaceFrom,changelogSheet);else openDialog(changelogSheet);
   markChangelogSeen();
 }
@@ -7257,6 +7287,15 @@ function openChangelogIfNew(){
   const entries=last===null?CHANGELOG.slice(0,1):CHANGELOG.filter(e=>e.v>last);
   if(!entries.length){markChangelogSeen();return;}
   renderChangelog(entries);
+  /* Rappel notifs : seulement pour un utilisateur EXISTANT (last!==null —
+     jamais au tout premier lancement, welcomeSheet suffit déjà), qui vient
+     de recevoir la mise à jour qui introduit la fonctionnalité (l'entrée
+     NOTIF_INTRO_VERSION fait partie de ce qu'on lui montre), qui ne l'a pas
+     déjà activée, et à qui on ne l'a encore JAMAIS proposé. */
+  const showNudge=last!==null&&isNativeApp&&notifPref==="off"&&!notifNudgeSeen()
+    &&entries.some(e=>e.v===NOTIF_INTRO_VERSION);
+  renderNotifNudge(showNudge);
+  if(showNudge)markNotifNudgeSeen();
   openDialog(changelogSheet);
   markChangelogSeen();
 }
