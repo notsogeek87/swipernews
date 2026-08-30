@@ -287,7 +287,17 @@
      laisser comprimer à l'exacte fraction 1/5 — ` .pvrow{overflow:hidden}`
      est le filet qui tronque plutôt que de laisser dépasser. */
   .card--eq{overflow:hidden}
-  .card--eq .card__pv{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+  /* padding-top réservé : SEULE la toute première ligne de la toute première
+     carte du fil (scrollTop=0) passe sous la barre du haut, mais réserver la
+     place partout est plus simple qu'un cas spécial, et la barre est un
+     CALQUE FIXE qui ne pousse jamais le reste du contenu (voir .top) — donc
+     sans cette réserve, un texte centré dans une ligne haute tombait dessous
+     (mesuré : ses clics étaient interceptés par la barre). Même construction
+     que le padding-top de .top elle-même (12px + max(inset, systop, plancher))
+     PLUS sa propre hauteur mesurée (contenu + son padding-bottom, ~87+14px) :
+     de quoi être sûr de dégager la barre quel que soit l'appareil. */
+  .card--eq .card__pv{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
+    padding-top:calc(113px + max(env(safe-area-inset-top),var(--systop,0px),var(--systop-min,0px)))}
   /* .pvrow N'EST PAS un lien — seul .pvrow__title (voir plus bas) en est un.
      Deux essais précédents faisaient de la ligne ENTIÈRE (miniature comprise)
      un <a> plein format : plus rien, nulle part sur une carte à parts égales,
@@ -297,8 +307,12 @@
      ouvrait déjà un article). Ici, seul le TITRE ouvre — exactement comme sur
      une carte héros, où le fond de l'image ne fait rien d'autre que ce même
      geste. Le reste de la ligne (miniature, marges) est donc une zone morte
-     volontaire, pas un oubli. */
-  .pvrow{position:relative;flex:1 1 0;min-height:0;display:flex;align-items:flex-end;
+     volontaire, pas un oubli.
+     align-items:CENTER, pas flex-end (essayé d'abord pour dégager la barre du
+     haut — voir le padding-top ci-dessus, qui règle déjà ce problème) : à peu
+     d'articles par carte (donc des lignes hautes), un bloc ancré en bas
+     laissait un vide écrasant au-dessus, lu comme un bug (« pas centré »). */
+  .pvrow{position:relative;flex:1 1 0;min-height:0;display:flex;align-items:center;
     gap:14px;padding:10px 18px;background:var(--surface);
     border-bottom:1px solid rgba(255,255,255,.08)}
   .pvrow:last-child{border-bottom:0}
@@ -316,8 +330,7 @@
   .pvrow__play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     color:#fff;background:rgba(0,0,0,.28)}
   .pvrow__play svg{width:22px;height:22px;filter:drop-shadow(0 1px 4px rgba(0,0,0,.6));opacity:1}
-  .pvrow__body{min-width:0;flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;
-    gap:5px;padding-bottom:2px}
+  .pvrow__body{min-width:0;flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;gap:5px}
   .pvrow__source{font-family:var(--font-mono);font-size:11px;letter-spacing:-.03em;
     text-transform:uppercase;color:var(--flare);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   /* Le lien ne doit pas RESSEMBLER à un lien, même règle que .card__title —
@@ -325,6 +338,12 @@
   .pvrow__title{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
     font-size:15px;line-height:1.3;font-weight:600;color:var(--ink);text-decoration:none;
     -webkit-tap-highlight-color:transparent}
+  /* Résumé et date : seulement quand la ligne a la place de les montrer, voir
+     pvRowHTML(it,n) — n grand (peu de place par ligne) les omet plutôt que de
+     les faire déborder. */
+  .pvrow__desc{font-size:13px;line-height:1.4;color:var(--ink);opacity:.7;margin-top:1px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .pvrow__meta{font-size:11.5px;color:var(--ash);margin-top:1px}
   .pvrow__title:active{opacity:.65}
 
   /* Rail UNIQUE en position:fixed, hors des cartes. Auparavant chaque carte
@@ -1415,9 +1434,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=226"></script>
-<script src="src/learn-core.js?v=226"></script>
-<script src="src/i18n.js?v=226"></script>
+<script src="src/lib.js?v=227"></script>
+<script src="src/learn-core.js?v=227"></script>
+<script src="src/i18n.js?v=227"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2363,7 +2382,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="226";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="227";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4809,7 +4828,7 @@ function applyGroup(el,grp){
   if(wasEq&&el.dataset.pvsig===sig)return;   // rien n'a changé : on ne touche à rien
   el.dataset.pvsig=sig;
   if(wasEq){
-    el.querySelector(".card__pv").innerHTML=grp.map(pvRowHTML).join("");
+    el.querySelector(".card__pv").innerHTML=grp.map(it=>pvRowHTML(it,grp.length)).join("");
   }else{
     const fresh=parseCardEl(eqCardHTML(grp,id));
     swapCardContent(el,fresh);
@@ -4838,7 +4857,7 @@ function swapCardContent(el,fresh){
    pour le pendant côté état). */
 function eqCardHTML(grp,id){
   return `<article class="card card--eq" data-id="${id}">
-    <div class="card__pv">${grp.map(pvRowHTML).join("")}</div>
+    <div class="card__pv">${grp.map(it=>pvRowHTML(it,grp.length)).join("")}</div>
   </article>`;
 }
 /* Ligne d'un article au sein d'une carte à parts égales (cardsPerSwipe>1) :
@@ -4851,8 +4870,13 @@ function eqCardHTML(grp,id){
    reprend l'icône « lire » (ICON_READ) plutôt qu'un vide. Vidéo : la ligne
    ne peut pas jouer sur place (un seul lecteur à la fois dans le fil, voir
    startVideo) donc un tap ouvre directement l'article, jamais en mode
-   lecture (data-vid déclenche noReader dans la délégation de clic). */
-function pvRowHTML(it){
+   lecture (data-vid déclenche noReader dans la délégation de clic).
+   `n` (taille du groupe) décide de ce qui TIENT en plus du titre : à peu
+   d'articles la ligne est haute, il y a la place pour un résumé et la date ;
+   au-delà, seuls la source et le titre restent sûrs de ne pas déborder — la
+   hauteur RÉELLE de la ligne n'est pas connue à ce stade (elle dépend du
+   CSS), donc le seuil se fait sur `n`, pas sur une mesure. */
+function pvRowHTML(it,n){
   const img=safeImg(it.img,location.href);
   const link=it.link?safeLink(it.link,location.href):"";
   const vid=videoIdOf(it);
@@ -4860,11 +4884,14 @@ function pvRowHTML(it){
   const titleAttrs=link
     ?` data-pv data-open${vid?` data-vid="${escAttr(vid)}"`:""} href="${escAttr(link)}" target="_blank" rel="noopener"`
     :` data-pv`;
+  const descHTML=n<=2&&it.desc?`<p class="pvrow__desc">${esc(it.desc)}</p>`:"";
+  const metaHTML=n<=3&&it.date?`<span class="pvrow__meta">${relTime(it.date)}</span>`:"";
   return `<div class="pvrow">
     <div class="pvrow__thumb">${img?`<img src="${escAttr(img)}" alt="" loading="lazy">`:ICON_READ}${vid?`<span class="pvrow__play">${ICON_PLAY}</span>`:""}</div>
     <div class="pvrow__body">
       <span class="pvrow__source">${esc(it.source)}</span>
       <${titleTag} class="pvrow__title"${titleAttrs}>${esc(it.title)}</${titleTag}>
+      ${descHTML}${metaHTML}
     </div>
   </div>`;
 }
