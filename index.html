@@ -1537,9 +1537,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=250"></script>
-<script src="src/learn-core.js?v=250"></script>
-<script src="src/i18n.js?v=250"></script>
+<script src="src/lib.js?v=251"></script>
+<script src="src/learn-core.js?v=251"></script>
+<script src="src/i18n.js?v=251"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2522,7 +2522,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="250";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="251";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -6063,6 +6063,22 @@ function hideTop(){clearTimeout(topAwayTimer);topEl.classList.add("top--away");d
    ou en chargement — avant que quiconque n'ait eu la moindre chance de la
    voir — et la toute première carte apparaissait alors déjà sans marque, ni
    filtres, ni bouton menu, comme si la barre n'avait jamais existé. */
+/* Dernier CONTACT réel de l'utilisateur avec le fil (doigt, molette, clavier).
+   Seul signal fiable pour distinguer un défilement voulu d'un défilement subi
+   (reflow, insertion de cartes, re-calage du scroll-snap) — voir onScrollFrame,
+   qui s'en sert pour décider de masquer la barre du haut.
+   La fenêtre couvre l'INERTIE : le doigt quitte l'écran mais le fil continue
+   de défiler, et ces frames-là appartiennent bien au geste. Trop courte, la
+   barre resterait à l'écran pendant la fin d'un swipe ; trop longue, un rendu
+   qui tombe juste après un tap passerait pour un geste. Les écouteurs sont
+   passifs et posés en capture : ils ne font qu'horodater, sans jamais
+   interférer avec le défilement natif ni avec les gestes du fil. */
+let dernierGesteAt=0;
+const GESTE_FENETRE_MS=1200;
+const gesteRecent=()=>Date.now()-dernierGesteAt<GESTE_FENETRE_MS;
+for(const ev of ["pointerdown","touchstart","touchmove","wheel","keydown"]){
+  addEventListener(ev,()=>{dernierGesteAt=Date.now();},{passive:true,capture:true});
+}
 const TOP_AWAY_MS=3000;
 let topAwayTimer=null;
 const focusClavierDansBarre=()=>{try{return !!topEl.querySelector(":focus-visible");}catch(_){return false;}};
@@ -6128,11 +6144,18 @@ function onScrollFrame(){
   scrollTick=false;
   const top=feedEl.scrollTop,h=viewH();
   if(top>50)document.getElementById("hint").classList.add("hidden");
-  // Vrai défilement (l'écart avec un défilement PROGRAMMÉ est déjà neutralisé
-  // par setScrollTopInstant, voir son commentaire) : on masque la barre, et
-  // c'est ce même geste qui autorise désormais le compte à rebours à courir
-  // pour le reste de la session (voir gesteDepuisArrivee).
-  if(Math.abs(top-lastScrollY)>4){gesteDepuisArrivee=true;hideTop();}
+  /* Masquer la barre est réservé à un défilement VENU DE L'UTILISATEUR, jamais
+     à un simple écart de scrollTop. Comparer les positions ne suffit pas :
+     au-delà des défilements programmés explicites (déjà neutralisés par
+     setScrollTopInstant), le navigateur en provoque lui-même à chaque
+     reconstruction du fil — cartes insérées ou retirées au-dessus de la
+     position courante, re-calage du scroll-snap, changement de hauteur — et
+     aucun ne passe par nos fonctions. Ils suffisaient à masquer la barre
+     PENDANT le premier rendu, donc avant que l'utilisateur ait pu la voir :
+     « le menu ne s'affiche pas à l'ouverture, seul le clic le fait revenir ».
+     On exige donc un contact récent (voir gesteRecent) : c'est le seul signal
+     qui distingue vraiment un doigt d'un reflow. */
+  if(Math.abs(top-lastScrollY)>4&&gesteRecent()){gesteDepuisArrivee=true;hideTop();}
   lastScrollY=top;
   // L'utilisateur a franchi au moins une carte avant la reprise → on l'annule
   if(resumePending&&top>h*0.5)resumePending=false;
