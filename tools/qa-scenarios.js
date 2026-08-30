@@ -2615,6 +2615,119 @@ ${Array.from({ length: 12 }, (_, k) => {
     console.log("erreurs :", errors);
     await browser.close();
   },
+
+  /* 35. LA CARTE SUR LAQUELLE ON QUITTE L'APP est-elle mémorisée ?
+     Une carte n'est marquée « vue » qu'au SWIPE (voir pendingSeenItem /
+     onCardChange dans index.html) : c'est la bonne règle pour un fil qu'on
+     parcourt, mais on ne quitte pas toujours une carte en swipant — on quitte
+     aussi l'app dessus, et cette carte-là n'était alors jamais marquée. Chaque
+     session laissait donc UN article « jamais vu » derrière elle, précisément
+     celui sur lequel on s'était arrêté ; au lancement suivant, le tri « non lu
+     d'abord » (rebuild) le remettait en tête de la file de sa source, donc en
+     haut du fil. Symptôme remonté : « je revois certains articles ».
+     Mesuré avant correctif : 4 mémorisés sur 5 réellement lus, le manquant
+     toujours le dernier. Le scénario vérifie les DEUX moitiés de la règle —
+     une carte gardée assez longtemps sous les yeux compte comme lue, une
+     carte à peine effleurée (app refermée aussitôt) ne compte toujours pas,
+     sans quoi on reviendrait au défaut que la règle du swipe corrigeait. */
+  async quitte() {
+    const N = 4;
+    const rss = (i) =>
+      `<?xml version="1.0"?><rss version="2.0"><channel><title>S${i}</title>${Array.from(
+        { length: 20 },
+        (_, k) =>
+          `<item><title>S${i} art ${k}</title><link>https://s${i}.test/n/${k}</link>` +
+          `<description>${"texte ".repeat(20)}</description><pubDate>` +
+          `${new Date(Date.now() - (k * 45 + i) * 60e3).toUTCString()}</pubDate></item>`
+      ).join("")}</channel></rss>`;
+    const feeds = Array.from({ length: N }, (_, i) => ({
+      url: `https://s${i}.test/rss`,
+      name: "S" + i,
+      on: true,
+    }));
+    const { browser, page, errors } = await boot({
+      // dose « Actus seules » : on ne mesure ici que la mémoire des actus.
+      storage: {
+        ...READY,
+        "fluxswipe.feeds.v1": JSON.stringify(feeds),
+        "fluxswipe.mix.v1": "0",
+      },
+    });
+    await page.route(/s\d\.test/, (r) => {
+      const u = r.request().url();
+      if (/\/api\/og/.test(u)) return r.fallback();
+      const m = u.match(/s(\d)\.test/);
+      return r
+        .fulfill({ status: 200, contentType: "application/xml", body: rss(+m[1]) })
+        .catch(() => {});
+    });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(5000);
+
+    /* Cinq cartes lues, l'app quittée EN RESTANT sur la cinquième — le geste
+       ordinaire de fin de session. `visibilitychange` puis `pagehide` : les
+       deux signaux que l'app écoute (voir persistAll). */
+    const quitter = (dwell) =>
+      page.evaluate(async (dwell) => {
+        /* Remise à zéro AVANT de vider la mémoire, pas après : revenir de la
+           carte 4 (où le tour précédent s'est arrêté) à la carte 0 est un
+           changement de carte comme un autre, donc marque la 4 au passage —
+           et le second tour partait alors avec le résultat du premier. */
+        feedEl.scrollTop = feedEl.children[0].offsetTop;
+        onCardChange(true);
+        seenNews.clear();
+        for (let i = 1; i < 5 && i < feedEl.children.length; i++) {
+          feedEl.scrollTop = feedEl.children[i].offsetTop;
+          onCardChange(true);
+        }
+        // Temps passé sur la dernière carte avant de quitter.
+        pendingSeenAt = Date.now() - dwell;
+        Object.defineProperty(document, "visibilityState", {
+          value: "hidden",
+          configurable: true,
+        });
+        document.dispatchEvent(new Event("visibilitychange"));
+        dispatchEvent(new Event("pagehide"));
+        Object.defineProperty(document, "visibilityState", {
+          value: "visible",
+          configurable: true,
+        });
+        const lues = items.slice(0, 5).map((it) => ({ t: it.title, vu: itemSeen(it) }));
+        return {
+          lues,
+          derniere: lues[4],
+          // relu depuis le DISQUE : le marquage doit avoir été persisté, pas
+          // seulement posé en mémoire (addSeenNews diffère l'écriture de 800 ms).
+          disque: JSON.parse(localStorage.getItem("fluxswipe.seennews.v1") || "[]")
+            .length,
+        };
+      }, dwell);
+
+    const reste = await quitter(30000); // 30 s sur la dernière carte
+    console.log(
+      `restée 30 s sous les yeux → « ${reste.derniere.t} » ` +
+        (reste.derniere.vu
+          ? "mémorisée ✓"
+          : "PAS mémorisée ← elle reviendra en tête (régression)")
+    );
+    console.log(
+      `  ${reste.lues.filter((x) => x.vu).length}/5 cartes lues mémorisées, ` +
+        `${reste.disque} entrées écrites sur le disque`
+    );
+
+    const file = await quitter(200); // app refermée aussitôt, sans rien lire
+    console.log(
+      `à peine effleurée (200 ms) → « ${file.derniere.t} » ` +
+        (file.derniere.vu
+          ? "MÉMORISÉE ← trop tôt, la règle du swipe est perdue (régression)"
+          : "pas mémorisée ✓")
+    );
+    console.log(
+      `  ${file.lues.filter((x) => x.vu).length}/5 cartes lues mémorisées (4 attendues)`
+    );
+    console.log("erreurs :", errors);
+    await browser.close();
+  },
 };
 
 const which = process.argv[2];

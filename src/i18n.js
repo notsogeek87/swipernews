@@ -53,6 +53,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v252.item1":
+        "🧠 Mémoire de lecture plus fiable : l'article sur lequel tu refermes l'app compte désormais comme lu, et le fil retient beaucoup plus longtemps ce que tu as déjà vu — moins de redites.",
       "changelog.v239.item1":
         "🔔 App Android : notifications de nouveaux articles (à activer dans les réglages) — une alerte quand une source suivie publie, même l'app fermée.",
       "changelog.v238.item1":
@@ -462,6 +464,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v252.item1":
+        "🧠 More reliable reading memory: the article you close the app on now counts as read, and the feed remembers what you have already seen for far longer — fewer repeats.",
       "changelog.v239.item1":
         "🔔 Android app: new-article notifications (turn on in settings) — an alert when a followed source publishes, even with the app closed.",
       "changelog.v238.item1":

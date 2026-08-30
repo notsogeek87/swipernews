@@ -899,9 +899,9 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
     places de `seen`. Les actus défilent bien plus vite et évinceraient la
     mémoire Wikipédia, celle qui garde le fil infini varié ;
   - **clé = `canonicalLink` seul**, sans le titre. Plus court (2000 entrées
-    `lien|titre` pèseraient ~400 Ko sur ~5 Mo de quota, d'où aussi le plafond
-    plus bas, `SEEN_NEWS_MAX` = 800) et surtout c'est la clé qui reconnaît le
-    MÊME article servi par deux flux avec des paramètres de suivi différents ;
+    `lien|titre` pèseraient ~400 Ko sur ~5 Mo de quota) et surtout c'est la clé
+    qui reconnaît le MÊME article servi par deux flux avec des paramètres de
+    suivi différents ;
   - **repoussés, jamais supprimés**. Retirer les lus viderait la file d'une
     source lente entièrement lue, et lui ferait reperdre la part que le tour de
     rôle vient de lui rendre.
@@ -909,8 +909,37 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   l'article le plus récent **qu'on n'a pas déjà eu sous les yeux**, et non le
   plus récent dans l'absolu — rouvrir l'app sur la carte qu'on vient de lire
   n'apprend rien. Au premier chargement d'une session neuve, les deux
-  définitions coïncident. « Vu » veut dire AFFICHÉ, pas ouvert : c'est la
-  question à laquelle on répond.
+  définitions coïncident.
+  **`SEEN_NEWS_MAX` doit couvrir au moins `NEWS_SEEN_COOLDOWN_MS`.** Une entrée
+  évincée avant la fin de son propre délai de garde redevient « jamais vue »,
+  donc remonte en tête de la file de sa source et revient se poser en haut du
+  fil — exactement le symptôme que cette mémoire supprime. 800 ne le couvrait
+  pas : « Articles par carte » marque les N articles d'une carte à parts égales
+  d'un seul swipe (`markVisibleSeen`), soit ~2,5× plus d'entrées par geste à
+  N=5 (mesuré), et une lecture soutenue dépasse la centaine de cartes par jour
+  — le plafond tombait en quelques jours, contre sept de garde. Porté à 3000
+  (~90 Ko : une entrée pèse ~30 octets MESURÉS, pas les ~90 supposés). Éviction
+  par dernière LECTURE, pas par première rencontre : `Map.set` sur une clé déjà
+  présente ne la déplace pas en queue, d'où le `delete` avant le `set` dans
+  `addSeenNews`.
+  **« Vu » veut dire QUITTÉ, pas affiché** (`pendingSeenItem` / `onCardChange`) :
+  une carte n'est marquée qu'en la quittant, sinon ouvrir l'app puis la refermer
+  aussitôt, sans avoir lu le titre, suffisait à la marquer lue. Mais on ne quitte
+  pas toujours une carte en SWIPANT — **on quitte aussi l'app dessus**, et cette
+  carte-là n'était alors jamais marquée : chaque session laissait un article
+  « jamais vu » derrière elle, précisément celui sur lequel on s'était arrêté,
+  qui revenait en tête au lancement suivant (mesuré : 4 mémorisés sur 5 lus, le
+  manquant toujours le dernier). D'où `flushPendingSeen()`, appelé par
+  `persistAll()` — donc sur `visibilitychange`/`pagehide`, et AVANT les deux
+  écritures, le marquage devant atteindre le disque et pas seulement la mémoire.
+  Le seuil de séjour (`SEEN_DWELL_MS`, 4 s) est ce qui garde la protection
+  d'origine : une carte à peine effleurée ne compte toujours pas. Scénario
+  `quitte`, qui vérifie les DEUX moitiés.
+  Corollaire de robustesse : `persistSeen`/`persistSeenNews` ne baissent leur
+  drapeau `dirty` qu'une fois l'écriture RÉUSSIE. Le baisser avant l'appel
+  faisait perdre définitivement le lot en attente dès que `setItem` levait
+  (quota saturé) — le filet de `persistAll` trouvait un drapeau propre et
+  n'écrivait rien.
 - **« Vu » ne veut pas dire la même chose pour une VIDÉO.** Une carte d'article
   porte le titre, le résumé et l'image : l'avoir eue sous les yeux, c'est en
   avoir tiré ce qu'il y avait à en tirer. Une carte vidéo ne montre qu'une
@@ -1221,7 +1250,7 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 
 `npm test` ne voit que `src/` et `api/` : **tout le JS en ligne d'`index.html`
 — le fil, l'état, le stockage local — n'est couvert par aucun test**. Ce banc
-comble le trou en jouant 32 scénarios réels dans Chromium, réseau entièrement
+comble le trou en jouant 35 scénarios réels dans Chromium, réseau entièrement
 simulé (rien ne part vers une vraie source) : hors-ligne, réseau lent, coupure en
 cours de requête, API en 500, RSS vide/tronqué/HTML, contenu démesuré, doublons,
 120 sources, stockage et cache abîmés, quota saturé, actions enchaînées, retour
@@ -1244,9 +1273,15 @@ avant l'échéance.
 la lente revient régulièrement ET la carte 1 reste l'actu la plus récente.
 Repères : 1 carte sur 120 (en position 94) avant le tour de rôle, 8 après.
 `redites` en est le pendant indispensable : il parcourt VRAIMENT les cartes
-(c'est l'affichage qui marque « vu ») puis compte ce qui revient après trois ↻.
-Repères : 1 article distinct d'une source lente sur quatre lectures sans la
-mémoire des actus, 4 avec — et zéro redite d'actu.
+(c'est le passage d'une carte à l'autre qui marque « vu ») puis compte ce qui
+revient après trois ↻. Repères : 1 article distinct d'une source lente sur
+quatre lectures sans la mémoire des actus, 4 avec — et zéro redite d'actu.
+`quitte` couvre l'autre façon de quitter une carte, celle que `redites` ne joue
+pas : quitter l'APP dessus. Il lit cinq cartes, envoie
+`visibilitychange`/`pagehide` en restant sur la cinquième, et vérifie les deux
+moitiés de la règle — restée 30 s sous les yeux elle est mémorisée (et écrite
+sur le disque), effleurée 200 ms elle ne l'est pas. Repère avant correctif :
+4 mémorisées sur 5 lues.
 
 `video` joue un flux Atom de chaîne YouTube (avec son `<media:group>`, et un
 `media:content` en pièce jointe vidéo qu'il ne faut pas prendre pour une image) et

@@ -1537,9 +1537,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=251"></script>
-<script src="src/learn-core.js?v=251"></script>
-<script src="src/i18n.js?v=251"></script>
+<script src="src/lib.js?v=252"></script>
+<script src="src/learn-core.js?v=252"></script>
+<script src="src/i18n.js?v=252"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1657,11 +1657,33 @@ const CONFIG = {
   // des articles à chaque relancement.
   CACHE_ITEMS: 140,
   SEEN_MAX: 2000,        // articles Wikipédia « déjà vus » mémorisés
-  /* Actus « déjà vues » mémorisées. Bien moins que les 2000 de Wikipédia, à
-     dessein : les actus défilent beaucoup plus vite, et une actu sort de son
-     flux RSS au bout de quelques jours — la mémoriser plus longtemps ne sert
-     plus à rien. 800 liens canoniques pèsent ~70 Ko, contre ~5 Mo de quota. */
-  SEEN_NEWS_MAX: 800,
+  /* Actus « déjà vues » mémorisées. Ce plafond doit couvrir au moins la
+     fenêtre de NEWS_SEEN_COOLDOWN_MS ci-dessous : une entrée évincée avant la
+     fin de son propre délai de garde redevient « jamais vue », donc remonte en
+     tête de la file de sa source (tri « non lu d'abord », voir rebuild) et
+     revient se poser en haut du fil — le symptôme exact que cette mémoire
+     existe pour supprimer.
+     800 ne le couvrait pas. Deux choses le consomment plus vite que prévu :
+     le réglage « Articles par carte » marque les N articles d'une carte à
+     parts égales d'un seul swipe (markVisibleSeen), soit ~2,5× plus d'entrées
+     par geste à N=5 (mesuré) ; et une lecture soutenue dépasse couramment la
+     centaine de cartes par jour. Le plafond était donc atteint en quelques
+     jours, bien avant les sept de la garde.
+     Le coût invoqué pour le garder bas était surestimé : une entrée pèse
+     ~30 octets (mesuré, format [lien canonique, date]), pas ~90 — 3000
+     entrées tiennent dans ~90 Ko sur un quota d'environ 5 Mo, et couvrent
+     largement dix jours de lecture soutenue. */
+  SEEN_NEWS_MAX: 3000,
+  /* Temps de présence à l'écran au-delà duquel la carte QUITTÉE avec l'app
+     (arrière-plan, fermeture) compte comme lue — voir flushPendingSeen.
+     Une carte n'est marquée qu'au swipe (voir pendingSeenItem), donc celle
+     sur laquelle on referme l'app ne l'était JAMAIS : à chaque session, le
+     dernier article lu — souvent celui sur lequel on s'est le plus attardé —
+     restait « jamais vu » et revenait en tête au lancement suivant.
+     Un seuil plutôt qu'un marquage inconditionnel : ouvrir puis refermer
+     aussitôt, sans même avoir lu le titre, ne doit toujours rien marquer —
+     c'est la raison d'être de la règle du swipe. */
+  SEEN_DWELL_MS: 4000,
   /* Une actu (article ou vidéo) déjà vue reste écartée du tour de rôle pendant
      ce délai, même si sa file n'a rien d'autre à offrir — voir rebuild().
      Sans lui, une source pauvre (chaîne YouTube à un seul Short, flux qui ne
@@ -2135,8 +2157,15 @@ async function fetchWithTimeout(url,opts={},ms=7000){
 const LS_SEEN="fluxswipe.seen.v1";
 let seen=(()=>{try{const a=JSON.parse(localStorage.getItem(LS_SEEN)||"[]");return new Set(Array.isArray(a)?a:[]);}catch(e){return new Set();}})();
 let seenDirty=false,seenPersistT;
-function persistSeen(){if(!seenDirty)return;seenDirty=false;
-  try{localStorage.setItem(LS_SEEN,JSON.stringify([...seen]));}catch(e){warn("save seen",e);}}
+/* `seenDirty` ne retombe qu'une fois l'écriture RÉUSSIE. Le remettre à faux
+   avant l'appel faisait perdre définitivement le lot en attente dès que
+   `setItem` levait (quota saturé) : le filet de `persistAll` sur pagehide
+   trouvait un drapeau propre et n'écrivait rien de plus. Le garder vrai fait
+   simplement retenter à la prochaine occasion, laquelle peut réussir — le
+   quota se libère (éviction du cache de fils, voir CACHE_KEYS_MAX). */
+function persistSeen(){if(!seenDirty)return;
+  try{localStorage.setItem(LS_SEEN,JSON.stringify([...seen]));seenDirty=false;}
+  catch(e){warn("save seen",e);}}
 function addSeen(it){
   const k=seenKey(it);
   if(!it.title||seen.has(k))return;
@@ -2185,8 +2214,10 @@ let seenNews=(()=>{try{const a=JSON.parse(localStorage.getItem(LS_SEEN_NEWS)||"[
       .filter(([k,t])=>typeof k==="string"&&typeof t==="number"));
   }catch(e){return new Map();}})();
 let seenNewsDirty=false,seenNewsPersistT;
-function persistSeenNews(){if(!seenNewsDirty)return;seenNewsDirty=false;
-  try{localStorage.setItem(LS_SEEN_NEWS,JSON.stringify([...seenNews]));}catch(e){warn("save seen news",e);}}
+// Même règle que persistSeen ci-dessus : le drapeau ne retombe qu'à l'écriture réussie.
+function persistSeenNews(){if(!seenNewsDirty)return;
+  try{localStorage.setItem(LS_SEEN_NEWS,JSON.stringify([...seenNews]));seenNewsDirty=false;}
+  catch(e){warn("save seen news",e);}}
 function newsKey(it){return it&&it.link?canonicalLink(it.link):"";}
 function newsSeen(it){const k=newsKey(it);return !!k&&seenNews.has(k);}
 /* Date (ms epoch) de dernière lecture, ou undefined si jamais vue. */
@@ -2194,12 +2225,19 @@ function newsSeenAt(it){const k=newsKey(it);return k?seenNews.get(k):undefined;}
 function addSeenNews(it){
   const k=newsKey(it);
   if(!k)return;
-  const neuf=!seenNews.has(k);
   // Rejouer une vidéo (ou rouvrir un article depuis « Articles en mémoire »)
   // repousse le cooldown à partir de CETTE lecture, pas de la première.
+  // Le `delete` avant le `set` n'est pas cosmétique : `Map.set` sur une clé
+  // DÉJÀ présente ne la déplace pas en queue, donc l'ordre d'itération restait
+  // celui de la PREMIÈRE rencontre — et l'éviction ci-dessous sacrifiait alors
+  // un article relu ce matin avant un article croisé une seule fois hier. On
+  // évince la moins récemment LUE, ce que la date stockée dit déjà.
+  seenNews.delete(k);
   seenNews.set(k,Date.now());seenNewsDirty=true;
-  if(neuf&&seenNews.size>CONFIG.SEEN_NEWS_MAX){
-    const plusAncienne=seenNews.keys().next().value;   // ordre d'insertion Map = ordre d'ajout
+  // La taille ne dépasse le plafond que sur une clé neuve (le couple
+  // delete/set ci-dessus la laisse inchangée pour une relecture).
+  if(seenNews.size>CONFIG.SEEN_NEWS_MAX){
+    const plusAncienne=seenNews.keys().next().value;   // ordre d'itération Map = ordre de dernière lecture
     seenNews.delete(plusAncienne);
   }
   clearTimeout(seenNewsPersistT);seenNewsPersistT=setTimeout(persistSeenNews,800);
@@ -2471,6 +2509,14 @@ let pendingSeenItem=null;
 // c'est une carte à parts égales (cardGroups) et doive marquer tout le
 // groupe plutôt qu'un seul membre arbitraire — voir markVisibleSeen.
 let pendingSeenCardId=null;
+/* Instant d'arrivée sur cette carte. Sert au seul cas que la règle du swipe
+   ne couvre pas : on ne quitte pas toujours une carte en swipant, on quitte
+   aussi l'app dessus — et cette carte-là n'était JAMAIS marquée. Une session
+   laissait donc systématiquement un article « jamais vu » derrière elle,
+   précisément celui sur lequel on s'était arrêté ; il remontait en tête de la
+   file de sa source au lancement suivant (tri « non lu d'abord », rebuild) et
+   se reposait en haut du fil. Voir flushPendingSeen. */
+let pendingSeenAt=Date.now();
 /* `userScroll` : distingue un VRAI défilement (onScrollFrame, le seul appelant
    qui le passe à `true`) d'un simple recalage de suivi — cette fonction est
    aussi appelée après un rendu (nouveau lot, dose changée, retour depuis
@@ -2493,7 +2539,7 @@ function onCardChange(userScroll){
   if(!samePending){
     if(pendingSeenItem&&userScroll)bumpCardScroll();   // VRAI swipe seulement : une de plus au compteur
     markVisibleSeen(pendingSeenItem,pendingSeenCardId);   // on quitte cette carte : c'est CE geste qui la marque vue
-    pendingSeenItem=it;pendingSeenCardId=cardId;
+    pendingSeenItem=it;pendingSeenCardId=cardId;pendingSeenAt=Date.now();
   }
   rememberPos(it);
   updateRail(it);
@@ -2522,7 +2568,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="251";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="252";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2533,6 +2579,8 @@ const APP_VERSION="251";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:252,date:"2026-08-30",items:[
+    "changelog.v252.item1"]},
   {v:239,date:"2026-08-30",items:[
     "changelog.v239.item1"]},
   {v:238,date:"2026-08-30",items:[
@@ -3015,8 +3063,25 @@ function dbg(msg){
   el.textContent=msg;
 }
 
+/* Deuxième façon de quitter une carte : quitter l'app dessus. `markVisibleSeen`
+   n'est appelé qu'au CHANGEMENT de carte (voir onCardChange/pendingSeenItem),
+   donc la carte affichée au moment où l'app passe en arrière-plan n'était
+   jamais marquée — à chaque session, un article restait « jamais vu » et
+   revenait en tête au lancement suivant. Mesuré : 4 articles mémorisés sur 5
+   réellement lus, le manquant étant toujours le dernier.
+   Le seuil de séjour (SEEN_DWELL_MS) garde ce que la règle du swipe protégeait
+   au départ : ouvrir puis refermer aussitôt, sans avoir lu le titre, ne marque
+   toujours rien. Au-delà, la carte a été regardée assez longtemps pour que la
+   reproposer en tête n'apprenne plus rien.
+   Appelé depuis persistAll, donc AVANT les deux écritures qui suivent : le
+   marquage doit être sur le disque quand l'app s'arrête, pas seulement en
+   mémoire (addSeen/addSeenNews ne font que différer l'écriture de 800 ms). */
+function flushPendingSeen(){
+  if(!pendingSeenItem||Date.now()-pendingSeenAt<CONFIG.SEEN_DWELL_MS)return;
+  markVisibleSeen(pendingSeenItem,pendingSeenCardId);
+}
 // Persiste sans attendre le debounce quand l'app passe en arrière-plan / se ferme
-function persistAll(){persistSeen();persistSeenNews();persistPos();}
+function persistAll(){flushPendingSeen();persistSeen();persistSeenNews();persistPos();}
 window.addEventListener("pagehide",persistAll);
 /* Point de passage UNIQUE des trois déclencheurs automatiques de fraîcheur :
    retour au premier plan, filet périodique, et onResume() natif. Le seuil
