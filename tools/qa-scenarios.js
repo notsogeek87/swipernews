@@ -24,6 +24,16 @@ const RSS_OK = `<?xml version="1.0"?><rss version="2.0"><channel><title>T</title
 ${Array.from({ length: 12 }, (_, i) => `<item><title>Actu ${i}</title><link>https://ex.test/a${i}</link><description>Resume ${i} un peu de texte</description><pubDate>${new Date(Date.now() - i * 3600e3).toUTCString()}</pubDate></item>`).join("\n")}
 </channel></rss>`;
 
+/* Flux aux articles BIEN À ELLE, pour la source ajoutée en cours de route par
+   `dirty`. Le fourre-tout de boot() sert RSS_OK à toutes les sources : leurs
+   articles portent alors les mêmes liens, dedupNews (par lien canonique) n'en
+   garde qu'un exemplaire, sous le nom de la première source servie — et la
+   question « la source ajoutée est-elle dans le fil ? » répondait toujours
+   non, sans rien dire de l'app. */
+const RSS_NEUF = `<?xml version="1.0"?><rss version="2.0"><channel><title>Neuf</title>
+${Array.from({ length: 6 }, (_, i) => `<item><title>Neuf ${i}</title><link>https://neuf.test/n${i}</link><description>Article ${i} de la source ajoutee</description><pubDate>${new Date(Date.now() - i * 600e3).toUTCString()}</pubDate></item>`).join("\n")}
+</channel></rss>`;
+
 const WIKI_OK = JSON.stringify({
   query: {
     pages: Array.from({ length: 20 }, (_, i) => ({
@@ -163,9 +173,15 @@ const scenarios = {
     const { browser, page, errors } = await boot();
     await page.goto(URL_APP);
     await page.waitForTimeout(1500);
-    const sheetOpen = await page.$eval("#sheet", (e) => e.classList.contains("open"));
+    /* Le 1er lancement ouvre welcomeSheet, pas le panneau de réglages : les
+       deux ont été séparés (voir openWelcome/startWelcome), et l'accueil a son
+       propre bouton de validation. Viser #sheet/#applySettings testait donc un
+       panneau resté fermé — d'où « element is not visible ». */
+    const sheetOpen = await page.$eval("#welcomeSheet", (e) =>
+      e.classList.contains("open")
+    );
     console.log("panneau d'accueil ouvert :", sheetOpen);
-    await page.click("#applySettings");
+    await page.click("#welcomeStart");
     await page.waitForTimeout(2500);
     console.log("cartes :", await page.$$eval("#feed .card", (e) => e.length));
     console.log("erreurs :", errors);
@@ -296,8 +312,24 @@ const scenarios = {
     await page.goto(URL_APP);
     await page.waitForTimeout(2500);
     const avant = await page.$$eval("#feed .card", (e) => e.length);
+    // Les réglages sont passés dans le tiroir menuSheet, comme « Articles en
+    // mémoire » (voir memoire) : #openSheet existe toujours, mais dans un
+    // tiroir fermé. On ouvre le menu d'abord, comme l'utilisateur.
+    await page.evaluate(() => showTop());
+    await page.click("#menuBtn");
+    await page.waitForTimeout(300);
     await page.click("#openSheet");
     await page.waitForTimeout(300);
+    // Ses propres articles (voir RSS_NEUF) : sans ça, dedupNews les confond
+    // avec ceux des autres sources du banc et la source ajoutée reste
+    // invisible quoi qu'il arrive. La route posée en dernier a priorité.
+    await page.route(/neuf\.test/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/xml",
+        body: RSS_NEUF,
+      })
+    );
     // On ajoute une source (comme un tap sur une suggestion)
     await page.evaluate(() => {
       feeds.push({ name: "Neuf", url: "https://neuf.test/rss", on: true });
@@ -314,7 +346,7 @@ const scenarios = {
     // Validation : recharge-t-elle vraiment ?
     const seqAvant = await page.evaluate(() => loadSeq);
     await page.click("#applySettings");
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(4000); // le rechargement doit ABOUTIR, pas juste partir
     const seqApres = await page.evaluate(() => loadSeq);
     console.log(
       "loadSeq avant/après validation :",
@@ -523,9 +555,22 @@ const scenarios = {
     await page.goto(URL_APP);
     await page.waitForTimeout(2500);
     const urlAvant = page.url();
+    /* Les réglages sont passés dans le tiroir menuSheet (voir memoire/dirty).
+       Passer par le menu n'est pas qu'un détour de banc : c'est justement le
+       chemin que replaceDialog existe pour traiter — le panneau REPREND
+       l'entrée d'historique déjà posée par le menu au lieu d'en empiler une
+       seconde. Ce que ce scénario mesure reste donc exactement le même : une
+       entrée posée, une seule, consommée par le retour. */
+    const ouvrirReglages = async () => {
+      await page.evaluate(() => showTop());
+      await page.waitForTimeout(200);
+      await page.click("#menuBtn");
+      await page.waitForTimeout(300);
+      await page.click("#openSheet");
+      await page.waitForTimeout(300);
+    };
     // Panneau de réglages
-    await page.click("#openSheet");
-    await page.waitForTimeout(300);
+    await ouvrirReglages();
     console.log(
       "panneau ouvert :",
       await page.$eval("#sheet", (e) => e.classList.contains("open"))
@@ -541,8 +586,7 @@ const scenarios = {
       (await page.$$eval("#feed .card", (e) => e.length)) > 0
     );
     // Fermeture normale : l'entrée d'historique doit être consommée
-    await page.click("#openSheet");
-    await page.waitForTimeout(200);
+    await ouvrirReglages();
     await page.click("#applySettings");
     await page.waitForTimeout(1500);
     console.log(
