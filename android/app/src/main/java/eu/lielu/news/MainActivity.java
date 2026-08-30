@@ -41,13 +41,20 @@ public class MainActivity extends BridgeActivity {
      * visible (ni marque, ni filtres, ni bouton menu), comme si elle n'avait
      * jamais existé — constaté par un utilisateur.
      *
-     * <p>reprendreBarre() plutôt que showTop() tout court : elle remet en plus
-     * le compte à rebours en attente d'un premier geste, sans quoi la barre
-     * repartait 3 s après la reprise, pendant que l'utilisateur se repère
-     * encore (« j'ouvre, la barre se ferme directement »). Repli sur showTop()
-     * si la WebView sert encore une version antérieure d'index.html : le natif
-     * et le web se mettent à jour séparément (APK vs Vercel), et un APK neuf
-     * ne doit pas perdre le rappel de barre sur un index.html plus ancien.
+     * <p>onRetourPremierPlan() plutôt que refreshIfStale() seul : cette
+     * Activity garde son processus VIVANT au retour (moveTaskToBack, voir plus
+     * bas), donc rouvrir l'app ne recharge PAS index.html, et tout ce qui ne
+     * se joue qu'au chargement de la page n'y est jamais rejoué. Ce point
+     * d'entrée refait les trois choses qui doivent l'être à chaque ouverture
+     * réelle : compter l'ouverture, rappeler la barre du haut avec son compte
+     * à rebours remis en attente d'un geste, et réévaluer le rappel de
+     * notifications (qu'un simple tap à côté faisait sinon disparaître pour
+     * toujours). Voir son commentaire côté web pour le détail.
+     *
+     * <p>Les deux replis (reprendreBarre, puis showTop) servent si la WebView
+     * sert encore une version antérieure d'index.html : le natif et le web se
+     * mettent à jour séparément (APK vs Vercel), et un APK neuf ne doit pas
+     * perdre le rappel de barre sur un index.html plus ancien.
      *
      * <p>try/catch côté JS : le tout premier onResume() peut survenir avant
      * que la WebView n'ait fini de charger index.html, où refreshIfStale et
@@ -57,6 +64,7 @@ public class MainActivity extends BridgeActivity {
      */
     private static final String RESUME_JS =
         "(function(){try{"
+            + "if(typeof onRetourPremierPlan===\"function\"){onRetourPremierPlan();return;}"
             + "if(typeof reprendreBarre===\"function\")reprendreBarre();"
             + "else if(typeof showTop===\"function\")showTop();"
             + "if(typeof refreshIfStale===\"function\")refreshIfStale();"

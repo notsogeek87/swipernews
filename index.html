@@ -1537,9 +1537,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=249"></script>
-<script src="src/learn-core.js?v=249"></script>
-<script src="src/i18n.js?v=249"></script>
+<script src="src/lib.js?v=250"></script>
+<script src="src/learn-core.js?v=250"></script>
+<script src="src/i18n.js?v=250"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2522,7 +2522,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="249";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="250";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2779,18 +2779,25 @@ let notifPref=(()=>{try{return localStorage.getItem(LS_NOTIF)==="on"?"on":"off";
 const LS_NOTIF_NUDGE="fluxswipe.notifnudge.answered.v1";
 function notifNudgeAnswered(){try{return localStorage.getItem(LS_NOTIF_NUDGE)==="1";}catch(e){return false;}}
 function markNotifNudgeAnswered(){try{localStorage.setItem(LS_NOTIF_NUDGE,"1");}catch(e){}}
-/* Compteur d'OUVERTURES de l'app (tous supports), unité du report « Plus
-   tard » ci-dessous — voir sa raison plus haut. Incrémenté une fois par
-   lancement, dès que possible : rien en dessous n'a besoin d'en savoir plus
-   que sa valeur courante. */
+/* Compteur d'OUVERTURES de l'app, unité du report « Plus tard » ci-dessous —
+   voir sa raison plus haut.
+   Compté à chaque RETOUR AU PREMIER PLAN, pas seulement au chargement de la
+   page : dans l'APK, le bouton retour appelle moveTaskToBack() et laisse le
+   processus VIVANT exprès (voir MainActivity), donc rouvrir l'app ne recharge
+   pas index.html. Un compteur incrémenté au seul chargement n'aurait alors
+   bougé qu'après une vraie mise à mort du processus — « 5 ouvertures »
+   n'arrivant en pratique jamais. */
 const LS_LAUNCH_COUNT="fluxswipe.launchcount.v1";
-let launchCount=(()=>{
+let launchCount=0;
+function bumpLaunchCount(){
   let n=0;
   try{n=parseInt(localStorage.getItem(LS_LAUNCH_COUNT),10)||0;}catch(e){}
   n+=1;
   try{localStorage.setItem(LS_LAUNCH_COUNT,String(n));}catch(e){}
+  launchCount=n;
   return n;
-})();
+}
+bumpLaunchCount();
 const LS_NOTIF_NUDGE_SNOOZE="fluxswipe.notifnudge.snoozeuntil.v1";
 /* « Quelques lancements » : ni assez court pour redevenir gênant au
    prochain, ni assez long pour donner l'impression d'avoir disparu. */
@@ -2802,6 +2809,30 @@ function notifNudgeSnoozed(){
 }
 function snoozeNotifNudge(){
   try{localStorage.setItem(LS_NOTIF_NUDGE_SNOOZE,String(launchCount+NOTIF_NUDGE_SNOOZE_LAUNCHES));}catch(e){}
+}
+/* Le rappel a-t-il lieu d'être MAINTENANT ? Décision unique, partagée par les
+   trois moments qui peuvent l'afficher (chargement de page via
+   openChangelogIfNew, retour au premier plan via onRetourPremierPlan, fin de
+   l'accueil via startWelcome) — elles ne peuvent donc pas diverger. */
+function notifNudgeDu(){
+  return isNativeApp&&notifPref==="off"&&!notifNudgeAnswered()&&!notifNudgeSnoozed();
+}
+/* Affiche le rappel autonome s'il est dû, en dehors de tout chargement de
+   page. INDISPENSABLE dans l'APK : le bouton retour y appelle
+   moveTaskToBack() et garde le processus vivant (voir MainActivity), donc
+   rouvrir l'app NE RECHARGE PAS index.html — openChangelogIfNew(), qui ne
+   tourne qu'au chargement, n'était alors jamais rejoué et le rappel ne
+   revenait JAMAIS, même après un simple tap à côté qui ne vaut pourtant pas
+   réponse. Symptôme vécu : « j'avais cliqué à côté, et je n'ai plus jamais eu
+   la demande ».
+   Ne recouvre jamais un panneau déjà ouvert (`.sheet.open`) : ni l'accueil du
+   1er lancement, qui enchaîne lui-même sur ce rappel (voir startWelcome), ni
+   un panneau que l'utilisateur venait de laisser ouvert en quittant l'app. */
+function maybeShowNotifNudge(){
+  if(!notifNudgeDu())return false;
+  if(document.querySelector(".sheet.open"))return false;
+  openDialog(notifNudgeSheet);
+  return true;
 }
 
 /* Filtre des articles sponsorisés ET bons plans dans le FLUX (pas les pubs de
@@ -3010,19 +3041,34 @@ function refreshIfStale(){
   if(newsLoadingSeq===loadSeq)return;   // un chargement d'actus est déjà en vol
   loadFeeds();
 }
-/* showTop() AVANT refreshIfStale(), aux deux points de reprise ci-dessous
-   (jamais dans refreshIfStale() elle-même, que le filet périodique de 60 s
-   appelle aussi SANS qu'on soit en train de revenir au premier plan — voir
-   plus bas : lui ne doit surtout pas rappeler la barre pendant une lecture en
-   cours). Sans ce showTop(), la minuterie de armerRetraitBarre() continue de
-   tourner en arrière-plan pendant que l'app est masquée — Android suspend
-   volontiers l'exécution JS d'une WebView non visible, donc son échéance de
-   3 s peut se retrouver largement dépassée au retour — et le premier
-   readonly qui s'exécute après la reprise la trouve déjà expirée : hideTop()
-   part alors immédiatement, avant que quiconque n'ait eu la moindre chance de
-   voir la barre. Résultat observé : l'app rouvre directement sur une carte
-   sans marque, ni filtres, ni bouton menu, comme si la barre n'avait jamais
-   existé. */
+/* RETOUR AU PREMIER PLAN : point de passage unique des trois signaux de
+   reprise (visibilitychange ci-dessous, @capacitor/app, et onResume() natif —
+   voir RESUME_JS dans MainActivity). Jamais appelé par le filet périodique de
+   60 s, qui tourne SANS qu'on revienne au premier plan et ne doit donc ni
+   rappeler la barre ni compter une ouverture pendant une lecture en cours.
+
+   Dans l'APK, c'est LE moment qui compte : le bouton retour y appelle
+   moveTaskToBack() et garde le processus vivant exprès (voir MainActivity),
+   donc rouvrir l'app ne recharge PAS index.html. Tout ce qui ne se joue qu'au
+   chargement de la page n'y est jamais rejoué — d'où les trois choses à
+   refaire ici :
+   - compter l'ouverture (bumpLaunchCount), unité du report « Plus tard » ;
+   - rappeler la barre du haut et remettre son compte à rebours en attente
+     d'un geste (reprendreBarre). Sans ça, sa minuterie — qui continue de
+     courir pendant que l'app est masquée, Android suspendant volontiers le JS
+     d'une WebView invisible — se retrouvait expirée au retour et la barre
+     s'effaçait avant que quiconque ait pu la voir ;
+   - réévaluer le rappel de notifications (maybeShowNotifNudge), sans quoi un
+     tap à côté — qui ne vaut pourtant pas réponse — le faisait disparaître
+     pour toujours.
+   `refreshIfStale()` en dernier : lui seul peut repeindre le fil, et les deux
+   précédents doivent avoir posé leur état avant. */
+function onRetourPremierPlan(){
+  bumpLaunchCount();
+  reprendreBarre();
+  maybeShowNotifNudge();
+  refreshIfStale();
+}
 document.addEventListener("visibilitychange",()=>{
   if(document.visibilityState==="hidden"){
     // Arrêt n°4 : l'app passe en arrière-plan. Une WebView laisse volontiers la
@@ -3031,7 +3077,7 @@ document.addEventListener("visibilitychange",()=>{
     stopVideo();
     persistAll();return;
   }
-  reprendreBarre();refreshIfStale();
+  onRetourPremierPlan();
 });
 /* App natif uniquement (@capacitor/app) : signal de reprise plus fiable que
    visibilitychange dans cette WebView, car adossé DIRECTEMENT à onResume() de
@@ -3043,7 +3089,7 @@ document.addEventListener("visibilitychange",()=>{
 if(isNativeApp){
   const CapApp=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
   if(CapApp&&CapApp.addListener){
-    CapApp.addListener("resume",()=>{reprendreBarre();refreshIfStale();});
+    CapApp.addListener("resume",onRetourPremierPlan);
     // Lien de partage d'une source (swipernews://…) : voir feedDeepLink /
     // handleDeepLink, et l'intent-filter dédié dans AndroidManifest.xml.
     // Le plugin relaie aussi bien un lancement à froid qu'un appui pendant
@@ -7473,22 +7519,23 @@ function openChangelogIfNew(){
      #notifNudgeSheet, jamais celle-ci en plus), qui n'a pas activé les
      notifs, et qui n'a pas encore RÉPONDU — peu importe si CE passage-ci a
      par ailleurs une nouveauté à montrer.
-     « Répondu » : markNotifNudgeAnswered() n'est plus appelé ICI (à
-     l'affichage), mais dans les deux boutons eux-mêmes (Activer / Plus tard,
-     voir plus bas) —
-     sans quoi un simple tap en dehors, ou le bouton retour, valait
-     acceptation silencieuse d'un « non » qu'on n'avait pas vraiment demandé,
-     et le rappel ne revenait plus JAMAIS. Comme cette fonction tourne à
-     CHAQUE lancement pour un utilisateur existant, ne rien marquer ici suffit
-     à le reproposer au prochain lancement tant qu'aucun des deux boutons n'a
-     été touché. */
-  const showNudge=last!==null&&isNativeApp&&notifPref==="off"&&!notifNudgeAnswered()&&!notifNudgeSnoozed();
+     « Répondu » : markNotifNudgeAnswered() n'est appelé que par les boutons
+     Activer et Non, jamais ici (à l'affichage) ni par Plus tard — sans quoi
+     un simple tap en dehors, ou le bouton retour, valait acceptation
+     silencieuse d'un « non » qu'on n'avait pas vraiment demandé, et le rappel
+     ne revenait plus JAMAIS.
+     Ne rien marquer ici ne suffit toutefois PAS à le reproposer : cette
+     fonction ne tourne qu'au CHARGEMENT de la page, et rouvrir l'APK n'en
+     déclenche aucun (moveTaskToBack garde le processus vivant, voir
+     MainActivity). C'est onRetourPremierPlan() qui s'en charge, via le même
+     maybeShowNotifNudge(). */
+  const showNudge=last!==null&&notifNudgeDu();
   if(!entries.length){
     markChangelogSeen();
     // Rien à annoncer dans le journal : le rappel, s'il est dû, prend alors
     // sa forme AUTONOME (#notifNudgeSheet) — celle du 1er lancement — plutôt
     // que de rester accolé à un changelogSheet qui, ici, ne s'ouvre pas.
-    if(showNudge)openDialog(notifNudgeSheet);
+    if(showNudge)maybeShowNotifNudge();
     return;
   }
   renderChangelog(entries);
@@ -7558,7 +7605,7 @@ function startWelcome(){
      est asynchrone : un openDialog immédiatement après se ferait défaire par
      son popstate encore en vol dès qu'il arrive (même piège que
      menuSheet→sheet, voir replaceDialog). */
-  if(isNativeApp&&notifPref==="off"&&!notifNudgeAnswered()&&!notifNudgeSnoozed()){
+  if(notifNudgeDu()){
     replaceDialog(welcomeSheet,notifNudgeSheet);
   }else{
     closeDialog(welcomeSheet);                  // ne relancera pas un 2e chargement
