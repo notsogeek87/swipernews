@@ -9,13 +9,13 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     /**
      * Relance la vérification de fraîcheur du fil (voir AUTO_RELOAD_MS dans
-     * index.html) directement depuis le cycle de vie natif de l'Activity —
-     * pas depuis un événement du plugin @capacitor/app ni depuis
-     * visibilitychange, tous deux relayés par la WebView et documentés côté
-     * web comme « parfois défaillants » selon l'OEM/la gestion batterie du
-     * téléphone. onResume() de l'Activity Android, lui, est garanti par le
-     * système à chaque retour au premier plan, backgrounded ou non — c'est
-     * le signal le plus fiable disponible.
+     * index.html) ET rappelle la barre du haut, directement depuis le cycle de
+     * vie natif de l'Activity — pas depuis un événement du plugin
+     * @capacitor/app ni depuis visibilitychange, tous deux relayés par la
+     * WebView et documentés côté web comme « parfois défaillants » selon
+     * l'OEM/la gestion batterie du téléphone. onResume() de l'Activity
+     * Android, lui, est garanti par le système à chaque retour au premier
+     * plan, backgrounded ou non — c'est le signal le plus fiable disponible.
      *
      * <p>On appelle refreshIfStale(), JAMAIS loadFeeds() directement : c'est le
      * point de passage unique des trois déclencheurs automatiques, et lui seul
@@ -31,12 +31,24 @@ public class MainActivity extends BridgeActivity {
      * lot — l'appeler à chaque retour au premier plan est donc sans effet la
      * plupart du temps.
      *
+     * <p>showTop() AVANT refreshIfStale() (voir son commentaire côté web,
+     * juste avant l'écouteur visibilitychange) : la minuterie qui efface la
+     * barre du haut au bout de 3 s (armerRetraitBarre) continue de compter en
+     * arrière-plan pendant que l'app est masquée, et Android suspend souvent
+     * l'exécution JS d'une WebView non visible — son échéance se retrouve
+     * donc largement dépassée au retour, et hideTop() part dans la foulée si
+     * rien ne la réarme. Sans cet appel, l'app rouvrait directement sur une
+     * carte SANS aucune barre visible (ni marque, ni filtres, ni bouton menu),
+     * comme si elle n'avait jamais existé — constaté par un utilisateur.
+     *
      * <p>try/catch côté JS : le tout premier onResume() peut survenir avant
-     * que la WebView n'ait fini de charger index.html, où refreshIfStale
-     * n'existe pas encore. La fonction vérifie elle-même feedLoadStarted.
+     * que la WebView n'ait fini de charger index.html, où refreshIfStale et
+     * showTop n'existent pas encore. La fonction vérifie elle-même
+     * feedLoadStarted ; showTop(), lui, est sans effet indésirable à répéter.
      */
     private static final String RESUME_JS =
         "(function(){try{"
+            + "if(typeof showTop===\"function\")showTop();"
             + "if(typeof refreshIfStale===\"function\")refreshIfStale();"
             + "}catch(e){}})();";
 

@@ -1517,9 +1517,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=242"></script>
-<script src="src/learn-core.js?v=242"></script>
-<script src="src/i18n.js?v=242"></script>
+<script src="src/lib.js?v=243"></script>
+<script src="src/learn-core.js?v=243"></script>
+<script src="src/i18n.js?v=243"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2482,7 +2482,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="242";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="243";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2923,6 +2923,19 @@ function refreshIfStale(){
   if(newsLoadingSeq===loadSeq)return;   // un chargement d'actus est déjà en vol
   loadFeeds();
 }
+/* showTop() AVANT refreshIfStale(), aux deux points de reprise ci-dessous
+   (jamais dans refreshIfStale() elle-même, que le filet périodique de 60 s
+   appelle aussi SANS qu'on soit en train de revenir au premier plan — voir
+   plus bas : lui ne doit surtout pas rappeler la barre pendant une lecture en
+   cours). Sans ce showTop(), la minuterie de armerRetraitBarre() continue de
+   tourner en arrière-plan pendant que l'app est masquée — Android suspend
+   volontiers l'exécution JS d'une WebView non visible, donc son échéance de
+   3 s peut se retrouver largement dépassée au retour — et le premier
+   readonly qui s'exécute après la reprise la trouve déjà expirée : hideTop()
+   part alors immédiatement, avant que quiconque n'ait eu la moindre chance de
+   voir la barre. Résultat observé : l'app rouvre directement sur une carte
+   sans marque, ni filtres, ni bouton menu, comme si la barre n'avait jamais
+   existé. */
 document.addEventListener("visibilitychange",()=>{
   if(document.visibilityState==="hidden"){
     // Arrêt n°4 : l'app passe en arrière-plan. Une WebView laisse volontiers la
@@ -2931,18 +2944,19 @@ document.addEventListener("visibilitychange",()=>{
     stopVideo();
     persistAll();return;
   }
-  refreshIfStale();
+  showTop();refreshIfStale();
 });
 /* App natif uniquement (@capacitor/app) : signal de reprise plus fiable que
    visibilitychange dans cette WebView, car adossé DIRECTEMENT à onResume() de
    l'Activity Android plutôt qu'à l'implémentation — parfois défaillante — de
    la Page Visibility API par le WebView. Redondant AVEC visibilitychange, pas
    à sa place : si les deux se déclenchent, loadFeeds() ignore le doublon via
-   loadSeq. Sur le web, window.Capacitor n'existe pas : ce bloc ne fait rien. */
+   loadSeq (et showTop() est sans effet à se répéter). Sur le web,
+   window.Capacitor n'existe pas : ce bloc ne fait rien. */
 if(isNativeApp){
   const CapApp=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
   if(CapApp&&CapApp.addListener){
-    CapApp.addListener("resume",refreshIfStale);
+    CapApp.addListener("resume",()=>{showTop();refreshIfStale();});
     // Lien de partage d'une source (swipernews://…) : voir feedDeepLink /
     // handleDeepLink, et l'intent-filter dédié dans AndroidManifest.xml.
     // Le plugin relaie aussi bien un lancement à froid qu'un appui pendant
