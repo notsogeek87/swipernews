@@ -601,8 +601,39 @@ genre de script dérape.
   frame plus tard : sans son compteur de génération, celui d'un rendu dépassé
   revient défaire la décision du rendu suivant (une repeinture progressive
   ancrée sur l'article lu annulait le `forceTop` du rendu final).
+- `cardsPerSwipe` / `groupItems` (`src/lib.js`, testée) / `cardItems()` /
+  `itemIndexOfCard()` / `cardIndexOfLink()` — le réglage « Articles par carte »
+  (1 à 5) et, surtout, **les DEUX granularités qu'il a séparées**.
+  `feedEl.children` compte des CARTES, `items` compte des ARTICLES : à
+  `cardsPerSwipe===1` (le défaut) les deux coïncident exactement, et
+  `currentIndex()` a donc longtemps servi d'index dans `items` un peu partout
+  sans que ce soit faux. Au-delà, une carte porte N articles et les deux
+  échelles divergent d'un facteur N — c'est le piège de cette fonctionnalité,
+  et il ne se voit PAS en lecture de code, chaque site pris isolément
+  paraissant correct. Tout ce qui raisonne en ARTICLES passe par
+  `itemIndexOfCard()`/`currentItemIndex()` (gel de `remix`, `survivingLink`,
+  `learnCardsAhead`, l'`idx` mémorisé par `rememberPos` et relu par
+  `resolveResume`, la ligne « en cours » d'`openHistory`) ; tout ce qui DÉFILE
+  passe par `cardIndexOfLink()`, jamais par une arithmétique d'index —
+  `scrollToCard` prend un index de CARTE, et un groupe peut « sauter »
+  par-dessus les vidéos qui le séparaient dans `items` (voir `groupItems`,
+  dont le prédicat `isSolo` sort les vidéos du regroupement : une vidéo se lit
+  SUR sa carte). Mesuré avant correctif, à N=3 : « Articles en mémoire »
+  atterrissait sur une tout autre carte (souvent hors du fil, donc sans rien
+  faire ni rien dire), et le gel de `remix(true)` ne couvrait que les deux
+  premiers articles du fil au lieu de la carte sous le doigt.
+  Corollaire de registre : `cardGroups` (id de carte -> groupe) suit `cardReg`
+  À LA TRACE, `snapshotFeed`/`restoreFeed` compris — `restoreFeed` écrase le
+  DOM sans passer par la boucle de retrait de `render()` ET rembobine
+  `cardSeq`, donc une entrée oubliée porte un id que `cardSeq` va
+  redistribuer, et une carte héros neuve hérite du groupe fantôme d'un fil
+  quitté. L'instantané mémorise aussi `cards:cardsPerSwipe`, pour la même
+  raison que `mix` : le HTML retenu porte le regroupement d'alors.
 - `feedKey()` — identité du fil : LANG, les deux filtres (source d'actu, thème
   Wikipédia). Cache local, `feedSnap` et test « même fil » en dépendent.
+  **`cardsPerSwipe` n'en fait PAS partie** : il ne change rien à ce qui est
+  chargé, seulement au découpage en cartes (comme la dose), d'où un simple
+  `render()` et aucun appel réseau.
 - `feedSnap` — état du fil mémorisé par filtre ; revenir à un filtre déjà vu ne
   recharge rien.
 - `LANG` / `T()` / `src/i18n.js` — la couche de traduction de l'interface.

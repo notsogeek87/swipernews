@@ -1452,9 +1452,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=235"></script>
-<script src="src/learn-core.js?v=235"></script>
-<script src="src/i18n.js?v=232"></script>
+<script src="src/lib.js?v=236"></script>
+<script src="src/learn-core.js?v=236"></script>
+<script src="src/i18n.js?v=236"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1854,8 +1854,22 @@ function mixLists(news,learn,m){
    `adoptItems()` (changement de filtre/langue, restauration d'un instantané —
    une IDENTITÉ DE FIL DIFFÉRENTE) doit garder le défaut `false` : figer des
    cartes de l'ANCIEN fil les ferait apparaître au début du nouveau. */
+/* Ce que le gel protège : la carte SOUS LE DOIGT et la suivante (son aperçu,
+   visible en bas d'écran en scroll-snap). Lu sur le DOM plutôt que par une
+   tranche de `items` : depuis « Articles par carte », une carte porte N
+   articles, et `items.slice(0,currentIndex()+2)` ne couvrait plus que les
+   deux premiers ARTICLES du fil — donc plus du tout la carte lue dès qu'on
+   avait descendu un peu, exactement l'inverse de ce que le gel existe pour
+   faire. À cardsPerSwipe===1 le résultat est identique à l'ancienne tranche,
+   carte et article étant alors la même chose. */
+function figeSousLeDoigt(){
+  const fin=Math.min(feedEl.children.length,Math.max(0,currentIndex())+2);
+  const out=[];
+  for(let k=0;k<fin;k++)out.push(...cardItems(feedEl.children[k]));
+  return out;
+}
 function remix(geleAvant){
-  let fige=geleAvant?items.slice(0,Math.min(Math.max(0,currentIndex())+2,items.length)):[];
+  let fige=geleAvant?figeSousLeDoigt():[];
   // Le gel ne protège JAMAIS un article dont on vient de confirmer qu'il est
   // sponsorisé (voir sponsorOut) : c'est précisément une carte proche de
   // l'écran, donc dans cette fenêtre, et la figer la garderait à jamais.
@@ -2288,7 +2302,10 @@ function rememberPos(it=currentItem()){
   // N derniers articles, donc au retour le lien exact a souvent disparu. Sans
   // repli, la reprise échouait silencieusement et l'utilisateur retombait en
   // haut — exactement comme si rien n'était mémorisé.
-  posMap[POS_KEY]={link:it.link,date:it.date||"",idx:currentIndex()};
+  // `idx` est relu par resolveResume comme un index dans `items` (dernier
+  // repli, quand le lien ET la date ont disparu) : on mémorise donc bien un
+  // index d'ARTICLE, pas l'index de la carte qui le porte.
+  posMap[POS_KEY]={link:it.link,date:it.date||"",idx:currentItemIndex()};
   persistPos();
   if(DEBUG){const relu=(JSON.parse(localStorage.getItem(LS_POS)||"{}")[POS_KEY])||{};
     dbg(`v${APP_VERSION}  idx=${currentIndex()}\n`+
@@ -2400,7 +2417,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="235";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="236";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4349,6 +4366,48 @@ function itemAt(i){
 }
 /* Article actuellement à l'écran (sert au rail de partage et à l'ancrage). */
 function currentItem(){return itemAt(currentIndex());}
+/* ---------- Les DEUX granularités du fil ----------
+   Le réglage « Articles par carte » (cardsPerSwipe) les a séparées :
+   `feedEl.children` compte des CARTES, `items` compte des ARTICLES. À
+   cardsPerSwipe===1 (défaut) les deux coïncident exactement — c'est pourquoi
+   currentIndex() a longtemps pu servir d'index dans `items` un peu partout —
+   mais au-delà une carte porte N articles et les deux échelles divergent d'un
+   facteur N. Tout ce qui raisonne en ARTICLES (gel de remix, reprise, réserve
+   Wikipédia d'avance, « Articles en mémoire ») passe donc par cardItems()/
+   itemIndexOfCard(), et tout ce qui DÉFILE (scrollToCard, qui prend un index
+   de carte) par cardIndexOfLink(). Aucune de ces trois fonctions ne change
+   quoi que ce soit au comportement à cardsPerSwipe===1. */
+/* Les articles portés par une carte : son groupe entier si c'est une carte à
+   parts égales, sinon l'unique article d'une carte héros. */
+function cardItems(el){
+  const id=el?+el.dataset.id:NaN;
+  if(!el||isNaN(id))return [];
+  const g=cardGroups.get(id);
+  if(g)return g;
+  const it=cardReg.get(id);
+  return it?[it]:[];
+}
+/* Index dans `items` du PREMIER article de la carte d'index `i` (-1 : aucun).
+   Prend l'index de carte en argument plutôt que de relire la géométrie : les
+   appelants l'ont déjà, et currentIndex() force un calcul de mise en page. */
+function itemIndexOfCard(i){
+  const g=cardItems(i>=0?feedEl.children[i]:null);
+  if(!g.length)return -1;
+  const j=items.indexOf(g[0]);
+  return j>=0?j:items.findIndex(x=>x.link&&x.link===g[0].link);
+}
+function currentItemIndex(){return itemIndexOfCard(currentIndex());}
+/* Index de CARTE portant l'article de lien `link` (-1 : plus dans le fil).
+   Recherche sur le DOM, jamais une arithmétique sur l'index dans `items` : un
+   groupe peut sauter par-dessus les vidéos qui le séparaient à l'origine
+   (voir groupItems), sa position ne se déduit donc d'aucune division. */
+function cardIndexOfLink(link){
+  if(!link)return -1;
+  const kids=feedEl.children;
+  for(let k=0;k<kids.length;k++)
+    if(cardItems(kids[k]).some(x=>x.link===link))return k;
+  return -1;
+}
 /* Lien de la carte visible, pour réancrer le fil après une mutation.
    Vide si on est encore en haut : dans ce cas c'est la reprise de session qui
    décide de la position, pas l'ancrage. */
@@ -4869,7 +4928,14 @@ function parseCardEl(html){
    contenu de `fresh` : seul chemin où la FORME de la carte change (héros <->
    parts égales), donc rien à préserver de son ancien contenu. */
 function swapCardContent(el,fresh){
-  if(el===playingCard)stopVideo();
+  /* L'ancien contenu est jeté ici, SANS passer par la boucle de retrait de
+     render() : ses .card__bg/.card__noimg resteraient des cibles vivantes de
+     leurs IntersectionObserver, qui retiennent FORTEMENT ce qu'ils observent —
+     la fuite exacte que unobserveCard existe pour éviter (voir son
+     commentaire). Il couvre au passage l'arrêt de la vidéo si cette carte
+     jouait. Les nœuds neufs sont réobservés par les observe*() de fin de
+     render(), qui balaient le fil entier. */
+  unobserveCard(el);
   for(const a of [...el.attributes])if(!fresh.hasAttribute(a.name))el.removeAttribute(a.name);
   for(const a of fresh.attributes)el.setAttribute(a.name,a.value);
   el.innerHTML=fresh.innerHTML;
@@ -5692,7 +5758,7 @@ function onScrollFrame(){
   // les écritures de style d'updateRail().
   if(loadingMore||!items.length)return;
   const nearEnd=top+h*3>=feedEl.scrollHeight;
-  const lowOnLearn=learnMoreVide<LEARN_MORE_VIDE_MAX&&!!mixLevel().learn&&learnCardsAhead(idx)<10;
+  const lowOnLearn=learnMoreVide<LEARN_MORE_VIDE_MAX&&!!mixLevel().learn&&learnCardsAhead(itemIndexOfCard(idx))<10;
   if(nearEnd||lowOnLearn)loadMore();
 }
 feedEl.addEventListener("scroll",()=>{
@@ -6099,7 +6165,14 @@ function snapshotFeed(){
   if(!feedEl.children.length)return;               // rien à mémoriser
   feedSnap[feedKey()]={
     html:feedEl.innerHTML,scrollTop:feedEl.scrollTop,
-    items:items.slice(),reg:new Map(cardReg),seq:cardSeq,mix:mixScore,n:++snapSeq
+    // `groups` accompagne `reg` pour la MÊME raison : le HTML mémorisé porte
+    // des data-id, et les deux registres disent ce qu'ils désignent. Sans lui,
+    // un fil restauré perdait la trace de ses cartes à parts égales (rail
+    // réaffiché à tort, marquage « vu » réduit à un seul membre du groupe).
+    // `cards` joue pour la granularité le rôle que `mix` joue pour la dose :
+    // voir restoreFeed.
+    items:items.slice(),reg:new Map(cardReg),groups:new Map(cardGroups),
+    seq:cardSeq,mix:mixScore,cards:cardsPerSwipe,n:++snapSeq
   };
   const keys=Object.keys(feedSnap);
   if(keys.length>SNAP_MAX){
@@ -6113,6 +6186,16 @@ function restoreFeed(){
   adoptItems(s.items);                              // sépare le fil mêlé en ses deux réserves
   feedEl.innerHTML=s.html;
   cardReg.clear();s.reg.forEach((v,k)=>cardReg.set(k,v));
+  /* cardGroups suit cardReg à la trace, et pour une raison qui va au-delà de
+     l'affichage : `feedEl.innerHTML=…` ci-dessus jette les cartes de l'autre
+     fil SANS passer par la boucle de retrait de render(), la seule qui purge
+     ces deux registres — et `cardSeq` est rembobiné juste en dessous. Les
+     entrées laissées derrière portaient donc des id que cardSeq allait
+     redistribuer : une carte héros neuve héritait alors du groupe fantôme
+     d'un fil quitté (rail masqué sans raison, marquage « vu » sur des
+     articles jamais affichés). Mesuré : 10 entrées orphelines, toutes
+     réattribuables, après un simple aller-retour entre deux filtres. */
+  cardGroups.clear();if(s.groups)s.groups.forEach((v,k)=>cardGroups.set(k,v));
   cardSeq=s.seq;
   demobadge(false);hideStates();feedKeyShown=feedKey();
   document.getElementById("hint").classList.toggle("hidden",items.length===0);
@@ -6121,7 +6204,11 @@ function restoreFeed(){
   // au fil recomposé. render() réconcilie par lien et garde la position — deux
   // mélanges peuvent avoir la même LONGUEUR sans avoir le même ordre, d'où la
   // comparaison de la dose plutôt que du nombre de cartes.
-  if(s.mix!==mixScore)render();
+  // Même raisonnement pour « Articles par carte » : le HTML mémorisé porte le
+  // regroupement d'alors, et le réglage a pu changer entre-temps — sans ce
+  // test, revenir sur un filtre resservait l'ancien groupement (des cartes à
+  // parts égales alors que cardsPerSwipe est repassé à 1, et l'inverse).
+  if(s.mix!==mixScore||s.cards!==cardsPerSwipe)render();
   /* La carte « chargement d'autres articles » fait partie du HTML mémorisé si
      l'instantané a été pris pendant un loadMore. Restaurée telle quelle, elle
      restait en queue de fil À JAMAIS quand aucun render() ne suivait (dose
@@ -6143,7 +6230,10 @@ function restoreFeed(){
    — même endroit du fil, à une carte près. Sans ça, retirer Wikipédia depuis un
    article Wikipédia renvoyait tout en haut. */
 function survivingLink(m){
-  for(let i=Math.max(0,currentIndex());i<items.length;i++){
+  // Départ à l'ARTICLE courant (voir itemIndexOfCard) : partir de l'index de
+  // CARTE renvoyait, à cardsPerSwipe>1, un article déjà passé — changer la
+  // dose faisait alors reculer le fil au lieu de le garder sur place.
+  for(let i=Math.max(0,currentItemIndex());i<items.length;i++){
     const it=items[i];
     if(it.kind==="learn"?m.learn:m.news)return it.link||"";
   }
@@ -6210,9 +6300,15 @@ function histRowHTML(it,etat){
 /* Vue TOUJOURS complète, cochée ou non : voir le commentaire de `hideSeen`
    plus haut — la case ne joue que sur le fil, jamais ici. */
 function renderHistList(){
-  const cur=currentIndex();
+  // « En cours » et « déjà passé » se mesurent en ARTICLES, jamais en cartes :
+  // à cardsPerSwipe>1 une carte en porte plusieurs, et TOUS sont également à
+  // l'écran — d'où un ensemble de liens plutôt qu'un index unique. Comparer
+  // l'index de rangée à currentIndex() (un index de CARTE) marquait une
+  // rangée arbitraire, N fois trop haut dans la liste.
+  const surEcran=new Set(cardItems(currentCardEl()).map(x=>x.link).filter(Boolean));
+  const cur=currentItemIndex();
   histList.innerHTML=items.length
-    ? items.map((it,i)=>histRowHTML(it,i===cur?"now":(i<cur?"past":""))).join("")
+    ? items.map((it,i)=>histRowHTML(it,(it.link&&surEcran.has(it.link))?"now":(cur>=0&&i<cur?"past":""))).join("")
     : `<p class="histempty">${esc(T("hist.empty"))}</p>`;
   document.getElementById("histSub").textContent=
     items.length?T("hist.sub",{n:items.length}):T("hist.subEmpty");
@@ -6252,11 +6348,16 @@ histList.addEventListener("click",e=>{
   // Recherche par CLÉ, jamais par l'index de la rangée : entre l'ouverture de la
   // feuille et le toucher, un lot arrivé en arrière-plan a pu réentrelacer le
   // fil — le même index désignerait alors un autre article.
-  const i=items.findIndex(it=>seenKey(it)===b.dataset.hk);
+  const cible=items.find(it=>seenKey(it)===b.dataset.hk);
+  // scrollToCard prend un index de CARTE : à cardsPerSwipe>1, l'index de
+  // l'article dans `items` n'est plus celui de sa carte (une carte en porte
+  // N), et défiler sur l'index brut atterrissait sur une tout autre carte —
+  // voire hors du fil, sans rien faire ni rien dire.
+  const k=cible?cardIndexOfLink(cible.link):-1;
   // Le fil a jeté l'article entre-temps (remix au-delà de MAX_ITEMS) : le dire,
   // plutôt que de ne rien faire ou d'atterrir à côté.
-  if(i<0){toast(T("hist.gone"));return;}
-  scrollToCard(i);
+  if(k<0){toast(T("hist.gone"));return;}
+  scrollToCard(k);
   onCardChange();   // position mémorisée aussitôt, sans attendre une frame de défilement
 });
 
