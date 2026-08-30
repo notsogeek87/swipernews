@@ -154,7 +154,7 @@
      position:fixed hors du fil — enregistrer/partager n'ayant pas de sens
      pendant la lecture, startVideo() l'efface pour toute sa durée (voir
      .rail--away plus bas). */
-  .card--playing .card__body,.card--playing .card__play,.card--playing .card__pv{opacity:0;pointer-events:none}
+  .card--playing .card__body,.card--playing .card__play{opacity:0;pointer-events:none}
   /* Échappatoire posée par startVideo()/retirée par stopVideo() — voir son
      commentaire : YouTube bloque parfois la lecture derrière un mur « confirmez
      que vous n'êtes pas un robot » (réputation de l'IP, rien que l'app puisse
@@ -270,36 +270,46 @@
     flex:0 0 auto;color:var(--ash);opacity:.8}
   .card__paywall svg{width:16px;height:16px}
 
-  /* Articles par carte > 1 (réglage cardsPerSwipe, voir applyExtras/pvRowHTML
-     dans index.html) : le héros garde .card__bg/.card__body EXACTEMENT comme
-     à N=1 (image, titre, rail, sondes…) — description et date s'effacent
-     pour laisser la place aux (N-1) lignes d'aperçu, posées SOUS le bloc de
-     texte. .card garde déjà justify-content:flex-end (voir plus haut) : les
-     deux blocs, en flux normal, se tassent donc naturellement en bas de la
-     carte, l'aperçu sous le texte. min-height:0 + overflow-y:auto sur
-     .card__pv (jamais sur .card__body, qui garde sa taille intrinsèque) :
-     si le contenu dépasse les 100vh disponibles (beaucoup d'articles sans
-     image, donc un bloc de texte haut), c'est la liste d'aperçu qui rétrécit
-     et défile sur elle-même plutôt que de faire déborder la carte. */
-  .card--multi .card__desc,.card--multi .card__meta{display:none}
-  .card__pv{position:relative;z-index:2;flex:0 1 auto;min-height:0;overflow-y:auto;
-    -webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:8px;
-    padding:0 22px calc(20px + env(safe-area-inset-bottom))}
-  .pvrow{display:flex;align-items:center;gap:12px;background:rgba(0,0,0,.4);
-    border:1px solid rgba(255,255,255,.14);border-radius:var(--radius-sm);
-    padding:8px 10px;text-decoration:none;color:inherit;-webkit-tap-highlight-color:transparent;
-    transition:transform .12s}
-  .pvrow:active{transform:scale(.98)}
-  .pvrow__thumb{position:relative;flex:0 0 auto;width:52px;height:52px;border-radius:8px;
-    overflow:hidden;background:var(--surface);display:flex;align-items:center;justify-content:center}
+  /* Carte à parts ÉGALES (réglage cardsPerSwipe>1, voir eqCardHTML/applyGroup
+     dans index.html) : chaque article du groupe reçoit une part rigoureusement
+     égale de la hauteur de la carte — demande explicite, après un premier
+     essai (un héros plein écran + des aperçus compacts en dessous) qui ne
+     partageait pas l'écran équitablement. Aucune carte héros ne porte plus
+     `.card__pv` : les deux formes ne coexistent jamais (voir eqCardHTML), donc
+     ce bloc peut dimensionner `.card__pv` pour occuper la carte ENTIÈRE sans
+     égard pour `.card__body` (qui n'existe pas ici).
+     flex:1 1 0 sur chaque .pvrow À L'INTÉRIEUR d'un conteneur qui remplit
+     toute la carte (flex:1 1 auto sur .card__pv) : c'est ce partage à égalité
+     qui donne à N articles N parts identiques, quel que soit leur contenu.
+     min-height:0 sur .pvrow est ce qui autorise un enfant flex à rétrécir
+     SOUS la hauteur de son propre contenu (le texte, notamment) : sans lui,
+     à 5 articles un titre un peu long ferait déborder sa ligne au lieu de se
+     laisser comprimer à l'exacte fraction 1/5 — ` .pvrow{overflow:hidden}`
+     est le filet qui tronque plutôt que de laisser dépasser. */
+  .card--eq{overflow:hidden}
+  .card--eq .card__pv{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
+    gap:1px;background:rgba(255,255,255,.08);padding-bottom:env(safe-area-inset-bottom)}
+  .pvrow{position:relative;flex:1 1 0;min-height:0;display:flex;align-items:stretch;
+    background:var(--surface);text-decoration:none;color:inherit;
+    -webkit-tap-highlight-color:transparent;overflow:hidden}
+  .pvrow:active{filter:brightness(.82)}
+  .pvrow__thumb{position:relative;flex:0 0 34%;overflow:hidden;background:var(--bg)}
   .pvrow__thumb img{width:100%;height:100%;object-fit:cover;display:block}
-  .pvrow__play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff}
-  .pvrow__play svg{width:20px;height:20px;filter:drop-shadow(0 1px 4px rgba(0,0,0,.6))}
-  .pvrow__body{min-width:0;flex:1 1 auto;display:flex;flex-direction:column;gap:3px}
-  .pvrow__source{font-family:var(--font-mono);font-size:10.5px;letter-spacing:-.03em;
+  .pvrow__play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:#fff;background:rgba(0,0,0,.25)}
+  .pvrow__play svg{width:28px;height:28px;filter:drop-shadow(0 1px 4px rgba(0,0,0,.6))}
+  /* justify-content:flex-end, jamais center : la barre du haut est un CALQUE
+     fixe qui ne pousse aucun contenu (voir .top plus haut) — pour la toute
+     PREMIÈRE ligne de la carte en tête du fil, un texte centré tombait sous
+     elle (mesuré : ses clics étaient interceptés par la barre). Ancrer le
+     texte en BAS de sa ligne, comme le fait déjà le bloc de texte d'une carte
+     héros dans le reste de la carte, l'en éloigne sans rien devoir réserver. */
+  .pvrow__body{min-width:0;flex:1 1 auto;display:flex;flex-direction:column;justify-content:flex-end;
+    gap:6px;padding:12px 18px}
+  .pvrow__source{font-family:var(--font-mono);font-size:11px;letter-spacing:-.03em;
     text-transform:uppercase;color:var(--flare);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .pvrow__title{font-size:13.5px;line-height:1.3;font-weight:600;color:var(--ink);
-    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .pvrow__title{font-size:15px;line-height:1.35;font-weight:600;color:var(--ink);
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 
   /* Rail UNIQUE en position:fixed, hors des cartes. Auparavant chaque carte
      portait son propre rail avec backdrop-filter:blur(12px) — l'un des effets
@@ -1389,9 +1399,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=224"></script>
-<script src="src/learn-core.js?v=224"></script>
-<script src="src/i18n.js?v=224"></script>
+<script src="src/lib.js?v=225"></script>
+<script src="src/learn-core.js?v=225"></script>
+<script src="src/i18n.js?v=225"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1721,15 +1731,19 @@ function persistMix(n){
 }
 /* Articles par carte : 1 à 5, réglable à l'accueil du 1er lancement comme
    dans les réglages (voir renderCardsPref, prefRow, [data-cardsmount]).
-   1 = comportement d'origine, une carte plein écran par article — c'est le
-   seul cas couvert par le banc de QA (tools/qa-scenarios.js) et par les 32
-   scénarios qui en dépendent (resume, tête, vidéo…), donc c'est le défaut.
+   1 = comportement d'origine, une carte plein écran par article, RENDUE PAR
+   cardHTML SANS AUCUN CHANGEMENT — c'est le seul cas couvert par le banc de
+   QA (tools/qa-scenarios.js) et par les 32 scénarios qui en dépendent
+   (resume, tête, vidéo…), donc c'est le défaut, et le chemin qui ne doit
+   jamais bouger.
    Au-delà, `groupItems` (src/lib.js) découpe le fil déjà entrelacé en
-   groupes de N : le PREMIER de chaque groupe reste la carte « héros »
-   inchangée (image, titre, rail, sondes…), les suivants s'affichent en
-   aperçu compact au bas de la MÊME carte — voir applyExtras/pvRowHTML,
-   cardsPerSwipe est donc lu par render() mais ne change rien d'autre à
-   l'état du fil (aucun appel réseau, comme applyMix). */
+   groupes de N, et CHAQUE article du groupe reçoit une part ÉGALE de la
+   carte (flex:1 1 0, voir eqCardHTML/.card--eq) — demande explicite : les
+   deux formes essayées avant (héros plein écran + aperçus compacts en
+   dessous) ne partageaient pas l'écran équitablement. Aucune de ces deux
+   formes n'a de rail ni de sondes payant/sponsorisé/image manquante — voir
+   makeCardEl/applyGroup/pvRowHTML. cardsPerSwipe est lu par render() mais ne
+   change rien d'autre à l'état du fil (aucun appel réseau, comme applyMix). */
 const LS_CARDSPERSWIPE="fluxswipe.cardspercard.v1";
 const CARDS_PER_SWIPE_DEFAULT=1;
 const clampCardsPerSwipe=n=>(Number.isInteger(n)&&n>=1&&n<=5)?n:CARDS_PER_SWIPE_DEFAULT;
@@ -2278,6 +2292,10 @@ function currentCardEl(){const i=currentIndex();return i<0?null:feedEl.children[
    à une carte déjà en place (cardReg.set ligne ~3639) même quand c'est le même
    article, ce qui casserait une comparaison par identité. */
 let pendingSeenItem=null;
+// Id DOM de la carte de `pendingSeenItem`, pour que markVisibleSeen sache si
+// c'est une carte à parts égales (cardGroups) et doive marquer tout le
+// groupe plutôt qu'un seul membre arbitraire — voir markVisibleSeen.
+let pendingSeenCardId=null;
 /* `userScroll` : distingue un VRAI défilement (onScrollFrame, le seul appelant
    qui le passe à `true`) d'un simple recalage de suivi — cette fonction est
    aussi appelée après un rendu (nouveau lot, dose changée, retour depuis
@@ -2290,6 +2308,8 @@ let pendingSeenItem=null;
    les yeux est bien sorti du fil, qu'on l'ait swipé ou non). */
 function onCardChange(userScroll){
   const i=currentIndex();
+  const card=i>=0?feedEl.children[i]:null;
+  const cardId=card?+card.dataset.id:null;
   const it=itemAt(i);
   // Arrêt n°1 : on a quitté la carte qui jouait. C'est le geste attendu — swiper
   // coupe la vidéo, comme sur n'importe quel fil vertical.
@@ -2297,8 +2317,8 @@ function onCardChange(userScroll){
   const samePending=pendingSeenItem===it||(pendingSeenItem&&it&&pendingSeenItem.link&&pendingSeenItem.link===it.link);
   if(!samePending){
     if(pendingSeenItem&&userScroll)bumpCardScroll();   // VRAI swipe seulement : une de plus au compteur
-    markVisibleSeen(pendingSeenItem);   // on quitte cette carte : c'est CE geste qui la marque vue
-    pendingSeenItem=it;
+    markVisibleSeen(pendingSeenItem,pendingSeenCardId);   // on quitte cette carte : c'est CE geste qui la marque vue
+    pendingSeenItem=it;pendingSeenCardId=cardId;
   }
   rememberPos(it);
   updateRail(it);
@@ -2327,7 +2347,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="224";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="225";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4247,13 +4267,14 @@ let loadingMore=false;
 // tableau, ce qui permet de retirer d'anciennes cartes du DOM sans tout casser.
 const cardReg=new Map();
 let cardSeq=0;
-/* Articles par carte > 1 (cardsPerSwipe) : id de carte -> articles
-   SUPPLÉMENTAIRES du groupe (au-delà du héros, déjà dans cardReg), affichés
-   en aperçu compact. Séparé de cardReg exprès : cardReg reste « id -> UN
-   article » partout ailleurs (rail, sondes, vidéo…), qui n'ont pas à savoir
-   que le fil peut être groupé — voir applyExtras. Vide en permanence quand
-   cardsPerSwipe===1 (défaut). */
-const cardExtras=new Map();
+/* Articles par carte > 1 (cardsPerSwipe) : id de carte -> le groupe ENTIER
+   d'articles qu'elle affiche à parts égales (voir eqCardHTML), présent
+   SEULEMENT pour une carte à parts égales — jamais pour une carte héros
+   normale, où cardReg (« id -> UN article ») suffit déjà à tout (rail,
+   sondes, vidéo…). C'est cette absence/présence qui distingue les deux
+   formes de carte (voir updateRail, markVisibleSeen). Vide en permanence
+   quand cardsPerSwipe===1 (défaut). */
+const cardGroups=new Map();
 /* Article porté par la carte d'index `i` dans le fil, sans relire la géométrie :
    c'est ce qui permet à onCardChange() de ne calculer l'index qu'une fois pour
    ses trois usages. */
@@ -4344,20 +4365,33 @@ function scrollToCard(i){
    de la file de sa chaîne et revient à chaque rafraîchissement — c'est
    précisément ce qu'on veut dire par « pas encore regardée », et c'est le
    contraire du défaut corrigé pour les actus (voir seenNews). */
-function markVisibleSeen(it=currentItem()){
+/* `cardId` : id DOM de la carte quittée. Sur une carte à parts égales
+   (cardsPerSwipe>1, voir cardGroups/eqCardHTML), les N articles sont TOUS
+   également visibles — aucun n'est plus « la » carte que les autres — donc
+   quitter la carte les marque tous vus, pas seulement `it` (qui ne serait
+   qu'un membre arbitraire du groupe). Sur une carte héros normale (pas
+   d'entrée dans cardGroups), comportement inchangé : un seul article. */
+function markVisibleSeen(it,cardId){
+  const grp=cardId!=null?cardGroups.get(cardId):null;
+  if(grp){grp.forEach(markOneSeen);return;}
+  markOneSeen(it);
+}
+function markOneSeen(it){
   if(!it)return;
   if(it.kind==="learn")addSeen(it);
   else if(!videoIdOf(it))addSeenNews(it);
 }
-/* Marquage « vu » pour un article ouvert depuis une ligne d'aperçu (cardsPerSwipe>1,
-   voir pvRowHTML) : il n'est JAMAIS le héros d'aucune carte, donc jamais vu
-   par markVisibleSeen (qui ne regarde que currentItem()) — le tap est son
-   seul signal d'engagement, exactement comme le lancement d'une vidéo
-   (startVideo) l'est pour markVisibleSeen : d'où vidéo INCLUSE ici, à
-   l'inverse de markVisibleSeen qui l'exclut (déjà marquée ailleurs, au
-   lancement sur la carte). Une ligne croisée mais jamais touchée reste donc
-   non-vue et peut revenir en aperçu au prochain rendu — comme une vidéo
-   jamais lancée, assumé. */
+/* Marquage « vu » IMMÉDIAT pour un article ouvert depuis une ligne d'une
+   carte à parts égales (cardsPerSwipe>1, voir pvRowHTML) : markVisibleSeen
+   marquera de toute façon TOUT le groupe une fois la carte quittée (voir
+   plus haut), mais seulement à ce moment-là — fermer l'app juste après avoir
+   tapé, sans avoir swipé, ne devrait pas faire perdre le geste. Pour une
+   VIDÉO, c'est même le SEUL déclencheur : markOneSeen l'exclut toujours
+   (vue au lancement, pas à l'affichage — voir plus haut), et une ligne
+   d'aperçu ne peut pas « lancer » une vidéo sur place (un seul lecteur à la
+   fois, voir startVideo) — d'où vidéo INCLUSE ici. Une ligne croisée mais
+   jamais tapée ni scrollée-au-delà reste non-vue et peut revenir au prochain
+   rendu — comme une vidéo jamais lancée, assumé. */
 function markPreviewOpened(it){
   if(!it)return;
   if(it.kind==="learn")addSeen(it);else addSeenNews(it);
@@ -4712,46 +4746,94 @@ function unobserveCard(card){
    changeait d'identité à chaque réponse. On réancre donc sur le lien de la
    carte visible — et, au démarrage seulement, sur l'article de la session
    précédente. */
-/* Crée l'élément d'une carte et l'enregistre. `extras` : les articles
-   suivants du groupe (cardsPerSwipe>1), voir applyExtras. */
-function makeCardEl(it,extras){
+/* Crée l'élément d'une carte et l'enregistre. `grp` : le groupe entier
+   (1 à cardsPerSwipe articles, voir groupItems) que cette carte représente —
+   un seul (le cas cardsPerSwipe===1, l'immense majorité) donne une carte
+   héros ordinaire ; plusieurs donnent une carte à parts égales, voir
+   applyGroup/eqCardHTML. */
+function makeCardEl(grp){
   const id=cardSeq++;
-  cardReg.set(id,it);
+  cardReg.set(id,grp[0]);
   const tpl=document.createElement("template");
-  tpl.innerHTML=cardHTML(it,id);
+  tpl.innerHTML=grp.length>1?eqCardHTML(grp,id):cardHTML(grp[0],id);
   const el=tpl.content.firstElementChild;
-  applyExtras(el,extras);
+  if(grp.length>1){cardGroups.set(id,grp);el.dataset.pvsig=pvSig(grp);}
   return el;
 }
-/* Pose ou retire le bloc d'aperçu (.card__pv) d'une carte : appelé à la
-   création (makeCardEl) ET à chaque réconciliation d'une carte déjà en place
-   (render()), puisque la composition d'un groupe peut changer d'un rendu à
-   l'autre même quand son héros, lui, ne bouge pas. Coût nul quand `extras`
-   est vide et l'a toujours été (cas cardsPerSwipe===1, l'immense majorité) :
-   aucune lecture ni écriture du DOM. */
-function applyExtras(el,extras){
+/* Clé de contenu d'un groupe : sert à éviter de reconstruire les lignes
+   d'une carte à parts égales quand elles n'ont pas changé d'un rendu à
+   l'autre (les vignettes sont de simples <img loading=lazy>, pas de sonde
+   ni de fond posé par IntersectionObserver comme sur une carte héros — les
+   réécrire pour rien les ferait clignoter, seul le navigateur amortissant
+   via son propre cache). */
+const pvSig=grp=>grp.map(it=>it.link||"").join("|");
+/* Réconcilie une carte déjà en place avec le groupe qu'elle doit maintenant
+   représenter (render()) : la composition d'un groupe — et sa TAILLE — peut
+   changer d'un rendu à l'autre même quand son premier article, lui, reste le
+   même (un nouveau lot déplace les frontières des groupes). Les deux formes
+   de carte (héros / parts égales) ont un balisage entièrement différent, donc
+   un changement de taille de groupe reconstruit la carte en entier ; à taille
+   de groupe inchangée (le cas courant), le chemin est bon marché — pour
+   cardsPerSwipe===1 (défaut), RIEN n'est jamais touché ici, exactement comme
+   avant l'existence de ce réglage. */
+function applyGroup(el,grp){
   const id=+el.dataset.id;
-  if(extras&&extras.length){
-    cardExtras.set(id,extras);
-    el.classList.add("card--multi");
-    let pv=el.querySelector(".card__pv");
-    if(!pv){pv=document.createElement("div");pv.className="card__pv";el.appendChild(pv);}
-    pv.innerHTML=extras.map(pvRowHTML).join("");
-  }else if(cardExtras.has(id)){
-    cardExtras.delete(id);
-    el.classList.remove("card--multi");
-    const pv=el.querySelector(".card__pv");
-    if(pv)pv.remove();
+  const wasEq=cardGroups.has(id);
+  if(grp.length<=1){
+    if(wasEq){
+      cardGroups.delete(id);
+      delete el.dataset.pvsig;
+      const fresh=parseCardEl(cardHTML(grp[0],id));
+      swapCardContent(el,fresh);
+    }
+    return;
+  }
+  cardGroups.set(id,grp);
+  const sig=pvSig(grp);
+  if(wasEq&&el.dataset.pvsig===sig)return;   // rien n'a changé : on ne touche à rien
+  el.dataset.pvsig=sig;
+  if(wasEq){
+    el.querySelector(".card__pv").innerHTML=grp.map(pvRowHTML).join("");
+  }else{
+    const fresh=parseCardEl(eqCardHTML(grp,id));
+    swapCardContent(el,fresh);
   }
 }
-/* Ligne compacte d'un article SUPPLÉMENTAIRE au sein d'une carte groupée
-   (cardsPerSwipe>1) : contrairement au héros elle n'a ni image de fond
-   plein écran, ni rail, ni sondes payant/sponsorisé/image manquante — juste
-   de quoi identifier l'article et l'ouvrir, comme une ligne d'« Articles en
-   mémoire » (histRowHTML) mais posée dans le fil. Vidéo : l'aperçu ne peut
-   pas jouer sur place (un seul lecteur à la fois dans le fil, voir
-   startVideo) donc un tap ouvre directement l'article, jamais en mode
-   lecture (data-vid déclenche noReader dans la délégation de clic). */
+function parseCardEl(html){
+  const tpl=document.createElement("template");
+  tpl.innerHTML=html;
+  return tpl.content.firstElementChild;
+}
+/* Bascule `el` (le nœud EXISTANT, jamais recréé — voir render()) sur le
+   contenu de `fresh` : seul chemin où la FORME de la carte change (héros <->
+   parts égales), donc rien à préserver de son ancien contenu. */
+function swapCardContent(el,fresh){
+  if(el===playingCard)stopVideo();
+  for(const a of [...el.attributes])if(!fresh.hasAttribute(a.name))el.removeAttribute(a.name);
+  for(const a of fresh.attributes)el.setAttribute(a.name,a.value);
+  el.innerHTML=fresh.innerHTML;
+}
+/* Carte à parts ÉGALES (cardsPerSwipe>1) : demande explicite — les deux
+   articles (ou plus) du groupe se partagent la hauteur de la carte à égalité
+   (flex:1 1 0 sur chaque .pvrow, voir CSS .card--eq), aucun n'étant plus
+   « la » carte que les autres. Ni fond plein écran, ni rail, ni sondes
+   payant/sponsorisé/image manquante : ces trois-là supposent un article
+   PRINCIPAL, qui n'existe justement plus ici (voir updateRail/markVisibleSeen
+   pour le pendant côté état). */
+function eqCardHTML(grp,id){
+  return `<article class="card card--eq" data-id="${id}">
+    <div class="card__pv">${grp.map(pvRowHTML).join("")}</div>
+  </article>`;
+}
+/* Ligne d'un article au sein d'une carte à parts égales (cardsPerSwipe>1) :
+   pas d'image de fond plein écran, pas de rail, pas de sondes payant/
+   sponsorisé/image manquante — juste de quoi identifier l'article et
+   l'ouvrir, comme une ligne d'« Articles en mémoire » (histRowHTML) mais
+   posée dans le fil et dimensionnée pour occuper sa part égale de l'écran
+   (voir CSS .pvrow). Vidéo : la ligne ne peut pas jouer sur place (un seul
+   lecteur à la fois dans le fil, voir startVideo) donc un tap ouvre
+   directement l'article, jamais en mode lecture (data-vid déclenche
+   noReader dans la délégation de clic). */
 function pvRowHTML(it){
   const img=safeImg(it.img,location.href);
   const link=it.link?safeLink(it.link,location.href):"";
@@ -4799,20 +4881,20 @@ function render(forceTop,altAnchor){
   }
 
   /* Articles par carte (cardsPerSwipe) : le fil déjà entrelacé (`items`) est
-     découpé en groupes de N — groupItems (src/lib.js). Le PREMIER article de
-     chaque groupe reste le « héros » de la carte (réconcilié par lien,
-     exactement comme avant cardsPerSwipe : à N=1 chaque groupe est un
-     singleton, comportement inchangé au bit près), les suivants sont ses
-     `extras`, posés par applyExtras. */
+     découpé en groupes de N — groupItems (src/lib.js). Chaque carte est
+     réconciliée par le lien de son PREMIER article (exactement comme avant
+     cardsPerSwipe : à N=1 chaque groupe est un singleton, comportement
+     inchangé au bit près) — mais qu'un groupe compte 1 ou N articles décide
+     entièrement de sa FORME (héros ou parts égales), voir applyGroup. */
   const groups=groupItems(items,cardsPerSwipe);
   let cursor=feedEl.firstElementChild;
   for(const grp of groups){
-    const hero=grp[0],extras=grp.slice(1);
-    const el=hero.link?existing.get(hero.link):null;
+    const first=grp[0];
+    const el=first.link?existing.get(first.link):null;
     if(el){
-      existing.delete(hero.link);
-      cardReg.set(+el.dataset.id,hero);         // rafraîchit l'article associé
-      applyExtras(el,extras);
+      existing.delete(first.link);
+      cardReg.set(+el.dataset.id,first);        // rafraîchit l'article associé
+      applyGroup(el,grp);
       if(el===cursor){cursor=cursor.nextElementSibling;continue;}   // déjà en place
       /* Arrêt n°3, le moins évident : réinsérer un nœud qui contient une
          <iframe> DÉTRUIT son contexte de navigation, donc la recharge — et
@@ -4823,14 +4905,14 @@ function render(forceTop,altAnchor){
       if(el===playingCard)stopVideo();
       feedEl.insertBefore(el,cursor);           // simple déplacement, pas de recréation
     }else{
-      feedEl.insertBefore(makeCardEl(hero,extras),cursor);
+      feedEl.insertBefore(makeCardEl(grp),cursor);
     }
   }
   // Tout ce qui reste après le curseur n'est plus dans le fil.
   while(cursor){
     const next=cursor.nextElementSibling;
     cardReg.delete(+cursor.dataset.id);
-    cardExtras.delete(+cursor.dataset.id);
+    cardGroups.delete(+cursor.dataset.id);
     unobserveCard(cursor);
     cursor.remove();
     cursor=next;
@@ -5191,16 +5273,16 @@ feedEl.addEventListener("click",e=>{
   const openLink=e.target.closest("a[data-open]");
   if(openLink&&openLink.href){
     const card=openLink.closest(".card");
-    // Ligne d'aperçu (cardsPerSwipe>1, voir pvRowHTML) : ni rail ni sondes,
-    // et « vu » se marque au tap plutôt qu'au défilement — voir
-    // markPreviewOpened. Sans lien (isolée du DOM au moment du clic), on
-    // retombe sur .card__title comme pour le héros.
+    // Ligne d'une carte à parts égales (cardsPerSwipe>1, voir pvRowHTML) : ni
+    // rail ni sondes, et « vu » se marque au tap plutôt qu'au défilement —
+    // voir markPreviewOpened. Sans lien (isolée du DOM au moment du clic), on
+    // retombe sur .card__title comme pour une carte héros ordinaire.
     const pv=openLink.classList.contains("pvrow")?openLink:null;
     const t=pv?pv.querySelector(".pvrow__title"):(card&&card.querySelector(".card__title"));
     bumpArticleOpen();
     if(pv&&card){
-      const extras=cardExtras.get(+card.dataset.id)||[];
-      const hit=extras.find(x=>x.link&&safeLink(x.link,location.href)===openLink.getAttribute("href"));
+      const grp=cardGroups.get(+card.dataset.id)||[];
+      const hit=grp.find(x=>x.link&&safeLink(x.link,location.href)===openLink.getAttribute("href"));
       if(hit)markPreviewOpened(hit);
     }
     // noReader pour une vidéo d'aperçu : le mode lecture n'est jamais tenté
@@ -5216,6 +5298,12 @@ feedEl.addEventListener("click",e=>{
 const railEl=document.getElementById("rail");
 const saveBtn=document.getElementById("saveBtn");
 function updateRail(it=currentItem()){
+  // Carte à parts égales (cardsPerSwipe>1, voir cardGroups) : aucun des N
+  // articles n'est PLUS « celui-ci » que les autres, donc rien de cohérent
+  // sur quoi faire agir enregistrer/partager — masqué comme sur la carte de
+  // fin, plutôt que d'agir en douce sur un membre arbitraire du groupe.
+  const card=currentCardEl();
+  if(card&&cardGroups.has(+card.dataset.id))it=null;
   railEl.classList.toggle("hidden",!it);
   // Icône ET libellé dépendent de l'état : contrairement à shareBtn (aria/title
   // statiques posés par data-i18n-attr), ceux-ci changent à chaque bascule.
