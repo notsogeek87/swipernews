@@ -287,29 +287,45 @@
      laisser comprimer à l'exacte fraction 1/5 — ` .pvrow{overflow:hidden}`
      est le filet qui tronque plutôt que de laisser dépasser. */
   .card--eq{overflow:hidden}
-  .card--eq .card__pv{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
-    gap:1px;background:rgba(255,255,255,.08);padding-bottom:env(safe-area-inset-bottom)}
-  .pvrow{position:relative;flex:1 1 0;min-height:0;display:flex;align-items:stretch;
-    background:var(--surface);text-decoration:none;color:inherit;
-    -webkit-tap-highlight-color:transparent;overflow:hidden}
-  .pvrow:active{filter:brightness(.82)}
-  .pvrow__thumb{position:relative;flex:0 0 34%;overflow:hidden;background:var(--bg)}
+  .card--eq .card__pv{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+  /* .pvrow N'EST PAS un lien — seul .pvrow__title (voir plus bas) en est un.
+     Deux essais précédents faisaient de la ligne ENTIÈRE (miniature comprise)
+     un <a> plein format : plus rien, nulle part sur une carte à parts égales,
+     ne restait alors pour le geste qui fait réapparaître la barre du haut
+     ailleurs dans le fil (tap sur le fond d'une carte héros, voir la
+     délégation de clic — `showTop()`, jamais atteint puisque CHAQUE tap
+     ouvrait déjà un article). Ici, seul le TITRE ouvre — exactement comme sur
+     une carte héros, où le fond de l'image ne fait rien d'autre que ce même
+     geste. Le reste de la ligne (miniature, marges) est donc une zone morte
+     volontaire, pas un oubli. */
+  .pvrow{position:relative;flex:1 1 0;min-height:0;display:flex;align-items:flex-end;
+    gap:14px;padding:10px 18px;background:var(--surface);
+    border-bottom:1px solid rgba(255,255,255,.08)}
+  .pvrow:last-child{border-bottom:0}
+  /* Miniature à taille FIXE (jamais étirée sur la hauteur de la ligne, très
+     variable selon cardsPerSwipe — de ~150px à 5 articles à ~450px à 2) :
+     un format carré souple (clamp) plutôt qu'un ancien essai en bande
+     verticale sur toute la hauteur, qui donnait un rognage à l'emporte-pièce
+     sur une vignette 16:9 (une image large compressée dans une colonne
+     étroite et haute grossit son centre au lieu de simplement la montrer). */
+  .pvrow__thumb{position:relative;flex:0 0 auto;width:clamp(56px,18vw,84px);
+    aspect-ratio:1/1;border-radius:var(--radius-sm);overflow:hidden;background:var(--bg);
+    display:flex;align-items:center;justify-content:center;color:var(--ash)}
+  .pvrow__thumb svg{width:28px;height:28px;opacity:.6}
   .pvrow__thumb img{width:100%;height:100%;object-fit:cover;display:block}
   .pvrow__play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    color:#fff;background:rgba(0,0,0,.25)}
-  .pvrow__play svg{width:28px;height:28px;filter:drop-shadow(0 1px 4px rgba(0,0,0,.6))}
-  /* justify-content:flex-end, jamais center : la barre du haut est un CALQUE
-     fixe qui ne pousse aucun contenu (voir .top plus haut) — pour la toute
-     PREMIÈRE ligne de la carte en tête du fil, un texte centré tombait sous
-     elle (mesuré : ses clics étaient interceptés par la barre). Ancrer le
-     texte en BAS de sa ligne, comme le fait déjà le bloc de texte d'une carte
-     héros dans le reste de la carte, l'en éloigne sans rien devoir réserver. */
-  .pvrow__body{min-width:0;flex:1 1 auto;display:flex;flex-direction:column;justify-content:flex-end;
-    gap:6px;padding:12px 18px}
+    color:#fff;background:rgba(0,0,0,.28)}
+  .pvrow__play svg{width:22px;height:22px;filter:drop-shadow(0 1px 4px rgba(0,0,0,.6));opacity:1}
+  .pvrow__body{min-width:0;flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;
+    gap:5px;padding-bottom:2px}
   .pvrow__source{font-family:var(--font-mono);font-size:11px;letter-spacing:-.03em;
     text-transform:uppercase;color:var(--flare);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .pvrow__title{font-size:15px;line-height:1.35;font-weight:600;color:var(--ink);
-    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  /* Le lien ne doit pas RESSEMBLER à un lien, même règle que .card__title —
+     seul l'appui (:active) signale qu'il est actionnable. */
+  .pvrow__title{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+    font-size:15px;line-height:1.3;font-weight:600;color:var(--ink);text-decoration:none;
+    -webkit-tap-highlight-color:transparent}
+  .pvrow__title:active{opacity:.65}
 
   /* Rail UNIQUE en position:fixed, hors des cartes. Auparavant chaque carte
      portait son propre rail avec backdrop-filter:blur(12px) — l'un des effets
@@ -1399,9 +1415,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=225"></script>
-<script src="src/learn-core.js?v=225"></script>
-<script src="src/i18n.js?v=225"></script>
+<script src="src/lib.js?v=226"></script>
+<script src="src/learn-core.js?v=226"></script>
+<script src="src/i18n.js?v=226"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2347,7 +2363,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="225";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="226";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4830,23 +4846,27 @@ function eqCardHTML(grp,id){
    sponsorisé/image manquante — juste de quoi identifier l'article et
    l'ouvrir, comme une ligne d'« Articles en mémoire » (histRowHTML) mais
    posée dans le fil et dimensionnée pour occuper sa part égale de l'écran
-   (voir CSS .pvrow). Vidéo : la ligne ne peut pas jouer sur place (un seul
-   lecteur à la fois dans le fil, voir startVideo) donc un tap ouvre
-   directement l'article, jamais en mode lecture (data-vid déclenche
-   noReader dans la délégation de clic). */
+   (voir CSS .pvrow). SEUL le titre est un lien (voir le commentaire CSS de
+   .pvrow) : la miniature, elle, est délibérément inerte. Sans image, elle
+   reprend l'icône « lire » (ICON_READ) plutôt qu'un vide. Vidéo : la ligne
+   ne peut pas jouer sur place (un seul lecteur à la fois dans le fil, voir
+   startVideo) donc un tap ouvre directement l'article, jamais en mode
+   lecture (data-vid déclenche noReader dans la délégation de clic). */
 function pvRowHTML(it){
   const img=safeImg(it.img,location.href);
   const link=it.link?safeLink(it.link,location.href):"";
   const vid=videoIdOf(it);
-  const tag=link?"a":"div";
-  const attrs=link?` data-pv data-open href="${escAttr(link)}" target="_blank" rel="noopener"`:` data-pv`;
-  return `<${tag} class="pvrow"${vid?` data-vid="${escAttr(vid)}"`:""}${attrs}>
-    <span class="pvrow__thumb">${img?`<img src="${escAttr(img)}" alt="" loading="lazy">`:""}${vid?`<span class="pvrow__play">${ICON_PLAY}</span>`:""}</span>
-    <span class="pvrow__body">
+  const titleTag=link?"a":"span";
+  const titleAttrs=link
+    ?` data-pv data-open${vid?` data-vid="${escAttr(vid)}"`:""} href="${escAttr(link)}" target="_blank" rel="noopener"`
+    :` data-pv`;
+  return `<div class="pvrow">
+    <div class="pvrow__thumb">${img?`<img src="${escAttr(img)}" alt="" loading="lazy">`:ICON_READ}${vid?`<span class="pvrow__play">${ICON_PLAY}</span>`:""}</div>
+    <div class="pvrow__body">
       <span class="pvrow__source">${esc(it.source)}</span>
-      <span class="pvrow__title">${esc(it.title)}</span>
-    </span>
-  </${tag}>`;
+      <${titleTag} class="pvrow__title"${titleAttrs}>${esc(it.title)}</${titleTag}>
+    </div>
+  </div>`;
 }
 /* Reconstruit le fil en gardant l'utilisateur SUR SON ARTICLE, et en
    RÉUTILISANT les cartes déjà affichées.
@@ -5273,12 +5293,14 @@ feedEl.addEventListener("click",e=>{
   const openLink=e.target.closest("a[data-open]");
   if(openLink&&openLink.href){
     const card=openLink.closest(".card");
-    // Ligne d'une carte à parts égales (cardsPerSwipe>1, voir pvRowHTML) : ni
-    // rail ni sondes, et « vu » se marque au tap plutôt qu'au défilement —
-    // voir markPreviewOpened. Sans lien (isolée du DOM au moment du clic), on
-    // retombe sur .card__title comme pour une carte héros ordinaire.
-    const pv=openLink.classList.contains("pvrow")?openLink:null;
-    const t=pv?pv.querySelector(".pvrow__title"):(card&&card.querySelector(".card__title"));
+    // Titre d'une ligne de carte à parts égales (cardsPerSwipe>1, voir
+    // pvRowHTML) : ni rail ni sondes, et « vu » se marque au tap plutôt qu'au
+    // défilement — voir markPreviewOpened. C'est le SEUL élément cliquable de
+    // sa ligne (la miniature est inerte, voir le commentaire CSS de .pvrow),
+    // donc lui-même porte déjà le texte à annoncer — pas de .card__title à
+    // aller chercher, contrairement à une carte héros ordinaire.
+    const pv=openLink.classList.contains("pvrow__title")?openLink:null;
+    const t=pv||(card&&card.querySelector(".card__title"));
     bumpArticleOpen();
     if(pv&&card){
       const grp=cardGroups.get(+card.dataset.id)||[];
