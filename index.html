@@ -333,12 +333,16 @@
   .pvrow__title{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
     font-size:15px;line-height:1.3;font-weight:600;color:var(--ink);text-decoration:none;
     -webkit-tap-highlight-color:transparent}
-  /* Résumé : TOUJOURS affiché quand l'article en a un (voir pvRowHTML) — une
-     seule ligne par défaut, étendue à 3 par --roomy (n<=2, ligne haute) pour
-     ne pas gâcher la place disponible. */
+  /* Résumé : TOUJOURS affiché quand l'article en a un (voir pvRowHTML), sur
+     autant de lignes que la hauteur de ligne peut raisonnablement en offrir
+     — 2 par défaut (n>=4, lignes déjà courtes), étendu à 3 ou 4 par les
+     modificateurs ci-dessous (n===3, n<=2). Un article sans résumé assez
+     long ne remplit simplement pas les lignes réservées, .pvrow{overflow:
+     hidden} restant le filet si jamais le texte dépassait quand même. */
   .pvrow__desc{font-size:13px;line-height:1.4;color:var(--ink);opacity:.7;margin-top:1px;
-    display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
-  .pvrow__desc--roomy{-webkit-line-clamp:3}
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .pvrow__desc--lines-3{-webkit-line-clamp:3}
+  .pvrow__desc--lines-4{-webkit-line-clamp:4}
   .pvrow__meta{font-size:11.5px;color:var(--ash);margin-top:1px}
   .pvrow__title:active{opacity:.65}
 
@@ -1440,9 +1444,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=230"></script>
-<script src="src/learn-core.js?v=230"></script>
-<script src="src/i18n.js?v=230"></script>
+<script src="src/lib.js?v=231"></script>
+<script src="src/learn-core.js?v=231"></script>
+<script src="src/i18n.js?v=231"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2388,7 +2392,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="230";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="231";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4875,20 +4879,20 @@ function eqCardHTML(grp,id){
    `n` (taille du groupe) ne décide plus SI le résumé s'affiche (toujours,
    quand l'article en a un) mais sur COMBIEN de lignes : la hauteur RÉELLE
    d'une ligne n'est pas connue à ce stade (elle dépend du CSS), donc le
-   seuil se fait sur `n` plutôt que sur une mesure — au-delà de 2
-   articles/carte, une seule ligne de résumé, .pvrow{overflow:hidden} coupant
-   de toute façon ce qui déborderait. */
+   seuil se fait sur `n` plutôt que sur une mesure — 2 lignes par défaut
+   (n>=4, lignes déjà courtes), 3 à n===3, 4 à n<=2 (lignes hautes, largement
+   de quoi montrer un vrai début de résumé sans que ce soit envahissant). */
 function pvRowHTML(it,n){
   const img=safeImg(it.img,location.href);
   const link=it.link?safeLink(it.link,location.href):"";
   const titleTag=link?"a":"span";
   const titleAttrs=link?` data-pv data-open href="${escAttr(link)}" target="_blank" rel="noopener"`:` data-pv`;
-  // Résumé : toujours affiché quand l'article en a un, mais sur UNE seule
-  // ligne au-delà de 2 articles/carte (--roomy l'étend à 3, voir CSS) — une
-  // ligne compacte n'a pas la hauteur pour plus, et .pvrow{overflow:hidden}
-  // couperait de toute façon un résumé trop long, mais tronquer au bon
-  // nombre de lignes évite une coupure en plein mot.
-  const descHTML=it.desc?`<p class="pvrow__desc${n<=2?" pvrow__desc--roomy":""}">${esc(it.desc)}</p>`:"";
+  // Résumé : toujours affiché quand l'article en a un, sur un nombre de
+  // lignes croissant quand la ligne est plus haute (voir CSS) —
+  // .pvrow{overflow:hidden} coupe de toute façon ce qui déborderait, mais
+  // tronquer au bon nombre de lignes évite une coupure en plein mot.
+  const descMod=n<=2?" pvrow__desc--lines-4":n===3?" pvrow__desc--lines-3":"";
+  const descHTML=it.desc?`<p class="pvrow__desc${descMod}">${esc(it.desc)}</p>`:"";
   const metaHTML=it.date?`<span class="pvrow__meta">${relTime(it.date)}</span>`:"";
   return `<div class="pvrow">
     <div class="pvrow__thumb">${img?`<img src="${escAttr(img)}" alt="" loading="lazy">`:ICON_READ}</div>
