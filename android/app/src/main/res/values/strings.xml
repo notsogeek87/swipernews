@@ -20,10 +20,34 @@
     <string name="reader_error_sub">Le site n\'a pas répondu. Vérifie ta connexion, ou ouvre l\'article dans ton navigateur.</string>
     <string name="reader_no_app">Aucune application pour ouvrir ce lien</string>
 
-    <!-- Vérification en arrière-plan (NewsCheckWorker) -->
+    <!-- Vérification en arrière-plan (NewsCheckWorker). Le nom/la description du
+         canal restent sobres : c'est ce qu'Android affiche dans SES PROPRES
+         réglages système, pas dans la notification elle-même. -->
     <string name="notif_channel_name">Nouveaux articles</string>
     <string name="notif_channel_desc">Alerte quand une source suivie publie du nouveau contenu</string>
-    <string name="notif_title">De nouveaux articles</string>
-    <string name="notif_body_one">%1$s vient de publier un nouvel article</string>
-    <string name="notif_body_many">%1$d sources ont publié du nouveau contenu</string>
+
+    <!-- Titre et corps de la notification : un tirage au sort à chaque envoi
+         (voir NewsCheckWorker.postNotification), pour que « De nouveaux
+         articles » ne revienne pas identique à chaque réveil pendant des mois —
+         cosmétique seulement, aucune variante ne change ce qui est annoncé.
+         Les deux tableaux de corps doivent rester du MÊME FORMAT (%1$s ou
+         %1$d) que leur cas : one = une source nommée, many = un compte. -->
+    <string-array name="notif_titles">
+        <item>📰 Ça vient de tomber</item>
+        <item>👀 Y\'a du neuf sur ton fil</item>
+        <item>✨ Une pause lecture ?</item>
+        <item>🗞️ Fraîchement publié</item>
+    </string-array>
+    <string-array name="notif_bodies_one">
+        <item>%1$s vient de publier — de quoi faire une pause</item>
+        <item>Nouvel article chez %1$s, juste pour toi</item>
+        <item>%1$s a publié quelque chose de neuf à découvrir</item>
+        <item>Un nouvel article de %1$s t\'attend</item>
+    </string-array>
+    <string-array name="notif_bodies_many">
+        <item>%1$d sources ont publié du nouveau contenu — de quoi papillonner</item>
+        <item>%1$d nouveautés à glisser tout à l\'heure</item>
+        <item>%1$d sources se sont réveillées : de la lecture fraîche</item>
+        <item>%1$d nouveaux articles à swiper</item>
+    </string-array>
 </resources>

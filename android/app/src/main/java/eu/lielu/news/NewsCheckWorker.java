@@ -33,6 +33,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Locale;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -85,6 +87,10 @@ public class NewsCheckWorker extends Worker {
      *  timeout jamais franchement (flux qui égoutte ses octets) ne doit pas
      *  immobiliser tout le réveil. */
     private static final long PARSE_BUDGET_MS = 6000;
+
+    /** Tirage du titre/corps de la notification (voir postNotification) — pas
+     *  besoin d'aléatoire cryptographique pour une variété cosmétique. */
+    private static final Random RANDOM = new Random();
 
     public NewsCheckWorker(@NonNull Context context, @NonNull WorkerParameters params) {
         super(context, params);
@@ -258,16 +264,27 @@ public class NewsCheckWorker extends Worker {
         launch.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
         PendingIntent pi = PendingIntent.getActivity(ctx, 0, launch, flags);
-        String body = (count == 1 && firstName != null && !firstName.isEmpty())
-            ? ctx.getString(R.string.notif_body_one, firstName)
-            : ctx.getString(R.string.notif_body_many, count);
+        boolean one = count == 1 && firstName != null && !firstName.isEmpty();
+        // Titre ET corps tirés au sort à chaque envoi : voir strings.xml
+        // (notif_titles/notif_bodies_one/notif_bodies_many) pour la raison —
+        // purement cosmétique, ne changent jamais ce qui est annoncé.
+        String title = pickRandom(ctx, R.array.notif_titles);
+        String bodyTemplate = pickRandom(ctx, one ? R.array.notif_bodies_one : R.array.notif_bodies_many);
+        String body = one
+            ? String.format(Locale.getDefault(), bodyTemplate, firstName)
+            : String.format(Locale.getDefault(), bodyTemplate, count);
         Notification notification = new NotificationCompat.Builder(ctx, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(ctx.getString(R.string.notif_title))
+            .setContentTitle(title)
             .setContentText(body)
             .setAutoCancel(true)
             .setContentIntent(pi)
             .build();
         nm.notify(NOTIF_ID, notification);
+    }
+
+    private static String pickRandom(Context ctx, int arrayResId) {
+        String[] items = ctx.getResources().getStringArray(arrayResId);
+        return items[RANDOM.nextInt(items.length)];
     }
 }
