@@ -356,6 +356,23 @@
   .pvrow__body{min-width:0;flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;gap:5px}
   .pvrow__source{font-family:var(--font-mono);font-size:11px;letter-spacing:-.03em;
     text-transform:uppercase;color:var(--flare);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* Enregistrer/partager PAR LIGNE (voir pvRowHTML) : le rail agit sur « la »
+     carte courante, qui n'existe plus ici (updateRail le masque exprès sur une
+     carte à parts égales — aucun des N articles n'étant plus « celui-ci » que
+     les autres, voir son commentaire). Posées dans l'EN-TÊTE de chaque ligne,
+     jamais en dessous : ça ne consomme aucune hauteur supplémentaire, alors
+     qu'à cardsPerSwipe élevé une ligne peut faire moins de 150px — un rail à
+     la .card__open grignoterait une part disproportionnée de chacune. */
+  .pvrow__head{display:flex;align-items:center;gap:8px}
+  .pvrow__head .pvrow__source{flex:1 1 auto;min-width:0}
+  .pvrow__actions{display:flex;gap:2px;flex:0 0 auto}
+  .pvact{background:none;border:none;color:var(--ash);cursor:pointer;padding:5px;
+    display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+  .pvact svg{width:15px;height:15px;display:block}
+  .pvact:active{transform:scale(.85)}
+  /* Même logique que .rail button.on : l'icône PLEINE (ICON_SAVED) porte déjà
+     le signal, la couleur ne fait que l'appuyer. */
+  .pvact.on{color:var(--flare)}
   /* Le lien ne doit pas RESSEMBLER à un lien, même règle que .card__title —
      seul l'appui (:active) signale qu'il est actionnable. */
   .pvrow__title{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
@@ -1481,9 +1498,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=237"></script>
-<script src="src/learn-core.js?v=237"></script>
-<script src="src/i18n.js?v=237"></script>
+<script src="src/lib.js?v=238"></script>
+<script src="src/learn-core.js?v=238"></script>
+<script src="src/i18n.js?v=238"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2446,7 +2463,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="237";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="238";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2457,6 +2474,8 @@ const APP_VERSION="237";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:238,date:"2026-08-30",items:[
+    "changelog.v238.item1"]},
   {v:237,date:"2026-08-30",items:[
     "changelog.v237.item1"]},
   {v:233,date:"2026-08-30",items:[
@@ -5019,10 +5038,23 @@ function pvRowHTML(it,n){
   const isWiki=it.kind==="learn";
   const wikiMod=isWiki?" pvrow--wiki":"";
   const sourceIcon=isWiki?ICON_DISCOVER:"";
+  // Clé d'identité (seenKey), pas l'index dans le groupe : le clic est délégué
+  // sur feedEl (voir plus bas) et retrouve l'article dans `items`, exactement
+  // comme data-hk dans histRowHTML — jamais un index qu'un remix entre-temps
+  // rendrait faux.
+  const key=escAttr(seenKey(it));
+  const saveOn=isSaved(it);
+  const saveT=saveOn?T("rail.save.titleOn"):T("rail.save.titleOff");
   return `<div class="pvrow${wikiMod}">
     <div class="pvrow__thumb">${img?`<img src="${escAttr(img)}" alt="" loading="lazy">`:ICON_READ}</div>
     <div class="pvrow__body">
-      <span class="pvrow__source">${sourceIcon}${esc(it.source)}</span>
+      <div class="pvrow__head">
+        <span class="pvrow__source">${sourceIcon}${esc(it.source)}</span>
+        <span class="pvrow__actions">
+          <button type="button" class="pvact${saveOn?" on":""}" data-pvsave="${key}" aria-label="${escAttr(saveT)}" title="${escAttr(saveT)}">${saveOn?ICON_SAVED:ICON_SAVE}</button>
+          <button type="button" class="pvact" data-pvshare="${key}" aria-label="${escAttr(T("rail.share.aria"))}" title="${escAttr(T("rail.share.title"))}">${ICON_SHARE}</button>
+        </span>
+      </div>
       <${titleTag} class="pvrow__title"${titleAttrs}>${esc(it.title)}</${titleTag}>
       ${descHTML}${metaHTML}
     </div>
@@ -5262,6 +5294,10 @@ const ICON_PLAY=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 // elle ne reflète l'état d'aucune carte en particulier.
 const ICON_SAVE=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>`;
 const ICON_SAVED=`<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>`;
+// Même tracé que #shareBtn (rail) et .feedrow .share (panneau Sources) : une
+// 3e icône de partage aurait dû rester identique aux deux premières de toute
+// façon, autant en faire la référence commune (voir pvRowHTML).
+const ICON_SHARE=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>`;
 /* Identifiant de la vidéo intégrable portée par un article, "" sinon —
    le SEUL point de décision « cette carte est-elle une carte vidéo ? ».
    Six endroits en dépendent (cardHTML pour la classe, les trois marqueurs de
@@ -5470,6 +5506,36 @@ feedEl.addEventListener("click",e=>{
   if(play){
     const card=play.closest(".card");
     if(card){startVideo(card);hideTop();e.preventDefault();}
+    return;
+  }
+  // Enregistrer/partager d'une ligne de carte à parts égales (cardsPerSwipe>1,
+  // voir pvRowHTML) : le rail ne peut pas servir ici (updateRail le masque
+  // exprès, voir son commentaire), donc chaque ligne porte sa propre paire
+  // d'icônes. Retrouvé dans `items` par seenKey, comme data-hk dans
+  // histRowHTML — jamais par un index de groupe, qu'un remix rendrait faux.
+  const pvsave=e.target.closest("[data-pvsave]");
+  if(pvsave){
+    e.stopPropagation();
+    const it=items.find(x=>seenKey(x)===pvsave.dataset.pvsave);
+    if(it){
+      toggleSave(it);
+      // toggleSave() rafraîchit le RAIL (updateRail), jamais CETTE ligne — sans
+      // ce qui suit, l'icône restait figée sur son état d'avant le tap jusqu'au
+      // prochain render() complet (mesuré : un enregistrement qui ne se voyait
+      // pas avant le rafraîchissement suivant).
+      const on=isSaved(it);
+      pvsave.classList.toggle("on",on);
+      pvsave.innerHTML=on?ICON_SAVED:ICON_SAVE;
+      const t=on?T("rail.save.titleOn"):T("rail.save.titleOff");
+      pvsave.title=t;pvsave.setAttribute("aria-label",t);
+    }
+    return;
+  }
+  const pvshare=e.target.closest("[data-pvshare]");
+  if(pvshare){
+    e.stopPropagation();
+    const it=items.find(x=>seenKey(x)===pvshare.dataset.pvshare);
+    if(it)shareItem(it);
     return;
   }
   // Lien d'un article : dans l'app packagée, il s'ouvre dans le navigateur

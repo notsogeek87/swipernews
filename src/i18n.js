@@ -53,6 +53,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v238.item1":
+        "🔖 Enregistrer et partager marchent maintenant à plusieurs articles par carte — chaque ligne a ses propres icônes.",
       "changelog.v237.item1":
         "🫧 La barre du haut se floute derrière elle et s'efface toute seule au bout de 3 s — le temps de viser un bouton, pas plus.",
       "changelog.v233.item1":
@@ -444,6 +446,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v238.item1":
+        "🔖 Save and share now work with multiple articles per card — each row has its own icons.",
       "changelog.v237.item1":
         "🫧 The top bar now blurs what sits behind it and slides away on its own after 3s — long enough to aim for a button, no longer.",
       "changelog.v233.item1":
