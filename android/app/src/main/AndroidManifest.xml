@@ -51,4 +51,9 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Notification « de nouveaux articles » (NewsCheckWorker) : ignorée par le
+         système avant Android 13, où poster une notification ne demandait
+         encore aucune permission — la déclarer ici ne change rien pour ces
+         versions, c'est là qu'elle devient obligatoire. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

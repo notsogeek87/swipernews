@@ -1498,9 +1498,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=238"></script>
-<script src="src/learn-core.js?v=238"></script>
-<script src="src/i18n.js?v=238"></script>
+<script src="src/lib.js?v=239"></script>
+<script src="src/learn-core.js?v=239"></script>
+<script src="src/i18n.js?v=239"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2463,7 +2463,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="238";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="239";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2474,6 +2474,8 @@ const APP_VERSION="238";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:239,date:"2026-08-30",items:[
+    "changelog.v239.item1"]},
   {v:238,date:"2026-08-30",items:[
     "changelog.v238.item1"]},
   {v:237,date:"2026-08-30",items:[
@@ -2659,6 +2661,16 @@ const LS_ADS="fluxswipe.ads.v1";
    qui « ne marche pas » à quelqu'un qui n'a rien demandé. C'est une option à
    activer sciemment, pas un comportement subi. */
 let adsPref=(()=>{try{return localStorage.getItem(LS_ADS)==="block"?"block":"allow";}catch(e){return "allow";}})();
+
+/* Notification « de nouveaux articles », app packagée seulement : réveille
+   NewsCheckWorker (natif) même l'app fermée, voir InAppBrowserPlugin et
+   syncBackgroundFeeds()/setNotifPref() plus bas. Désactivée par défaut,
+   comme le blocage de pub ci-dessus et pour la même raison : ça demande une
+   permission système (POST_NOTIFICATIONS, Android 13+) et un réveil
+   périodique, deux choses qui doivent s'activer sciemment plutôt que se
+   subir. */
+const LS_NOTIF="fluxswipe.notif.v1";
+let notifPref=(()=>{try{return localStorage.getItem(LS_NOTIF)==="on"?"on":"off";}catch(e){return "off";}})();
 
 /* Filtre des articles sponsorisés ET bons plans dans le FLUX (pas les pubs de
    la page ouverte, voir reader_ads.js pour ça) — un seul réglage pour les
@@ -4080,7 +4092,14 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
       // rebuild() vient tout juste de recalculer ci-dessus — l'appeler depuis
       // finish() AVANT que ce bloc ne s'exécute (un doigt posé sur le fil le
       // reporte) enregistrerait encore l'ancien `items` sous la nouvelle clé.
-      if(cloture&&collected.size)cacheSave(key);
+      if(cloture&&collected.size){
+        cacheSave(key);
+        // Repère natif pour NewsCheckWorker : seulement la repeinture FINALE
+        // (comme cacheSave juste au-dessus), et seulement si le réglage est
+        // actif — inutile d'appeler le plugin à chaque fil renouvelé pour une
+        // fonctionnalité que l'utilisateur n'a pas activée.
+        if(notifPref==="on")syncBackgroundFeeds();
+      }
     });
   }
   /* Fenêtre progressive : courte pour le tout premier rendu (le contenu doit
@@ -6122,6 +6141,8 @@ function renderReadPref(){
     html+=prefRow("ads",T("ads.label"),T("ads.desc."+adsPref),
       [{v:"block",t:T("ads.opt.block")},{v:"allow",t:T("ads.opt.allow")}],adsPref);
     if(adsPref==="block")html+=blocklistHTML();
+    html+=prefRow("notif",T("notif.label"),T("notif.desc."+notifPref),
+      [{v:"on",t:T("notif.opt.on")},{v:"off",t:T("notif.opt.off")}],notifPref);
   }
   document.querySelectorAll("[data-readmount]").forEach(el=>{
     el.innerHTML=isNativeApp?html:"";
@@ -6172,6 +6193,7 @@ function setPref(name,v){
   if(name==="apptheme"){setAppTheme(v);return;}   // idem : attribut sur <html>
   if(name==="cardsPerSwipe"){setCardsPerSwipe(v);return;}   // idem : recompose le fil
   if(name==="contentFilter"){setContentFilter(v);return;}   // idem : recharge le fil
+  if(name==="notif"){setNotifPref(v);return;}   // idem : aller-retour natif (permission), voir setNotifPref
   const p=PREFS[name];
   if(!p)return;
   const next=p.vals.includes(v)?v:p.vals[0];   // valeur inconnue → on retombe sur le défaut
@@ -6206,6 +6228,69 @@ function setAppTheme(v){
   try{localStorage.setItem(LS_APPTHEME,appTheme);}catch(e){warn("save apptheme",e);}
   applyAppTheme();
   renderThemePref();
+}
+/* Notification de nouveaux articles : contrairement au reste de PREFS/setPref,
+   l'état réellement appliqué dépend d'une permission SYSTÈME (Android 13+)
+   que l'utilisateur peut refuser — d'où l'aller-retour par le plugin plutôt
+   qu'une simple écriture locale. setBackgroundNotifications() (natif) résout
+   toujours, y compris sur refus : le libellé "enabled" de sa réponse dit ce
+   qui a VRAIMENT été retenu, potentiellement différent de ce qu'on vient de
+   demander, et c'est cette valeur qui doit rester affichée. */
+function setNotifPref(v){
+  const next=v==="on"?"on":"off";
+  if(next===notifPref)return;
+  notifPref=next;
+  try{localStorage.setItem(LS_NOTIF,notifPref);}catch(e){warn("save notif",e);}
+  renderReadPref();
+  const p=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
+  if(!p||!p.setBackgroundNotifications)return;
+  p.setBackgroundNotifications({enabled:notifPref==="on"}).then(res=>{
+    if(!res||res.enabled===undefined)return;
+    const got=res.enabled?"on":"off";
+    if(got===notifPref)return;
+    notifPref=got;   // permission refusée : le natif est redescendu à "off" tout seul
+    try{localStorage.setItem(LS_NOTIF,notifPref);}catch(e){warn("save notif",e);}
+    renderReadPref();
+    toast(T("toast.notifDenied"));
+  }).catch(()=>{});
+  // Repère de départ posé tout de suite : sans lui, le premier réveil de
+  // NewsCheckWorker n'aurait rien à comparer et attendrait le prochain vrai
+  // chargement (jusqu'à 30 min, voir AUTO_RELOAD_MS) avant de pouvoir dire
+  // quoi que ce soit.
+  if(notifPref==="on")syncBackgroundFeeds();
+}
+/* Instantané envoyé à NewsCheckWorker (natif) : uniquement les sources
+   actives, avec l'URL RÉELLEMENT interrogée (urlDuFlux — la playlist Shorts
+   pour une chaîne YouTube, jamais son channel_id brut, sinon le worker
+   vérifierait une source différente de celle que le fil affiche) et le lien
+   de son article le plus récent tel qu'affiché dans le fil. C'est tout ce
+   que le natif doit savoir : lui-même ne connaît rien du contenu, seulement
+   « ce lien a changé depuis la dernière fois ». Appelée après chaque fil
+   d'actus renouvelé (voir loadNewsPart) ET à l'activation du réglage
+   (voir setNotifPref) — jamais à chaque rendu, coûteux pour rien tant que
+   rien n'a changé côté actus. */
+function backgroundFeedSnapshot(){
+  const bySource=new Map();
+  for(const it of newsItems){
+    if(!it.source)continue;
+    const cur=bySource.get(it.source);
+    if(!cur||itemTime(it)>itemTime(cur))bySource.set(it.source,it);
+  }
+  const out=[];
+  for(const f of feeds){
+    if(!f.on)continue;
+    const top=bySource.get(f.name);
+    out.push({url:urlDuFlux(f),name:f.name,link:top?top.link:""});
+  }
+  return out;
+}
+function syncBackgroundFeeds(){
+  if(!isNativeApp)return;
+  try{
+    const p=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
+    if(!p||!p.syncBackgroundFeeds)return;
+    p.syncBackgroundFeeds({feeds:backgroundFeedSnapshot()}).catch(()=>{});
+  }catch(e){}
 }
 // Délégation : les blocs sont réécrits à chaque rendu, un écouteur par bouton
 // serait à ré-attacher à chaque fois.

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icône de la barre d'état pour la notification de NewsCheckWorker. Blanc
+     uniquement : le système ignore toute autre couleur pour une icône de
+     notification (silhouette d'après le canal alpha seul, API 21+) — inutile
+     d'y référencer une couleur du thème. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M12,4 a8,8 0 1,0 0.01,0"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2" />
+    <path
+        android:pathData="M12,10 a2,2 0 1,0 0.01,0"
+        android:fillColor="#FFFFFFFF" />
+</vector>

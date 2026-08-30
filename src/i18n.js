@@ -53,6 +53,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v239.item1":
+        "🔔 App Android : notifications de nouveaux articles (à activer dans les réglages) — une alerte quand une source suivie publie, même l'app fermée.",
       "changelog.v238.item1":
         "🔖 Enregistrer et partager marchent maintenant à plusieurs articles par carte — chaque ligne a ses propres icônes.",
       "changelog.v237.item1":
@@ -344,6 +346,13 @@
       "ads.opt.block": "Bloqués",
       "ads.opt.allow": "Affichés",
 
+      "notif.label": "Nouveaux articles",
+      "notif.desc.on":
+        "Une notification t'avertit quand une source suivie publie du nouveau contenu, même l'app fermée.",
+      "notif.desc.off": "Aucune vérification en arrière-plan.",
+      "notif.opt.on": "Activées",
+      "notif.opt.off": "Désactivées",
+
       "bl.builtin":
         "Liste intégrée à l'app : 178 domaines. Une liste publique en bloque bien davantage, et se met à jour sans réinstaller l'app.",
       "bl.active": "{name} — {n} domaines{whenPart}, plus les 178 intégrés.",
@@ -373,6 +382,7 @@
       "toast.refreshing": "Actualisation…",
       "toast.statsReset": "Statistiques réinitialisées",
       "toast.backExit": "Appuie de nouveau sur retour pour quitter",
+      "toast.notifDenied": "Permission refusée — notifications désactivées",
       "toast.invalidUrl": "URL invalide",
       "toast.youtubeResolving": "Recherche du flux YouTube…",
       "toast.youtubeChannelNotFound":
@@ -446,6 +456,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v239.item1":
+        "🔔 Android app: new-article notifications (turn on in settings) — an alert when a followed source publishes, even with the app closed.",
       "changelog.v238.item1":
         "🔖 Save and share now work with multiple articles per card — each row has its own icons.",
       "changelog.v237.item1":
@@ -733,6 +745,13 @@
       "ads.opt.block": "Blocked",
       "ads.opt.allow": "Shown",
 
+      "notif.label": "New articles",
+      "notif.desc.on":
+        "A notification alerts you when a followed source publishes new content, even with the app closed.",
+      "notif.desc.off": "No background check.",
+      "notif.opt.on": "On",
+      "notif.opt.off": "Off",
+
       "bl.builtin":
         "Built into the app: 178 domains. A public list blocks far more, and updates without reinstalling the app.",
       "bl.active": "{name} — {n} domains{whenPart}, plus the 178 built in.",
@@ -761,6 +780,7 @@
       "toast.refreshing": "Refreshing…",
       "toast.statsReset": "Activity stats reset",
       "toast.backExit": "Press back again to exit",
+      "toast.notifDenied": "Permission denied — notifications turned off",
       "toast.invalidUrl": "Invalid URL",
       "toast.youtubeResolving": "Looking up the YouTube feed…",
       "toast.youtubeChannelNotFound": "Could not determine this channel's RSS feed.",

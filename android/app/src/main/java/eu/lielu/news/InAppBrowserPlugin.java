@@ -1,8 +1,11 @@
 package eu.lielu.news;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Build;
 
 import androidx.activity.result.ActivityResult;
@@ -12,22 +15,32 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
 /**
- * Pont JS → natif du navigateur intégré.
+ * Pont JS → natif du navigateur intégré — et, depuis {@link #syncBackgroundFeeds}
+ * et {@link #setBackgroundNotifications}, de la vérification en arrière-plan
+ * (voir {@link NewsCheckWorker}). Même plugin, pas un second : les deux
+ * partagent déjà le même point d'entrée côté web ({@code Capacitor.Plugins.InAppBrowser}),
+ * ouvrir un second plugin pour deux méthodes n'aurait rien apporté.
  *
  * <p>Côté web, {@code index.html} appelle
  * {@code Capacitor.Plugins.InAppBrowser.open({url, title})} : c'est le seul
  * point d'entrée. Hors app packagée le plugin n'existe pas, et le lien garde
  * son comportement de navigateur (target=_blank) — voir {@code openArticle}.
  */
-@CapacitorPlugin(name = "InAppBrowser")
+@CapacitorPlugin(name = "InAppBrowser", permissions = {
+    @Permission(strings = { Manifest.permission.POST_NOTIFICATIONS }, alias = "notifications")
+})
 public class InAppBrowserPlugin extends Plugin {
 
     @PluginMethod
@@ -263,5 +276,67 @@ public class InAppBrowserPlugin extends Plugin {
         } catch (Exception e) {
             return 0;   // aucune raison de faire échouer le fil pour une marge
         }
+    }
+
+    /**
+     * Instantané des sources actives que {@link NewsCheckWorker} relira à son
+     * prochain réveil : chaque entrée porte l'URL RÉELLEMENT interrogée (déjà
+     * résolue côté web par {@code urlDuFlux}, jamais recalculée ici) et le
+     * lien de son article le plus récent tel qu'affiché dans le fil — voir
+     * {@code backgroundFeedSnapshot()} dans index.html. Appelé après chaque
+     * fil renouvelé, et pas seulement à l'activation du réglage : sinon le
+     * repère natif resterait celui du jour d'activation pour toujours.
+     *
+     * <p>Simple écriture, aucun aller-retour attendu par le web au-delà de la
+     * confirmation : {@code feeds} est déjà un JSON valide dans la forme que
+     * le worker attend, il n'y a rien à transformer.
+     */
+    @PluginMethod
+    public void syncBackgroundFeeds(PluginCall call) {
+        JSArray feeds = call.getArray("feeds");
+        if (feeds == null) { call.resolve(); return; }
+        getContext().getSharedPreferences(NewsCheckWorker.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(NewsCheckWorker.KEY_FEEDS, feeds.toString()).apply();
+        call.resolve();
+    }
+
+    /**
+     * Active ou désactive la vérification en arrière-plan (voir
+     * {@code setNotifPref} dans index.html). L'activation seule peut demander
+     * la permission système POST_NOTIFICATIONS (Android 13+) — d'où l'aller-
+     * retour par {@link #requestPermissionForAlias}, contrairement au reste
+     * des réglages du lecteur qui n'écrivent jamais que du localStorage.
+     */
+    @PluginMethod
+    public void setBackgroundNotifications(PluginCall call) {
+        boolean enabled = Boolean.TRUE.equals(call.getBoolean("enabled", Boolean.FALSE));
+        if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+            && getPermissionState("notifications") != PermissionState.GRANTED) {
+            requestPermissionForAlias("notifications", call, "notificationPermCallback");
+            return;
+        }
+        applyBackgroundNotifications(enabled);
+        call.resolve();
+    }
+
+    /** Suite de {@link #setBackgroundNotifications} après la réponse au dialogue
+     *  système. Un refus n'est PAS une erreur du point de vue du plugin — c'est
+     *  un choix légitime — donc jamais {@code call.reject} : le web redescend
+     *  sa case à cocher sur "enabled":false dans la réponse résolue. */
+    @PermissionCallback
+    private void notificationPermCallback(PluginCall call) {
+        boolean granted = getPermissionState("notifications") == PermissionState.GRANTED;
+        applyBackgroundNotifications(granted);
+        JSObject res = new JSObject();
+        res.put("enabled", granted);
+        call.resolve(res);
+    }
+
+    private void applyBackgroundNotifications(boolean enabled) {
+        SharedPreferences prefs = getContext()
+            .getSharedPreferences(NewsCheckWorker.PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putBoolean(NewsCheckWorker.KEY_ENABLED, enabled).apply();
+        if (enabled) NewsCheckWorker.schedule(getContext());
+        else NewsCheckWorker.cancel(getContext());
     }
 }

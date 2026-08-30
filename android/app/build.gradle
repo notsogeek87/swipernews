@@ -108,6 +108,10 @@ dependencies {
     // bibliothèque nouvelle n'entre dans le paquet, capacitor-android l'embarque
     // déjà ; on la remonte simplement sur le classpath du module app.
     implementation "androidx.webkit:webkit:$androidxWebkitVersion"
+    // Vérification en arrière-plan des sources (NewsCheckWorker) : réveil
+    // périodique garanti même l'app fermée ou le téléphone redémarré, sans
+    // service tiers — voir CLAUDE.md, « aucun appel à un tiers non choisi ».
+    implementation "androidx.work:work-runtime:$workManagerVersion"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
