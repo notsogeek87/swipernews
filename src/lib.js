@@ -614,13 +614,39 @@
    *  consécutifs de `n` éléments — le dernier groupe peut être plus court.
    *  `n<1` ou non entier retombe sur 1 (chaque article seul, le comportement
    *  d'origine : une carte, un article). Sert le réglage « Articles par carte »
-   *  (index.html, cardsPerSwipe) : le premier élément d'un groupe reste
-   *  l'article « héros » de la carte (image, titre, rail…), les suivants
-   *  s'affichent en aperçu compact — voir applyExtras/pvRowHTML. */
-  function groupItems(list, n) {
+   *  (index.html, cardsPerSwipe) : à N=1 chaque groupe est un singleton, et
+   *  au-delà les articles d'un groupe se partagent la carte à parts égales —
+   *  voir eqCardHTML/applyGroup.
+   *
+   *  `isSolo(item)`, optionnel : un article pour lequel elle rend vrai n'est
+   *  JAMAIS regroupé avec ses voisins, même au milieu d'un groupe en cours —
+   *  il ferme le groupe courant (s'il n'est pas vide), part seul dans le
+   *  sien, puis un groupe neuf démarre après lui. Sert à exclure les vidéos
+   *  du regroupement (index.html, videoIdOf) : une vidéo se lit SUR sa carte
+   *  (voir startVideo), ce qu'une ligne de carte à parts égales ne peut pas
+   *  offrir — sans cette exception elle perdait sa lecture intégrée dès que
+   *  cardsPerSwipe>1. */
+  function groupItems(list, n, isSolo) {
     const size = Number.isInteger(n) && n >= 1 ? n : 1;
+    const solo = typeof isSolo === "function" ? isSolo : null;
     const out = [];
-    for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+    let cur = [];
+    for (const it of list) {
+      if (solo && solo(it)) {
+        if (cur.length) {
+          out.push(cur);
+          cur = [];
+        }
+        out.push([it]);
+        continue;
+      }
+      cur.push(it);
+      if (cur.length >= size) {
+        out.push(cur);
+        cur = [];
+      }
+    }
+    if (cur.length) out.push(cur);
     return out;
   }
 

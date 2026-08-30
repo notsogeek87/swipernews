@@ -287,17 +287,7 @@
      laisser comprimer à l'exacte fraction 1/5 — ` .pvrow{overflow:hidden}`
      est le filet qui tronque plutôt que de laisser dépasser. */
   .card--eq{overflow:hidden}
-  /* padding-top réservé : SEULE la toute première ligne de la toute première
-     carte du fil (scrollTop=0) passe sous la barre du haut, mais réserver la
-     place partout est plus simple qu'un cas spécial, et la barre est un
-     CALQUE FIXE qui ne pousse jamais le reste du contenu (voir .top) — donc
-     sans cette réserve, un texte centré dans une ligne haute tombait dessous
-     (mesuré : ses clics étaient interceptés par la barre). Même construction
-     que le padding-top de .top elle-même (12px + max(inset, systop, plancher))
-     PLUS sa propre hauteur mesurée (contenu + son padding-bottom, ~87+14px) :
-     de quoi être sûr de dégager la barre quel que soit l'appareil. */
-  .card--eq .card__pv{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
-    padding-top:calc(113px + max(env(safe-area-inset-top),var(--systop,0px),var(--systop-min,0px)))}
+  .card--eq .card__pv{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
   /* .pvrow N'EST PAS un lien — seul .pvrow__title (voir plus bas) en est un.
      Deux essais précédents faisaient de la ligne ENTIÈRE (miniature comprise)
      un <a> plein format : plus rien, nulle part sur une carte à parts égales,
@@ -307,15 +297,25 @@
      ouvrait déjà un article). Ici, seul le TITRE ouvre — exactement comme sur
      une carte héros, où le fond de l'image ne fait rien d'autre que ce même
      geste. Le reste de la ligne (miniature, marges) est donc une zone morte
-     volontaire, pas un oubli.
-     align-items:CENTER, pas flex-end (essayé d'abord pour dégager la barre du
-     haut — voir le padding-top ci-dessus, qui règle déjà ce problème) : à peu
-     d'articles par carte (donc des lignes hautes), un bloc ancré en bas
-     laissait un vide écrasant au-dessus, lu comme un bug (« pas centré »). */
+     volontaire, pas un oubli — et c'est elle qui, associée à pointer-events
+     sur .top (voir plus bas), rend la barre du haut traversable au clic. La
+     réserve visuelle qui la dégage, elle, vit sur .pvrow:first-child, pas ici
+     (voir plus bas) : la barre étant FIXE à l'écran, elle chevauche le haut
+     de CHAQUE carte à parts égales une fois active, pas seulement la
+     première du fil — la réserve doit donc suivre la même règle. */
   .pvrow{position:relative;flex:1 1 0;min-height:0;display:flex;align-items:center;
     gap:14px;padding:10px 18px;background:var(--surface);
     border-bottom:1px solid rgba(255,255,255,.08)}
   .pvrow:last-child{border-bottom:0}
+  /* Dégage la barre du haut EN PLUS de pointer-events (voir .top) : celle-ci
+     ne porte pas qu'un dégradé mais aussi des pastilles à fond plein
+     (filtres) — un texte dessous restait donc illisible même une fois le
+     clic rendu traversant. Posé sur la ligne elle-même (jamais sur le
+     conteneur .card__pv) : la réserve hérite du fond déjà coloré de la ligne
+     (background ci-dessus), et se lit comme « la 1re ligne est un peu plus
+     haute », pas comme un bandeau vide flottant au-dessus d'elle — c'est ce
+     second rendu, essayé d'abord, qui ressemblait à un bug. */
+  .pvrow:first-child{padding-top:calc(10px + 113px + max(env(safe-area-inset-top),var(--systop,0px),var(--systop-min,0px)))}
   /* Miniature à taille FIXE (jamais étirée sur la hauteur de la ligne, très
      variable selon cardsPerSwipe — de ~150px à 5 articles à ~450px à 2) :
      un format carré souple (clamp) plutôt qu'un ancien essai en bande
@@ -327,9 +327,6 @@
     display:flex;align-items:center;justify-content:center;color:var(--ash)}
   .pvrow__thumb svg{width:28px;height:28px;opacity:.6}
   .pvrow__thumb img{width:100%;height:100%;object-fit:cover;display:block}
-  .pvrow__play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    color:#fff;background:rgba(0,0,0,.28)}
-  .pvrow__play svg{width:22px;height:22px;filter:drop-shadow(0 1px 4px rgba(0,0,0,.6));opacity:1}
   .pvrow__body{min-width:0;flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;gap:5px}
   .pvrow__source{font-family:var(--font-mono);font-size:11px;letter-spacing:-.03em;
     text-transform:uppercase;color:var(--flare);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -338,11 +335,12 @@
   .pvrow__title{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
     font-size:15px;line-height:1.3;font-weight:600;color:var(--ink);text-decoration:none;
     -webkit-tap-highlight-color:transparent}
-  /* Résumé et date : seulement quand la ligne a la place de les montrer, voir
-     pvRowHTML(it,n) — n grand (peu de place par ligne) les omet plutôt que de
-     les faire déborder. */
+  /* Résumé : TOUJOURS affiché quand l'article en a un (voir pvRowHTML) — une
+     seule ligne par défaut, étendue à 3 par --roomy (n<=2, ligne haute) pour
+     ne pas gâcher la place disponible. */
   .pvrow__desc{font-size:13px;line-height:1.4;color:var(--ink);opacity:.7;margin-top:1px;
-    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+  .pvrow__desc--roomy{-webkit-line-clamp:3}
   .pvrow__meta{font-size:11.5px;color:var(--ash);margin-top:1px}
   .pvrow__title:active{opacity:.65}
 
@@ -420,8 +418,19 @@
   .top{position:fixed;top:0;left:0;right:0;z-index:15;padding:12px 16px 14px;
     padding-top:calc(12px + max(env(safe-area-inset-top),var(--systop,0px),var(--systop-min,0px)));
     display:flex;flex-direction:column;gap:11px;background:linear-gradient(rgba(25,5,1,.82),rgba(25,5,1,.5) 65%,transparent);
-    transition:transform .32s ease,opacity .32s ease}
+    transition:transform .32s ease,opacity .32s ease;
+    pointer-events:none}   /* voir .top button ci-dessous : seuls SES boutons captent le clic */
   .top.top--away{transform:translateY(-115%);opacity:0;pointer-events:none}  /* masqué pendant le swipe */
+  /* Le calque de la barre elle-même (dégradé, marges entre boutons) laisse
+     passer le clic à travers lui jusqu'à la carte en dessous — SEULS ses
+     boutons (rechargement, menu, filtres) le captent. La 1re ligne d'une
+     carte à parts égales s'en écarte déjà (.pvrow:first-child, voir plus
+     haut) : ceci est le filet, pas la protection principale — au cas où un
+     appui atteindrait quand même le bord de la barre (petit écran, texte
+     qui déborde un peu). Une carte héros n'a jamais eu ce problème (son
+     texte reste ancré en bas, jamais sous la barre), donc rien à côté de
+     .top elle-même n'a besoin de ce traitement. */
+  .top button{pointer-events:auto}
   .topline{display:flex;align-items:center;justify-content:space-between;gap:8px}
   /* Rangée des filtres, et d'eux seuls. C'est la marque qui cède la place aux
      boutons (elle se coupe au filet sur un écran étroit), jamais les pastilles :
@@ -1434,9 +1443,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=227"></script>
-<script src="src/learn-core.js?v=227"></script>
-<script src="src/i18n.js?v=227"></script>
+<script src="src/lib.js?v=228"></script>
+<script src="src/learn-core.js?v=228"></script>
+<script src="src/i18n.js?v=228"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2382,7 +2391,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="227";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="228";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4417,16 +4426,12 @@ function markOneSeen(it){
   else if(!videoIdOf(it))addSeenNews(it);
 }
 /* Marquage « vu » IMMÉDIAT pour un article ouvert depuis une ligne d'une
-   carte à parts égales (cardsPerSwipe>1, voir pvRowHTML) : markVisibleSeen
-   marquera de toute façon TOUT le groupe une fois la carte quittée (voir
-   plus haut), mais seulement à ce moment-là — fermer l'app juste après avoir
-   tapé, sans avoir swipé, ne devrait pas faire perdre le geste. Pour une
-   VIDÉO, c'est même le SEUL déclencheur : markOneSeen l'exclut toujours
-   (vue au lancement, pas à l'affichage — voir plus haut), et une ligne
-   d'aperçu ne peut pas « lancer » une vidéo sur place (un seul lecteur à la
-   fois, voir startVideo) — d'où vidéo INCLUSE ici. Une ligne croisée mais
-   jamais tapée ni scrollée-au-delà reste non-vue et peut revenir au prochain
-   rendu — comme une vidéo jamais lancée, assumé. */
+   carte à parts égales (cardsPerSwipe>1, voir pvRowHTML — jamais une vidéo,
+   toujours exclue du regroupement par isSolo dans render()) :
+   markVisibleSeen marquera de toute façon TOUT le groupe une fois la carte
+   quittée (voir plus haut), mais seulement à ce moment-là — fermer l'app
+   juste après avoir tapé, sans avoir swipé, ne devrait pas faire perdre le
+   geste. */
 function markPreviewOpened(it){
   if(!it)return;
   if(it.kind==="learn")addSeen(it);else addSeenNews(it);
@@ -4861,33 +4866,35 @@ function eqCardHTML(grp,id){
   </article>`;
 }
 /* Ligne d'un article au sein d'une carte à parts égales (cardsPerSwipe>1) :
-   pas d'image de fond plein écran, pas de rail, pas de sondes payant/
+   jamais une vidéo (isSolo l'exclut du regroupement dans render(), voir son
+   commentaire — elle garde sa propre carte héros et sa lecture intégrée).
+   Pas d'image de fond plein écran, pas de rail, pas de sondes payant/
    sponsorisé/image manquante — juste de quoi identifier l'article et
    l'ouvrir, comme une ligne d'« Articles en mémoire » (histRowHTML) mais
    posée dans le fil et dimensionnée pour occuper sa part égale de l'écran
    (voir CSS .pvrow). SEUL le titre est un lien (voir le commentaire CSS de
    .pvrow) : la miniature, elle, est délibérément inerte. Sans image, elle
-   reprend l'icône « lire » (ICON_READ) plutôt qu'un vide. Vidéo : la ligne
-   ne peut pas jouer sur place (un seul lecteur à la fois dans le fil, voir
-   startVideo) donc un tap ouvre directement l'article, jamais en mode
-   lecture (data-vid déclenche noReader dans la délégation de clic).
-   `n` (taille du groupe) décide de ce qui TIENT en plus du titre : à peu
-   d'articles la ligne est haute, il y a la place pour un résumé et la date ;
-   au-delà, seuls la source et le titre restent sûrs de ne pas déborder — la
-   hauteur RÉELLE de la ligne n'est pas connue à ce stade (elle dépend du
-   CSS), donc le seuil se fait sur `n`, pas sur une mesure. */
+   reprend l'icône « lire » (ICON_READ) plutôt qu'un vide.
+   `n` (taille du groupe) ne décide plus SI le résumé s'affiche (toujours,
+   quand l'article en a un) mais sur COMBIEN de lignes : la hauteur RÉELLE
+   d'une ligne n'est pas connue à ce stade (elle dépend du CSS), donc le
+   seuil se fait sur `n` plutôt que sur une mesure — au-delà de 2
+   articles/carte, une seule ligne de résumé, .pvrow{overflow:hidden} coupant
+   de toute façon ce qui déborderait. */
 function pvRowHTML(it,n){
   const img=safeImg(it.img,location.href);
   const link=it.link?safeLink(it.link,location.href):"";
-  const vid=videoIdOf(it);
   const titleTag=link?"a":"span";
-  const titleAttrs=link
-    ?` data-pv data-open${vid?` data-vid="${escAttr(vid)}"`:""} href="${escAttr(link)}" target="_blank" rel="noopener"`
-    :` data-pv`;
-  const descHTML=n<=2&&it.desc?`<p class="pvrow__desc">${esc(it.desc)}</p>`:"";
-  const metaHTML=n<=3&&it.date?`<span class="pvrow__meta">${relTime(it.date)}</span>`:"";
+  const titleAttrs=link?` data-pv data-open href="${escAttr(link)}" target="_blank" rel="noopener"`:` data-pv`;
+  // Résumé : toujours affiché quand l'article en a un, mais sur UNE seule
+  // ligne au-delà de 2 articles/carte (--roomy l'étend à 3, voir CSS) — une
+  // ligne compacte n'a pas la hauteur pour plus, et .pvrow{overflow:hidden}
+  // couperait de toute façon un résumé trop long, mais tronquer au bon
+  // nombre de lignes évite une coupure en plein mot.
+  const descHTML=it.desc?`<p class="pvrow__desc${n<=2?" pvrow__desc--roomy":""}">${esc(it.desc)}</p>`:"";
+  const metaHTML=it.date?`<span class="pvrow__meta">${relTime(it.date)}</span>`:"";
   return `<div class="pvrow">
-    <div class="pvrow__thumb">${img?`<img src="${escAttr(img)}" alt="" loading="lazy">`:ICON_READ}${vid?`<span class="pvrow__play">${ICON_PLAY}</span>`:""}</div>
+    <div class="pvrow__thumb">${img?`<img src="${escAttr(img)}" alt="" loading="lazy">`:ICON_READ}</div>
     <div class="pvrow__body">
       <span class="pvrow__source">${esc(it.source)}</span>
       <${titleTag} class="pvrow__title"${titleAttrs}>${esc(it.title)}</${titleTag}>
@@ -4932,8 +4939,15 @@ function render(forceTop,altAnchor){
      réconciliée par le lien de son PREMIER article (exactement comme avant
      cardsPerSwipe : à N=1 chaque groupe est un singleton, comportement
      inchangé au bit près) — mais qu'un groupe compte 1 ou N articles décide
-     entièrement de sa FORME (héros ou parts égales), voir applyGroup. */
-  const groups=groupItems(items,cardsPerSwipe);
+     entièrement de sa FORME (héros ou parts égales), voir applyGroup.
+     Une vidéo (videoIdOf) est TOUJOURS seule dans son groupe (isSolo) : elle
+     se lit SUR sa carte (voir startVideo, « UN lecteur au plus dans tout le
+     fil »), ce qu'une ligne de carte à parts égales ne peut pas offrir — sans
+     cette exception, grouper une vidéo lui faisait perdre sa lecture intégrée
+     et l'ouvrait comme un lien ordinaire, expérience différente du reste du
+     fil pour rien de mieux en échange. Les groupes n'ont donc plus tous la
+     même taille : voir groupIndexAt ci-dessous pour l'anchor/resume. */
+  const groups=groupItems(items,cardsPerSwipe,it=>!!videoIdOf(it));
   let cursor=feedEl.firstElementChild;
   for(const grp of groups){
     const first=grp[0];
@@ -4965,8 +4979,18 @@ function render(forceTop,altAnchor){
     cursor=next;
   }
   // Index dans `items` (granularité article) -> index de carte dans le fil
-  // (granularité groupe, voir groupItems ci-dessus) : à N=1 c'est l'identité.
-  const groupIndexOf=flatI=>Math.floor(flatI/Math.max(1,cardsPerSwipe));
+  // (granularité groupe, voir groupItems ci-dessus). Les groupes n'ont pas
+  // tous la même taille (une vidéo est toujours seule dans le sien, voir
+  // isSolo plus haut) : une simple division ne suffit donc plus, il faut
+  // parcourir `groups` en cumulant leurs tailles jusqu'à dépasser `flatI`.
+  const groupIndexOf=flatI=>{
+    let acc=0;
+    for(let g=0;g<groups.length;g++){
+      acc+=groups[g].length;
+      if(flatI<acc)return g;
+    }
+    return Math.max(0,groups.length-1);
+  };
   let top=0;
   if(forceTop){
     resumePending=false;                        // ordre explicite : pas de reprise à ignorer
@@ -5334,12 +5358,7 @@ feedEl.addEventListener("click",e=>{
       const hit=grp.find(x=>x.link&&safeLink(x.link,location.href)===openLink.getAttribute("href"));
       if(hit)markPreviewOpened(hit);
     }
-    // noReader pour une vidéo d'aperçu : le mode lecture n'est jamais tenté
-    // sur une vidéo (voir CLAUDE.md), et ici il n'y a de toute façon aucune
-    // lecture SUR la carte possible (un seul lecteur à la fois, voir
-    // startVideo) — un tap ouvre directement, comme "Ouvrir sur YouTube".
-    const opts=pv&&pv.dataset.vid?{noReader:true}:undefined;
-    if(openArticle(openLink.href,t?t.textContent:"",opts))e.preventDefault();
+    if(openArticle(openLink.href,t?t.textContent:""))e.preventDefault();
   }
 });
 /* Rail unique : il agit sur la carte visible (une seule instance pour toute

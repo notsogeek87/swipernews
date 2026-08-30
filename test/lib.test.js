@@ -1135,6 +1135,32 @@ test("groupItems(list,1) équivaut au comportement d'origine : un article par gr
   assert.deepEqual(lib.groupItems(list, 2.5), [["a"], ["b"], ["c"]]);
 });
 
+test("groupItems(list,n,isSolo) isole les articles solo, même en plein groupe", () => {
+  const isVid = (x) => x.startsWith("v");
+  // Un solo EN MILIEU de groupe ferme le groupe en cours, part seul, puis un
+  // groupe neuf démarre après lui — jamais fusionné avec ses voisins.
+  assert.deepEqual(lib.groupItems(["a", "b", "v1", "c", "d"], 2, isVid), [
+    ["a", "b"],
+    ["v1"],
+    ["c", "d"],
+  ]);
+  // Solo pile à la frontière d'un groupe : ne casse rien de plus qu'un solo
+  // ordinaire.
+  assert.deepEqual(lib.groupItems(["a", "v1", "b", "c"], 2, isVid), [
+    ["a"],
+    ["v1"],
+    ["b", "c"],
+  ]);
+  // Solos consécutifs : chacun son groupe.
+  assert.deepEqual(lib.groupItems(["v1", "v2", "a"], 3, isVid), [["v1"], ["v2"], ["a"]]);
+  // Sans isSolo (ou une fonction qui ne dit jamais oui) : comportement de
+  // base inchangé, chunks de taille fixe.
+  assert.deepEqual(
+    lib.groupItems(["a", "b", "c"], 2, () => false),
+    [["a", "b"], ["c"]]
+  );
+});
+
 /* ---------- Dédoublonnage des actus entre flux ---------- */
 
 const art = (o) =>
