@@ -619,35 +619,45 @@
    *  voir eqCardHTML/applyGroup.
    *
    *  `isSolo(item)`, optionnel : un article pour lequel elle rend vrai n'est
-   *  JAMAIS regroupé avec ses voisins, même au milieu d'un groupe en cours —
-   *  il ferme le groupe courant (s'il n'est pas vide), part seul dans le
-   *  sien, puis un groupe neuf démarre après lui. Sert à exclure les vidéos
-   *  du regroupement (index.html, videoIdOf) : une vidéo se lit SUR sa carte
-   *  (voir startVideo), ce qu'une ligne de carte à parts égales ne peut pas
-   *  offrir — sans cette exception elle perdait sa lecture intégrée dès que
-   *  cardsPerSwipe>1. */
+   *  JAMAIS regroupé avec ses voisins — il part TOUJOURS seul dans sa propre
+   *  carte. Sert à exclure les vidéos du regroupement (index.html, videoIdOf) :
+   *  une vidéo se lit SUR sa carte (voir startVideo), ce qu'une ligne de carte
+   *  à parts égales ne peut pas offrir.
+   *
+   *  Les articles solo sont RETIRÉS avant le découpage, pas simplement
+   *  traités comme une frontière de groupe : un premier essai fermait le
+   *  groupe en cours dès qu'un solo apparaissait, même à peine commencé — sur
+   *  un fil où actus et vidéos alternent strictement (le tour de rôle « une
+   *  actu, une vidéo », voir CLAUDE.md), quasi CHAQUE actu se retrouvait
+   *  interrompue avant même d'avoir un deuxième voisin, donc quasi TOUJOURS
+   *  seule malgré cardsPerSwipe>1 — l'inverse de ce que règle ce prédicat.
+   *  Ici, les articles « groupables » (non-solo) sont d'abord chaînés dans
+   *  leur ordre d'origine, SANS les solos intercalés, puis découpés en
+   *  tranches de `n` bien pleines (dernière tranche exceptée) — un solo ne
+   *  peut donc plus jamais fragmenter un groupe en cours. Le résultat est
+   *  ensuite refusionné avec les solos, chaque groupe repris à la position
+   *  de son PREMIER membre : l'ordre global reste proche de l'original, sans
+   *  que la présence d'un solo entre deux articles groupés ne les sépare. */
   function groupItems(list, n, isSolo) {
     const size = Number.isInteger(n) && n >= 1 ? n : 1;
     const solo = typeof isSolo === "function" ? isSolo : null;
-    const out = [];
-    let cur = [];
-    for (const it of list) {
-      if (solo && solo(it)) {
-        if (cur.length) {
-          out.push(cur);
-          cur = [];
-        }
-        out.push([it]);
-        continue;
-      }
-      cur.push(it);
-      if (cur.length >= size) {
-        out.push(cur);
-        cur = [];
-      }
+    if (!solo) {
+      const out = [];
+      for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+      return out;
     }
-    if (cur.length) out.push(cur);
-    return out;
+    const groupable = [];
+    const tagged = [];
+    list.forEach((it, i) => {
+      if (solo(it)) tagged.push({ at: i, items: [it] });
+      else groupable.push({ at: i, item: it });
+    });
+    for (let i = 0; i < groupable.length; i += size) {
+      const slice = groupable.slice(i, i + size);
+      tagged.push({ at: slice[0].at, items: slice.map((x) => x.item) });
+    }
+    tagged.sort((a, b) => a.at - b.at);
+    return tagged.map((g) => g.items);
   }
 
   /** Extrait le contenu d'une balise <meta>, quel que soit l'ordre des attributs.

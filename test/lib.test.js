@@ -1135,21 +1135,22 @@ test("groupItems(list,1) équivaut au comportement d'origine : un article par gr
   assert.deepEqual(lib.groupItems(list, 2.5), [["a"], ["b"], ["c"]]);
 });
 
-test("groupItems(list,n,isSolo) isole les articles solo, même en plein groupe", () => {
+test("groupItems(list,n,isSolo) isole les articles solo, sans jamais fragmenter un groupe en cours", () => {
   const isVid = (x) => x.startsWith("v");
-  // Un solo EN MILIEU de groupe ferme le groupe en cours, part seul, puis un
-  // groupe neuf démarre après lui — jamais fusionné avec ses voisins.
+  // Un solo EN MILIEU d'une paire ne la sépare pas : les deux voisins
+  // groupables (a et b) se retrouvent ensemble, le solo est juste retiré
+  // avant découpage et reprend sa place à sa position d'origine.
+  assert.deepEqual(lib.groupItems(["a", "v1", "b", "c"], 2, isVid), [
+    ["a", "b"],
+    ["v1"],
+    ["c"],
+  ]);
+  // Solo déjà à la frontière d'un groupe : rien à fragmenter, résultat
+  // identique à un simple retrait.
   assert.deepEqual(lib.groupItems(["a", "b", "v1", "c", "d"], 2, isVid), [
     ["a", "b"],
     ["v1"],
     ["c", "d"],
-  ]);
-  // Solo pile à la frontière d'un groupe : ne casse rien de plus qu'un solo
-  // ordinaire.
-  assert.deepEqual(lib.groupItems(["a", "v1", "b", "c"], 2, isVid), [
-    ["a"],
-    ["v1"],
-    ["b", "c"],
   ]);
   // Solos consécutifs : chacun son groupe.
   assert.deepEqual(lib.groupItems(["v1", "v2", "a"], 3, isVid), [["v1"], ["v2"], ["a"]]);
@@ -1159,6 +1160,29 @@ test("groupItems(list,n,isSolo) isole les articles solo, même en plein groupe",
     lib.groupItems(["a", "b", "c"], 2, () => false),
     [["a", "b"], ["c"]]
   );
+});
+
+test("groupItems(list,n,isSolo) : une alternance stricte solo/groupable groupe quand même normalement", () => {
+  // Cas réel qui a motivé la réécriture : le tour de rôle « une actu, une
+  // vidéo » (voir CLAUDE.md) alterne STRICTEMENT les deux natures. Fermer le
+  // groupe en cours à chaque solo rencontré (premier essai) donnait alors
+  // une carte de 1 article sur deux, quel que soit cardsPerSwipe — plus
+  // aucun regroupement effectif. Ici, les 6 articles groupables doivent
+  // toujours former des paires pleines, la vidéo n'étant plus qu'un
+  // « figurant » qui garde sa place sans rien fragmenter.
+  const isVid = (x) => x.startsWith("v");
+  const alt = ["a1", "v1", "a2", "v2", "a3", "v3", "a4", "v4", "a5", "v5", "a6", "v6"];
+  assert.deepEqual(lib.groupItems(alt, 2, isVid), [
+    ["a1", "a2"],
+    ["v1"],
+    ["v2"],
+    ["a3", "a4"],
+    ["v3"],
+    ["v4"],
+    ["a5", "a6"],
+    ["v5"],
+    ["v6"],
+  ]);
 });
 
 /* ---------- Dédoublonnage des actus entre flux ---------- */
