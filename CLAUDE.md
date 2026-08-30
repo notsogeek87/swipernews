@@ -629,6 +629,24 @@ genre de script dérape.
   redistribuer, et une carte héros neuve hérite du groupe fantôme d'un fil
   quitté. L'instantané mémorise aussi `cards:cardsPerSwipe`, pour la même
   raison que `mix` : le HTML retenu porte le regroupement d'alors.
+- `showTop()` / `hideTop()` / `armerRetraitBarre()` — la barre du haut est un
+  CALQUE au-dessus du fil, masqué au moindre défilement et rappelé d'un tap sur
+  une carte. Elle repart aussi TOUTE SEULE après `TOP_AWAY_MS` (3 s) : revenue
+  d'un tap, elle restait sinon posée là indéfiniment tant que le doigt ne
+  bougeait plus — sur une carte à parts égales, exactement par-dessus la 1re
+  ligne (mesuré : titre recouvert à 100 % dès `cardsPerSwipe` ≥ 4). Deux
+  situations REPORTENT l'échéance sans jamais l'annuler : un panneau ouvert
+  (`topEl.inert`, le signal déjà posé par `openDialog` — sans lui, l'accueil du
+  1er lancement consommait les 3 s et le tout premier fil s'affichait sans
+  barre) et une navigation au CLAVIER dans la barre. Ce second test est
+  `:focus-visible`, **jamais** `contains(document.activeElement)` :
+  `closeDialog` rend le focus au bouton qui a ouvert le panneau, donc souvent à
+  un bouton de la barre, au doigt comme au clavier — avec `activeElement`, tout
+  panneau refermé laissait la barre à l'écran pour toujours. Et `closeDialog`
+  réarme explicitement, pour que la fermeture d'un panneau donne 3 s pleines et
+  non le reliquat d'une échéance reportée. Le flou (`.top::before`) est la même
+  recette que celle du bloc de texte d'une carte avec image — un seul flou dans
+  l'app, et UNE surface fixe, jamais une par carte (voir le rail).
 - `feedKey()` — identité du fil : LANG, les deux filtres (source d'actu, thème
   Wikipédia). Cache local, `feedSnap` et test « même fil » en dépendent.
   **`cardsPerSwipe` n'en fait PAS partie** : il ne change rien à ce qui est

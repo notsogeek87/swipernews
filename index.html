@@ -307,9 +307,13 @@
      suffit déjà à ce qu'aucun tap ne se perde ; ce qui reste, c'est que le
      TEXTE de la 1re ligne peut se retrouver visuellement sous les pastilles
      de la barre le temps qu'un utilisateur la réaffiche exprès en tapant
-     dessus — la barre est masquée par défaut pendant le défilement (voir
-     .top--away), ce carre de figure est donc rare et se referme au tap
-     suivant, contrepartie jugée préférable à l'espace perdu en permanence. */
+     dessus. Deux choses bornent ce cas de figure, et c'est ce qui a fait
+     préférer la contrepartie à l'espace perdu en permanence : la barre est
+     masquée par défaut pendant le défilement (voir .top--away) et, revenue,
+     elle repart TOUTE SEULE au bout de TOP_AWAY_MS sans rien demander (voir
+     armerRetraitBarre) ; et tant qu'elle est là, son flou (voir .top::before)
+     traite le texte qu'elle recouvre comme une texture plutôt que comme des
+     mots à moitié lisibles. */
   .pvrow{position:relative;flex:1 1 0;min-height:0;display:flex;align-items:center;
     gap:14px;padding:10px 18px;background:var(--surface);
     border-bottom:1px solid rgba(255,255,255,.08)}
@@ -447,6 +451,31 @@
     transition:transform .32s ease,opacity .32s ease;
     pointer-events:none}   /* voir .top button ci-dessous : seuls SES boutons captent le clic */
   .top.top--away{transform:translateY(-115%);opacity:0;pointer-events:none}  /* masqué pendant le swipe */
+  /* Flou derrière la barre, MÊME recette que le bloc de texte d'une carte avec
+     image (.card--img .card__body::before) : un seul flou dans toute l'app,
+     posé de la même façon — calque absolu en z-index:-1, masqué en dégradé
+     pour se fondre au lieu de laisser une arête nette au bas de la barre.
+     Il traite ce que le seul dégradé sombre ne traitait pas : sur une carte à
+     parts égales, la 1re ligne passe SOUS la barre (voir le commentaire de
+     .pvrow), et son titre y restait lisible-mais-brouillon, mot à mot, à
+     travers le voile. Flouté, il redevient une texture, et la barre se lit
+     comme un calque à part.
+     Le coût redouté par le rail (voir son commentaire : jusqu'à 120 surfaces
+     de flou) n'existe pas ici — la barre est UNE surface fixe, comme le rail
+     l'est devenu, pas une par carte. Le dégradé reste sur .top : il se peint
+     AVANT ce calque, qui le refloute sans rien y changer (flouter un dégradé
+     vertical rend le même dégradé).
+     Le 84 % du masque n'est pas une valeur ronde : il est réglé pour que le
+     flou couvre ENTIÈREMENT la rangée des filtres (la dernière chose de la
+     barre, jusqu'à ~90 % de sa hauteur) et ne se fonde qu'en dessous d'elle.
+     Réglé plus court (62 % essayé), le fondu commençait au milieu des
+     pastilles : le texte de la carte redevenait net pile derrière elles,
+     exactement là où on cherchait à le calmer. */
+  .top::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+    -webkit-backdrop-filter:blur(18px) saturate(.85);
+    backdrop-filter:blur(18px) saturate(.85);
+    -webkit-mask-image:linear-gradient(#000 84%,transparent 100%);
+    mask-image:linear-gradient(#000 84%,transparent 100%)}
   /* Le calque de la barre elle-même (dégradé, marges entre boutons) laisse
      passer le clic à travers lui jusqu'à la carte en dessous — SEULS ses
      boutons (rechargement, menu, filtres) le captent. C'est la SEULE
@@ -1452,9 +1481,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=236"></script>
-<script src="src/learn-core.js?v=236"></script>
-<script src="src/i18n.js?v=236"></script>
+<script src="src/lib.js?v=237"></script>
+<script src="src/learn-core.js?v=237"></script>
+<script src="src/i18n.js?v=237"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2417,7 +2446,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="236";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="237";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2428,6 +2457,8 @@ const APP_VERSION="236";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:237,date:"2026-08-30",items:[
+    "changelog.v237.item1"]},
   {v:233,date:"2026-08-30",items:[
     "changelog.v233.item1"]},
   {v:224,date:"2026-08-29",items:[
@@ -5701,13 +5732,61 @@ function showTop(){
   // le nom se réécrirait à chaque tap.
   const revenait=topEl.classList.contains("top--away");
   topEl.classList.remove("top--away");document.body.classList.remove("top-away");
+  armerRetraitBarre();   // elle repartira seule, voir plus bas
   if(revenait)typeBrand();
   if(peekEl.classList.contains("peek--new")){
     peekEl.classList.remove("peek--new");
     try{localStorage.setItem(LS_PEEK,"1");}catch(e){warn("save peek",e);}
   }
 }
-function hideTop(){topEl.classList.add("top--away");document.body.classList.add("top-away");}
+function hideTop(){clearTimeout(topAwayTimer);topEl.classList.add("top--away");document.body.classList.add("top-away");}
+/* Retrait AUTOMATIQUE de la barre du haut. Elle ne partait jusqu'ici que sur
+   un vrai défilement (onScrollFrame) : revenue d'un tap, elle restait posée
+   là indéfiniment tant que le doigt ne bougeait plus — sur une carte à parts
+   égales, exactement par-dessus la 1re ligne (voir le commentaire de .pvrow).
+   Elle s'efface donc d'elle-même après TOP_AWAY_MS, par le MÊME chemin que le
+   défilement (hideTop, donc la même transition) : rien de nouveau à l'écran,
+   juste un second déclencheur.
+   Le compte à rebours est REPARTI de zéro à chaque showTop(), jamais empilé —
+   sans le clearTimeout, deux taps rapprochés armeraient deux minuteries et la
+   première ferait disparaître la barre bien avant les 3 s du dernier tap.
+   Deux situations le REPORTENT (elles le relancent, elles ne l'annulent
+   jamais : la barre finit toujours par partir) :
+   - un PANNEAU est ouvert. Il recouvre le fil, donc la barre n'est de toute
+     façon pas à l'écran, et le compte à rebours se viderait dans le vide —
+     au 1er lancement, où l'accueil s'ouvre tout seul, la barre serait déjà
+     partie à sa fermeture et le tout premier fil s'afficherait sans marque,
+     sans filtres et sans bouton menu à voir. `inert` est le signal déjà posé
+     par openDialog sur ces trois calques (voir bgLayers), pas un drapeau de
+     plus à tenir à jour ;
+   - le CLAVIER tient un bouton de la barre : l'effacer ferait disparaître
+     l'élément focalisé sous les doigts de qui navigue à la tabulation. Le
+     critère est `:focus-visible`, JAMAIS `contains(document.activeElement)` :
+     closeDialog REND le focus au bouton qui a ouvert le panneau (voir
+     lastFocused), souvent un bouton de cette barre — au doigt comme au
+     clavier. Avec activeElement, refermer le menu laissait donc la barre
+     posée à l'écran pour toujours, chaque échéance se reportant elle-même.
+     `:focus-visible` ne répond oui que quand le navigateur a jugé bon
+     d'afficher le halo de focus, c'est-à-dire précisément à la navigation au
+     clavier — le seul cas où la question se pose.
+   Le report se relance sur le champ à l'échéance, mais la fin d'un panneau,
+   elle, ne s'attend pas : closeDialog réarme (voir sa dernière ligne), sinon
+   une échéance reportée juste avant la fermeture emportait la barre dans la
+   seconde qui suit, au lieu des 3 s pleines. */
+const TOP_AWAY_MS=3000;
+let topAwayTimer=null;
+const focusClavierDansBarre=()=>{try{return !!topEl.querySelector(":focus-visible");}catch(_){return false;}};
+function armerRetraitBarre(){
+  clearTimeout(topAwayTimer);
+  topAwayTimer=setTimeout(()=>{
+    if(topEl.inert||focusClavierDansBarre()){armerRetraitBarre();return;}
+    hideTop();
+  },TOP_AWAY_MS);
+}
+/* La barre est visible au lancement (aucune classe .top--away dans le HTML) :
+   ce premier armement est ce qui la fait partir sans attendre un premier
+   geste, comme après n'importe quel showTop(). */
+armerRetraitBarre();
 /* Le traitement du scroll est groupé dans un requestAnimationFrame : il lit la
    géométrie (dont scrollHeight, coûteux sur un fil de cartes plein écran) puis
    écrit des styles. En le faisant à chaque événement, on alternait lectures et
@@ -5857,6 +5936,9 @@ function closeDialog(el,fromHistory){
   // Panneau refermé sans valider au 1er lancement : le fil n'a encore rien
   // chargé (on ne charge plus derrière la feuille), il faut le faire.
   if(!feedLoadStarted)loadFeeds();
+  // La barre du haut redevient visible et atteignable : elle repart pour
+  // 3 s PLEINES (voir armerRetraitBarre, dernier paragraphe).
+  armerRetraitBarre();
 }
 /* Bascule du menu vers un panneau plus précis SANS toucher à l'historique :
    `to` reprend l'entrée déjà posée par `from` (voir pushDialogState) — en

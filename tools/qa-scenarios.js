@@ -126,6 +126,30 @@ async function boot(opts = {}) {
   return { browser, ctx, page, errors };
 }
 
+/* La barre du haut est un calque qui se masque au moindre défilement ET repart
+   tout seul au bout de TOP_AWAY_MS (3 s, voir armerRetraitBarre dans
+   index.html). Un scénario qui attend le chargement d'un lot entre deux appuis
+   vise donc un bouton déjà parti — d'où « element is outside of the
+   viewport ». On la ramène d'un showTop(), même geste que `memoire`/`back`
+   pour les boutons du menu.
+   Les deux fonctions plutôt qu'une : `avancewiki` CHRONOMÈTRE l'appui, et doit
+   pouvoir rappeler la barre AVANT de lancer son chrono — sinon les 200 ms
+   d'attente entrent dans la mesure et le « ~80 ms servi par la réserve »
+   devient ~280 ms, pour une raison qui n'a rien à voir avec la réserve. */
+async function ramenerBarre(page) {
+  await page.evaluate(() => showTop());
+  // 400 ms, pas 200 : la barre revient par une TRANSITION de .32 s, et
+  // page.click() attend qu'un élément soit « stable » (immobile) avant de
+  // cliquer. À 200 ms, cette attente-là tombait DANS le chrono d'`avancewiki`
+  // et gonflait ses ~80 ms à ~300 — un chiffre qui n'aurait rien dit de la
+  // réserve.
+  await page.waitForTimeout(400);
+}
+async function appuyerRecharger(page) {
+  await ramenerBarre(page);
+  await page.click("#reloadBtn");
+}
+
 const READY = {
   "fluxswipe.interests.v1": JSON.stringify(["sciences", "histoire"]),
   "fluxswipe.lang.v1": "fr",
@@ -1366,7 +1390,7 @@ const scenarios = {
     };
     await rendreCompte("au lancement");
     for (let k = 1; k <= 5; k++) {
-      await page.click("#reloadBtn");
+      await appuyerRecharger(page);
       await page.waitForTimeout(2500);
       await rendreCompte(`↻ n°${k}`);
     }
@@ -1410,7 +1434,7 @@ const scenarios = {
     let avant = await tetes();
     console.log("au lancement :", avant.join(" | "));
     for (let k = 1; k <= 3; k++) {
-      await page.click("#reloadBtn");
+      await appuyerRecharger(page);
       await page.waitForTimeout(2500);
       const apres = await tetes();
       const revenues = apres.filter((t) => avant.includes(t));
@@ -1469,6 +1493,8 @@ const scenarios = {
       // + la latence), comme le ferait quelqu'un qui lit entre deux appuis.
       await page.waitForTimeout(2500 + LAT + 600);
       appels = [];
+      // Barre ramenée AVANT le chrono : voir le commentaire de ramenerBarre.
+      await ramenerBarre(page);
       const t0 = Date.now();
       await page.click("#reloadBtn");
       let vu = -1;
@@ -1514,7 +1540,7 @@ const scenarios = {
     });
     if (!marques) console.log("réserve absente : impossible de tester le refiltrage");
     else {
-      await page.click("#reloadBtn");
+      await appuyerRecharger(page);
       await page.waitForTimeout(1200);
       const revenus = await page.evaluate(
         (t) => items.filter((i) => t.includes(i.title)).map((i) => i.title),

@@ -53,6 +53,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v237.item1":
+        "🫧 La barre du haut se floute derrière elle et s'efface toute seule au bout de 3 s — le temps de viser un bouton, pas plus.",
       "changelog.v233.item1":
         "🎚️ Le filtre vidéo des sources devient un choix à 3 : tout, vidéos seulement, ou articles (actus + Wikipédia, sans les vidéos).",
       "changelog.v224.item1":
@@ -442,6 +444,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v237.item1":
+        "🫧 The top bar now blurs what sits behind it and slides away on its own after 3s — long enough to aim for a button, no longer.",
       "changelog.v233.item1":
         "🎚️ The video-only source filter is now a 3-way choice: everything, videos only, or articles (news + Wikipedia, no videos).",
       "changelog.v224.item1":
