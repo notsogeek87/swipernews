@@ -711,6 +711,18 @@
   .sheet__grip{width:44px;height:5px;border-radius:var(--radius-sm);background:var(--ash);opacity:.4;margin:0 auto 20px}
   .sheet h2{font-family:var(--font-sans);font-size:20px;font-weight:700;margin-bottom:4px;letter-spacing:-.02em}
   .sheet p.sub{color:var(--ash);font-size:14px;margin-bottom:18px}
+  /* Rappel notifs (#notifNudgeSheet et sa variante accolée au journal des
+     nouveautés, [data-notifnudge]) : contenu COURT et isolé (titre, une
+     phrase, deux/trois boutons) — centré, contrairement aux feuilles de
+     contenu (listes de réglages, journal) qui restent alignées à gauche par
+     défaut, seule mise en page qui leur convient. Plus tard/Non réutilisent
+     .prefsub__acts (la paire de boutons du bloc-liste), qui les taille à leur
+     contenu (flex:0, pensé pour deux petites pastilles) — ici on veut au
+     contraire qu'ils se PARTAGENT toute la largeur, à égalité, pour aligner
+     leurs bords sur ceux du bouton Activer au-dessus : flex:1 l'emporte sur
+     la règle plus générale par spécificité du sélecteur. */
+  #notifNudgeSheet .sheet__panel,[data-notifnudge]{text-align:center}
+  #notifNudgeSheet .prefsub__acts .iobtn,[data-notifnudge] .prefsub__acts .iobtn{flex:1 1 0;min-width:0}
   /* Titre de section du panneau unique : les deux réglages (thèmes Wikipédia,
      sources RSS) vivent maintenant dans la même feuille, il faut donc voir où
      l'un finit et où l'autre commence. Même filet que les autres séparateurs du
@@ -1525,9 +1537,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=246"></script>
-<script src="src/learn-core.js?v=246"></script>
-<script src="src/i18n.js?v=246"></script>
+<script src="src/lib.js?v=247"></script>
+<script src="src/learn-core.js?v=247"></script>
+<script src="src/i18n.js?v=247"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2490,7 +2502,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="246";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="247";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
