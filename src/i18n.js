@@ -53,6 +53,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v232.item1":
+        "🎚️ Le filtre vidéo des sources devient un choix à 3 : tout, vidéos seulement, ou Wikipédia seul.",
       "changelog.v224.item1":
         "🗂️ Choisis combien d'articles apparaissent par carte (1 à 5), dès l'accueil ou dans les réglages.",
       "changelog.v223.item1":
@@ -239,7 +241,13 @@
       "sheet.sources.title": "📰 Sources d'actualité",
       "sheet.sources.sub": "Coche les flux à afficher, ajoute ceux que tu veux.",
       "sheet.sources.filterSponsored": "Filtrer les articles sponsorisés et bons plans",
-      "sheet.sources.filterVideoOnly": "Afficher les Shorts YouTube uniquement",
+      "cf.label": "Contenu affiché",
+      "cf.desc.all": "Toutes tes sources, mélangées normalement.",
+      "cf.desc.video": "Seulement les Shorts YouTube de tes chaînes.",
+      "cf.desc.wiki": "Seulement des articles Wikipédia, sans tes flux.",
+      "cf.opt.all": "Tout",
+      "cf.opt.video": "Vidéos",
+      "cf.opt.wiki": "Wikipédia",
       "sheet.sources.noVideoFeed.title": "Pas de chaîne YouTube",
       "sheet.sources.noVideoFeed.msg":
         "Ce filtre ne montre que les Shorts de tes chaînes YouTube — tu n'en as ajouté aucune. Ajoutes-en une pour l'utiliser.",
@@ -434,6 +442,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v232.item1":
+        "🎚️ The video-only source filter is now a 3-way choice: everything, videos only, or Wikipedia only.",
       "changelog.v224.item1":
         "🗂️ Choose how many articles appear per card (1 to 5), from onboarding or settings.",
       "changelog.v223.item1":
@@ -617,7 +627,13 @@
       "sheet.sources.title": "📰 News sources",
       "sheet.sources.sub": "Check the feeds to show, add whichever you like.",
       "sheet.sources.filterSponsored": "Filter out sponsored articles and deals",
-      "sheet.sources.filterVideoOnly": "Show YouTube Shorts only",
+      "cf.label": "Content shown",
+      "cf.desc.all": "All your sources, mixed as usual.",
+      "cf.desc.video": "Only YouTube Shorts from your channels.",
+      "cf.desc.wiki": "Only Wikipedia articles, without your feeds.",
+      "cf.opt.all": "All",
+      "cf.opt.video": "Videos",
+      "cf.opt.wiki": "Wikipedia",
       "sheet.sources.noVideoFeed.title": "No YouTube channel",
       "sheet.sources.noVideoFeed.msg":
         "This filter only shows Shorts from your YouTube channels, and you haven't added any yet. Add one to use it.",

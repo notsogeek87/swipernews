@@ -687,21 +687,6 @@
   .feedrow .del--confirm{background:var(--redline);color:#fff}
   .sponsorrow{display:flex;align-items:center;gap:10px;padding:4px 0 16px;cursor:pointer;font-size:14px}
   .sponsorrow input[type=checkbox]{width:20px;height:20px;accent-color:var(--flare);flex-shrink:0}
-  /* Interrupteur (vidéos seules, en tête de la feuille des sources) : une case
-     à cocher classique s'y perdait en bas d'une longue liste de puces — un
-     réglage qui bascule tout le fil mérite la forme la plus rapide à repérer
-     et à actionner, pas une de plus parmi les cases sponsorisé/déjà-lu. La
-     case d'origine reste le contrôle réel (label, focus clavier, lecteur
-     d'écran) ; track/knob ne sont que son habillage visuel. */
-  .switchrow{display:flex;align-items:center;gap:12px;padding:4px 0 16px;cursor:pointer;font-size:14px}
-  .switchrow input{position:absolute;opacity:0;width:1px;height:1px}
-  .switchtrack{position:relative;flex:0 0 auto;width:44px;height:26px;border-radius:999px;
-    background:transparent;border:1.5px solid var(--redline);transition:background .18s,border-color .18s}
-  .switchknob{position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;
-    background:var(--ash);transition:transform .18s ease,background .18s}
-  .switchrow input:checked+.switchtrack{background:var(--flare);border-color:var(--flare)}
-  .switchrow input:checked+.switchtrack .switchknob{transform:translateX(18px);background:var(--bg)}
-  .switchrow input:focus-visible+.switchtrack{outline:2px solid var(--flare);outline-offset:2px}
   .addbox{display:flex;gap:8px;margin:18px 0 8px}
   .addbox input{flex:1;background:transparent;border:1px solid var(--redline);color:var(--ink);
     padding:13px 16px;border-radius:var(--radius-sm);font-family:var(--font-sans);font-size:14px}
@@ -1390,14 +1375,14 @@
     <div class="sheet__grip"></div>
     <h2 id="pickTitle"></h2>
     <p class="sub" id="pickSub"></p>
-    <!-- Filtre vidéo YouTube Shorts uniquement pour la feuille des sources —
-         EN TÊTE, avant la grille des sources : un réglage qui bascule tout le
-         fil, pas un de plus dans la liste. -->
-    <label class="switchrow hidden" id="videoFilterRow">
-      <input type="checkbox" id="videoFilterChk" role="switch">
-      <span class="switchtrack"><span class="switchknob"></span></span>
-      <span data-i18n="sheet.sources.filterVideoOnly">Afficher les Shorts YouTube uniquement</span>
-    </label>
+    <!-- Filtre de contenu (tout / vidéos seules / Wikipédia seul) pour la
+         feuille des sources — EN TÊTE, avant la grille des sources : un
+         réglage qui bascule tout le fil, pas un de plus dans la liste.
+         Rempli par renderContentFilterPref() (prefRow), voir son
+         commentaire dans index.html pour la relation avec la dose. -->
+    <div class="hidden" id="videoFilterRow">
+      <div data-cfmount></div>
+    </div>
     <div class="intgrid" id="pickGrid"></div>
     <!-- Seulement pour les sources, où le choix est MULTIPLE : il faut bien un
          moment où l'on a fini de cocher. Le filtre des thèmes, choix unique,
@@ -1444,9 +1429,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=231"></script>
-<script src="src/learn-core.js?v=231"></script>
-<script src="src/i18n.js?v=231"></script>
+<script src="src/lib.js?v=232"></script>
+<script src="src/learn-core.js?v=232"></script>
+<script src="src/i18n.js?v=232"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2392,7 +2377,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="231";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="232";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2403,6 +2388,8 @@ const APP_VERSION="231";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:232,date:"2026-08-30",items:[
+    "changelog.v232.item1"]},
   {v:224,date:"2026-08-29",items:[
     "changelog.v224.item1"]},
   {v:223,date:"2026-08-26",items:[
@@ -5929,6 +5916,7 @@ function setPref(name,v){
   if(name==="lang"){setLang(v);return;}   // effets de bord propres : voir setLang
   if(name==="apptheme"){setAppTheme(v);return;}   // idem : attribut sur <html>
   if(name==="cardsPerSwipe"){setCardsPerSwipe(v);return;}   // idem : recompose le fil
+  if(name==="contentFilter"){setContentFilter(v);return;}   // idem : recharge le fil
   const p=PREFS[name];
   if(!p)return;
   const next=p.vals.includes(v)?v:p.vals[0];   // valeur inconnue → on retombe sur le défaut
@@ -6396,8 +6384,6 @@ let pickKind="src";
    aussitôt. Nulle pour le filtre des thèmes, qui reste un choix UNIQUE — un
    article Wikipédia est tiré dans un thème, pas dans plusieurs. */
 let pickSel=null;
-// État du filtre vidéo EN DÉBUT d'ouverture : détecte si l'utilisateur l'a changé
-let pickVideoFilterBefore=null;
 /* Vrai quand la puce `k` doit paraître cochée. « Toutes » n'est pas une valeur
    parmi les autres : elle s'allume quand RIEN n'est retenu. */
 function pickOn(k){
@@ -6433,10 +6419,7 @@ function openPicker(kind){
   document.getElementById("pickSub").textContent=T(src?"filter.src.sub":"filter.cat.sub");
   pickApply.classList.toggle("hidden",!src);   // le choix unique s'applique au tap, sans bouton
   document.getElementById("videoFilterRow").classList.toggle("hidden",!src);
-  if(src){
-    pickVideoFilterBefore=filterVideoOnly;
-    document.getElementById("videoFilterChk").checked=filterVideoOnly;
-  }
+  if(src)renderContentFilterPref();
   renderPickGrid();
   openDialog(pickSheet);
 }
@@ -6460,13 +6443,12 @@ document.getElementById("pickGrid").addEventListener("click",e=>{
    refermé autrement qu'avec le bouton. */
 function closePicker(fromHistory){
   const sel=pickKind==="src"&&pickSel?[...pickSel]:null;
-  const videoFilterChanged=pickVideoFilterBefore!==null&&pickVideoFilterBefore!==filterVideoOnly;
   pickSel=null;
-  pickVideoFilterBefore=null;
   closeDialog(pickSheet,fromHistory);
   if(sel)setNewsSrc(sel);
-  // Force refresh si le filtre vidéo a changé, même si les sources n'ont pas bougé
-  if(videoFilterChanged&&!fromHistory)loadFeeds(true);
+  // Le filtre de contenu (voir setContentFilter) recharge déjà lui-même dès
+  // qu'il change, contrairement au choix des sources ci-dessus : rien à
+  // rattraper ici pour lui.
 }
 // Enveloppé : passer le handler directement donnerait l'ÉVÉNEMENT en premier
 // argument, donc un `fromHistory` toujours vrai — l'entrée d'historique du
@@ -6853,7 +6835,6 @@ function openSettings(replaceFrom){
   suggestGroupOpen={};
   renderMix();renderIntGrid("intGrid");renderList();renderSuggest();renderReadPref();renderLangPref();renderThemePref();
   document.getElementById("sponsorFilterChk").checked=filterSponsored;
-  document.getElementById("videoFilterChk").checked=filterVideoOnly;
   document.getElementById("ytApiKeyInput").value=ytApiKey;
   if(replaceFrom)replaceDialog(replaceFrom,sheet);else openDialog(sheet);
 }
@@ -6989,19 +6970,57 @@ document.getElementById("sponsorFilterChk").onchange=e=>{
   try{localStorage.setItem(LS_SPONSOR,filterSponsored?"1":"0");}catch(_){}
   feedsDirty=true;   // même flag que save() : signale un rechargement dû à applySettings()
 };
-document.getElementById("videoFilterChk").onchange=e=>{
-  // Activer sans aucune chaîne YouTube viderait le fil sans un mot
-  // d'explication : mieux vaut le dire, et pointer vers l'endroit où en
+/* Filtre de contenu à 3 choix, en tête de la feuille des sources d'actus
+   (voir [data-cfmount] dans le HTML, prefRow) : remplace l'ancien
+   interrupteur binaire « Shorts YouTube uniquement » — demande explicite
+   pour pouvoir aussi basculer vers Wikipédia seul aussi vite, sans aller
+   chercher le curseur de dose ailleurs dans les réglages.
+   « Wikipédia » n'est PAS un troisième état stocké à part : c'est un
+   raccourci qui pousse la dose (mixScore) à son extrémité « Wikipédia
+   seul » — la dose reste la seule source de vérité, ce contrôle ne fait
+   qu'y donner un accès plus court. contentFilterValue() LIT l'état courant
+   (filterVideoOnly, mixScore) plutôt que de dupliquer l'info dans une
+   variable à part, qui pourrait diverger si la dose est changée ailleurs
+   (le curseur lui-même, un import de réglages…). */
+function contentFilterValue(){
+  if(filterVideoOnly)return "video";
+  if(mixScore===MIX_LEVELS.length-1)return "wiki";
+  return "all";
+}
+function renderContentFilterPref(){
+  const v=contentFilterValue();
+  const html=prefRow("contentFilter",T("cf.label"),T("cf.desc."+v),
+    [{v:"all",t:T("cf.opt.all")},{v:"video",t:T("cf.opt.video")},{v:"wiki",t:T("cf.opt.wiki")}],v);
+  document.querySelectorAll("[data-cfmount]").forEach(el=>{el.innerHTML=html;});
+}
+function setContentFilter(v){
+  // Activer « Vidéos » sans aucune chaîne YouTube viderait le fil sans un
+  // mot d'explication : mieux vaut le dire, et pointer vers l'endroit où en
   // ajouter une, que remettre à l'utilisateur un fil vide à deviner.
-  if(e.target.checked&&!feeds.some(f=>isYoutubeFeedUrl(f.url))){
-    e.target.checked=false;
+  if(v==="video"&&!feeds.some(f=>isYoutubeFeedUrl(f.url))){
     replaceDialog(pickSheet,noVideoSheet);
     return;
   }
-  filterVideoOnly=e.target.checked;
-  try{localStorage.setItem(LS_VIDEO_ONLY,filterVideoOnly?"1":"0");}catch(_){}
-  feedsDirty=true;
-};
+  const wantVideo=v==="video";
+  const wantWikiOnly=v==="wiki";
+  const videoChanged=wantVideo!==filterVideoOnly;
+  const doseChanged=wantWikiOnly!==(mixScore===MIX_LEVELS.length-1);
+  if(!videoChanged&&!doseChanged)return;   // déjà dans cet état
+  if(videoChanged){
+    filterVideoOnly=wantVideo;
+    try{localStorage.setItem(LS_VIDEO_ONLY,filterVideoOnly?"1":"0");}catch(_){}
+  }
+  // « Vidéos » ou « Tout » : sortir d'une dose Wikipédia-seul, sinon le
+  // premier ne montrerait jamais rien (aucune actu chargée à filtrer) et le
+  // second resterait, en pratique, un filtre Wikipédia caché.
+  if(doseChanged)persistMix(wantWikiOnly?MIX_LEVELS.length-1:MIX_DEFAULT);
+  renderContentFilterPref();renderMixUI();
+  // Toujours un rechargement COMPLET, jamais un simple remix : le filtre
+  // vidéo change ce qui est FETCHÉ par source (voir fetchFeedRobust), pas
+  // seulement l'entrelacement — remix() seul aurait laissé les articles
+  // déjà en cache, vidéo ou non, tels quels.
+  loadFeeds(true);
+}
 /* La clé n'est enregistrée qu'après VÉRIFICATION réussie — jamais au simple
    blur du champ. Une clé fautive (faute de frappe, restriction mal posée
    côté Google Cloud) enregistrée en silence se serait révélée seulement au
