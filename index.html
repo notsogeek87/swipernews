@@ -1537,9 +1537,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=247"></script>
-<script src="src/learn-core.js?v=247"></script>
-<script src="src/i18n.js?v=247"></script>
+<script src="src/lib.js?v=248"></script>
+<script src="src/learn-core.js?v=248"></script>
+<script src="src/i18n.js?v=248"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2397,16 +2397,36 @@ function rememberPos(it=currentItem()){
         `ÉCRIT …${it.link.slice(-24)}\n`+
         `RELU  …${String(relu.link||relu||"(rien)").slice(-24)}`);}
 }
+/* Dernière position de défilement CONNUE du fil, partagée avec onScrollFrame
+   (plus bas) : c'est l'écart avec elle qui distingue un vrai swipe d'un
+   défilement PROGRAMMÉ — voir setScrollTopInstant juste en dessous. Déclarée
+   ici, et non à côté de son autre usage, uniquement pour qu'elle soit
+   initialisée avant le premier appel possible de setScrollTopInstant. */
+let lastScrollY=0;
 /* Défilement instantané, quel que soit le CSS en vigueur.
    Le setter scrollTop utilise le comportement calculé de l'élément : si
    scroll-behavior vaut smooth, la restauration devient une ANIMATION qui entre
    en conflit avec le scroll-snap et avec le geste en cours. On force donc
-   explicitement le comportement le temps de l'affectation. */
+   explicitement le comportement le temps de l'affectation.
+
+   POINT DE PASSAGE UNIQUE de tout défilement programmé (render qui remonte en
+   tête, scrollToCard, restoreFeed) : on y note la position visée comme étant
+   la dernière connue, AVANT même que l'événement `scroll` ne parte. Sans ça,
+   onScrollFrame comparait cette position à celle d'avant, y voyait un écart
+   de plusieurs centaines de pixels et masquait la barre du haut (hideTop) —
+   alors que personne n'avait bougé le doigt. C'est ce qui la faisait
+   disparaître À LA RÉOUVERTURE de l'app : showTop() la rappelait bien depuis
+   onResume, puis la repeinture du fil (retour en tête, reprise de lecture)
+   défilait par ici dans la foulée et la reprenait aussitôt — barre absente
+   dès l'ouverture, à ne récupérer que d'un tap. Même distinction, et pour la
+   même raison, que le `userScroll` d'onCardChange (voir bumpCardScroll dans
+   CLAUDE.md) : un recalage n'est pas un geste. */
 function setScrollTopInstant(el,top){
   const prev=el.style.scrollBehavior;
   el.style.scrollBehavior="auto";
   el.scrollTop=top;
   el.style.scrollBehavior=prev;
+  if(el===feedEl)lastScrollY=el.scrollTop;
 }
 /* Hauteur de vue, pour le défilement clavier uniquement (jamais pour repérer
    la carte courante — voir plus bas pourquoi). */
@@ -2502,7 +2522,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="247";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="248";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -5907,8 +5927,10 @@ function openShareMenu(it){
 /* Masquage auto du haut pendant le swipe ; réapparaît au tap ou après une pause */
 const topEl=document.querySelector(".top");
 /* La barre du haut se masque au swipe et ne revient QUE sur un appui à
-   l'écran — pas de réapparition automatique après un délai. */
-let lastScrollY=0;
+   l'écran — pas de réapparition automatique après un délai.
+   `lastScrollY`, le repère qui sert à reconnaître ce swipe, est déclaré plus
+   haut (à côté de setScrollTopInstant, qui doit pouvoir l'écrire sans risquer
+   de tomber sur une déclaration pas encore initialisée). */
 /* Repère « appuie pour retrouver la barre » (.peek) : visible seulement quand
    la barre est masquée, d'où la classe posée sur <body> plutôt que sur .top —
    le repère n'en est pas un descendant.
