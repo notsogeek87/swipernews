@@ -31,24 +31,34 @@ public class MainActivity extends BridgeActivity {
      * lot — l'appeler à chaque retour au premier plan est donc sans effet la
      * plupart du temps.
      *
-     * <p>showTop() AVANT refreshIfStale() (voir son commentaire côté web,
-     * juste avant l'écouteur visibilitychange) : la minuterie qui efface la
-     * barre du haut au bout de 3 s (armerRetraitBarre) continue de compter en
-     * arrière-plan pendant que l'app est masquée, et Android suspend souvent
-     * l'exécution JS d'une WebView non visible — son échéance se retrouve
-     * donc largement dépassée au retour, et hideTop() part dans la foulée si
-     * rien ne la réarme. Sans cet appel, l'app rouvrait directement sur une
-     * carte SANS aucune barre visible (ni marque, ni filtres, ni bouton menu),
-     * comme si elle n'avait jamais existé — constaté par un utilisateur.
+     * <p>reprendreBarre() AVANT refreshIfStale() (voir son commentaire côté
+     * web) : la minuterie qui efface la barre du haut au bout de 3 s
+     * (armerRetraitBarre) continue de compter en arrière-plan pendant que
+     * l'app est masquée, et Android suspend souvent l'exécution JS d'une
+     * WebView non visible — son échéance se retrouve donc largement dépassée
+     * au retour, et hideTop() part dans la foulée si rien ne la réarme. Sans
+     * cet appel, l'app rouvrait directement sur une carte SANS aucune barre
+     * visible (ni marque, ni filtres, ni bouton menu), comme si elle n'avait
+     * jamais existé — constaté par un utilisateur.
+     *
+     * <p>reprendreBarre() plutôt que showTop() tout court : elle remet en plus
+     * le compte à rebours en attente d'un premier geste, sans quoi la barre
+     * repartait 3 s après la reprise, pendant que l'utilisateur se repère
+     * encore (« j'ouvre, la barre se ferme directement »). Repli sur showTop()
+     * si la WebView sert encore une version antérieure d'index.html : le natif
+     * et le web se mettent à jour séparément (APK vs Vercel), et un APK neuf
+     * ne doit pas perdre le rappel de barre sur un index.html plus ancien.
      *
      * <p>try/catch côté JS : le tout premier onResume() peut survenir avant
      * que la WebView n'ait fini de charger index.html, où refreshIfStale et
-     * showTop n'existent pas encore. La fonction vérifie elle-même
-     * feedLoadStarted ; showTop(), lui, est sans effet indésirable à répéter.
+     * reprendreBarre n'existent pas encore. La fonction vérifie elle-même
+     * feedLoadStarted ; reprendreBarre(), lui, est sans effet indésirable à
+     * répéter.
      */
     private static final String RESUME_JS =
         "(function(){try{"
-            + "if(typeof showTop===\"function\")showTop();"
+            + "if(typeof reprendreBarre===\"function\")reprendreBarre();"
+            + "else if(typeof showTop===\"function\")showTop();"
             + "if(typeof refreshIfStale===\"function\")refreshIfStale();"
             + "}catch(e){}})();";
 
