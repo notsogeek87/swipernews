@@ -356,7 +356,8 @@
       "notif.nudge.txt":
         "Tu n'as pas activé les notifications de nouveaux articles — tu veux les allumer maintenant ?",
       "notif.nudge.enable": "Activer les notifications",
-      "notif.nudge.decline": "Plus tard",
+      "notif.nudge.later": "Plus tard",
+      "notif.nudge.decline": "Non",
 
       "bl.builtin":
         "Liste intégrée à l'app : 178 domaines. Une liste publique en bloque bien davantage, et se met à jour sans réinstaller l'app.",
@@ -760,7 +761,8 @@
       "notif.nudge.txt":
         "You haven't turned on new-article notifications — want to enable them now?",
       "notif.nudge.enable": "Enable notifications",
-      "notif.nudge.decline": "Not now",
+      "notif.nudge.later": "Later",
+      "notif.nudge.decline": "No",
 
       "bl.builtin":
         "Built into the app: 178 domains. A public list blocks far more, and updates without reinstalling the app.",

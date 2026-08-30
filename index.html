@@ -1484,18 +1484,21 @@
      ci-dessus). Un utilisateur déjà en place voit le même panneau, ou sa
      variante accolée au journal des nouveautés s'il en ouvre un
      (renderNotifNudge, openChangelogIfNew) : les deux partagent le MÊME
-     marqueur "déjà proposé", jamais les deux à la fois. Reproposé au
-     lancement SUIVANT tant qu'aucun des deux boutons n'a été touché (un tap
-     en dehors ou le retour arrière ne valent pas réponse) — voir
-     markNotifNudgeAnswered, posé par Activer ET par Plus tard, jamais à
-     l'affichage. -->
+     marqueur "déjà proposé", jamais les deux à la fois. TROIS issues, voir
+     leur détail plus haut (LS_NOTIF_NUDGE) : Activer et Non répondent pour de
+     bon (markNotifNudgeAnswered), Plus tard reporte seulement de quelques
+     lancements (snoozeNotifNudge) sans jamais répondre — un tap en dehors ou
+     le retour arrière ne valent ni l'un ni l'autre. -->
 <div class="sheet" id="notifNudgeSheet" role="dialog" aria-modal="true" aria-labelledby="notifNudgeTitle">
   <div class="sheet__panel" tabindex="-1">
     <div class="sheet__grip"></div>
     <h2 id="notifNudgeTitle" data-i18n="notif.nudge.title">Notifications</h2>
     <p class="sub" data-i18n="notif.nudge.txt">Tu n'as pas activé les notifications de nouveaux articles — tu veux les allumer maintenant ?</p>
     <button class="applybtn" id="notifNudgeEnable" data-i18n="notif.nudge.enable">Activer les notifications</button>
-    <button type="button" class="iobtn" id="notifNudgeDecline" data-i18n="notif.nudge.decline">Plus tard</button>
+    <div class="prefsub__acts">
+      <button type="button" class="iobtn" id="notifNudgeLater" data-i18n="notif.nudge.later">Plus tard</button>
+      <button type="button" class="iobtn" id="notifNudgeDecline" data-i18n="notif.nudge.decline">Non</button>
+    </div>
   </div>
 </div>
 
@@ -1522,9 +1525,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=245"></script>
-<script src="src/learn-core.js?v=245"></script>
-<script src="src/i18n.js?v=245"></script>
+<script src="src/lib.js?v=246"></script>
+<script src="src/learn-core.js?v=246"></script>
+<script src="src/i18n.js?v=246"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2487,7 +2490,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="245";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="246";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2696,9 +2699,8 @@ let adsPref=(()=>{try{return localStorage.getItem(LS_ADS)==="block"?"block":"all
 const LS_NOTIF="fluxswipe.notif.v1";
 let notifPref=(()=>{try{return localStorage.getItem(LS_NOTIF)==="on"?"on":"off";}catch(e){return "off";}})();
 /* Rappel ponctuel « active les notifications », proposé jusqu'à ce qu'il
-   reçoive une VRAIE réponse (Activer ou Plus tard, jamais un simple tap en
-   dehors ou le bouton retour), sous DEUX formes SANS RAPPORT hiérarchique —
-   un utilisateur ne voit jamais les deux à la fois :
+   reçoive une VRAIE réponse, sous DEUX formes SANS RAPPORT hiérarchique — un
+   utilisateur ne voit jamais les deux à la fois :
    - 1er lancement (installation neuve) : #notifNudgeSheet, un panneau à part
      ouvert par replaceDialog juste après l'accueil (voir startWelcome) ;
    - utilisateur déjà en place (last!==null dans changelogLastSeen, voir
@@ -2711,18 +2713,30 @@ let notifPref=(()=>{try{return localStorage.getItem(LS_NOTIF)==="on"?"on":"off";
      alors plus JAMAIS pour qui avait déjà dépassé cette entrée sans avoir
      répondu (marqué vu par erreur, essai interrompu…) — la plupart des mises
      à jour suivantes n'ajoutant aucune nouvelle entrée, `entries` restait
-     vide pour toujours à ses yeux. Le seul critère qui compte : utilisateur
-     EXISTANT, notifs encore désactivées, pas encore répondu — peu importe ce
-     que le journal a ou non à montrer CE passage-ci.
-   D'où un marqueur « a répondu » PARTAGÉ entre les deux formes, posé
-   UNIQUEMENT par les boutons Activer/Plus tard eux-mêmes (jamais à
-   l'affichage) et séparé de celui du changelog : « vu le changelog » et
-   « a répondu au rappel » ne doivent pas se confondre, un utilisateur peut
-   rouvrir le journal plus tard (menu) sans qu'on lui repropose le rappel
-   auquel il a déjà répondu — sous une forme ou l'autre. Tant qu'il n'a pas
-   répondu, openChangelogIfNew() (tous les lancements) et/ou startWelcome()
-   (le tout premier) le reproposent naturellement, sans rien à tenir à jour
-   en plus.
+     vide pour toujours à ses yeux.
+   TROIS boutons, TROIS issues bien distinctes (jamais un simple tap en
+   dehors ou le bouton retour, qui ne valent pas réponse) :
+   - Activer : active les notifs ET répond « oui » — voir markNotifNudgeAnswered ;
+   - Non : répond « non » DÉFINITIVEMENT — même marqueur que Activer, sans
+     activer quoi que ce soit. Seul le réglage manuel des Réglages peut
+     rallumer les notifs ensuite ; le rappel automatique ne revient plus ;
+   - Plus tard : NE répond PAS — voir snoozeNotifNudge/notifNudgeSnoozed —
+     reporte juste le PROCHAIN rappel de quelques lancements (launchCount,
+     compté en OUVERTURES de l'app et non en jours : un intervalle calendaire
+     n'a pas de sens pour qui rouvre plusieurs fois par jour comme pour qui
+     n'ouvre qu'une fois par semaine), sans jamais le désactiver pour de bon.
+   Le seul critère qui compte pour reproposer : utilisateur EXISTANT, notifs
+   encore désactivées, pas encore répondu ET pas en train d'être reporté —
+   peu importe ce que le journal a ou non à montrer CE passage-ci.
+   D'où un marqueur « a répondu » PARTAGÉ entre les deux formes (Activer et
+   Non seulement, jamais Plus tard), posé UNIQUEMENT par ces boutons
+   eux-mêmes (jamais à l'affichage) et séparé de celui du changelog : « vu le
+   changelog » et « a répondu au rappel » ne doivent pas se confondre, un
+   utilisateur peut rouvrir le journal plus tard (menu) sans qu'on lui
+   repropose le rappel auquel il a déjà répondu. Tant qu'il n'a ni répondu ni
+   un report en cours, openChangelogIfNew() (tous les lancements) et/ou
+   startWelcome() (le tout premier) le reproposent naturellement, sans rien à
+   tenir à jour en plus.
    Clé RENOMMÉE (…notifnudge.seen.v1 → …notifnudge.answered.v1), pas juste
    les fonctions : une première version posait ce marqueur à l'AFFICHAGE
    (voir juste au-dessus), donc quiconque avait déjà croisé le rappel une
@@ -2733,6 +2747,30 @@ let notifPref=(()=>{try{return localStorage.getItem(LS_NOTIF)==="on"?"on":"off";
 const LS_NOTIF_NUDGE="fluxswipe.notifnudge.answered.v1";
 function notifNudgeAnswered(){try{return localStorage.getItem(LS_NOTIF_NUDGE)==="1";}catch(e){return false;}}
 function markNotifNudgeAnswered(){try{localStorage.setItem(LS_NOTIF_NUDGE,"1");}catch(e){}}
+/* Compteur d'OUVERTURES de l'app (tous supports), unité du report « Plus
+   tard » ci-dessous — voir sa raison plus haut. Incrémenté une fois par
+   lancement, dès que possible : rien en dessous n'a besoin d'en savoir plus
+   que sa valeur courante. */
+const LS_LAUNCH_COUNT="fluxswipe.launchcount.v1";
+let launchCount=(()=>{
+  let n=0;
+  try{n=parseInt(localStorage.getItem(LS_LAUNCH_COUNT),10)||0;}catch(e){}
+  n+=1;
+  try{localStorage.setItem(LS_LAUNCH_COUNT,String(n));}catch(e){}
+  return n;
+})();
+const LS_NOTIF_NUDGE_SNOOZE="fluxswipe.notifnudge.snoozeuntil.v1";
+/* « Quelques lancements » : ni assez court pour redevenir gênant au
+   prochain, ni assez long pour donner l'impression d'avoir disparu. */
+const NOTIF_NUDGE_SNOOZE_LAUNCHES=5;
+function notifNudgeSnoozed(){
+  let until=0;
+  try{until=parseInt(localStorage.getItem(LS_NOTIF_NUDGE_SNOOZE),10)||0;}catch(e){}
+  return launchCount<until;
+}
+function snoozeNotifNudge(){
+  try{localStorage.setItem(LS_NOTIF_NUDGE_SNOOZE,String(launchCount+NOTIF_NUDGE_SNOOZE_LAUNCHES));}catch(e){}
+}
 
 /* Filtre des articles sponsorisés ET bons plans dans le FLUX (pas les pubs de
    la page ouverte, voir reader_ads.js pour ça) — un seul réglage pour les
@@ -6146,6 +6184,7 @@ changelogSheet.onclick=e=>{if(e.target===changelogSheet)closeDialog(changelogShe
 noVideoSheet.onclick=e=>{if(e.target===noVideoSheet)closeDialog(noVideoSheet);};
 notifNudgeSheet.onclick=e=>{if(e.target===notifNudgeSheet)closeDialog(notifNudgeSheet);};
 document.getElementById("notifNudgeEnable").onclick=()=>{markNotifNudgeAnswered();setPref("notif","on");closeDialog(notifNudgeSheet);};
+document.getElementById("notifNudgeLater").onclick=()=>{snoozeNotifNudge();closeDialog(notifNudgeSheet);};
 document.getElementById("notifNudgeDecline").onclick=()=>{markNotifNudgeAnswered();closeDialog(notifNudgeSheet);};
 /* CTA de noVideoSheet : bascule directement sur les réglages (même mécanique
    replaceDialog que la notice elle-même) et pose le focus dans le champ
@@ -6392,6 +6431,7 @@ document.addEventListener("click",e=>{
   if(src){syncBlocklist(src.dataset.blsrc,false);return;}
   if(e.target.closest("[data-bldrop]"))dropBlocklist();
   if(e.target.closest("[data-notifnudge-enable]")){markNotifNudgeAnswered();setPref("notif","on");renderNotifNudge(false);}
+  if(e.target.closest("[data-notifnudge-later]")){snoozeNotifNudge();renderNotifNudge(false);}
   if(e.target.closest("[data-notifnudge-decline]")){markNotifNudgeAnswered();renderNotifNudge(false);}
 });
 renderLangPref();
@@ -7331,7 +7371,10 @@ function renderChangelog(entries){
 function renderNotifNudge(show){
   const html=show?`<p class="sub">${esc(T("notif.nudge.txt"))}</p>
     <button type="button" class="applybtn" data-notifnudge-enable>${esc(T("notif.nudge.enable"))}</button>
-    <button type="button" class="iobtn" data-notifnudge-decline>${esc(T("notif.nudge.decline"))}</button>`:"";
+    <div class="prefsub__acts">
+      <button type="button" class="iobtn" data-notifnudge-later>${esc(T("notif.nudge.later"))}</button>
+      <button type="button" class="iobtn" data-notifnudge-decline>${esc(T("notif.nudge.decline"))}</button>
+    </div>`:"";
   document.querySelectorAll("[data-notifnudge]").forEach(el=>{el.innerHTML=html;});
 }
 // Depuis le menu : le journal ENTIER, qu'on l'ait déjà vu ou non — retrouver
@@ -7382,7 +7425,7 @@ function openChangelogIfNew(){
      CHAQUE lancement pour un utilisateur existant, ne rien marquer ici suffit
      à le reproposer au prochain lancement tant qu'aucun des deux boutons n'a
      été touché. */
-  const showNudge=last!==null&&isNativeApp&&notifPref==="off"&&!notifNudgeAnswered();
+  const showNudge=last!==null&&isNativeApp&&notifPref==="off"&&!notifNudgeAnswered()&&!notifNudgeSnoozed();
   if(!entries.length){
     markChangelogSeen();
     // Rien à annoncer dans le journal : le rappel, s'il est dû, prend alors
@@ -7443,19 +7486,22 @@ function startWelcome(){
   // fil déjà à jour) : comme applySettings(), on force si les intérêts ont
   // vraiment changé depuis l'ouverture.
   if(interests.join(",")!==avant||!feedLoadStarted)loadFeeds(true);
-  /* Rappel notifs juste après l'accueil (voir notifNudgeAnswered — posé par les
-     boutons Activer/Plus tard du panneau lui-même, PAS ici : un simple tap en
-     dehors ou le bouton retour ne doivent pas valoir « non » silencieux, voir
-     openChangelogIfNew pour le même choix côté utilisateur déjà en place, qui
-     reproposera d'ailleurs ce rappel au tout prochain lancement si celui-ci
-     reste sans réponse — firstRun ne vaut que pour CE lancement précis).
+  /* Rappel notifs juste après l'accueil (voir notifNudgeAnswered — posé par
+     Activer/Non seulement, jamais à l'affichage ni par Plus tard : un simple
+     tap en dehors ou le bouton retour ne doivent pas non plus valoir « non »
+     silencieux ; voir openChangelogIfNew pour le même choix côté utilisateur
+     déjà en place, qui reproposera d'ailleurs ce rappel au tout prochain
+     lancement si celui-ci reste sans réponse — firstRun ne vaut que pour CE
+     lancement précis). !notifNudgeSnoozed() n'a pas d'effet ICI en pratique
+     (aucun report possible avant un tout premier lancement) mais reste posé
+     par cohérence avec l'autre déclencheur.
      replaceDialog, jamais closeDialog+openDialog — welcomeSheet a déjà posé
      son entrée d'historique, en repousser une seconde casserait "une seule
      couche à la fois" (pushDialogState), et l'history.back() de closeDialog
      est asynchrone : un openDialog immédiatement après se ferait défaire par
      son popstate encore en vol dès qu'il arrive (même piège que
      menuSheet→sheet, voir replaceDialog). */
-  if(isNativeApp&&notifPref==="off"&&!notifNudgeAnswered()){
+  if(isNativeApp&&notifPref==="off"&&!notifNudgeAnswered()&&!notifNudgeSnoozed()){
     replaceDialog(welcomeSheet,notifNudgeSheet);
   }else{
     closeDialog(welcomeSheet);                  // ne relancera pas un 2e chargement
