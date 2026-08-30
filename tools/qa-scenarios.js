@@ -90,11 +90,22 @@ async function boot(opts = {}) {
       });
     return route.fulfill({ status: 200, body: "" });
   });
-  if (opts.storage) {
-    await page.addInitScript((kv) => {
+  /* La feuille « Nouveautés » s'ouvre d'elle-même dès qu'APP_VERSION a changé
+     depuis la dernière ouverture (voir openChangelogIfNew) — donc à CHAQUE
+     lancement du banc, où rien n'a jamais été vu. Pour un scénario qui pose
+     déjà un fil (donc pas un premier lancement), elle s'ouvrait par-dessus le
+     fil et interceptait les clics : `video` et `memoire` échouaient en
+     TimeoutError « changelogSheet intercepts pointer events », sans aucun
+     rapport avec ce qu'ils mesurent. On la déclare vue par défaut ; un
+     scénario qui voudrait l'étudier n'a qu'à repasser la clé dans
+     `opts.storage`, qui a le dernier mot. */
+  const kvBase = { "fluxswipe.changelog.seen.v1": "999999" };
+  await page.addInitScript(
+    (kv) => {
       for (const [k, v] of Object.entries(kv)) localStorage.setItem(k, v);
-    }, opts.storage);
-  }
+    },
+    Object.assign(kvBase, opts.storage || {})
+  );
   await page.addInitScript(() => {
     window.__rejections = [];
     addEventListener("unhandledrejection", (e) => {
@@ -1144,10 +1155,17 @@ const scenarios = {
     // La barre du haut se masque à chaque défilement (hideTop) : comme
     // l'utilisateur, on la ramène d'un tap AVANT de viser son bouton — et
     // toujours après que le défilement en cours a fini de la faire fuir.
+    // « Articles en mémoire » ne vit plus dans la barre du haut : elle ne
+    // porte que ↻ et le bouton menu, qui ouvre le tiroir où sont passées les
+    // quatre actions (voir menuSheet/replaceDialog). Viser #histBtn
+    // directement échouait donc en « element is outside of the viewport » :
+    // le bouton existe, mais dans un tiroir fermé.
     const ouvrirMemoire = async () => {
       await page.waitForTimeout(400);
       await page.evaluate(() => showTop());
       await page.waitForTimeout(250);
+      await page.click("#menuBtn");
+      await page.waitForTimeout(300);
       await page.click("#histBtn");
       await page.waitForTimeout(350);
     };
