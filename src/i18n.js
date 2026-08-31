@@ -360,6 +360,11 @@
       "notif.nudge.enable": "Activer les notifications",
       "notif.nudge.later": "Plus tard",
       "notif.nudge.decline": "Non",
+      "notif.battery.on":
+        "SwiperNews est exclue de l'optimisation de batterie : les notifications ont toutes leurs chances d'arriver à l'heure.",
+      "notif.battery.off":
+        "Android retarde souvent les vérifications en arrière-plan pour économiser la batterie — exclus SwiperNews de cette optimisation pour des notifications plus fiables.",
+      "notif.battery.btn": "Exclure de l'optimisation de batterie",
 
       "bl.builtin":
         "Liste intégrée à l'app : 178 domaines. Une liste publique en bloque bien davantage, et se met à jour sans réinstaller l'app.",
@@ -391,6 +396,7 @@
       "toast.statsReset": "Statistiques réinitialisées",
       "toast.backExit": "Appuie de nouveau sur retour pour quitter",
       "toast.notifDenied": "Permission refusée — notifications désactivées",
+      "toast.batteryFailed": "Réglage batterie indisponible",
       "toast.invalidUrl": "URL invalide",
       "toast.youtubeResolving": "Recherche du flux YouTube…",
       "toast.youtubeChannelNotFound":
@@ -767,6 +773,11 @@
       "notif.nudge.enable": "Enable notifications",
       "notif.nudge.later": "Later",
       "notif.nudge.decline": "No",
+      "notif.battery.on":
+        "SwiperNews is excluded from battery optimization: notifications have the best chance of arriving on time.",
+      "notif.battery.off":
+        "Android often delays background checks to save battery — exclude SwiperNews from this optimization for more reliable notifications.",
+      "notif.battery.btn": "Exclude from battery optimization",
 
       "bl.builtin":
         "Built into the app: 178 domains. A public list blocks far more, and updates without reinstalling the app.",
@@ -797,6 +808,7 @@
       "toast.statsReset": "Activity stats reset",
       "toast.backExit": "Press back again to exit",
       "toast.notifDenied": "Permission denied — notifications turned off",
+      "toast.batteryFailed": "Battery setting unavailable",
       "toast.invalidUrl": "Invalid URL",
       "toast.youtubeResolving": "Looking up the YouTube feed…",
       "toast.youtubeChannelNotFound": "Could not determine this channel's RSS feed.",
