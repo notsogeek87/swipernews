@@ -52,8 +52,11 @@ import java.util.concurrent.TimeUnit;
  * convention de tous les flux), et on compare son lien à celui mémorisé au
  * dernier vrai chargement de l'app (voir InAppBrowserPlugin.syncBackgroundFeeds,
  * appelé depuis index.html après chaque fil renouvelé). Un lien différent
- * veut dire « du neuf » ; c'est tout ce qu'il faut pour une notification, pas
- * pour reconstruire le fil.
+ * veut dire « du neuf » ; c'est le SEUL signal comparé au repère mémorisé, et
+ * ça reste tout ce qu'il faut pour déclencher une notification, pas pour
+ * reconstruire le fil. Le TITRE du même item est aussi lu au passage — jamais
+ * comparé ni persisté, seulement montré dans la notification (voir
+ * postNotification) pour dire QUOI est neuf plutôt que juste COMBIEN.
  *
  * <p>Aucun accès à {@code seenNews} ou au cache du fil : ce que ce worker
  * mémorise (le lien le plus récent par source) est une bookkeeping purement
@@ -134,6 +137,7 @@ public class NewsCheckWorker extends Worker {
 
         int newCount = 0;
         String firstNewName = null;
+        String firstNewTitle = null;
         JSONArray updated = new JSONArray();
         int checkedMax = Math.min(feeds.length(), MAX_FEEDS);
 
@@ -149,13 +153,14 @@ public class NewsCheckWorker extends Worker {
                 continue;
             }
 
-            String freshLink;
+            Head head;
             try {
-                freshLink = fetchNewestLink(url);
+                head = fetchNewestHead(url);
             } catch (Exception e) {
                 updated.put(f);   // échec ponctuel : on retentera au prochain réveil
                 continue;
             }
+            String freshLink = head == null ? null : head.link;
             if (freshLink == null || freshLink.isEmpty()) {
                 updated.put(f);
                 continue;
@@ -166,7 +171,10 @@ public class NewsCheckWorker extends Worker {
             // l'utilisateur a justement sous les yeux dans le fil déjà affiché.
             if (!knownLink.isEmpty() && !knownLink.equals(freshLink)) {
                 newCount++;
-                if (firstNewName == null) firstNewName = name;
+                if (firstNewName == null) {
+                    firstNewName = name;
+                    firstNewTitle = head.title;   // voir le rôle du titre en tête de fichier
+                }
             }
             JSONObject nf = new JSONObject();
             try {
@@ -180,14 +188,20 @@ public class NewsCheckWorker extends Worker {
         }
 
         prefs.edit().putString(KEY_FEEDS, updated.toString()).apply();
-        if (newCount > 0) postNotification(ctx, newCount, firstNewName);
+        if (newCount > 0) postNotification(ctx, newCount, firstNewName, firstNewTitle);
         return Result.success();
     }
 
-    /** Lien du premier {@code <item>}/{@code <entry>} du flux — le plus récent,
-     *  par convention (le fil lui-même trie ensuite par date, mais ici on ne
-     *  veut qu'un signal de changement, pas un ordre). */
-    private static String fetchNewestLink(String urlStr) throws IOException {
+    /** Lien ET titre du premier {@code <item>}/{@code <entry>} du flux — le
+     *  plus récent, par convention (le fil lui-même trie ensuite par date,
+     *  mais ici on ne veut qu'un signal de changement, pas un ordre). */
+    private static final class Head {
+        final String link;
+        final String title;
+        Head(String link, String title) { this.link = link; this.title = title; }
+    }
+
+    private static Head fetchNewestHead(String urlStr) throws IOException {
         HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
         conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
         conn.setReadTimeout(READ_TIMEOUT_MS);
@@ -197,14 +211,14 @@ public class NewsCheckWorker extends Worker {
             int code = conn.getResponseCode();
             if (code < 200 || code >= 300) return null;
             try (InputStream in = new BufferedInputStream(conn.getInputStream())) {
-                return parseFirstLink(in);
+                return parseFirstHead(in);
             }
         } finally {
             conn.disconnect();
         }
     }
 
-    private static String parseFirstLink(InputStream in) throws IOException {
+    private static Head parseFirstHead(InputStream in) throws IOException {
         long deadline = System.currentTimeMillis() + PARSE_BUDGET_MS;
         try {
             XmlPullParser parser = Xml.newPullParser();
@@ -212,6 +226,7 @@ public class NewsCheckWorker extends Worker {
             parser.setInput(in, null);
             int itemDepth = -1;   // profondeur du item/entry trouvé, -1 = pas encore
             String link = null;
+            String title = null;
             int event = parser.next();
             while (event != XmlPullParser.END_DOCUMENT) {
                 if (System.currentTimeMillis() > deadline) break;
@@ -229,6 +244,14 @@ public class NewsCheckWorker extends Worker {
                             if (text != null && !text.trim().isEmpty()) link = text.trim();
                             continue;   // TEXT déjà consommé ci-dessus
                         }
+                    } else if (itemDepth >= 0 && title == null && "title".equals(tag)) {
+                        // Même position dans l'arbre en RSS et en Atom : texte de
+                        // l'élément, jamais un attribut — pas de variante href ici.
+                        if (parser.next() == XmlPullParser.TEXT) {
+                            String text = parser.getText();
+                            if (text != null && !text.trim().isEmpty()) title = text.trim();
+                            continue;   // TEXT déjà consommé ci-dessus
+                        }
                     }
                 } else if (event == XmlPullParser.END_TAG && itemDepth >= 0
                     && parser.getDepth() == itemDepth
@@ -237,13 +260,23 @@ public class NewsCheckWorker extends Worker {
                 }
                 event = parser.next();
             }
-            return link;
+            return new Head(link, title);
         } catch (Exception e) {
             return null;   // XML mal formé : pas une panne du réveil, juste rien à en tirer
         }
     }
 
-    private void postNotification(Context ctx, int count, String firstName) {
+    /** Coupe un titre trop long avant de l'insérer dans la notification — un
+     *  {@code <title>} RSS n'a aucune limite de taille garantie, et un pavé de
+     *  texte dans une notification en collapsed masquerait tout le reste. */
+    private static String clampTitle(String title) {
+        final int MAX = 80;
+        String t = title.trim();
+        if (t.length() <= MAX) return t;
+        return t.substring(0, MAX).trim() + "…";
+    }
+
+    private void postNotification(Context ctx, int count, String firstName, String firstTitle) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
             && ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -265,18 +298,36 @@ public class NewsCheckWorker extends Worker {
         int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
         PendingIntent pi = PendingIntent.getActivity(ctx, 0, launch, flags);
         boolean one = count == 1 && firstName != null && !firstName.isEmpty();
+        // Un titre RSS manque rarement, mais un flux malformé ne doit jamais
+        // empêcher la notification de partir (même principe que « aucune
+        // donnée locale ne doit pouvoir empêcher le fil de se charger », côté
+        // web) — repli sur les variantes SANS titre quand il est absent.
+        boolean hasTitle = firstTitle != null && !firstTitle.trim().isEmpty();
         // Titre ET corps tirés au sort à chaque envoi : voir strings.xml
-        // (notif_titles/notif_bodies_one/notif_bodies_many) pour la raison —
-        // purement cosmétique, ne changent jamais ce qui est annoncé.
+        // (notif_titles/notif_bodies_*) pour la raison — purement cosmétique,
+        // ne change jamais ce qui est annoncé.
         String title = pickRandom(ctx, R.array.notif_titles);
-        String bodyTemplate = pickRandom(ctx, one ? R.array.notif_bodies_one : R.array.notif_bodies_many);
-        String body = one
-            ? String.format(Locale.getDefault(), bodyTemplate, firstName)
-            : String.format(Locale.getDefault(), bodyTemplate, count);
+        String bodyTemplate;
+        String body;
+        if (one) {
+            bodyTemplate = pickRandom(ctx, hasTitle ? R.array.notif_bodies_one_titled : R.array.notif_bodies_one);
+            body = hasTitle
+                ? String.format(Locale.getDefault(), bodyTemplate, firstName, clampTitle(firstTitle))
+                : String.format(Locale.getDefault(), bodyTemplate, firstName);
+        } else {
+            bodyTemplate = pickRandom(ctx, hasTitle ? R.array.notif_bodies_many_titled : R.array.notif_bodies_many);
+            body = hasTitle
+                ? String.format(Locale.getDefault(), bodyTemplate, count, clampTitle(firstTitle))
+                : String.format(Locale.getDefault(), bodyTemplate, count);
+        }
         Notification notification = new NotificationCompat.Builder(ctx, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(body)
+            // Un titre d'article peut dépasser la ligne unique du corps
+            // collapsed : BigTextStyle le rend lisible en entier une fois la
+            // notification dépliée, sans rien changer à la forme repliée.
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setContentIntent(pi)
             .build();

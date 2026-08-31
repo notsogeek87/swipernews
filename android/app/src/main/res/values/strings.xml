@@ -30,14 +30,18 @@
          (voir NewsCheckWorker.postNotification), pour que « De nouveaux
          articles » ne revienne pas identique à chaque réveil pendant des mois —
          cosmétique seulement, aucune variante ne change ce qui est annoncé.
-         Les deux tableaux de corps doivent rester du MÊME FORMAT (%1$s ou
-         %1$d) que leur cas : one = une source nommée, many = un compte. -->
+         Les tableaux de corps doivent rester du MÊME FORMAT (%1$s ou %1$d,
+         plus %2$s pour les variantes « titled ») que leur cas : one = une
+         source nommée, many = un compte, titled = le titre du premier
+         article neuf trouvé (voir clampTitle) est disponible en plus. -->
     <string-array name="notif_titles">
         <item>📰 Ça vient de tomber</item>
         <item>👀 Y\'a du neuf sur ton fil</item>
         <item>✨ Une pause lecture ?</item>
         <item>🗞️ Fraîchement publié</item>
     </string-array>
+    <!-- Repli SANS titre (flux malformé, <title> absent de l'item) — voir
+         hasTitle dans postNotification. -->
     <string-array name="notif_bodies_one">
         <item>%1$s vient de publier — de quoi faire une pause</item>
         <item>Nouvel article chez %1$s, juste pour toi</item>
@@ -49,5 +53,19 @@
         <item>%1$d nouveautés à glisser tout à l\'heure</item>
         <item>%1$d sources se sont réveillées : de la lecture fraîche</item>
         <item>%1$d nouveaux articles à swiper</item>
+    </string-array>
+    <!-- Variantes AVEC titre (%2$s), utilisées dès que le flux en fournit un —
+         le cas courant : disent QUOI lire, pas seulement COMBIEN ou OÙ. -->
+    <string-array name="notif_bodies_one_titled">
+        <item>%1$s : « %2$s »</item>
+        <item>%1$s vient de publier « %2$s »</item>
+        <item>Chez %1$s : « %2$s »</item>
+        <item>Nouvel article de %1$s — « %2$s »</item>
+    </string-array>
+    <string-array name="notif_bodies_many_titled">
+        <item>%1$d nouveautés, dont « %2$s »</item>
+        <item>%1$d sources se sont réveillées, à commencer par « %2$s »</item>
+        <item>%1$d nouveaux articles à swiper, dont « %2$s »</item>
+        <item>%1$d nouveautés — la dernière : « %2$s »</item>
     </string-array>
 </resources>
