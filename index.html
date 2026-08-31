@@ -1548,9 +1548,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=253"></script>
+<script src="src/lib.js?v=254"></script>
 <script src="src/learn-core.js?v=252"></script>
-<script src="src/i18n.js?v=253"></script>
+<script src="src/i18n.js?v=254"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2579,7 +2579,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="253";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="254";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2789,6 +2789,12 @@ let adsPref=(()=>{try{return localStorage.getItem(LS_ADS)==="block"?"block":"all
    subir. */
 const LS_NOTIF="fluxswipe.notif.v1";
 let notifPref=(()=>{try{return localStorage.getItem(LS_NOTIF)==="on"?"on":"off";}catch(e){return "off";}})();
+/* État de l'exemption d'optimisation batterie (voir batteryHTML/refreshBatteryIgnored
+   plus bas) : null = pas encore interrogé côté natif, sinon reflet exact de
+   PowerManager.isIgnoringBatteryOptimizations. JAMAIS persisté — c'est un état
+   système qui peut changer hors de l'app (l'utilisateur peut le révoquer dans
+   les réglages Android), donc reparti de zéro à chaque lancement. */
+let batteryIgnored=null;
 /* Rappel ponctuel « active les notifications », proposé jusqu'à ce qu'il
    reçoive une VRAIE réponse, sous DEUX formes SANS RAPPORT hiérarchique — un
    utilisateur ne voit jamais les deux à la fois :
@@ -6475,6 +6481,12 @@ function renderReadPref(){
     if(adsPref==="block")html+=blocklistHTML();
     html+=prefRow("notif",T("notif.label"),T("notif.desc."+notifPref),
       [{v:"on",t:T("notif.opt.on")},{v:"off",t:T("notif.opt.off")}],notifPref);
+    // Rien à rendre plus fiable côté batterie si le réveil périodique lui-même
+    // est éteint.
+    if(notifPref==="on"){
+      if(isNativeApp&&batteryIgnored===null)refreshBatteryIgnored();
+      html+=batteryHTML();
+    }
   }
   document.querySelectorAll("[data-readmount]").forEach(el=>{
     el.innerHTML=isNativeApp?html:"";
@@ -6624,6 +6636,43 @@ function syncBackgroundFeeds(){
     p.syncBackgroundFeeds({feeds:backgroundFeedSnapshot()}).catch(()=>{});
   }catch(e){}
 }
+/* Ligne « Exclure de l'optimisation de batterie » sous le réglage notifs —
+   seul levier qui rend NewsCheckWorker (natif) vraiment fiable en arrière-
+   plan, voir requestIgnoreBatteryOptimizations côté InAppBrowserPlugin.
+   batteryIgnored===true : rien à proposer, juste la confirmation. Sinon
+   (false ou encore null, le temps que refreshBatteryIgnored réponde) : le
+   bouton reste affiché, un appui re-vérifie l'état réel avant d'agir. */
+function batteryHTML(){
+  if(batteryIgnored===true){
+    return `<div class="prefsub"><span class="prefsub__state">${esc(T("notif.battery.on"))}</span></div>`;
+  }
+  return `<div class="prefsub">
+    <span class="prefsub__state">${esc(T("notif.battery.off"))}</span>
+    <div class="prefsub__acts">
+      <button type="button" class="iobtn" data-battignore>${esc(T("notif.battery.btn"))}</button>
+    </div>
+  </div>`;
+}
+async function refreshBatteryIgnored(){
+  const p=iabPlugin();
+  if(!p||!p.isIgnoringBatteryOptimizations)return;
+  try{
+    const r=await p.isIgnoringBatteryOptimizations();
+    batteryIgnored=!!(r&&r.ignoring);
+    renderReadPref();
+  }catch(e){}
+}
+async function requestIgnoreBattery(){
+  const p=iabPlugin();
+  if(!p||!p.requestIgnoreBatteryOptimizations)return;
+  try{
+    const r=await p.requestIgnoreBatteryOptimizations();
+    batteryIgnored=!!(r&&r.ignoring);
+    renderReadPref();
+  }catch(e){
+    toast(T("toast.batteryFailed"));
+  }
+}
 // Délégation : les blocs sont réécrits à chaque rendu, un écouteur par bouton
 // serait à ré-attacher à chaque fois.
 document.addEventListener("click",e=>{
@@ -6632,6 +6681,7 @@ document.addEventListener("click",e=>{
   const src=e.target.closest("[data-blsrc]");
   if(src){syncBlocklist(src.dataset.blsrc,false);return;}
   if(e.target.closest("[data-bldrop]"))dropBlocklist();
+  if(e.target.closest("[data-battignore]")){requestIgnoreBattery();return;}
   if(e.target.closest("[data-notifnudge-enable]")){markNotifNudgeAnswered();setPref("notif","on");renderNotifNudge(false);}
   if(e.target.closest("[data-notifnudge-later]")){snoozeNotifNudge();renderNotifNudge(false);}
   if(e.target.closest("[data-notifnudge-decline]")){markNotifNudgeAnswered();renderNotifNudge(false);}

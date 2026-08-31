@@ -6,7 +6,10 @@ import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Build;
+import android.os.PowerManager;
+import android.provider.Settings;
 
 import androidx.activity.result.ActivityResult;
 
@@ -338,5 +341,82 @@ public class InAppBrowserPlugin extends Plugin {
         prefs.edit().putBoolean(NewsCheckWorker.KEY_ENABLED, enabled).apply();
         if (enabled) NewsCheckWorker.schedule(getContext());
         else NewsCheckWorker.cancel(getContext());
+    }
+
+    /** État actuel de l'exemption d'optimisation batterie — interrogé à
+     *  l'ouverture des réglages pour savoir si {@link #requestIgnoreBatteryOptimizations}
+     *  a encore un sens à proposer (voir batteryHTML côté web). */
+    @PluginMethod
+    public void isIgnoringBatteryOptimizations(PluginCall call) {
+        JSObject res = new JSObject();
+        res.put("ignoring", isIgnoringBatteryOptimizationsNow());
+        call.resolve(res);
+    }
+
+    private boolean isIgnoringBatteryOptimizationsNow() {
+        PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+        return pm != null && pm.isIgnoringBatteryOptimizations(getContext().getPackageName());
+    }
+
+    /**
+     * Demande au système d'exclure SwiperNews de l'optimisation de batterie —
+     * seul levier qui améliore VRAIMENT la fiabilité de {@link NewsCheckWorker} :
+     * Doze et les économiseurs constructeur retardent (parfois indéfiniment) un
+     * réveil {@code WorkManager} périodique tant que cette exemption n'est pas
+     * posée, quelle que soit la cadence choisie côté code.
+     *
+     * <p>Proposé comme un choix explicite dans les réglages, jamais un aller-
+     * retour automatique à l'activation des notifs : le dialogue système
+     * (« Autoriser [app] à ignorer l'optimisation de la batterie ? ») est
+     * intrusif, il ne doit apparaître qu'à une action volontaire.
+     *
+     * <p>Déjà exempté : on ne redemande rien, {@code call.resolve} tout de
+     * suite. Intent absent (certains OEM le retirent) : repli sur l'écran de
+     * liste générique ({@code ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS}),
+     * qui existe partout — un tour de plus pour l'utilisateur (il doit
+     * retrouver SwiperNews dans la liste), jamais un échec sec. Ce repli ne
+     * peut pas suivre le choix de l'utilisateur (pas de résultat exploitable
+     * pour un écran de LISTE) : la réponse reflète l'état au moment de l'appel,
+     * un second appui après coup corrige l'affichage.
+     */
+    @PluginMethod
+    public void requestIgnoreBatteryOptimizations(PluginCall call) {
+        if (isIgnoringBatteryOptimizationsNow()) {
+            JSObject res = new JSObject();
+            res.put("ignoring", true);
+            call.resolve(res);
+            return;
+        }
+        Activity activity = getActivity();
+        if (activity == null) {
+            call.reject("activité indisponible");
+            return;
+        }
+        Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+            Uri.parse("package:" + getContext().getPackageName()));
+        try {
+            startActivityForResult(call, intent, "handleBatteryResult");
+        } catch (ActivityNotFoundException e) {
+            try {
+                activity.startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+            } catch (ActivityNotFoundException e2) {
+                call.reject("réglages indisponibles");
+                return;
+            }
+            JSObject res = new JSObject();
+            res.put("ignoring", isIgnoringBatteryOptimizationsNow());
+            call.resolve(res);
+        }
+    }
+
+    /** Callback de {@link #requestIgnoreBatteryOptimizations} : le code de
+     *  retour du dialogue système n'est pas fiable (varie selon les versions),
+     *  donc on se fie uniquement à l'état RÉEL relu après coup. */
+    @ActivityCallback
+    private void handleBatteryResult(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        JSObject res = new JSObject();
+        res.put("ignoring", isIgnoringBatteryOptimizationsNow());
+        call.resolve(res);
     }
 }

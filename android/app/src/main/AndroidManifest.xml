@@ -56,4 +56,9 @@
          encore aucune permission — la déclarer ici ne change rien pour ces
          versions, c'est là qu'elle devient obligatoire. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Bouton « Exclure de l'optimisation de batterie » des réglages notifs
+         (InAppBrowserPlugin.requestIgnoreBatteryOptimizations) : seul levier
+         qui rend NewsCheckWorker vraiment fiable en arrière-plan, Doze
+         retardant sinon un WorkManager périodique quelle que soit sa cadence. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 </manifest>
