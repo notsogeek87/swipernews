@@ -279,6 +279,43 @@ l'écran déplace la découpe). Le pied du panneau de réglages affiche la marge
 installée n'ont de barre d'URL où ajouter `?debug=1`, et « le poinçon rogne
 encore » n'est pas débogable à distance sans ce chiffre.
 
+### Écrans larges couchés : le volet de gauche
+
+L'app ne connaissait qu'un seul paysage, celui du **téléphone couché**, où une
+carte plein écran ne tient pas debout : elle y répond par un verrou
+d'orientation (« Remets ton téléphone à la verticale »). Un **pliant déplié**
+n'est pas ce paysage-là. Un Galaxy Z Fold couché offre ~1224×924 points CSS
+(pour 1848×2448 pixels) : la carte y tient parfaitement, et il reste de la
+place à côté d'elle.
+
+Les deux se séparent **par la hauteur**, jamais par un nom d'appareil — même
+règle qu'au paragraphe précédent : on mesure la géométrie, on ne devine pas le
+matériel.
+
+| | Largeur | Hauteur | Ce qui s'affiche |
+| --- | --- | --- | --- |
+| Téléphone couché | ≤ 1024 | < 560 | Le verrou d'orientation |
+| Pliant déplié, tablette, fenêtre desktop couchés | ≥ 900 | ≥ 560 | Le fil **et le volet** |
+
+560 px de hauteur ne peut pas se tromper de catégorie : être *haut* de 560 une
+fois couché, c'est être *large* de 560 debout, et aucun téléphone ne l'est (les
+plus grands plafonnent vers 480 points CSS).
+
+Le volet n'invente rien : c'est la liste « Articles en mémoire »
+([Retrouver un article dépassé](#retrouver-un-article-dépassé)), aux mêmes
+rangées et avec le même saut, simplement **posée à demeure** au lieu de
+recouvrir le fil. Elle se cherchait déjà en plein milieu d'une lecture ; sur un
+écran assez large, elle n'a plus besoin de le cacher pour se montrer. Le repère
+de position y suit le fil pendant qu'on swipe.
+
+Le fil, lui, ne change que de **largeur** : les cartes font toujours une
+hauteur d'écran et le geste reste exactement le même. Un pliant déplié en
+*portrait* reste d'ailleurs en fil plein écran — il est large, mais c'est déjà
+l'orientation du geste.
+
+Le détail des choix est dans
+[`docs/architecture/2026-09-01-paysage-large-volet.md`](docs/architecture/2026-09-01-paysage-large-volet.md).
+
 ## Dose d'apprentissage
 
 La composition du fil tient à un seul réglage — un **curseur** à six crans, en

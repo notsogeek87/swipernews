@@ -1115,14 +1115,29 @@
   .visually-hidden{position:absolute!important;width:1px;height:1px;margin:-1px;padding:0;
     overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
 
-  /* Fil pensé pour le swipe vertical plein écran : illisible en paysage. Gardé
-     à la taille (max-width), pas aux capacités d'entrée (hover/pointer) —
-     ces dernières sont rapportées de façon peu fiable par certains
-     navigateurs mobiles. 1024px couvre tous les téléphones en paysage (le
-     plus large, iPhone Pro Max, culmine à 932px) et les tablettes courantes,
-     tout en épargnant une fenêtre desktop habituelle. */
+  /* ---------- Les DEUX paysages ----------
+     Ils ne se distinguent pas par un nom d'appareil ni par les capacités
+     d'entrée (hover/pointer, rapportées de façon peu fiable par plusieurs
+     navigateurs mobiles) mais par la HAUTEUR — même leçon que « systop » plus
+     haut : on mesure la géométrie, on ne devine pas le matériel.
+
+     - Un TÉLÉPHONE couché est large et PLAT (iPhone Pro Max, le plus grand :
+       932×430). Une carte plein écran n'y tient pas debout : verrou
+       d'orientation, inchangé.
+     - Un PLIANT DÉPLIÉ ou une tablette est large et HAUT (Galaxy Z Fold
+       déplié : ~1224×924 points CSS pour 1848×2448 pixels ; iPad mini :
+       1024×768). La carte y tient parfaitement, et il reste de la place à
+       côté d'elle : c'est le volet du bloc suivant.
+
+     560 px de hauteur sépare les deux catégories sans ambiguïté possible :
+     être HAUT de 560 une fois couché, c'est être LARGE de 560 debout, et
+     aucun téléphone ne l'est (les plus grands plafonnent vers 480 points
+     CSS). Le seuil ne peut donc jamais se tromper de catégorie, quel que
+     soit l'appareil — c'est tout l'intérêt de le poser sur la géométrie.
+     1024 px de large reste la borne d'origine du verrou : elle épargne une
+     fenêtre desktop habituelle. */
   .orientlock{display:none}
-  @media (orientation:landscape) and (max-width:1024px){
+  @media (orientation:landscape) and (max-width:1024px) and (max-height:559px){
     .orientlock{display:flex;position:fixed;inset:0;z-index:9999;flex-direction:column;
       align-items:center;justify-content:center;gap:16px;padding:32px;text-align:center;
       background:var(--bg)}
@@ -1130,6 +1145,80 @@
     .orientlock p{font-size:16px;color:var(--ash);max-width:32ch;line-height:1.5}
     .orientlock b{color:var(--ink)}
     @keyframes orientspin{0%,100%{transform:rotate(0)}50%{transform:rotate(-90deg)}}
+  }
+
+  /* ---------- Paysage LARGE : le volet de gauche ----------
+     Le pendant du verrou ci-dessus, pour l'autre paysage. Un pliant déplié
+     couché offre ~1224×924 : la carte n'a besoin que d'une colonne pour
+     rester ce qu'elle est, et les 300 px restants valaient mieux qu'une
+     image étirée et un titre de 100 caractères de long.
+
+     Le volet n'invente rien : c'est la feuille « Articles en mémoire »
+     (histRowHTML) posée à demeure, aux MÊMES rangées, avec le MÊME saut vers
+     la carte. Elle existait déjà et se cherchait déjà en plein milieu d'une
+     lecture ; sur un écran assez large, elle n'a plus à recouvrir le fil pour
+     se montrer.
+
+     Ce qui rend tout cela sûr tient en une phrase : **la géométrie VERTICALE
+     du fil ne bouge pas d'un pixel**. Les cartes font toujours 100dvh, le
+     scroll-snap est le même, `offsetTop` mesure la même chose — donc
+     currentIndex(), scrollToCard(), rememberPos(), le filet de scrollFix et
+     la reprise de lecture continuent de marcher sans une ligne de changement.
+     Seule la LARGEUR du fil est réduite. Ne pas défaire ça : dès qu'une carte
+     cesse de faire une hauteur d'écran, c'est tout le suivi de position qui
+     est à reprendre.
+
+     Le seuil de largeur (900) est le second critère, indépendant de la
+     hauteur : en dessous, le volet mangerait la carte au lieu de
+     l'accompagner. Un pliant déplié en PORTRAIT (~924×1224) reste donc en fil
+     plein écran — il est large, mais c'est déjà l'orientation du geste. */
+  .volet{display:none}
+  @media (orientation:landscape) and (min-width:900px) and (min-height:560px){
+    :root{--volet:clamp(250px,26vw,340px)}
+    #feed{margin-left:var(--volet);width:calc(100% - var(--volet))}
+    /* La barre du haut et les écrans d'état sont des CALQUES au-dessus du
+       fil : ils se posent sur le fil, jamais sur le volet — sinon le flou et
+       le dégradé de .top recouvrent les premières rangées de la liste. */
+    .top,.state{left:var(--volet)}
+    /* Tout ce qui se centre se centre sur le FIL, pas sur l'écran : centré sur
+       l'écran, un toast tombe à cheval sur le volet. */
+    .hint,.peek,.toast,.demobadge{left:calc(50% + var(--volet)/2)}
+    /* Une ligne de titre de 100 caractères ne se lit pas, quelle que soit la
+       taille de la police (.card__title plafonne déjà à 38px). L'image, elle,
+       reste plein cadre : elle EST le fond de la carte. Le plafond va sur le
+       titre et non sur .card__body, qui porte le calque de flou local
+       (.card--img .card__body::before) — le rétrécir laisserait une arête
+       verticale nette en plein milieu de l'image. */
+    .card__title{max-width:22ch}
+    /* Les feuilles gardent leur forme (elles montent du bas) mais pas toute la
+       largeur : une case à cocher suivie de 900 px de vide ne se lit pas mieux
+       qu'un titre de 100 caractères. #menuSheet est le tiroir LATÉRAL (voir
+       son commentaire) : il est ancré à DROITE, sous le bouton qui l'ouvre, le
+       centrer l'en décollerait. */
+    .sheet:not(#menuSheet) .sheet__panel{max-width:760px;margin:0 auto}
+
+    /* Le volet lui-même. Fond « surface » et liseré : c'est un panneau, il se
+       lit comme les feuilles, pas comme une carte. */
+    .volet{display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;
+      width:var(--volet);z-index:16;background:var(--surface);
+      border-right:1px solid var(--redline);
+      padding-top:max(env(safe-area-inset-top),var(--systop,0px),var(--systop-min,0px))}
+    .volethead{flex:0 0 auto;padding:14px 14px 11px;border-bottom:1px solid rgba(var(--redline-rgb),.3)}
+    .volethead h2{font-size:14px;font-weight:600;letter-spacing:-.01em}
+    .volethead p{margin-top:3px;color:var(--ash);font-size:11.5px;
+      font-family:var(--font-mono);letter-spacing:-.03em}
+    /* position:relative — les rangées sont ainsi positionnées par rapport à
+       cette liste, donc row.offsetTop y est directement l'offset dans le
+       contenu défilable (même raison que #feed, et c'est ce dont majVolet() se
+       sert pour garder la rangée courante en vue). */
+    #voletList{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;position:relative;
+      padding:0 12px calc(16px + env(safe-area-inset-bottom))}
+    /* Rangées : celles de la feuille, À L'IDENTIQUE (histRowHTML), en plus
+       compact — le volet est deux fois plus étroit qu'une feuille. */
+    #voletList .histrow{padding:10px 4px;gap:10px}
+    #voletList .histrow__th{width:44px;height:44px}
+    #voletList .histrow__ttl{font-size:13px;-webkit-line-clamp:3}
+    #voletList .histrow__top{font-size:11px;gap:6px}
   }
 
   /* Respect du réglage système « réduire les animations » (WCAG 2.3.3) */
@@ -1221,6 +1310,21 @@
   <button id="saveBtn"></button>
   <button id="shareBtn" data-i18n-attr="aria-label:rail.share.aria,title:rail.share.title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
 </div>
+
+<!-- Volet du paysage LARGE (pliant déplié, tablette, fenêtre desktop) : voir
+     « Paysage LARGE » dans le <style>. Masqué partout ailleurs, y compris pour
+     les lecteurs d'écran (display:none), et posé APRÈS le fil dans le document
+     pour qu'il reste lu en premier — le volet n'est qu'un raccourci vers lui.
+     Ses rangées sont celles d'« Articles en mémoire » (histRowHTML), au même
+     balisage : c'est la même liste, simplement posée à demeure au lieu de
+     recouvrir le fil. -->
+<aside class="volet" id="volet" data-i18n-attr="aria-label:hist.title">
+  <div class="volethead">
+    <h2 data-i18n="hist.title">Liste des articles</h2>
+    <p id="voletSub"></p>
+  </div>
+  <div id="voletList"></div>
+</aside>
 
 <div class="hint" id="hint"><span class="arrow">⌃</span><span data-i18n="hint.swipe">Swipe</span></div>
 <!-- Invitation à retrouver la barre du haut. Décoratif (aria-hidden) : le geste
@@ -1548,9 +1652,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=255"></script>
+<script src="src/lib.js?v=256"></script>
 <script src="src/learn-core.js?v=252"></script>
-<script src="src/i18n.js?v=255"></script>
+<script src="src/i18n.js?v=256"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2566,6 +2670,7 @@ function onCardChange(userScroll){
   }
   rememberPos(it);
   updateRail(it);
+  majVolet();     // paysage large seulement ; ailleurs, un test de media query
   if(DEBUG)dbgImage();
   return i;
 }
@@ -2591,7 +2696,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="255";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="256";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2602,6 +2707,8 @@ const APP_VERSION="255";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:256,date:"2026-09-01",items:[
+    "changelog.v256.item1"]},
   {v:252,date:"2026-08-30",items:[
     "changelog.v252.item1"]},
   {v:239,date:"2026-08-30",items:[
@@ -5388,6 +5495,7 @@ function pvRowHTML(it,n){
    seul cas où cela arrive, un changement de dose (voir applyMix). */
 function render(forceTop,altAnchor){
   scrollFix++;                                  // périme le filet d'un rendu précédent
+  voletSale=true;                               // `items` a bougé : voir majVolet()
   const anchor=forceTop?null:anchorLink();      // avant mutation : où est l'utilisateur ?
 
   // Index des cartes déjà à l'écran, par lien d'article.
@@ -6971,14 +7079,14 @@ histHideSeenChk.onchange=e=>{
   try{localStorage.setItem(LS_HIDE_SEEN,hideSeen?"1":"0");}catch(_){}
 };
 histSheet.onclick=e=>{if(e.target===histSheet)closeDialog(histSheet);};
-histList.addEventListener("click",e=>{
-  const b=e.target.closest("[data-hk]");
-  if(!b)return;
-  closeDialog(histSheet);              // d'abord refermer : le fil se repositionne derrière
-  // Recherche par CLÉ, jamais par l'index de la rangée : entre l'ouverture de la
-  // feuille et le toucher, un lot arrivé en arrière-plan a pu réentrelacer le
+/* Saut vers l'article d'une rangée, PARTAGÉ par la feuille et par le volet du
+   paysage large : les deux affichent exactement les mêmes rangées
+   (histRowHTML), il n'y a donc qu'une façon d'en toucher une. */
+function sauterVersHk(hk){
+  // Recherche par CLÉ, jamais par l'index de la rangée : entre le rendu de la
+  // liste et le toucher, un lot arrivé en arrière-plan a pu réentrelacer le
   // fil — le même index désignerait alors un autre article.
-  const cible=items.find(it=>seenKey(it)===b.dataset.hk);
+  const cible=items.find(it=>seenKey(it)===hk);
   // scrollToCard prend un index de CARTE : à cardsPerSwipe>1, l'index de
   // l'article dans `items` n'est plus celui de sa carte (une carte en porte
   // N), et défiler sur l'index brut atterrissait sur une tout autre carte —
@@ -6989,7 +7097,88 @@ histList.addEventListener("click",e=>{
   if(k<0){toast(T("hist.gone"));return;}
   scrollToCard(k);
   onCardChange();   // position mémorisée aussitôt, sans attendre une frame de défilement
+}
+histList.addEventListener("click",e=>{
+  const b=e.target.closest("[data-hk]");
+  if(!b)return;
+  closeDialog(histSheet);              // d'abord refermer : le fil se repositionne derrière
+  sauterVersHk(b.dataset.hk);
 });
+
+/* ---------- Volet du paysage large ----------
+   Voir « Paysage LARGE » dans le <style> pour le POURQUOI et pour le seul
+   invariant qui rend tout cela sûr (la géométrie verticale du fil ne bouge
+   pas). Ici, le COMMENT.
+
+   Le volet est la feuille « Articles en mémoire » posée à demeure : mêmes
+   rangées (histRowHTML), même saut (sauterVersHk). Ce qu'il ajoute, c'est
+   qu'il est VIVANT — la feuille, elle, est refaite à chaque ouverture et ne
+   bouge plus tant qu'elle est là (voir son commentaire : une liste qui se
+   recompose sous le doigt pendant qu'on la parcourt serait pire qu'inutile).
+   Un volet toujours à l'écran n'a pas ce luxe : il doit suivre le fil.
+
+   D'où DEUX granularités de mise à jour, et pas une :
+   - la REFONTE (voletSale) reconstruit les rangées, et n'a lieu qu'après un
+     render() — le seul moment où `items` change ;
+   - le REPÈRE (voletCle) ne fait que déplacer les classes --now/--past. C'est
+     lui qui tourne à chaque frame de défilement, via onCardChange().
+   Refaire l'innerHTML à chaque frame rechargerait les vignettes de tout le fil
+   et casserait le défilement du volet à chaque swipe.
+
+   Sur un téléphone (le cas de tout le monde), la fonction s'arrête à la
+   première ligne : un test de media query, rien d'autre. */
+const MQ_VOLET=window.matchMedia("(orientation:landscape) and (min-width:900px) and (min-height:560px)");
+const voletList=document.getElementById("voletList"),voletSub=document.getElementById("voletSub");
+let voletSale=true;    // posé par render() : le fil a bougé, les rangées sont à refaire
+let voletCle="";       // repère déjà posé, pour ne pas réécrire des classes identiques
+function majVolet(){
+  if(!MQ_VOLET.matches)return;
+  // Filet de sécurité, et il se répare tout seul : si le nombre de rangées ne
+  // correspond plus à `items`, l'indexation rangée↔article ci-dessous serait
+  // fausse (un remix sans render(), un rendu manqué). On refait plutôt.
+  if(voletList.children.length!==items.length)voletSale=true;
+  // « En cours » se mesure en ARTICLES, jamais en cartes : à cardsPerSwipe>1
+  // une carte en porte plusieurs, et TOUS sont également à l'écran — même
+  // raison que dans renderHistList().
+  const surEcran=new Set(cardItems(currentCardEl()).map(x=>x.link).filter(Boolean));
+  const cur=currentItemIndex();
+  if(voletSale){
+    voletList.innerHTML=items.length
+      ? items.map((it,i)=>histRowHTML(it,(it.link&&surEcran.has(it.link))?"now":(cur>=0&&i<cur?"past":""))).join("")
+      : `<p class="histempty">${esc(T("hist.empty"))}</p>`;
+    voletSub.textContent=items.length?T("volet.count",{n:items.length}):T("hist.subEmpty");
+    voletSale=false;
+    voletCle="";     // les rangées sont neuves : forcer le recalage du défilement ci-dessous
+  }
+  const cle=cur+"|"+[...surEcran].join("|");
+  if(cle===voletCle)return;
+  voletCle=cle;
+  const rows=voletList.children;
+  for(let i=0;i<rows.length&&i<items.length;i++){
+    const it=items[i],r=rows[i];
+    const now=!!(it.link&&surEcran.has(it.link));
+    r.classList.toggle("histrow--now",now);
+    r.classList.toggle("histrow--past",!now&&cur>=0&&i<cur);
+  }
+  // Garder la rangée courante en vue, mais SEULEMENT quand elle en est sortie :
+  // recentrer à chaque carte empêcherait de parcourir le volet à la main
+  // pendant que le fil défile. Offsets relatifs à la liste (elle est
+  // position:relative, donc offsetParent de ses rangées).
+  const r=voletList.querySelector(".histrow--now");
+  if(r){
+    const h=voletList.clientHeight,y=r.offsetTop;
+    if(y<voletList.scrollTop||y+r.offsetHeight>voletList.scrollTop+h)
+      voletList.scrollTop=Math.max(0,y-(h-r.offsetHeight)/2);
+  }
+}
+voletList.addEventListener("click",e=>{
+  const b=e.target.closest("[data-hk]");
+  if(b)sauterVersHk(b.dataset.hk);   // rien à refermer : le volet reste
+});
+// Le volet est apparu (appareil qu'on déplie, fenêtre qu'on agrandit, écran
+// qu'on tourne) : il n'a encore jamais été peint. Il disparaît, lui, sans rien
+// à faire — majVolet() sort à sa première ligne et le CSS le masque.
+MQ_VOLET.addEventListener("change",()=>{voletSale=true;majVolet();});
 
 /* ---------- Articles enregistrés ----------
    Contrairement à la feuille précédente, celle-ci ne fait JAMAIS défiler le

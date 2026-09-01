@@ -53,6 +53,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v256.item1":
+        "📱 Écrans larges couchés (pliant déplié, tablette, ordinateur) : le fil garde sa colonne et la liste des articles s'installe à gauche, toujours visible — plus besoin d'ouvrir un panneau pour revenir en arrière. Le téléphone couché, lui, demande toujours de se remettre à la verticale.",
       "changelog.v252.item1":
         "🧠 Mémoire de lecture plus fiable : l'article sur lequel tu refermes l'app compte désormais comme lu, et le fil retient beaucoup plus longtemps ce que tu as déjà vu — moins de redites.",
       "changelog.v239.item1":
@@ -161,6 +163,10 @@
       "hist.gone": "Cet article n'est plus dans le fil",
       "hist.hideSeen": "Cacher les articles déjà lus du fil",
       "hist.seenBadge": "Lu",
+      // Volet du paysage large : la même liste que « hist.* », mais dans une
+      // colonne de ~300 px — d'où un sous-titre réduit au décompte, là où
+      // "hist.sub" tient sur la largeur d'une feuille.
+      "volet.count": "{n} articles",
 
       "saved.title": "Enregistrés",
       "saved.sub": "{n} articles enregistrés. Touche-en un pour l'ouvrir.",
@@ -470,6 +476,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v256.item1":
+        "📱 Wide screens in landscape (unfolded foldable, tablet, desktop): the feed keeps its column and the article list settles on the left, always visible — no need to open a panel to go back. A phone in landscape still asks to be turned upright.",
       "changelog.v252.item1":
         "🧠 More reliable reading memory: the article you close the app on now counts as read, and the feed remembers what you have already seen for far longer — fewer repeats.",
       "changelog.v239.item1":
@@ -577,6 +585,7 @@
       "hist.gone": "This article is no longer in the feed",
       "hist.hideSeen": "Hide already-read articles from the feed",
       "hist.seenBadge": "Read",
+      "volet.count": "{n} articles",
 
       "saved.title": "Saved",
       "saved.sub": "{n} saved articles. Tap one to open it.",

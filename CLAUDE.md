@@ -478,6 +478,33 @@ genre de script dérape.
   l'app soit restée fermée pendant plusieurs mises à jour. Marqué vu au même
   sens que `markVisibleSeen`/`bumpCardScroll` (« affiché », pas « lu ») : dès
   l'ouverture, pas à la fermeture.
+- `MQ_VOLET` / `majVolet()` / `sauterVersHk()` — le **volet de gauche du
+  paysage LARGE** (pliant déplié, tablette, fenêtre desktop couchés). Il
+  n'invente aucune vue : c'est la feuille « Articles en mémoire » posée à
+  demeure, aux MÊMES rangées (`histRowHTML`) et avec le MÊME saut
+  (`sauterVersHk`, extrait exprès pour être partagé par les deux — il ne peut
+  donc pas y avoir deux façons de toucher une rangée).
+  Deux paysages, séparés par la HAUTEUR et jamais par un nom d'appareil (même
+  règle que « systop ») : un téléphone couché est large et PLAT (932×430) et
+  garde son verrou d'orientation ; un pliant déplié est large et HAUT
+  (~1224×924 points CSS pour 1848×2448 pixels) et gagne le volet. **560 px de
+  hauteur** ne peut pas se tromper de catégorie — être HAUT de 560 couché,
+  c'est être LARGE de 560 debout, et aucun téléphone ne l'est (plafond ~480).
+  L'invariant qui rend tout cela sûr tient en une phrase : **la géométrie
+  VERTICALE du fil ne bouge pas**. Les cartes font toujours 100dvh, seule la
+  LARGEUR de `#feed` est réduite — d'où `currentIndex`, `scrollToCard`,
+  `rememberPos`, `scrollFix` et la reprise de lecture inchangés, pas une ligne.
+  Ne pas défaire : dès qu'une carte cesse de faire une hauteur d'écran, c'est
+  tout le suivi de position qui est à reprendre.
+  DEUX granularités de mise à jour, et pas une : la REFONTE (`voletSale`, posé
+  par `render()`, le seul moment où `items` change) reconstruit les rangées ;
+  le REPÈRE (`voletCle`) ne fait que déplacer les classes `--now`/`--past` et
+  tourne, lui, à chaque frame de défilement via `onCardChange()`. Refaire
+  l'`innerHTML` à chaque frame rechargerait les vignettes de tout le fil et
+  casserait le défilement du volet à chaque swipe. Sur téléphone, `majVolet()`
+  sort à sa première ligne (un `matchMedia`), et le CSS masque le volet en
+  `display:none` — donc aussi pour les lecteurs d'écran. Détail complet :
+  `docs/architecture/2026-09-01-paysage-large-volet.md`.
 - `openHistory()` / `histRowHTML()` — la feuille « Articles en mémoire »
   (bouton liste de la barre du haut) : une VUE de `items`, refaite à chaque
   ouverture, qui ramène sur une carte dépassée d'un swipe de trop. Rien n'est
@@ -803,6 +830,17 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   Contrepartie ASSUMÉE de la réservation : si les actus se la réservent puis
   échouent toutes, personne ne remonte en tête pour ce chargement — ce qui est
   le bon comportement, rien de neuf n'étant arrivé côté actus.
+- **Le paysage se décide sur la HAUTEUR, et le fil n'y change que de LARGEUR.**
+  Deux paysages, pas un : le téléphone couché (large et plat) garde son verrou
+  d'orientation, l'écran large ET haut (pliant déplié, tablette, desktop) gagne
+  le volet de gauche. Le seuil est 560 px de hauteur, et il est infaillible par
+  construction — aucun téléphone n'est LARGE de 560 debout, donc aucun ne peut
+  être HAUT de 560 couché. Ne pas le remplacer par un `display-mode`, par
+  `hover`/`pointer` (rapportés de façon peu fiable sur mobile) ni par un nom
+  d'appareil. Et surtout, ne pas toucher à la géométrie VERTICALE du fil pour
+  gagner de la place : c'est parce que les cartes font toujours 100dvh que tout
+  le suivi de position (`currentIndex`, `scrollToCard`, `rememberPos`,
+  `scrollFix`, la reprise de lecture) a survécu sans une ligne de changement.
 - **`onResume()` natif appelle `refreshIfStale()`, JAMAIS `loadFeeds()`.**
   Le point de passage unique porte la garde « un chargement d'actus est déjà en
   vol » (`newsLoadingSeq`) ; en la contournant, le tout premier `onResume` — qui
