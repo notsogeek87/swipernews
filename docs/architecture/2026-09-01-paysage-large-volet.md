@@ -101,6 +101,61 @@ Les feuilles, elles, restent des calques plein écran (elles recouvrent aussi le
 volet) mais gagnent un plafond de largeur — sauf `#menuSheet`, le tiroir
 latéral ancré à droite sous le bouton qui l'ouvre.
 
+### 5. La carte, recomposée en hero paysage
+
+Le volet seul ne suffisait pas, et le retour a été immédiat : « la partie de
+droite est pas top niveau style, on dirait que ça prend pas tout l'écran ».
+Une carte est dessinée pour le **portrait** — image plein cadre, texte ancré en
+bas, dégradé qui monte du bas. Couchée, cette composition ne tient plus :
+
+| Symptôme                                      | Mesure                                          |
+| --------------------------------------------- | ----------------------------------------------- |
+| Le bloc de texte reste collé en bas à gauche  | titre plafonné à 465 px dans un panneau de 1260 |
+| La moitié droite est vide                     | ~700 px sans rien                               |
+| Le dégradé vertical noircit la moitié basse   | réglé pour un texte en pied de carte haute      |
+| De la photo, il ne reste qu'une bande délavée | le reste est sous le dégradé                    |
+
+Trois gestes, un seul principe — **le texte devient une colonne à gauche, la
+photo redevient une photo à droite** :
+
+1. le bloc de texte est borné (`min(640px,60%)`) et **centré verticalement** ;
+2. le dégradé passe à l'**horizontale** : opaque sous la colonne, il se lève
+   vers la droite et rend l'image visible au lieu de l'écraser ;
+3. le titre grandit — `clamp(30px,3.2vw,46px)`, contre un plafond de 38 px
+   taillé pour une largeur de téléphone.
+
+**L'image reste plein cadre**, jamais confinée à la moitié droite. Cette
+variante a été essayée et rendue : un cadre de 700×1000 rogne 60 % de la
+largeur d'une photo de presse en 16:9, qui n'est alors plus lisible. Plein
+cadre sur 1260×1000, la même photo ne perd que 29 % — la carte large rogne donc
+**moins** que la carte portrait d'un téléphone (74 %). Ce n'était jamais le
+cadrage qu'il fallait corriger, c'était le dégradé qui cachait le résultat.
+
+Trois effets de bord traités dans le même mouvement, aucun visible en lecture
+de code :
+
+- **le flou local** derrière le texte (`.card--img .card__body::before`) est
+  solidaire du bloc : borné en largeur et en hauteur, il devenait un rectangle
+  flou posé au milieu de l'image, avec une arête nette à droite et en bas (son
+  masque ne fond que vers le haut). Il est retiré — le dégradé horizontal fait
+  déjà tout le travail sous la colonne ;
+- **le ▶ d'une carte vidéo** est centré sur la carte : avec le texte au milieu
+  à gauche, il tombait dessus (icône à 453 px, colonne s'arrêtant à 547 px). Un
+  `padding-left` le pousse dans la moitié restée à l'image, sans toucher à sa
+  cible, qui reste la carte entière ;
+- **la carte à parts égales** (`cardsPerSwipe>1`) n'a pas de `.card__body` et
+  échappait donc à tout : ses lignes couraient sur 1 500 px, et surtout ses
+  deux boutons (enregistrer, partager) se retrouvaient à l'autre bout de
+  l'écran, loin du titre auquel ils se rapportent. Borner `.pvrow__body` les
+  ramène contre lui.
+
+`justify-content:safe center` n'est pas décoratif : un bloc plus haut que la
+carte (titre long + description à 10 lignes sur une fenêtre juste au-dessus du
+seuil de 560 px) déborderait des deux côtés avec un `center` nu, et c'est le
+haut — le titre — qui serait rogné. Les moteurs qui ne connaissent pas `safe`
+ignorent la déclaration et gardent le `center` de la ligne précédente :
+dégradation acceptable, jamais une carte cassée.
+
 ## Coût sur téléphone
 
 Nul, ou presque : `majVolet()` sort à sa première ligne sur un
@@ -118,3 +173,11 @@ formats larges couchés, le verrou que sur le téléphone couché ; le saut depu
 une rangée atterrit sur la bonne carte et le repère suit le défilement du fil.
 Scénarios du banc de QA rejoués sans régression : `forcetop`, `teteouverture`,
 `redites`, `memoire`, `video`, `corruptcache`, `back`.
+
+La recomposition de la carte a été rendue sur les **cinq formes de carte** —
+article avec image, article sans image, Wikipédia, vidéo (façade et en
+lecture), parts égales à N=3 — et sur une fenêtre courte (1100×600) pour
+vérifier qu'un bloc centré n'y est pas rogné. Le portrait et le téléphone
+couché ont été remesurés après coup : `justify-content:flex-end`, pas de
+`max-width`, padding 28/22 px, flou local présent, dégradé vertical — soit
+exactement l'état d'avant, aucune règle ne fuit hors du paysage large.

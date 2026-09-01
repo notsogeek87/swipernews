@@ -313,6 +313,21 @@ hauteur d'écran et le geste reste exactement le même. Un pliant déplié en
 *portrait* reste d'ailleurs en fil plein écran — il est large, mais c'est déjà
 l'orientation du geste.
 
+La **carte**, elle, est recomposée. Elle est dessinée pour le portrait — image
+plein cadre, texte ancré en bas, dégradé qui monte du bas — et couchée, cette
+composition ne tient plus : le texte reste collé en bas à gauche, la moitié
+droite est vide, et le dégradé vertical noircit la moitié basse pendant qu'il
+ne reste de la photo qu'une bande délavée. Le texte devient donc une
+**colonne** à gauche, centrée verticalement, et le dégradé passe à
+l'**horizontale** : opaque sous la colonne, il se lève vers la droite et rend
+la photo visible au lieu de l'écraser.
+
+L'image, elle, reste **plein cadre** — la confiner à la moitié droite a été
+essayé et rendu : un cadre de 700×1000 rogne 60 % de la largeur d'une photo de
+presse en 16:9. Plein cadre sur 1260×1000, la même photo n'en perd que 29 %,
+soit *moins* que sur l'écran portrait d'un téléphone (74 %). Ce n'était pas le
+cadrage qu'il fallait corriger, c'était le dégradé qui cachait le résultat.
+
 Le détail des choix est dans
 [`docs/architecture/2026-09-01-paysage-large-volet.md`](docs/architecture/2026-09-01-paysage-large-volet.md).
 

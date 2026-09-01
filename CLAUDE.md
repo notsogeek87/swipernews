@@ -841,6 +841,20 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   gagner de la place : c'est parce que les cartes font toujours 100dvh que tout
   le suivi de position (`currentIndex`, `scrollToCard`, `rememberPos`,
   `scrollFix`, la reprise de lecture) a survécu sans une ligne de changement.
+  **Le volet seul ne suffit pas** : une carte est dessinée pour le PORTRAIT
+  (image plein cadre, texte ancré en bas, dégradé montant), et couchée cette
+  composition laisse la moitié droite vide sous un dégradé qui noircit la
+  moitié basse. Elle est donc recomposée en HERO PAYSAGE — texte en colonne
+  bornée et centrée à gauche, dégradé HORIZONTAL, titre agrandi. L'image
+  reste PLEIN CADRE : la confiner à droite a été essayé et rend PIRE (un
+  cadre de 700×1000 rogne 60 % d'une photo 16:9, contre 29 % en plein cadre —
+  moins que les 74 % du portrait d'un téléphone). Ce n'est jamais le cadrage
+  qu'il faut corriger, c'est le dégradé qui cache le résultat. Trois effets de
+  bord invisibles en lecture de code sont traités avec : le flou local du bloc
+  de texte (retiré — borné, il devient un rectangle à arête nette), le ▶ d'une
+  carte vidéo (poussé dans la moitié image, sinon il tombe sur le texte) et la
+  carte à parts égales (pas de `.card__body`, donc rien ne l'atteignait : ses
+  boutons de ligne finissaient à l'autre bout de l'écran).
 - **`onResume()` natif appelle `refreshIfStale()`, JAMAIS `loadFeeds()`.**
   Le point de passage unique porte la garde « un chargement d'actus est déjà en
   vol » (`newsLoadingSeq`) ; en la contournant, le tout premier `onResume` — qui
