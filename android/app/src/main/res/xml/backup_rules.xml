@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Repli pour Android 8-11 (API 24-30) : au-delà, c'est
+     data_extraction_rules.xml qui prime (voir android:dataExtractionRules
+     dans AndroidManifest.xml). Même raisonnement, mêmes exclusions — voir
+     les commentaires là-bas. -->
+<full-backup-content>
+    <exclude domain="root" path="app_webview/Default/Cache/" />
+    <exclude domain="root" path="app_webview/Default/Code Cache/" />
+    <exclude domain="root" path="app_webview/Default/GPUCache/" />
+    <exclude domain="root" path="app_webview/Default/Service Worker/" />
+    <exclude domain="root" path="app_webview/Default/blob_storage/" />
+    <exclude domain="root" path="app_webview/Default/Session Storage/" />
+    <exclude domain="root" path="app_webview/GrShaderCache/" />
+    <exclude domain="root" path="app_webview/Crashpad/" />
+    <exclude domain="file" path="reader_blocklist_cache.txt" />
+</full-backup-content>

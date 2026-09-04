@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sauvegarde automatique (Google, à la configuration d'un nouveau téléphone)
+  et transfert d'appareil à appareil — Smart Switch et l'assistant Android
+  passent par ce même mécanisme standard depuis Android 12 (API 31+, ce que
+  cible ce fichier ; voir backup_rules.xml pour le repli API 24-30). Voir
+  CLAUDE.md, section sur le changement de téléphone.
+
+  Toute la config utilisateur (sources, réglages, historique, stats) vit dans
+  le localStorage de la WebView, sous app_webview/ — RIEN n'est exclu de ce
+  dossier lui-même, il part donc en entier par défaut. Ce qui est exclu
+  ci-dessous, c'est le cache HTTP/rendu de la WebView (Cache, GPUCache,
+  Service Worker...) : ces dossiers ne vivent PAS sous getCacheDir() ni
+  getCodeCacheDir() (les seuls exclus par défaut par Android), donc sans
+  cette règle ils partiraient en entier dans la sauvegarde — potentiellement
+  plusieurs dizaines de Mo de cache jetable, au risque de dépasser la limite
+  par appli et de faire échouer TOUTE la sauvegarde, y compris la config
+  qu'on veut vraiment préserver. Le cache de la liste de blocage
+  (BlocklistStore, jusqu'à 12 Mo déclarés) est exclu pour la même raison : il
+  se retélécharge tout seul, inutile de le transporter.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="app_webview/Default/Cache/" />
+        <exclude domain="root" path="app_webview/Default/Code Cache/" />
+        <exclude domain="root" path="app_webview/Default/GPUCache/" />
+        <exclude domain="root" path="app_webview/Default/Service Worker/" />
+        <exclude domain="root" path="app_webview/Default/blob_storage/" />
+        <exclude domain="root" path="app_webview/Default/Session Storage/" />
+        <exclude domain="root" path="app_webview/GrShaderCache/" />
+        <exclude domain="root" path="app_webview/Crashpad/" />
+        <exclude domain="file" path="reader_blocklist_cache.txt" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="app_webview/Default/Cache/" />
+        <exclude domain="root" path="app_webview/Default/Code Cache/" />
+        <exclude domain="root" path="app_webview/Default/GPUCache/" />
+        <exclude domain="root" path="app_webview/Default/Service Worker/" />
+        <exclude domain="root" path="app_webview/Default/blob_storage/" />
+        <exclude domain="root" path="app_webview/Default/Session Storage/" />
+        <exclude domain="root" path="app_webview/GrShaderCache/" />
+        <exclude domain="root" path="app_webview/Crashpad/" />
+        <exclude domain="file" path="reader_blocklist_cache.txt" />
+    </device-transfer>
+</data-extraction-rules>
