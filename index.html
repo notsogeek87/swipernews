@@ -1199,8 +1199,7 @@
 
        La recomposition tient en trois gestes, et un seul principe : le texte
        devient une COLONNE à gauche, la photo redevient une PHOTO à droite.
-       1. le bloc de texte est borné en largeur et CENTRÉ verticalement — une
-          colonne de lecture, plus un pied de carte ;
+       1. le bloc de texte est borné en largeur — une colonne de lecture ;
        2. le dégradé passe à l'HORIZONTALE : opaque sous la colonne, il se
           lève vers la droite et rend l'image visible au lieu de l'écraser.
           La seconde couche (bas, courte) garde le rail de partage lisible ;
@@ -1214,20 +1213,21 @@
        Ce n'est donc jamais le cadrage qu'il fallait corriger, c'est le
        dégradé qui cachait le résultat.
 
-       `safe center` n'est pas décoratif : un bloc plus HAUT que la carte
-       (titre long + description à 10 lignes, sur une fenêtre juste au-dessus
-       du seuil de 560 px) déborderait des DEUX côtés avec un `center` nu, et
-       c'est le haut — le titre — qui serait rogné. `safe` retombe alors sur
-       un alignement en début de boîte. Les moteurs qui ne le connaissent pas
-       ignorent la déclaration entière et gardent le `center` de la ligne
-       précédente : dégradation acceptable, jamais une carte cassée. */
-    .card{justify-content:center;justify-content:safe center}
-    /* Le padding vertical part (il décalerait le centrage), l'horizontal
-       grandit : 22 px de marge à gauche d'une colonne de titre en 46 px, ce
-       sont des lettres collées au bord de l'écran. */
-    .card__body{max-width:min(640px,60%);padding-top:0;padding-bottom:0;
-      padding-left:clamp(22px,3vw,56px)}
-    .card--learn .card__body{padding-top:0}
+       La colonne reste ANCRÉE EN BAS (`justify-content:flex-end`, l'héritage
+       du portrait, pas une valeur nouvelle) plutôt que centrée verticalement.
+       Un centrage vertical avait été essayé, et c'est le retour reçu sur
+       l'écran intérieur d'un pliant (large ET haut, exactement ce que cette
+       media query cible) qui l'a défait : titre et bouton « Lire l'article »
+       flottaient au milieu de l'écran pendant que le rail de partage/
+       enregistrer restait, lui, ancré en bas (`.rail`, `position:fixed`,
+       indépendant de ce flex) — les deux blocs qui se répondent visuellement
+       n'étaient plus à la même hauteur. Ancrer les deux en bas les remet en
+       ligne, et c'est aussi ce que fait déjà `.card` en portrait. */
+    .card{justify-content:flex-end}
+    /* Seul l'horizontal change : 22 px de marge à gauche d'une colonne de
+       titre en 46 px, ce sont des lettres collées au bord de l'écran. Le
+       padding vertical reste celui du portrait (aligné sur le bas du rail). */
+    .card__body{max-width:min(640px,60%);padding-left:clamp(22px,3vw,56px)}
     .card__title{font-size:clamp(30px,3.2vw,46px)}
     /* La description reprend la largeur de la COLONNE : son plafond de 46ch,
        taillé pour un téléphone, la faisait finir bien avant le titre — un
@@ -1245,8 +1245,8 @@
        et les halos de lettres (.card--img .card__title/.card__desc) traitent
        le reste. */
     .card--img .card__body::before{display:none}
-    /* Le ▶ d'une carte vidéo est centré sur la CARTE : avec le texte au
-       milieu à gauche, il tombait pile dessus (mesuré : icône à 453 px, la
+    /* Le ▶ d'une carte vidéo est centré sur la CARTE : avec le texte en
+       colonne à gauche, il tombait pile dessus (mesuré : icône à 453 px, la
        colonne s'arrêtant à 547 px). Le padding le pousse dans la moitié
        restée à l'image — sans toucher à sa cible, qui reste la carte
        entière. */
@@ -1723,9 +1723,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=257"></script>
+<script src="src/lib.js?v=258"></script>
 <script src="src/learn-core.js?v=252"></script>
-<script src="src/i18n.js?v=257"></script>
+<script src="src/i18n.js?v=258"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2767,7 +2767,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="257";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="258";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
