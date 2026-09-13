@@ -208,6 +208,13 @@
         "Choisis les thèmes qui t'intéressent — ou aucun, pour un peu de tout. Modifiable à tout moment depuis les réglages ⚙.",
       "welcome.start": "C'est parti →",
 
+      "age.label": "👤 Tu es",
+      "age.desc.major": "Majeur : les sources d'actu généralistes proposées par défaut.",
+      "age.desc.minor":
+        "Mineur : des sources pensées pour les plus jeunes, à la place des sources par défaut.",
+      "age.opt.major": "Majeur",
+      "age.opt.minor": "Mineur",
+
       "sheet.aria": "Réglages de ton fil",
       "sheet.title": "Ton fil",
       "sheet.subtitle":
@@ -626,6 +633,13 @@
       "welcome.interests.sub":
         "Pick the topics you're into — or none, for a bit of everything. You can change this anytime from settings ⚙.",
       "welcome.start": "Let's go →",
+
+      "age.label": "👤 You are",
+      "age.desc.major": "An adult: the general-news sources used by default.",
+      "age.desc.minor":
+        "A minor: sources aimed at younger readers, instead of the default ones.",
+      "age.opt.major": "Adult",
+      "age.opt.minor": "Minor",
 
       "sheet.aria": "Your feed's settings",
       "sheet.title": "Your feed",

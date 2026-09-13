@@ -1439,6 +1439,14 @@
       <h2 data-i18n="welcome.title">Bienvenue sur SwiperNews</h2>
     </div>
     <p class="intro" data-i18n="welcome.pitch">✨ Le swipe qui rend plus malin. Un seul fil : tes actus, et entre elles des articles Wikipédia qui t'apprennent un truc que tu ne connaissais pas.</p>
+    <!-- Choix binaire majeur/mineur, UNIQUEMENT pour pré-cocher les sources
+         d'actu (voir setAgeCategory/MINOR_FEEDS) — jamais persisté à part,
+         jamais revu ensuite : c'est un remplacement en un tap de `feeds`, au
+         même titre qu'un bouton de SUGGESTED_FEEDS, pas un réglage permanent.
+         Pas de secttl/sub séparé, même raison que data-cardsmount juste en
+         dessous : prefRow porte déjà son libellé + la description de l'option
+         choisie. -->
+    <div data-agemount></div>
     <h3 class="secttl" data-i18n="sheet.mix.title">🎚️ Dose d'apprentissage</h3>
     <p class="sub" data-i18n="dose.sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
     <!-- Même point de montage que le panneau de réglages (voir renderMix,
@@ -1725,7 +1733,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=258"></script>
 <script src="src/learn-core.js?v=252"></script>
-<script src="src/i18n.js?v=258"></script>
+<script src="src/i18n.js?v=259"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2001,6 +2009,18 @@ const DEFAULT_FEEDS = [
   {name:"France Info", url:"https://www.francetvinfo.fr/titres.rss", on:true},
   {name:"Le Monde", url:"https://www.lemonde.fr/rss/une.xml", on:true},
   {name:"20 Minutes", url:"https://www.20minutes.fr/feeds/rss-une.xml", on:true},
+];
+/* Sources posées à la place de DEFAULT_FEEDS quand l'accueil du 1er lancement
+   se déclare "mineur" (voir #welcomeSheet, setAgeCategory) — un remplacement
+   complet, jamais un ajout : la case "Majeur" doit garder EXACTEMENT les
+   sources d'aujourd'hui. Choisies pour un public plus jeune (actu expliquée,
+   podcasts jeunesse France Info, actu jeux vidéo), toutes modifiables ensuite
+   comme n'importe quelle source. */
+const MINOR_FEEDS = [
+  {name:"1jour1actu", url:"https://feeds.feedburner.com/1jour1actu/BwmM3ey8dPF", on:true},
+  {name:"Salut l'info !", url:"https://radiofrance-podcast.net/podcast09/35099478-7c72-4f9e-a6de-1b928400e9e5/podcast_9f5486b0-38b5-4544-bf49-e24b18bd022c.xml", on:true},
+  {name:"Franceinfo Junior", url:"https://radiofrance-podcast.net/podcast09/podcast_d8706bf1-54bf-4402-a1dd-85192a374d43.xml", on:true},
+  {name:"JeuxActu", url:"https://www.jeuxactu.com/rss/ja.rss", on:true},
 ];
 /* Sources proposées en un tap dans le panneau (RSS finis → plus de sources =
    plus d'articles), groupées par catégorie — reste ici (pas dans src/),
@@ -2767,7 +2787,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="258";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="259";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -6716,6 +6736,30 @@ function setCardsPerSwipe(v){
   renderCardsPref();
   render();   // recompose les cartes groupées ; aucun appel réseau (comme applyMix)
 }
+/* Choix "Majeur"/"Mineur" de l'accueil du 1er lancement (voir #welcomeSheet) :
+   ne vaut que pour pré-cocher des sources, jamais relu ensuite — pas de clé
+   localStorage dédiée, contrairement à cardsPerSwipe/apptheme ci-dessus. Un
+   utilisateur déjà en place ne revoit jamais ce choix (welcomeSheet ne
+   s'ouvre qu'au 1er lancement, voir firstRun) ; changer d'avis après coup se
+   fait comme pour n'importe quelle source, à la main dans le panneau. */
+let ageCategory="major";
+function renderAgePref(){
+  const html=prefRow("age",T("age.label"),T("age.desc."+ageCategory),
+    [{v:"major",t:T("age.opt.major")},{v:"minor",t:T("age.opt.minor")}],ageCategory);
+  document.querySelectorAll("[data-agemount]").forEach(el=>{el.innerHTML=html;});
+}
+function setAgeCategory(v){
+  const next=v==="minor"?"minor":"major";
+  if(next===ageCategory)return;
+  ageCategory=next;
+  // Remplacement COMPLET de `feeds`, jamais un ajout : sinon un aller-retour
+  // Mineur→Majeur→Mineur empilerait les deux jeux de sources. save() persiste
+  // et remet à jour la pastille de filtre des sources, comme tout changement
+  // de feeds ailleurs dans l'app.
+  feeds=structuredClone(next==="minor"?MINOR_FEEDS:DEFAULT_FEEDS);
+  save();
+  renderAgePref();
+}
 const PREFS={
   read:{get:()=>readPref,set:v=>{readPref=v;},key:LS_READ,vals:READ_MODES},
   cmp: {get:()=>cmpPref, set:v=>{cmpPref=v;}, key:LS_CMP, vals:["hide","show"]},
@@ -6727,6 +6771,7 @@ function setPref(name,v){
   if(name==="lang"){setLang(v);return;}   // effets de bord propres : voir setLang
   if(name==="apptheme"){setAppTheme(v);return;}   // idem : attribut sur <html>
   if(name==="cardsPerSwipe"){setCardsPerSwipe(v);return;}   // idem : recompose le fil
+  if(name==="age"){setAgeCategory(v);return;}   // idem : remplace `feeds`, voir setAgeCategory
   if(name==="contentFilter"){setContentFilter(v);return;}   // idem : recharge le fil
   if(name==="notif"){setNotifPref(v);return;}   // idem : aller-retour natif (permission), voir setNotifPref
   const p=PREFS[name];
@@ -7996,7 +8041,7 @@ function renderIntGrid(gridId){
    pour toute feuille refermée sans avoir chargé) — pas de loadFeeds() ici. */
 function openWelcome(){
   pendingInt=new Set(interests);
-  renderMix();renderCardsPref();renderIntGrid("welcomeIntGrid");
+  renderAgePref();renderMix();renderCardsPref();renderIntGrid("welcomeIntGrid");
   openDialog(welcomeSheet);
 }
 function startWelcome(){
