@@ -2443,8 +2443,9 @@ function newsSeenAt(it){const k=newsKey(it);return k?seenNews.get(k):undefined;}
 function addSeenNews(it){
   const k=newsKey(it);
   if(!k)return;
-  // Rejouer une vidéo (ou rouvrir un article depuis « Articles en mémoire »)
-  // repousse le cooldown à partir de CETTE lecture, pas de la première.
+  // Reswiper un article déjà vu (vidéo comprise — par exemple après un saut
+  // depuis « Articles en mémoire ») repousse le cooldown à partir de CETTE
+  // lecture, pas de la première.
   // Le `delete` avant le `set` n'est pas cosmétique : `Map.set` sur une clé
   // DÉJÀ présente ne la déplace pas en queue, donc l'ordre d'itération restait
   // celui de la PREMIÈRE rencontre — et l'éviction ci-dessous sacrifiait alors
@@ -2464,11 +2465,10 @@ function addSeenNews(it){
 /* ---------- Compteur de cartes défilées ----------
    Détail heure/jour/semaine/mois/année, affiché dans la feuille « Mon
    activité » (renderStats, statsBuckets côté src/lib.js). Incrémenté depuis
-   onCardChange, au même endroit et avec le même garde que markVisibleSeen
-   (samePending) : chaque VRAIE transition de carte compte une fois, jamais
-   deux. Contrairement à markVisibleSeen, il ne fait pas d'exception pour les
-   vidéos — une vidéo croisée sans être lancée reste une carte défilée, au
-   sens de ce compteur.
+   onCardChange, au même endroit que markVisibleSeen mais avec une garde EN
+   PLUS (`userScroll`) : chaque VRAI swipe (pas un recalage programmatique —
+   nouveau lot, dose changée, retour depuis « Articles en mémoire ») compte
+   une fois, jamais deux.
    Deux niveaux de granularité, pour deux besoins différents :
    - `days` ({"YYYY-MM-DD":n}) : un total par jour, conservé sur la durée
      (borné à STATS_DAYS_MAX). Base des fenêtres semaine/mois/année.
@@ -2527,11 +2527,10 @@ function makeStatsCounter(key){
 /* ---------- Compteur de cartes défilées ----------
    Détail heure/jour/semaine/mois/année, affiché dans la feuille « Mon
    activité » (renderStats, statsBuckets côté src/lib.js). Incrémenté depuis
-   onCardChange, au même endroit et avec le même garde que markVisibleSeen
-   (samePending) : chaque VRAIE transition de carte compte une fois, jamais
-   deux. Contrairement à markVisibleSeen, il ne fait pas d'exception pour les
-   vidéos — une vidéo croisée sans être lancée reste une carte défilée, au
-   sens de ce compteur. */
+   onCardChange, au même endroit que markVisibleSeen mais avec une garde EN
+   PLUS (`userScroll`) : chaque VRAI swipe (pas un recalage programmatique —
+   nouveau lot, dose changée, retour depuis « Articles en mémoire ») compte
+   une fois, jamais deux. */
 const cardCounter=makeStatsCounter(LS_STATS);
 function bumpCardScroll(){cardCounter.bump();}
 /* ---------- Compteur d'articles ouverts ----------
@@ -2787,7 +2786,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="259";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="260";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -5032,16 +5031,14 @@ function scrollToCard(i){
    à l'écran — sinon fermer l'app sur la 1ère carte sans en avoir lu le titre
    suffisait à la compter vue.
 
-   UNE EXCEPTION, et une seule : la carte VIDÉO. Pour un article, la carte porte
-   le titre, le résumé et l'image — l'avoir eue sous les yeux, c'est en avoir
-   tiré ce qu'il y avait à en tirer, et la revoir n'apprendrait rien. D'une
-   vidéo, la carte ne montre qu'une miniature : passer devant ne l'a pas
-   regardée. Elle est donc marquée au LANCEMENT (voir startVideo), pas à
-   l'affichage.
-   Conséquence assumée : une vidéo qu'on ne lance jamais garde sa place en tête
-   de la file de sa chaîne et revient à chaque rafraîchissement — c'est
-   précisément ce qu'on veut dire par « pas encore regardée », et c'est le
-   contraire du défaut corrigé pour les actus (voir seenNews). */
+   AUCUNE exception pour la carte VIDÉO : une vidéo croisée puis swipée compte
+   « vue », exactement comme un article — une seule et même règle pour les trois
+   natures de carte. Une première version la marquait au LANCEMENT (voir
+   startVideo), au motif qu'une simple miniature croisée n'apprend rien ; retour
+   explicite ensuite : ça donnait deux façons différentes d'être « vue » selon la
+   nature de la carte, l'une par swipe, l'autre par lancement, ce que rien
+   n'imposait de garder distinct — le swipe suffit aussi pour une vidéo, comme il
+   suffit pour un article qu'on n'a pas cliqué. */
 /* `cardId` : id DOM de la carte quittée. Sur une carte à parts égales
    (cardsPerSwipe>1, voir cardGroups/eqCardHTML), les N articles sont TOUS
    également visibles — aucun n'est plus « la » carte que les autres — donc
@@ -5056,7 +5053,7 @@ function markVisibleSeen(it,cardId){
 function markOneSeen(it){
   if(!it)return;
   if(it.kind==="learn")addSeen(it);
-  else if(!videoIdOf(it))addSeenNews(it);
+  else addSeenNews(it);
 }
 /* Marquage « vu » IMMÉDIAT pour un article ouvert depuis une ligne d'une
    carte à parts égales (cardsPerSwipe>1, voir pvRowHTML — jamais une vidéo,
@@ -5070,9 +5067,8 @@ function markPreviewOpened(it){
   if(it.kind==="learn")addSeen(it);else addSeenNews(it);
 }
 /* « Vu » au sens de la case à cocher d'openHistory : Wikipédia via `seen`,
-   actus ET vidéos via `newsSeen` — qui applique déjà, sans rien de plus ici,
-   la règle vidéo ci-dessus (vue au LANCEMENT, pas à l'affichage), puisque
-   `addSeenNews` est l'unique écriture commune aux deux. */
+   actus ET vidéos via `newsSeen` — la même mémoire et la même règle (swipée,
+   voir markOneSeen), `addSeenNews` étant l'unique écriture commune aux deux. */
 function itemSeen(it){
   return it&&it.kind==="learn"?seen.has(seenKey(it)):newsSeen(it);
 }
@@ -5989,13 +5985,10 @@ function startVideo(card){
      Sans cela, le retour quitte l'app ; ici, il rend la carte vidéo avec son
      titre et son bouton play. */
   pushVideoState();
-  /* C'EST ICI qu'une vidéo devient « vue » — pas à l'affichage de sa carte, qui
-     ne montre qu'une miniature (voir markVisibleSeen). Au lancement et non à la
-     fin : on ne sait pas quand une vidéo est « finie » depuis l'extérieur de
-     l'iframe, et relancer soi-même ce qu'on a commencé reste possible — c'est
-     seulement le fil qui cesse de le reproposer. */
-  const it=cardReg.get(+card.dataset.id);
-  if(it)addSeenNews(it);
+  // Lancer la vidéo ne la marque PAS « vue » : comme pour un article, seul le
+  // swipe qui quitte la carte le fait (voir markOneSeen). Regarder puis swiper
+  // marque bien la vidéo, exactement comme lire un article puis passer au
+  // suivant.
   // Le repère « Swipe » ne s'efface qu'au premier défilement — or c'est
   // précisément sur la PREMIÈRE carte d'une session qu'on appuie sur ▶, et il
   // resterait posé par-dessus le lecteur.
@@ -6051,7 +6044,8 @@ feedEl.addEventListener("click",e=>{
   // main droite — alors que le titre, lui, barre toute la largeur.
   // (Sur une carte vidéo, ni le titre ni la pastille ne sont des liens : les
   // deux passent par [data-play] ci-dessus, donc jamais par cette branche —
-  // « vu » y est déjà acquis au lancement, voir startVideo.)
+  // « vu » ne s'y acquiert que par swipe, comme pour toute carte, voir
+  // markOneSeen.)
   const openLink=e.target.closest("a[data-open]");
   if(openLink&&openLink.href){
     const card=openLink.closest(".card");
@@ -7135,8 +7129,7 @@ function histRowHTML(it,etat){
   // son thème qui distingue une carte d'une autre, comme sur la carte elle-même.
   const src=(it.kind==="learn"&&it.cat&&catLabelT(it.cat))||it.source||"";
   // INDÉPENDANT de hideSeen : cette feuille est un inventaire complet, le
-  // badge se contente de dire ce qui est vrai (voir itemSeen, qui applique
-  // déjà la nuance vidéo — vue au LANCEMENT, pas à l'affichage).
+  // badge se contente de dire ce qui est vrai (voir itemSeen).
   const vu=itemSeen(it);
   return `<button type="button" class="histrow${etat?" histrow--"+etat:""}" data-hk="${escAttr(seenKey(it))}">
     ${img?`<img class="histrow__th" src="${escAttr(img)}" alt="" loading="lazy" decoding="async" width="58" height="58">`
@@ -7337,19 +7330,13 @@ savedSheet.onclick=e=>{if(e.target===savedSheet)closeDialog(savedSheet);};
 savedListEl.addEventListener("click",e=>{
   const del=e.target.closest("[data-sd]");
   if(del){unsave(del.dataset.sd);return;}
-  // a[data-open] : même mécanique que le fil (voir plus haut). Pour une VIDÉO,
-  // ce clic EST le lancement (mêmes conséquences que ▶ sur la carte : lien
-  // externe, YouTube) — donc la marquer vue ici aussi, sinon elle n'a aucune
-  // autre occasion de l'être et revient sans fin tant qu'elle n'a jamais été
-  // lancée DEPUIS le fil (voir markVisibleSeen/startVideo). Un article, lui,
-  // ne se marque toujours qu'en le parcourant dans le fil : rien à faire ici.
+  // a[data-open] : même mécanique que le fil (voir plus haut) — y compris pour
+  // une vidéo, qui ne se marque plus « vue » qu'en la swipant dans le fil (voir
+  // markOneSeen), jamais en l'ouvrant depuis cette feuille. Même règle qu'un
+  // article, lui, ne se marque toujours qu'en le parcourant dans le fil : rien
+  // à faire ici.
   const open=e.target.closest("a[data-open]");
   if(open&&open.href){
-    if("video" in open.dataset){
-      const row=open.closest("[data-sk]");
-      const x=row&&saved.find(s=>s.key===row.dataset.sk);
-      if(x)addSeenNews(x);
-    }
     const t=open.querySelector(".histrow__ttl");
     bumpArticleOpen();
     if(openArticle(open.href,t?t.textContent:"",{noReader:"video" in open.dataset,external:"video" in open.dataset}))e.preventDefault();

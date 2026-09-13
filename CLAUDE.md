@@ -409,9 +409,6 @@ genre de script dérape.
   l'utilisateur ait swipé. Compter sur `samePending` seul (comme
   `markVisibleSeen`, qui lui doit continuer à tourner dans tous les cas)
   faisait grimper le compteur à l'ouverture, avant le premier swipe.
-  Contrairement à `markVisibleSeen`, aucune exception pour les vidéos — une
-  vidéo croisée sans être lancée reste une carte défilée, au sens de ce
-  compteur (différent de « vu »).
   Stockage à DEUX niveaux (`cardStats`) : `days` ({"YYYY-MM-DD":n}), un total
   par jour civil local conservé sur la durée (élagué à `STATS_DAYS_MAX`,
   ~400, pour ne jamais grossir sans fin) ; `today` ({day,slots}), les QUARTS
@@ -997,18 +994,21 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   faisait perdre définitivement le lot en attente dès que `setItem` levait
   (quota saturé) — le filet de `persistAll` trouvait un drapeau propre et
   n'écrivait rien.
-- **« Vu » ne veut pas dire la même chose pour une VIDÉO.** Une carte d'article
-  porte le titre, le résumé et l'image : l'avoir eue sous les yeux, c'est en
-  avoir tiré ce qu'il y avait à en tirer. Une carte vidéo ne montre qu'une
-  miniature — défiler devant ne l'a pas regardée. Elle est donc marquée au
-  LANCEMENT (`startVideo`, et aussi « Ouvrir sur YouTube » : on part la regarder
-  ailleurs, mais on la regarde), jamais par `markVisibleSeen`, qui l'écarte
-  explicitement. Au lancement et non à la fin : on ne sait pas, depuis
-  l'extérieur de l'iframe, quand une vidéo est finie.
-  Contrepartie assumée et voulue : une vidéo qu'on ne lance jamais garde sa
-  place en tête de la file de sa chaîne et revient à chaque rafraîchissement —
-  c'est précisément le sens de « pas encore regardée », et c'est l'inverse du
-  défaut corrigé juste au-dessus pour les actus. Scénario `video`.
+- **« Vu » se marque de la MÊME façon pour les trois natures de carte.**
+  Une vidéo croisée puis SWIPÉE compte « vue », exactement comme un article ou
+  un article Wikipédia — une seule règle (`markOneSeen`), pas une par nature.
+  Une première version marquait la vidéo au LANCEMENT (`startVideo`) plutôt
+  qu'au swipe, au motif qu'une simple miniature croisée n'apprend rien —
+  contrairement à un article, dont la carte porte déjà titre, résumé et image.
+  Revenu dessus explicitement : ça donnait deux façons différentes d'être
+  « vue » selon la nature de la carte, ce que rien n'imposait de garder
+  distinct. Lancer une vidéo (ou l'ouvrir depuis « Enregistrés ») ne la marque
+  donc plus « vue » en soi ; seul le swipe qui quitte sa carte le fait, comme
+  pour tout le reste.
+  Contrepartie assumée : une vidéo qu'on croise sans swiper dessus (lecture en
+  cours, ou app quittée avant `SEEN_DWELL_MS`) garde sa place en tête de la
+  file de sa chaîne et revient au rafraîchissement suivant — même règle qu'un
+  article qu'on n'a pas eu le temps de lire. Scénario `video`.
 - **D'une chaîne YouTube, on ne sert QUE les Shorts** — et le tri est fait par
   YouTube, jamais par nous. Rien dans l'Atom d'une chaîne ne distingue un Short
   d'une vidéo classique : pas de durée, pas de catégorie, et la même vignette

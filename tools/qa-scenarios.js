@@ -2115,29 +2115,26 @@ const scenarios = {
     console.log("/api/og partis (attendu : 0) :", calls.og);
     console.log("lecteurs chargés AVANT tout appui (attendu : 0) :", calls.player);
 
-    /* « Vu » ne veut PAS dire la même chose pour une vidéo que pour un article.
-       Une carte d'article porte titre, résumé et image : l'avoir eue sous les
-       yeux suffit. D'une vidéo, la carte ne montre qu'une miniature — défiler
-       devant ne l'a pas regardée, et elle doit garder sa place dans la file de
-       sa chaîne. On parcourt donc quatre cartes SANS rien lancer.
+    /* « Vu » se marque de la MÊME façon pour une vidéo que pour un article :
+       par le SWIPE qui quitte la carte (markOneSeen), jamais par le lancement
+       seul. On swipe la 1re carte SANS l'avoir lancée : elle doit être
+       mémorisée vue quand même, comme n'importe quel article.
        (Le pendant côté actus, lui, est vérifié par `redites`.) */
     await page.evaluate(() =>
-      feedEl.scrollTo({ top: feedEl.clientHeight * 3, behavior: "instant" })
+      feedEl.scrollTo({ top: feedEl.clientHeight, behavior: "instant" })
     );
     await page.waitForTimeout(500);
-    const vuSansLancer = await page.evaluate(() => seenNews.size);
-    await page.evaluate(() => feedEl.scrollTo({ top: 0, behavior: "instant" }));
-    await page.waitForTimeout(400);
     console.log(
-      "cartes vidéo défilées SANS lancer — mémorisées vues (attendu : 0) :",
-      vuSansLancer
+      "1re carte vidéo swipée SANS l'avoir lancée — mémorisées vues (attendu : 1) :",
+      await page.evaluate(() => seenNews.size)
     );
 
-    // Appui sur ▶ : le lecteur se monte, et lui seul.
-    await page.click(".card[data-vid] .card__play");
+    // Lancer la carte COURANTE (▶) SANS la swiper ne doit rien marquer de plus :
+    // le lancement seul n'est plus une façon d'être « vue ».
+    await page.click(".card[data-vid]:nth-child(2) .card__play");
     await page.waitForTimeout(600);
     console.log(
-      "après ▶ — vidéos mémorisées vues (attendu : 1) :",
+      "après ▶ SANS swiper — mémorisées vues (attendu : toujours 1) :",
       await page.evaluate(() => seenNews.size)
     );
     console.log(
@@ -2153,18 +2150,22 @@ const scenarios = {
       )
     );
 
-    // On glisse d'une carte : la lecture doit s'arrêter, et la suivante repartir
-    // de zéro sans laisser la première vivante.
+    // On glisse d'une carte : la lecture doit s'arrêter, ET la carte qui jouait
+    // doit à son tour être marquée vue — même règle, vidéo jouée ou non.
     await page.evaluate(() =>
-      feedEl.scrollTo({ top: feedEl.clientHeight, behavior: "instant" })
+      feedEl.scrollTo({ top: feedEl.clientHeight * 2, behavior: "instant" })
     );
     await page.waitForTimeout(400);
     console.log(
       "après swipe — iframes (attendu : 0) :",
       await page.evaluate(() => document.querySelectorAll(".card__video").length)
     );
+    console.log(
+      "après swipe DEPUIS la carte qui jouait — mémorisées vues (attendu : 2) :",
+      await page.evaluate(() => seenNews.size)
+    );
 
-    await page.click(".card[data-vid]:nth-child(2) .card__play");
+    await page.click(".card[data-vid]:nth-child(3) .card__play");
     await page.waitForTimeout(400);
     // Un lot arrive en arrière-plan et s'INSÈRE devant la carte qui joue. Insérer
     // un frère ne touche pas au nœud de la carte : la lecture doit continuer —
