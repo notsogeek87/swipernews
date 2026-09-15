@@ -342,7 +342,20 @@ mais les sources de `fdroidserver` sont lisibles sur GitLab — c'est la référ
 
 ## Anti-fonctionnalités à déclarer
 
-Aucune identifiée : les polices (Inter, Source Serif 4, licence OFL) sont
+Une seule, demandée en revue : **`NonFreeNet`**, pour `api.rss2json.com`
+(`fetchFeedRss2Json`, `index.html`). C'est le DERNIER repli de
+`fetchFeedRobust` — tenté seulement quand un flux ne peut être ni parsé
+directement ni via les proxys CORS publics (voir `README.md` racine, section
+récupération RSS). Il n'est PAS réservé au web : `fetchFeedRobust` est du code
+PARTAGÉ (pas de garde `isNativeApp`), donc l'APK peut l'appeler lui aussi — et
+l'appel part sans confirmation de l'utilisateur, ce qui suffit à l'anti-
+fonctionnalité même optionnel et rare en pratique. `api.rss2json.com` est un
+SaaS gratuit dont le code serveur n'est pas publié — pas de dépôt à créditer
+en retour, pas de licence libre à vérifier, juste `AntiFeatures: [NonFreeNet]`
+en tête de recette (premier champ de `yaml_app_field_order`).
+
+Pour le reste : les polices (Inter, Source Serif 4, licence OFL) sont
 auto-hébergées dans `fonts/` depuis [le remplacement de Google Fonts](../fonts/),
-donc plus de dépendance réseau à un service non-libre. Pas de pub, pas de
-tracking, pas de dépendance propriétaire dans le code embarqué sur Android.
+donc plus de dépendance réseau à un service non-libre pour elles. Pas de pub,
+pas de tracking, pas de dépendance propriétaire dans le code embarqué sur
+Android en dehors de ce repli RSS.

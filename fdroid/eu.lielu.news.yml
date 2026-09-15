@@ -9,6 +9,24 @@
 # pour produire l'APK GitHub — la recette F-Droid doit rester équivalente,
 # sans dépendre de GitHub Actions ni d'un token.
 
+# Demandé en revue : api.rss2json.com (fetchFeedRss2Json, index.html) est un
+# repli de fetchFeedRobust — dernier recours quand un flux ne peut être ni
+# parsé directement ni via les proxys CORS publics. Il n'est PAS gardé par
+# isNativeApp : fetchFeedRobust est du code PARTAGÉ, donc l'APK peut l'appeler
+# lui aussi. C'est un service tiers gratuit dont le code serveur n'est pas
+# publié (SaaS fermé), d'où l'anti-fonctionnalité — même optionnel et rare en
+# pratique, l'appel part sans confirmation de l'utilisateur.
+#
+# Forme LISTE, pas la forme objet ({NonFreeNet: "texte"}) : leur schéma exige
+# alors une chaîne LOCALISÉE ({en-US: "texte"}), pas une chaîne nue — inutile
+# ici, le détail vit dans le commentaire ci-dessus et dans la réponse postée
+# sur la MR.
+#
+# `AntiFeatures` est en TÊTE de fichier : premier champ de
+# `yaml_app_field_order` (metadata.py), avant même `Categories`.
+AntiFeatures:
+  - NonFreeNet
+
 Categories:
   - News
   - Reading
