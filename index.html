@@ -63,6 +63,13 @@
        renseigner, rend 0 sur plusieurs moteurs mobiles face à un poinçon —
        et un poinçon centré tombe pile sur un bouton de la barre d'outils. */
     --systop-min:0px;
+    /* Symétrique en bas, sans plancher : contrairement au poinçon de caméra,
+       le chevauchement du bas (barre des tâches d'un grand écran déplié, voir
+       applySystemInsets) n'existe que sur certains appareils et seulement en
+       paysage — un plancher universel réserverait une bande pour rien sur
+       tous les téléphones. Zéro par défaut, rempli par le natif quand il y a
+       vraiment quelque chose à éviter. */
+    --sysbot:0px;
     --shadow-ember:inset 0 0 20px rgb(99,19,3);
     --font-sans:'Matter','Inter','Söhne','Geist Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
     --font-mono:'Fabrikatmono','JetBrains Mono','IBM Plex Mono','Berkeley Mono',ui-monospace,
@@ -178,7 +185,7 @@
      iframe cross-origin n'expose aucun clic à la page qui l'englobe (voir plus
      haut), donc rien ne peut fiablement la faire réapparaître au toucher. */
   .card__vclose.dim{opacity:.32}
-  .card__body{position:relative;z-index:2;padding:28px 22px calc(44px + env(safe-area-inset-bottom));
+  .card__body{position:relative;z-index:2;padding:28px 22px calc(44px + max(env(safe-area-inset-bottom),var(--sysbot,0px)));
     transition:opacity .18s ease}
   /* Flou LOCAL derrière le texte, solidaire du bloc : il couvre exactement le
      texte quelle que soit sa longueur, et se fond au-dessus (masque) pour ne pas
@@ -409,7 +416,7 @@
      44px : le MÊME padding-bottom que .card__body (voir plus bas) — c'est ce
      qui aligne le bas du rail sur celui du bouton d'ouverture de la carte. Un
      autre chiffre les décale l'un de l'autre, même à hauteur de bouton égale. */
-  .rail{position:fixed;right:16px;bottom:calc(44px + env(safe-area-inset-bottom));z-index:3;
+  .rail{position:fixed;right:16px;bottom:calc(44px + max(env(safe-area-inset-bottom),var(--sysbot,0px)));z-index:3;
     display:flex;flex-direction:row;gap:18px;align-items:center;
     transition:transform .25s ease,opacity .25s ease}
   .rail.hidden{display:none}
@@ -683,7 +690,7 @@
   .card--learn .card__desc{-webkit-line-clamp:10;font-size:15px;line-height:1.55;max-width:60ch}
   .card--learn .card__body{padding-top:20px}
 
-  .hint{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  .hint{position:fixed;left:50%;bottom:calc(28px + max(env(safe-area-inset-bottom),var(--sysbot,0px)));transform:translateX(-50%);
     z-index:14;color:var(--ash);font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;
     animation:float 1.8s ease-in-out infinite;pointer-events:none;opacity:.9}
   .hint .arrow{font-size:20px}
@@ -716,7 +723,7 @@
   .sheet{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.78);display:none;align-items:flex-end}
   .sheet.open{display:flex}
   .sheet__panel{background:var(--surface);width:100%;border-radius:var(--radius-md) var(--radius-md) 0 0;
-    padding:22px 20px calc(28px + env(safe-area-inset-bottom));
+    padding:22px 20px calc(28px + max(env(safe-area-inset-bottom),var(--sysbot,0px)));
     max-height:82vh;max-height:82dvh;overflow-y:auto;border:1px solid var(--redline);border-bottom:none}
   .sheet__panel:focus{outline:none}
   .sheet__grip{width:44px;height:5px;border-radius:var(--radius-sm);background:var(--ash);opacity:.4;margin:0 auto 20px}
@@ -895,7 +902,7 @@
   #menuSheet .sheet__panel{width:min(86vw,340px);max-width:none;height:100%;max-height:none;
     border-radius:var(--radius-md) 0 0 var(--radius-md);border:1px solid var(--redline);border-right:none;
     padding:calc(20px + max(env(safe-area-inset-top),var(--systop,0px),var(--systop-min,0px))) 20px
-      calc(20px + env(safe-area-inset-bottom));
+      calc(20px + max(env(safe-area-inset-bottom),var(--sysbot,0px)));
     overflow-y:auto;transform:translateX(100%);transition:transform .25s}
   #menuSheet.open .sheet__panel{transform:translateX(0)}
   /* Poignée de bas de feuille : n'a pas de sens sur un tiroir latéral (rien à
@@ -1071,7 +1078,7 @@
      délinéé) : contrairement à un badge, ce message doit rester lisible
      par-dessus n'importe quelle carte, image comprise. Pas d'ombre (la charte
      l'exclut pour toute surface qui n'est pas un bouton plein). */
-  .toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  .toast{position:fixed;left:50%;bottom:calc(90px + max(env(safe-area-inset-bottom),var(--sysbot,0px)));transform:translateX(-50%);
     background:var(--surface);border:1px solid var(--redline);color:var(--ink);padding:12px 18px;border-radius:var(--radius-sm);
     max-width:min(88vw,420px);text-align:center;line-height:1.4;
     font-size:14px;z-index:60;opacity:0;transition:opacity .25s;pointer-events:none}
@@ -1081,7 +1088,7 @@
     display:flex;align-items:flex-end;opacity:0;transition:opacity .2s}
   .sharemenu.open{opacity:1}
   .sharemenu__panel{background:var(--surface);width:100%;border-radius:var(--radius-md) var(--radius-md) 0 0;
-    padding:22px 20px calc(28px + env(safe-area-inset-bottom));border:1px solid var(--redline);border-bottom:none;
+    padding:22px 20px calc(28px + max(env(safe-area-inset-bottom),var(--sysbot,0px)));border:1px solid var(--redline);border-bottom:none;
     transform:translateY(100%);transition:transform .25s}
   .sharemenu.open .sharemenu__panel{transform:translateY(0)}
   .sharemenu h2{font-family:var(--font-sans);font-size:20px;font-weight:700;margin-bottom:4px;letter-spacing:-.02em}
@@ -1095,7 +1102,7 @@
   .sharedest:active{transform:scale(.97)}
 
   /* Bannière d'incitation à installer la PWA */
-  .installbar{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:66;
+  .installbar{position:fixed;left:12px;right:12px;bottom:calc(14px + max(env(safe-area-inset-bottom),var(--sysbot,0px)));z-index:66;
     display:flex;align-items:center;gap:12px;padding:12px;border-radius:var(--radius-md);
     background:var(--surface);border:1px solid var(--redline);
     transform:translateY(160%);opacity:0;transition:transform .38s cubic-bezier(.2,.8,.2,1),opacity .38s}
@@ -1283,7 +1290,7 @@
        contenu défilable (même raison que #feed, et c'est ce dont majVolet() se
        sert pour garder la rangée courante en vue). */
     #voletList{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;position:relative;
-      padding:0 12px calc(16px + env(safe-area-inset-bottom))}
+      padding:0 12px calc(16px + max(env(safe-area-inset-bottom),var(--sysbot,0px)))}
     /* Rangées : celles de la feuille, À L'IDENTIQUE (histRowHTML), en plus
        compact — le volet est deux fois plus étroit qu'une feuille. */
     #voletList .histrow{padding:10px 4px;gap:10px}
@@ -2786,7 +2793,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="260";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="261";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2894,6 +2901,14 @@ function setSystop(px){
   systopPx=Math.max(0,Math.min(120,Math.round(px)||0));
   document.documentElement.style.setProperty("--systop",systopPx+"px");
 }
+/* Pas de plancher ici, à la différence de setSystop : le chevauchement du bas
+   (barre des tâches d'un grand écran déplié, voir InAppBrowserPlugin.
+   bottomOverlapDp) n'existe que sur certains appareils, en paysage — un repli
+   universel réserverait une bande pour rien sur tous les téléphones. Si la
+   mesure ne répond pas (APK ancien, pont indisponible), --sysbot reste à 0. */
+function setSysbot(px){
+  document.documentElement.style.setProperty("--sysbot",Math.max(0,Math.min(200,Math.round(px)||0))+"px");
+}
 function applySystemInsets(){
   if(!isNativeApp)return;
   const p=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
@@ -2902,6 +2917,8 @@ function applySystemInsets(){
   Promise.resolve(p.systemInsets()).then(r=>{
     const t=Number(r&&r.top);
     setSystop(Math.max(SYSTOP_MIN,isFinite(t)?t:0));
+    const b=Number(r&&r.bottom);
+    setSysbot(isFinite(b)?b:0);
   }).catch(e=>{warn("insets",e);setSystop(SYSTOP_MIN);});
 }
 /* Y a-t-il quelque chose entre le haut de l'écran et le haut de notre page ?

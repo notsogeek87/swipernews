@@ -222,10 +222,13 @@ public class InAppBrowserPlugin extends Plugin {
     }
 
     /**
-     * Hauteur, en px CSS, de ce que le système dessine PAR-DESSUS le haut de la
-     * WebView : barre d'état et poinçon/encoche de caméra.
+     * Hauteur, en px CSS, de ce que le système dessine PAR-DESSUS le haut
+     * ({@code top}) et PAR-DESSOUS le bas ({@code bottom}) de la WebView : côté
+     * haut, barre d'état et poinçon/encoche de caméra ; côté bas, barre de
+     * navigation et, sur un grand écran déplié, la barre des tâches (voir
+     * {@link #bottomOverlapDp}).
      *
-     * <p>Pourquoi le natif et pas {@code env(safe-area-inset-top)} : sur une
+     * <p>Pourquoi le natif et pas {@code env(safe-area-inset-top/bottom)} : sur une
      * WebView Android qui s'étend sous les barres système (bord à bord, imposé
      * depuis {@code targetSdk 35}), cet inset CSS ne décrit que la découpe
      * d'écran, et plusieurs versions de WebView le rapportent tout simplement à
@@ -252,6 +255,7 @@ public class InAppBrowserPlugin extends Plugin {
         activity.runOnUiThread(() -> {
             JSObject res = new JSObject();
             res.put("top", topOverlapDp(activity));
+            res.put("bottom", bottomOverlapDp(activity));
             call.resolve(res);
         });
     }
@@ -278,6 +282,46 @@ public class InAppBrowserPlugin extends Plugin {
             return Math.round(overlap / density);
         } catch (Exception e) {
             return 0;   // aucune raison de faire échouer le fil pour une marge
+        }
+    }
+
+    /**
+     * Symétrique de {@link #topOverlapDp} pour le bas : ce que le système
+     * dessine PAR-DESSOUS le bas de la WebView — barre de navigation, et sur
+     * un grand écran déplié (Z Fold, tablette), la barre des tâches Samsung,
+     * qui vit dans le même groupe d'insets et reste affichée en permanence
+     * (réglage système, hors de portée de l'app).
+     *
+     * <p>Repéré en PAYSAGE sur un tel écran seulement : {@code
+     * env(safe-area-inset-bottom)} évite déjà correctement la barre des
+     * tâches en portrait, mais pas dans cette orientation, où le fil se
+     * dessine visiblement dessous (visible par transparence). Même mesure de
+     * CHEVAUCHEMENT que le haut — jamais l'inset brut — pour ne rien compter
+     * en double là où l'inset CSS est déjà bon.
+     */
+    private int bottomOverlapDp(Activity activity) {
+        try {
+            android.view.View view = getBridge() != null ? getBridge().getWebView() : null;
+            if (view == null) view = activity.getWindow().getDecorView();
+            android.view.WindowInsets insets = view.getRootWindowInsets();
+            if (insets == null) return 0;
+            int bottom;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                bottom = insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom;
+            } else {
+                bottom = insets.getSystemWindowInsetBottom();
+            }
+            int[] pos = new int[2];
+            view.getLocationOnScreen(pos);
+            int screenBottom = activity.getWindow().getDecorView().getHeight();
+            int viewBottom = pos[1] + view.getHeight();
+            int gap = Math.max(0, screenBottom - viewBottom);
+            int overlap = Math.max(0, bottom - gap);
+            float density = activity.getResources().getDisplayMetrics().density;
+            if (density <= 0) return 0;
+            return Math.round(overlap / density);
+        } catch (Exception e) {
+            return 0;
         }
     }
 

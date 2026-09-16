@@ -3,9 +3,6 @@ package eu.lielu.news;
 import android.os.Bundle;
 
 import androidx.activity.OnBackPressedCallback;
-import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsCompat;
-import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.BridgeActivity;
 
@@ -102,20 +99,6 @@ public class MainActivity extends BridgeActivity {
         // des plugins exposés à la WebView.
         registerPlugin(InAppBrowserPlugin.class);
         super.onCreate(savedInstanceState);
-
-        // Grand écran déplié (Z Fold, tablette) : la barre des tâches du système
-        // (liée à la barre de navigation, pas à la barre d'état) reste sinon
-        // affichée en permanence en bas, faute de toute demande explicite — même
-        // motif que la barre d'état d'InAppBrowserActivity, mais seulement la
-        // navigation : le fil gère déjà sa propre zone haute via --systop/CSS,
-        // rien à en dupliquer ici. BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE la
-        // laisse revenir d'un geste, jamais fermée pour de bon.
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-        WindowInsetsControllerCompat insetsController =
-            WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-        insetsController.setSystemBarsBehavior(
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-        insetsController.hide(WindowInsetsCompat.Type.navigationBars());
 
         // Cartes vidéo : l'iframe du lecteur est créée PAR SCRIPT au moment de
         // l'appui sur ▶, et l'URL porte autoplay=1. Le « geste utilisateur »
