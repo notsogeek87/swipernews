@@ -1,8 +1,10 @@
 # Paysage large : le volet de gauche
 
-**Statut :** adopté (APP_VERSION 256, 2026-09-01)
+**Statut :** adopté (APP_VERSION 256, 2026-09-01) ; critère de hauteur corrigé
+en 262 (2026-09-16, voir « Mise à jour » en fin de document).
 **Concerne :** `index.html` (CSS « Les DEUX paysages » / « Paysage LARGE », JS
-`majVolet` / `sauterVersHk`), `src/i18n.js` (`volet.count`).
+`majVolet` / `sauterVersHk` / `paysageLargeActif` / `majPaysageLarge`),
+`src/i18n.js` (`volet.count`).
 
 ## Pour qui, pourquoi
 
@@ -181,3 +183,50 @@ vérifier qu'un bloc centré n'y est pas rogné. Le portrait et le téléphone
 couché ont été remesurés après coup : `justify-content:flex-end`, pas de
 `max-width`, padding 28/22 px, flou local présent, dégradé vertical — soit
 exactement l'état d'avant, aucune règle ne fuit hors du paysage large.
+
+## Mise à jour (APP_VERSION 262) : le critère de hauteur ne peut pas porter sur le viewport
+
+La phrase « le seuil ne peut jamais se tromper de catégorie » (section 1) s'est
+révélée fausse dans un cas précis, signalé en PWA sur un Galaxy Z Fold ouvert,
+en paysage : le verrou de portrait s'affichait à tort.
+
+Cause : le critère de hauteur était un `matchMedia("(min-height:560px)")` pur,
+donc porté sur le **viewport visible**. Sur un pliant déplié Samsung, la barre
+des tâches système (persistante par réglage — voir les commits Android
+`db80d8e`/`dd1b12b`, mêmes semaines) réduit ce viewport d'une cinquantaine de
+pixels en paysage. Assez pour faire chuter un Z Fold sous les 560, alors que
+l'écran lui-même n'a rien changé. Côté app native, `InAppBrowserPlugin.
+systemInsets()` mesure ce chevauchement et le compense (`--sysbot`) ; côté
+web/PWA, rien n'a la main sur cette barre — le viewport rapporté est
+simplement plus court, point.
+
+Correctif : le critère de hauteur retombe sur `screen.height` (résolution
+RÉELLE de l'écran, orientation courante — jamais réduite par une barre
+système) **quand et seulement quand** le viewport est court ET l'appareil est
+tactile (`pointer:coarse`, déjà le critère de `tactile` ailleurs dans
+`index.html`). Cette dernière condition n'est pas cosmétique : sur desktop,
+`screen.height` vaut la résolution du **moniteur**, pas celle de la fenêtre —
+sans le garde-fou tactile, réduire une fenêtre desktop sous 560 px de haut
+continuerait de déclencher le paysage large (le moniteur, lui, reste grand).
+
+```js
+function paysageLargeActif() {
+  if (!matchMedia("(orientation:landscape)").matches || innerWidth < 900) return false;
+  if (innerHeight >= 560) return true;
+  return matchMedia("(pointer:coarse)").matches && screen.height >= 560;
+}
+```
+
+Le résultat est posé en classe (`paysagelarge` sur `<html>`, via
+`majPaysageLarge()`) plutôt que laissé à un `matchMedia` CSS direct : tout le
+bloc « Paysage LARGE » (`#feed`, `.card`, le volet lui-même…) est maintenant
+préfixé `html.paysagelarge`, et `.orientlock` s'affiche sous
+`html:not(.paysagelarge)` — un seul état, calculé une fois en JS, jamais deux
+critères qui pourraient diverger entre CSS et JS. Recalculé au chargement et
+sur `resize` (debounce 200 ms, couvre aussi une rotation — `orientationchange`
+ne suffirait pas seul sur certains navigateurs desktop qui ne l'émettent
+jamais).
+
+Non régressé : un téléphone en paysage (`screen.height` toujours < 560, quel
+que soit le viewport) et une fenêtre desktop réduite (écartée par
+`pointer:coarse`) continuent de se voir proposer le verrou, jamais le volet.

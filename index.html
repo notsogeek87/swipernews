@@ -1136,16 +1136,32 @@
        1024×768). La carte y tient parfaitement, et il reste de la place à
        côté d'elle : c'est le volet du bloc suivant.
 
-     560 px de hauteur sépare les deux catégories sans ambiguïté possible :
-     être HAUT de 560 une fois couché, c'est être LARGE de 560 debout, et
-     aucun téléphone ne l'est (les plus grands plafonnent vers 480 points
-     CSS). Le seuil ne peut donc jamais se tromper de catégorie, quel que
-     soit l'appareil — c'est tout l'intérêt de le poser sur la géométrie.
-     1024 px de large reste la borne d'origine du verrou : elle épargne une
-     fenêtre desktop habituelle. */
+     560 px de hauteur sépare les deux catégories : être HAUT de 560 une fois
+     couché, c'est être LARGE de 560 debout, et aucun téléphone ne l'est (les
+     plus grands plafonnent vers 480 points CSS).
+
+     MAIS le seuil ne peut porter sur le VIEWPORT (`min-height`/`max-height`
+     en media query, la version précédente de ce bloc) : sur un pliant déplié
+     Samsung, la barre des tâches système (persistante par réglage, voir les
+     commits Android voisins de celui-ci) réduit le viewport VISIBLE d'une
+     cinquantaine de pixels en paysage — assez pour faire chuter un Z Fold
+     sous les 560, et lui coller à tort le verrou de portrait (signalé en
+     PWA : rien côté web n'a la main sur cette barre, contrairement à l'app
+     native qui la mesure via InAppBrowserPlugin.systemInsets). D'où la classe
+     `paysagelarge`, posée par JS (voir paysageLargeActif()/majPaysageLarge()
+     plus bas) : elle retombe sur `screen.height` — la résolution RÉELLE de
+     l'écran, orientation courante, jamais réduite par une barre système —
+     dès que le viewport, lui, est trop court MAIS que l'appareil est tactile
+     (`pointer:coarse`, déjà le critère de `tactile` plus bas dans le JS) :
+     un poste de bureau, lui, n'a jamais cette excuse — `screen.height` y vaut
+     la résolution du MONITEUR, pas celle de la fenêtre, donc une petite
+     fenêtre desktop resterait à tort « large » sans ce garde-fou. 1024 px de
+     large reste la borne d'origine du verrou (viewport, pas écran — une
+     fenêtre desktop redimensionnée doit continuer à se comporter en fenêtre
+     redimensionnée). */
   .orientlock{display:none}
-  @media (orientation:landscape) and (max-width:1024px) and (max-height:559px){
-    .orientlock{display:flex;position:fixed;inset:0;z-index:9999;flex-direction:column;
+  @media (orientation:landscape) and (max-width:1024px){
+    html:not(.paysagelarge) .orientlock{display:flex;position:fixed;inset:0;z-index:9999;flex-direction:column;
       align-items:center;justify-content:center;gap:16px;padding:32px;text-align:center;
       background:var(--bg)}
     .orientlock__ic{font-size:44px;animation:orientspin 1.8s ease-in-out infinite}
@@ -1180,16 +1196,16 @@
      l'accompagner. Un pliant déplié en PORTRAIT (~924×1224) reste donc en fil
      plein écran — il est large, mais c'est déjà l'orientation du geste. */
   .volet{display:none}
-  @media (orientation:landscape) and (min-width:900px) and (min-height:560px){
-    :root{--volet:clamp(250px,26vw,340px)}
-    #feed{margin-left:var(--volet);width:calc(100% - var(--volet))}
+  @media (orientation:landscape) and (min-width:900px){
+    html.paysagelarge{--volet:clamp(250px,26vw,340px)}
+    html.paysagelarge #feed{margin-left:var(--volet);width:calc(100% - var(--volet))}
     /* La barre du haut et les écrans d'état sont des CALQUES au-dessus du
        fil : ils se posent sur le fil, jamais sur le volet — sinon le flou et
        le dégradé de .top recouvrent les premières rangées de la liste. */
-    .top,.state{left:var(--volet)}
+    html.paysagelarge .top,html.paysagelarge .state{left:var(--volet)}
     /* Tout ce qui se centre se centre sur le FIL, pas sur l'écran : centré sur
        l'écran, un toast tombe à cheval sur le volet. */
-    .hint,.peek,.toast,.demobadge{left:calc(50% + var(--volet)/2)}
+    html.paysagelarge .hint,html.paysagelarge .peek,html.paysagelarge .toast,html.paysagelarge .demobadge{left:calc(50% + var(--volet)/2)}
     /* ---------- La carte, recomposée en HERO PAYSAGE ----------
        Une carte est dessinée pour le PORTRAIT : image plein cadre, texte
        ancré en BAS, dégradé qui monte du bas. Couchée, cette composition ne
@@ -1230,18 +1246,18 @@
        indépendant de ce flex) — les deux blocs qui se répondent visuellement
        n'étaient plus à la même hauteur. Ancrer les deux en bas les remet en
        ligne, et c'est aussi ce que fait déjà `.card` en portrait. */
-    .card{justify-content:flex-end}
+    html.paysagelarge .card{justify-content:flex-end}
     /* Seul l'horizontal change : 22 px de marge à gauche d'une colonne de
        titre en 46 px, ce sont des lettres collées au bord de l'écran. Le
        padding vertical reste celui du portrait (aligné sur le bas du rail). */
-    .card__body{max-width:min(640px,60%);padding-left:clamp(22px,3vw,56px)}
-    .card__title{font-size:clamp(30px,3.2vw,46px)}
+    html.paysagelarge .card__body{max-width:min(640px,60%);padding-left:clamp(22px,3vw,56px)}
+    html.paysagelarge .card__title{font-size:clamp(30px,3.2vw,46px)}
     /* La description reprend la largeur de la COLONNE : son plafond de 46ch,
        taillé pour un téléphone, la faisait finir bien avant le titre — un
        bord droit en escalier au milieu d'un bloc par ailleurs aligné. */
-    .card__desc{max-width:none;-webkit-line-clamp:7}
-    .card--learn .card__desc{max-width:none;-webkit-line-clamp:8}
-    .card__bg::after{background:
+    html.paysagelarge .card__desc{max-width:none;-webkit-line-clamp:7}
+    html.paysagelarge .card--learn .card__desc{max-width:none;-webkit-line-clamp:8}
+    html.paysagelarge .card__bg::after{background:
       linear-gradient(to right,rgba(25,5,1,.97) 0%,rgba(25,5,1,.93) 32%,rgba(25,5,1,.6) 56%,rgba(25,5,1,.3) 76%,rgba(25,5,1,.52) 100%),
       linear-gradient(to top,rgba(25,5,1,.55) 0%,transparent 24%)}
     /* Le flou LOCAL derrière le texte n'a plus lieu d'être : il est solidaire
@@ -1251,13 +1267,13 @@
        dégradé horizontal ci-dessus fait déjà tout le travail sous la colonne,
        et les halos de lettres (.card--img .card__title/.card__desc) traitent
        le reste. */
-    .card--img .card__body::before{display:none}
+    html.paysagelarge .card--img .card__body::before{display:none}
     /* Le ▶ d'une carte vidéo est centré sur la CARTE : avec le texte en
        colonne à gauche, il tombait pile dessus (mesuré : icône à 453 px, la
        colonne s'arrêtant à 547 px). Le padding le pousse dans la moitié
        restée à l'image — sans toucher à sa cible, qui reste la carte
        entière. */
-    .card__play{padding-left:min(640px,60%)}
+    html.paysagelarge .card__play{padding-left:min(640px,60%)}
     /* Carte à PARTS ÉGALES (cardsPerSwipe>1) : le même mal sous une autre
        forme. Elle n'a pas de .card__body — rien de ce qui précède ne
        l'atteint — mais ses lignes, elles, couraient sur toute la largeur du
@@ -1266,37 +1282,37 @@
        de l'écran, à plus d'un mètre visuel du titre auquel ils se
        rapportent. Borner la colonne les ramène contre elle — ils vivent dans
        .pvrow__head, donc DANS ce bloc, et suivent son bord droit. */
-    .pvrow{padding-left:clamp(18px,3vw,56px);padding-right:clamp(18px,3vw,56px)}
-    .pvrow__body{max-width:1000px}
+    html.paysagelarge .pvrow{padding-left:clamp(18px,3vw,56px);padding-right:clamp(18px,3vw,56px)}
+    html.paysagelarge .pvrow__body{max-width:1000px}
     /* Les feuilles gardent leur forme (elles montent du bas) mais pas toute la
        largeur : une case à cocher suivie de 900 px de vide ne se lit pas mieux
        qu'un titre de 100 caractères. #menuSheet est le tiroir LATÉRAL (voir
        son commentaire) : il est ancré à DROITE, sous le bouton qui l'ouvre, le
        centrer l'en décollerait. */
-    .sheet:not(#menuSheet) .sheet__panel{max-width:760px;margin:0 auto}
+    html.paysagelarge .sheet:not(#menuSheet) .sheet__panel{max-width:760px;margin:0 auto}
 
     /* Le volet lui-même. Fond « surface » et liseré : c'est un panneau, il se
        lit comme les feuilles, pas comme une carte. */
-    .volet{display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;
+    html.paysagelarge .volet{display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;
       width:var(--volet);z-index:16;background:var(--surface);
       border-right:1px solid var(--redline);
       padding-top:max(env(safe-area-inset-top),var(--systop,0px),var(--systop-min,0px))}
-    .volethead{flex:0 0 auto;padding:14px 14px 11px;border-bottom:1px solid rgba(var(--redline-rgb),.3)}
-    .volethead h2{font-size:14px;font-weight:600;letter-spacing:-.01em}
-    .volethead p{margin-top:3px;color:var(--ash);font-size:11.5px;
+    html.paysagelarge .volethead{flex:0 0 auto;padding:14px 14px 11px;border-bottom:1px solid rgba(var(--redline-rgb),.3)}
+    html.paysagelarge .volethead h2{font-size:14px;font-weight:600;letter-spacing:-.01em}
+    html.paysagelarge .volethead p{margin-top:3px;color:var(--ash);font-size:11.5px;
       font-family:var(--font-mono);letter-spacing:-.03em}
     /* position:relative — les rangées sont ainsi positionnées par rapport à
        cette liste, donc row.offsetTop y est directement l'offset dans le
        contenu défilable (même raison que #feed, et c'est ce dont majVolet() se
        sert pour garder la rangée courante en vue). */
-    #voletList{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;position:relative;
+    html.paysagelarge #voletList{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;position:relative;
       padding:0 12px calc(16px + max(env(safe-area-inset-bottom),var(--sysbot,0px)))}
     /* Rangées : celles de la feuille, À L'IDENTIQUE (histRowHTML), en plus
        compact — le volet est deux fois plus étroit qu'une feuille. */
-    #voletList .histrow{padding:10px 4px;gap:10px}
-    #voletList .histrow__th{width:44px;height:44px}
-    #voletList .histrow__ttl{font-size:13px;-webkit-line-clamp:3}
-    #voletList .histrow__top{font-size:11px;gap:6px}
+    html.paysagelarge #voletList .histrow{padding:10px 4px;gap:10px}
+    html.paysagelarge #voletList .histrow__th{width:44px;height:44px}
+    html.paysagelarge #voletList .histrow__ttl{font-size:13px;-webkit-line-clamp:3}
+    html.paysagelarge #voletList .histrow__top{font-size:11px;gap:6px}
   }
 
   /* Respect du réglage système « réduire les animations » (WCAG 2.3.3) */
@@ -2793,7 +2809,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="262";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="263";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2804,6 +2820,8 @@ const APP_VERSION="262";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:263,date:"2026-09-16",items:[
+    "changelog.v263.item1"]},
   {v:262,date:"2026-09-16",items:[
     "changelog.v262.item1","changelog.v262.item2"]},
   {v:256,date:"2026-09-01",items:[
@@ -3024,16 +3042,23 @@ let notifPref=(()=>{try{return localStorage.getItem(LS_NOTIF)==="on"?"on":"off";
    worker SANS page ouverte — mais seulement pour une PWA INSTALLÉE (le
    navigateur conditionne la permission à l'engagement du site), et seulement
    sur Chromium (Chrome/Edge Android et desktop ; ni Firefox ni Safari ne
-   l'implémentent). D'où la détection de CAPACITÉ ici (existence de l'API) et
-   une vraie vérification de PERMISSION au moment de l'activer
-   (setWebBgNotif) — les deux sont nécessaires : l'API peut exister sans que
-   la permission soit jamais accordée (site pas installé, pas assez engagé).
-   Comme pour le reste (voir CLAUDE.md, "Décisions à ne pas défaire") : zéro
-   backend, zéro compte — le seul état qui existe est dans l'IndexedDB de
-   CHAQUE navigateur, jamais envoyé nulle part. */
+   l'implémentent). D'où la détection de CAPACITÉ ici (existence de l'API ET
+   mode `standalone`) et une vraie vérification de PERMISSION au moment de
+   l'activer (setWebBgNotif) — les deux sont nécessaires : l'API peut exister
+   sans que la permission soit jamais accordée (pas assez engagé).
+   `standalone` n'est pas cosmétique : sans lui, un simple ONGLET de
+   navigateur (l'écrasante majorité des visites) se voyait proposer le
+   réglage ET le rappel « Active les notifications », pour une permission
+   qu'il ne pourra JAMAIS obtenir tant que le site n'est pas installé —
+   mesuré via le banc de QA (`back`), où le rappel s'affichait et bloquait le
+   menu, Chromium exposant l'API même en simple onglet. Comme pour le reste
+   (voir CLAUDE.md, "Décisions à ne pas défaire") : zéro backend, zéro
+   compte — le seul état qui existe est dans l'IndexedDB de CHAQUE
+   navigateur, jamais envoyé nulle part. */
 function webBgSyncSupported(){
   return typeof window!=="undefined"&&"serviceWorker"in navigator&&
-    "PeriodicSyncManager"in window&&"Notification"in window&&"indexedDB"in window;
+    "PeriodicSyncManager"in window&&"Notification"in window&&"indexedDB"in window&&
+    (matchMedia("(display-mode: standalone)").matches||navigator.standalone===true);
 }
 /* Cadence DEMANDÉE, pas garantie : le navigateur choisit la vraie fréquence
    selon l'engagement mesuré du site, souvent bien plus large. Même valeur que
@@ -7406,13 +7431,40 @@ histList.addEventListener("click",e=>{
    et casserait le défilement du volet à chaque swipe.
 
    Sur un téléphone (le cas de tout le monde), la fonction s'arrête à la
-   première ligne : un test de media query, rien d'autre. */
-const MQ_VOLET=window.matchMedia("(orientation:landscape) and (min-width:900px) and (min-height:560px)");
+   première ligne : la classe posée par majPaysageLarge() ci-dessous, rien
+   d'autre. */
+/* `paysagelarge` (posée sur <html>, voir le CSS "Les DEUX paysages" plus
+   haut) plutôt qu'un matchMedia("min-height:560px") pur : sur un pliant
+   déplié Samsung, la barre des tâches système réduit le viewport VISIBLE en
+   paysage sans que l'écran ait changé de catégorie — mesuré : un Z Fold
+   ouvert, en PWA (rien côté web n'a la main sur cette barre, contrairement à
+   l'app native et son InAppBrowserPlugin.systemInsets), tombait sous les 560
+   de viewport et se voyait donc imposer à tort le verrou de portrait.
+   `screen.height` (résolution RÉELLE de l'écran, orientation courante) ne
+   varie pas avec cette barre — mais ne suffit pas SEUL : sur desktop il vaut
+   la résolution du MONITEUR, pas celle de la fenêtre, et une petite fenêtre
+   y passerait alors à tort en paysage large. `pointer:coarse` (déjà le
+   critère de `tactile`, voir plus haut dans ce fichier) écarte ce cas : un
+   poste de bureau (souris) n'a jamais cette excuse, seul un appareil tactile
+   où `screen.height` suit vraiment l'écran physique — d'où le repli
+   UNIQUEMENT quand le viewport est court ET l'appareil est tactile ET
+   l'écran, lui, ne l'est pas. */
+function paysageLargeActif(){
+  if(!matchMedia("(orientation:landscape)").matches||innerWidth<900)return false;
+  if(innerHeight>=560)return true;
+  return matchMedia("(pointer:coarse)").matches&&screen.height>=560;
+}
+function majPaysageLarge(){
+  const actif=paysageLargeActif();
+  if(document.documentElement.classList.contains("paysagelarge")===actif)return;
+  document.documentElement.classList.toggle("paysagelarge",actif);
+  voletSale=true;majVolet();   // apparu/disparu : les rangées peuvent être à refaire
+}
 const voletList=document.getElementById("voletList"),voletSub=document.getElementById("voletSub");
 let voletSale=true;    // posé par render() : le fil a bougé, les rangées sont à refaire
 let voletCle="";       // repère déjà posé, pour ne pas réécrire des classes identiques
 function majVolet(){
-  if(!MQ_VOLET.matches)return;
+  if(!document.documentElement.classList.contains("paysagelarge"))return;
   // Filet de sécurité, et il se répare tout seul : si le nombre de rangées ne
   // correspond plus à `items`, l'indexation rangée↔article ci-dessous serait
   // fausse (un remix sans render(), un rendu manqué). On refait plutôt.
@@ -7456,9 +7508,17 @@ voletList.addEventListener("click",e=>{
   if(b)sauterVersHk(b.dataset.hk);   // rien à refermer : le volet reste
 });
 // Le volet est apparu (appareil qu'on déplie, fenêtre qu'on agrandit, écran
-// qu'on tourne) : il n'a encore jamais été peint. Il disparaît, lui, sans rien
-// à faire — majVolet() sort à sa première ligne et le CSS le masque.
-MQ_VOLET.addEventListener("change",()=>{voletSale=true;majVolet();});
+// qu'on tourne, barre des tâches système qui se montre/se cache) : il n'a
+// encore jamais été peint — majPaysageLarge() pose alors la classe et
+// rappelle majVolet(). Il disparaît, lui, sans rien à faire : la classe
+// retombe et le CSS le masque. `resize` couvre aussi une rotation
+// (`orientationchange` ne suffirait pas seul sur certains navigateurs
+// desktop, qui ne l'émettent jamais).
+majPaysageLarge();
+addEventListener("resize",()=>{
+  clearTimeout(majPaysageLarge.t);
+  majPaysageLarge.t=setTimeout(majPaysageLarge,200);
+});
 
 /* ---------- Articles enregistrés ----------
    Contrairement à la feuille précédente, celle-ci ne fait JAMAIS défiler le

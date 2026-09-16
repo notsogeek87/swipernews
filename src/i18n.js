@@ -53,6 +53,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v263.item1":
+        "📱 Correctif : sur un écran large déplié (pliant, tablette) en paysage, l'app pouvait à tort demander de repasser en portrait.",
       "changelog.v262.item1":
         "🔔 Notifications de nouveaux articles disponibles sur le web/PWA (Chrome/Edge, une fois l'app installée) — plus seulement dans l'app Android.",
       "changelog.v262.item2":
@@ -491,6 +493,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v263.item1":
+        "📱 Fix: on a large unfolded screen (foldable, tablet) in landscape, the app could wrongly ask to switch back to portrait.",
       "changelog.v262.item1":
         "🔔 New-article notifications now available on web/PWA (Chrome/Edge, once installed) — not just in the Android app.",
       "changelog.v262.item2":
