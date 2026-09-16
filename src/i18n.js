@@ -53,6 +53,10 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v262.item1":
+        "🔔 Notifications de nouveaux articles disponibles sur le web/PWA (Chrome/Edge, une fois l'app installée) — plus seulement dans l'app Android.",
+      "changelog.v262.item2":
+        "🔗 Un lien de source partagé s'ajoute maintenant automatiquement aussi dans le navigateur ou la PWA, pas seulement dans l'app Android.",
       "changelog.v256.item1":
         "📱 Écrans larges couchés (pliant déplié, tablette, ordinateur) : le fil garde sa colonne et la liste des articles s'installe à gauche, toujours visible — plus besoin d'ouvrir un panneau pour revenir en arrière. Le téléphone couché, lui, demande toujours de se remettre à la verticale.",
       "changelog.v252.item1":
@@ -378,6 +382,8 @@
       "notif.battery.off":
         "Android retarde souvent les vérifications en arrière-plan pour économiser la batterie — exclus SwiperNews de cette optimisation pour des notifications plus fiables.",
       "notif.battery.btn": "Exclure de l'optimisation de batterie",
+      "notif.web.hint":
+        "Sur Chrome/Edge, une fois l'app installée : le navigateur choisit seul la fréquence des vérifications (souvent plusieurs heures), sans aucun serveur ni compte.",
 
       "bl.builtin":
         "Liste intégrée à l'app : 178 domaines. Une liste publique en bloque bien davantage, et se met à jour sans réinstaller l'app.",
@@ -409,6 +415,8 @@
       "toast.statsReset": "Statistiques réinitialisées",
       "toast.backExit": "Appuie de nouveau sur retour pour quitter",
       "toast.notifDenied": "Permission refusée — notifications désactivées",
+      "toast.notifWebNeedsInstall":
+        "Installe SwiperNews (menu du navigateur) pour activer les notifications",
       "toast.batteryFailed": "Réglage batterie indisponible",
       "toast.invalidUrl": "URL invalide",
       "toast.youtubeResolving": "Recherche du flux YouTube…",
@@ -483,6 +491,10 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v262.item1":
+        "🔔 New-article notifications now available on web/PWA (Chrome/Edge, once installed) — not just in the Android app.",
+      "changelog.v262.item2":
+        "🔗 A shared source link now also adds itself automatically in the browser or PWA, not just the Android app.",
       "changelog.v256.item1":
         "📱 Wide screens in landscape (unfolded foldable, tablet, desktop): the feed keeps its column and the article list settles on the left, always visible — no need to open a panel to go back. A phone in landscape still asks to be turned upright.",
       "changelog.v252.item1":
@@ -801,6 +813,8 @@
       "notif.battery.off":
         "Android often delays background checks to save battery — exclude SwiperNews from this optimization for more reliable notifications.",
       "notif.battery.btn": "Exclude from battery optimization",
+      "notif.web.hint":
+        "On Chrome/Edge, once the app is installed: the browser alone decides how often to check (often several hours) — no server, no account.",
 
       "bl.builtin":
         "Built into the app: 178 domains. A public list blocks far more, and updates without reinstalling the app.",
@@ -831,6 +845,8 @@
       "toast.statsReset": "Activity stats reset",
       "toast.backExit": "Press back again to exit",
       "toast.notifDenied": "Permission denied — notifications turned off",
+      "toast.notifWebNeedsInstall":
+        "Install SwiperNews (browser menu) to enable notifications",
       "toast.batteryFailed": "Battery setting unavailable",
       "toast.invalidUrl": "Invalid URL",
       "toast.youtubeResolving": "Looking up the YouTube feed…",

@@ -1740,7 +1740,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=258"></script>
 <script src="src/learn-core.js?v=252"></script>
-<script src="src/i18n.js?v=259"></script>
+<script src="src/i18n.js?v=260"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2793,7 +2793,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="261";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="262";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2804,6 +2804,8 @@ const APP_VERSION="261";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:262,date:"2026-09-16",items:[
+    "changelog.v262.item1","changelog.v262.item2"]},
   {v:256,date:"2026-09-01",items:[
     "changelog.v256.item1"]},
   {v:252,date:"2026-08-30",items:[
@@ -3006,15 +3008,68 @@ const LS_ADS="fluxswipe.ads.v1";
    activer sciemment, pas un comportement subi. */
 let adsPref=(()=>{try{return localStorage.getItem(LS_ADS)==="block"?"block":"allow";}catch(e){return "allow";}})();
 
-/* Notification « de nouveaux articles », app packagée seulement : réveille
-   NewsCheckWorker (natif) même l'app fermée, voir InAppBrowserPlugin et
-   syncBackgroundFeeds()/setNotifPref() plus bas. Désactivée par défaut,
-   comme le blocage de pub ci-dessus et pour la même raison : ça demande une
-   permission système (POST_NOTIFICATIONS, Android 13+) et un réveil
+/* Notification « de nouveaux articles » : réveille NewsCheckWorker (natif,
+   voir InAppBrowserPlugin) même l'app fermée. Sur le web/PWA, même réglage,
+   par Periodic Background Sync quand le navigateur le permet (voir
+   webBgSyncSupported()/setWebBgNotif() plus bas) — sinon ce réglage disparaît
+   du panneau (renderReadPref), comme n'importe quelle fonctionnalité native
+   sans équivalent web. Désactivée par défaut, comme le blocage de pub
+   ci-dessus et pour la même raison : ça demande une permission système
+   (POST_NOTIFICATIONS Android, Notification côté web) et un réveil
    périodique, deux choses qui doivent s'activer sciemment plutôt que se
    subir. */
 const LS_NOTIF="fluxswipe.notif.v1";
 let notifPref=(()=>{try{return localStorage.getItem(LS_NOTIF)==="on"?"on":"off";}catch(e){return "off";}})();
+/* Periodic Background Sync : seul mécanisme web qui réveille un service
+   worker SANS page ouverte — mais seulement pour une PWA INSTALLÉE (le
+   navigateur conditionne la permission à l'engagement du site), et seulement
+   sur Chromium (Chrome/Edge Android et desktop ; ni Firefox ni Safari ne
+   l'implémentent). D'où la détection de CAPACITÉ ici (existence de l'API) et
+   une vraie vérification de PERMISSION au moment de l'activer
+   (setWebBgNotif) — les deux sont nécessaires : l'API peut exister sans que
+   la permission soit jamais accordée (site pas installé, pas assez engagé).
+   Comme pour le reste (voir CLAUDE.md, "Décisions à ne pas défaire") : zéro
+   backend, zéro compte — le seul état qui existe est dans l'IndexedDB de
+   CHAQUE navigateur, jamais envoyé nulle part. */
+function webBgSyncSupported(){
+  return typeof window!=="undefined"&&"serviceWorker"in navigator&&
+    "PeriodicSyncManager"in window&&"Notification"in window&&"indexedDB"in window;
+}
+/* Cadence DEMANDÉE, pas garantie : le navigateur choisit la vraie fréquence
+   selon l'engagement mesuré du site, souvent bien plus large. Même valeur que
+   NewsCheckWorker.INTERVAL_HOURS (natif) — un simple point de départ commun,
+   pas une promesse identique. */
+const BG_SYNC_TAG="check-news";
+const BG_SYNC_MIN_INTERVAL_MS=3*60*60*1000;
+/* IndexedDB : le SEUL stockage partagé entre cette page et le service worker
+   (sw.js, voir l'événement periodicsync) — localStorage n'existe pas dans un
+   service worker. Un enregistrement UNIQUE (BG_KEY) plutôt qu'une entrée par
+   source : la forme la plus simple pour un objet {enabled, feeds, lang} qui
+   se réécrit toujours en bloc, jamais consulté par clé individuelle. */
+const BG_DB="swipernews-bg",BG_STORE="state",BG_KEY="bg";
+function idbOpenBg(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(BG_DB,1);
+    req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(BG_STORE))req.result.createObjectStore(BG_STORE);};
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function idbSetBg(patch){
+  const db=await idbOpenBg();
+  try{
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction(BG_STORE,"readwrite");
+      const store=tx.objectStore(BG_STORE);
+      const getReq=store.get(BG_KEY);
+      getReq.onsuccess=()=>{
+        const cur=getReq.result||{enabled:false,feeds:[]};
+        store.put({...cur,...patch},BG_KEY);
+      };
+      tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
+    });
+  }finally{db.close();}
+}
 /* État de l'exemption d'optimisation batterie (voir batteryHTML/refreshBatteryIgnored
    plus bas) : null = pas encore interrogé côté natif, sinon reflet exact de
    PowerManager.isIgnoringBatteryOptimizations. JAMAIS persisté — c'est un état
@@ -3106,7 +3161,7 @@ function snoozeNotifNudge(){
    openChangelogIfNew, retour au premier plan via onRetourPremierPlan, fin de
    l'accueil via startWelcome) — elles ne peuvent donc pas diverger. */
 function notifNudgeDu(){
-  return isNativeApp&&notifPref==="off"&&!notifNudgeAnswered()&&!notifNudgeSnoozed();
+  return (isNativeApp||webBgSyncSupported())&&notifPref==="off"&&!notifNudgeAnswered()&&!notifNudgeSnoozed();
 }
 /* Affiche le rappel autonome s'il est dû, en dehors de tout chargement de
    page. INDISPENSABLE dans l'APK : le bouton retour y appelle
@@ -3404,6 +3459,12 @@ if(isNativeApp){
     // que l'app tourne déjà — un seul point d'écoute pour les deux.
     CapApp.addListener("appUrlOpen",e=>{try{handleDeepLink(e&&e.url);}catch(err){warn("deeplink",err);}});
   }
+}else{
+  // Pendant de handleDeepLink pour le web/PWA : add.html (voir feedDeepLink)
+  // rebondit vers l'app NATIVE via swipernews://, mais pointe aussi vers
+  // CETTE page avec les mêmes paramètres `url`/`name` — le seul chemin qui
+  // marche pour qui n'a pas l'APK (navigateur, PWA installée, iOS).
+  try{handleSharedFeedLink();}catch(err){warn("sharedfeedlink",err);}
 }
 /* Filet de sécurité : visibilitychange seul ne suffit pas. Le commentaire de
    rememberPos() le dit déjà pour un autre cas — « quand l'app est tuée depuis
@@ -6227,6 +6288,28 @@ function handleDeepLink(url){
   feeds.push({name,url:feedUrl,on:true});save();renderList();renderSuggest();
   toast(T("toast.feedAdded",{name}));
 }
+/* Pendant WEB de handleDeepLink ci-dessus : add.html (voir feedDeepLink) sert
+   de sas pour tout le monde, mais SEUL l'APK sait ouvrir swipernews://. Pour
+   quiconque n'a pas l'app native — navigateur, PWA installée, iOS — add.html
+   pointe donc aussi vers CETTE page avec les MÊMES paramètres `url`/`name` :
+   pas un schéma personnalisé, une navigation https ordinaire, lue une seule
+   fois au chargement. `history.replaceState` retire les paramètres de la
+   barre d'adresse aussitôt lus, sinon un simple rechargement (F5) réajouterait
+   la même source en boucle. */
+function handleSharedFeedLink(){
+  const q=new URLSearchParams(location.search);
+  const feedUrl=q.get("url");
+  if(!feedUrl)return;
+  const name=(q.get("name")||"").trim();
+  history.replaceState(null,"",location.pathname+location.hash);
+  let u;
+  try{u=new URL(feedUrl);}catch(_){return;}
+  if(u.protocol!=="http:"&&u.protocol!=="https:")return;
+  const finalName=name||hostOf(feedUrl);
+  if(feeds.some(f=>f.url===feedUrl)){toast(T("toast.feedsAlreadyPresent"));return;}
+  feeds.push({name:finalName,url:feedUrl,on:true});save();renderList();renderSuggest();
+  toast(T("toast.feedAdded",{name:finalName}));
+}
 
 /* Menu de partage de repli (desktop, ou si aucune feuille de partage n'existe) */
 function openShareMenu(it){
@@ -6636,8 +6719,11 @@ document.getElementById("reloadBtn").onclick=()=>{toast(T("toast.refreshing"));l
 
 /* ---------- Réglage « Ouvrir les articles » (app packagée) ----------
    Un seul point de montage depuis la fusion des panneaux (querySelectorAll
-   reste : le montage peut être absent, jamais dupliqué). Sur le web, le bloc
-   reste vide : le choix n'existe pas, un lien y part forcément dans un onglet. */
+   reste : le montage peut être absent, jamais dupliqué). Sur le web, la
+   question de l'ouverture des articles ne se pose pas (un lien y part
+   forcément dans un onglet) — mais le réglage NOTIFICATIONS, lui, peut s'y
+   trouver (voir webBgSyncSupported) : le bloc n'est donc vide que si NI le
+   lecteur natif NI les notifications web n'ont rien à proposer. */
 /* `extra` : classe supplémentaire sur la rangée de boutons (voir segbtns--sizes).
    `o.aria` : libellé parlé quand l'étiquette visible ne dit rien seule — quatre
    « A » de tailles différentes se voient mais ne s'entendent pas. */
@@ -6680,38 +6766,51 @@ function blocklistHTML(){
   </div>`;
 }
 function renderReadPref(){
-  const inApp=readPref!=="browser",hideCmp=cmpPref==="hide";
-  let html=prefRow("read",T("read.label"),T("read.desc."+readPref),
-    [{v:"app",t:T("read.opt.app")},{v:"read",t:T("read.opt.read")},{v:"browser",t:T("read.opt.browser")}],readPref);
-  /* Taille et fond ne sont proposés qu'en mode Lecture : en page complète, c'est
-     la feuille de style du site qui décide, ces deux boutons n'auraient aucun
-     effet visible et ne feraient qu'allonger le panneau. */
-  if(readPref==="read"){
-    html+=prefRow("rsize",T("rsize.label"),T("rsize.desc."+rSizePref),
-      [{v:"s",t:"A",aria:T("rsize.aria.s")},{v:"m",t:"A",aria:T("rsize.aria.m")},
-       {v:"l",t:"A",aria:T("rsize.aria.l")},{v:"xl",t:"A",aria:T("rsize.aria.xl")}],rSizePref,"segbtns--sizes");
-    html+=prefRow("rtheme",T("rtheme.label"),T("rtheme.desc."+rThemePref),
-      [{v:"dark",t:T("rtheme.opt.dark")},{v:"sepia",t:T("rtheme.opt.sepia")},{v:"light",t:T("rtheme.opt.light")}],rThemePref);
+  const inApp=isNativeApp&&readPref!=="browser",hideCmp=cmpPref==="hide";
+  let html="";
+  if(isNativeApp){
+    html+=prefRow("read",T("read.label"),T("read.desc."+readPref),
+      [{v:"app",t:T("read.opt.app")},{v:"read",t:T("read.opt.read")},{v:"browser",t:T("read.opt.browser")}],readPref);
+    /* Taille et fond ne sont proposés qu'en mode Lecture : en page complète, c'est
+       la feuille de style du site qui décide, ces deux boutons n'auraient aucun
+       effet visible et ne feraient qu'allonger le panneau. */
+    if(readPref==="read"){
+      html+=prefRow("rsize",T("rsize.label"),T("rsize.desc."+rSizePref),
+        [{v:"s",t:"A",aria:T("rsize.aria.s")},{v:"m",t:"A",aria:T("rsize.aria.m")},
+         {v:"l",t:"A",aria:T("rsize.aria.l")},{v:"xl",t:"A",aria:T("rsize.aria.xl")}],rSizePref,"segbtns--sizes");
+      html+=prefRow("rtheme",T("rtheme.label"),T("rtheme.desc."+rThemePref),
+        [{v:"dark",t:T("rtheme.opt.dark")},{v:"sepia",t:T("rtheme.opt.sepia")},{v:"light",t:T("rtheme.opt.light")}],rThemePref);
+    }
+    // Sans lecteur intégré, la question des bandeaux ne se pose plus : c'est le
+    // navigateur qui affiche la page, on n'a pas la main dessus.
+    if(inApp){
+      html+=prefRow("cmp",T("cmp.label"),T("cmp.desc."+(hideCmp?"hide":"show")),
+        [{v:"hide",t:T("cmp.opt.hide")},{v:"show",t:T("cmp.opt.show")}],cmpPref);
+      html+=prefRow("ads",T("ads.label"),T("ads.desc."+adsPref),
+        [{v:"block",t:T("ads.opt.block")},{v:"allow",t:T("ads.opt.allow")}],adsPref);
+      if(adsPref==="block")html+=blocklistHTML();
+    }
   }
-  // Sans lecteur intégré, la question des bandeaux ne se pose plus : c'est le
-  // navigateur qui affiche la page, on n'a pas la main dessus.
-  if(inApp){
-    html+=prefRow("cmp",T("cmp.label"),T("cmp.desc."+(hideCmp?"hide":"show")),
-      [{v:"hide",t:T("cmp.opt.hide")},{v:"show",t:T("cmp.opt.show")}],cmpPref);
-    html+=prefRow("ads",T("ads.label"),T("ads.desc."+adsPref),
-      [{v:"block",t:T("ads.opt.block")},{v:"allow",t:T("ads.opt.allow")}],adsPref);
-    if(adsPref==="block")html+=blocklistHTML();
+  // Notifications : natif toujours, web seulement si le navigateur sait faire
+  // du Periodic Background Sync (voir webBgSyncSupported) — sinon ce bloc
+  // n'existe simplement pas, comme n'importe quel réglage sans équivalent.
+  const notifOk=isNativeApp||webBgSyncSupported();
+  if(notifOk){
     html+=prefRow("notif",T("notif.label"),T("notif.desc."+notifPref),
       [{v:"on",t:T("notif.opt.on")},{v:"off",t:T("notif.opt.off")}],notifPref);
-    // Rien à rendre plus fiable côté batterie si le réveil périodique lui-même
-    // est éteint.
     if(notifPref==="on"){
-      if(isNativeApp&&batteryIgnored===null)refreshBatteryIgnored();
-      html+=batteryHTML();
+      if(isNativeApp){
+        // Rien à rendre plus fiable côté batterie si le réveil périodique
+        // lui-même est éteint.
+        if(batteryIgnored===null)refreshBatteryIgnored();
+        html+=batteryHTML();
+      }else{
+        html+=`<div class="prefsub"><span class="prefsub__state">${esc(T("notif.web.hint"))}</span></div>`;
+      }
     }
   }
   document.querySelectorAll("[data-readmount]").forEach(el=>{
-    el.innerHTML=isNativeApp?html:"";
+    el.innerHTML=(isNativeApp||notifOk)?html:"";
   });
 }
 /* Sélecteur de langue : contrairement à renderReadPref(), pas réservé à l'app
@@ -6821,18 +6920,19 @@ function setAppTheme(v){
   renderThemePref();
 }
 /* Notification de nouveaux articles : contrairement au reste de PREFS/setPref,
-   l'état réellement appliqué dépend d'une permission SYSTÈME (Android 13+)
-   que l'utilisateur peut refuser — d'où l'aller-retour par le plugin plutôt
-   qu'une simple écriture locale. setBackgroundNotifications() (natif) résout
-   toujours, y compris sur refus : le libellé "enabled" de sa réponse dit ce
-   qui a VRAIMENT été retenu, potentiellement différent de ce qu'on vient de
-   demander, et c'est cette valeur qui doit rester affichée. */
+   l'état réellement appliqué dépend d'une permission SYSTÈME (Android 13+,
+   ou Notification+periodic-background-sync côté web) que l'utilisateur peut
+   refuser — d'où l'aller-retour asynchrone plutôt qu'une simple écriture
+   locale. Le natif comme le web peuvent redescendre "off" tout seuls après
+   coup (permission refusée) : c'est cette valeur-là qui doit rester
+   affichée, jamais celle qu'on vient de demander. */
 function setNotifPref(v){
   const next=v==="on"?"on":"off";
   if(next===notifPref)return;
   notifPref=next;
   try{localStorage.setItem(LS_NOTIF,notifPref);}catch(e){warn("save notif",e);}
   renderReadPref();
+  if(!isNativeApp){setWebBgNotif(notifPref==="on");return;}
   const p=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
   if(!p||!p.setBackgroundNotifications)return;
   p.setBackgroundNotifications({enabled:notifPref==="on"}).then(res=>{
@@ -6849,6 +6949,52 @@ function setNotifPref(v){
   // chargement (jusqu'à 30 min, voir AUTO_RELOAD_MS) avant de pouvoir dire
   // quoi que ce soit.
   if(notifPref==="on")syncBackgroundFeeds();
+}
+/* Pendant WEB de l'aller-retour natif ci-dessus. DEUX permissions distinctes,
+   dans cet ordre : Notification (banale, l'utilisateur la connaît) puis
+   periodic-background-sync (silencieuse, le navigateur la calcule seul selon
+   l'engagement — jamais de dialogue système pour celle-ci). Un refus de
+   L'UNE OU L'AUTRE, ou l'absence de l'API, ramène le réglage à "off" et le
+   dit par toast, exactement comme le natif redescend sa case après un refus
+   système. */
+async function setWebBgNotif(enabled){
+  if(!webBgSyncSupported())return;
+  if(!enabled){
+    try{
+      const reg=await navigator.serviceWorker.ready;
+      if(reg.periodicSync)await reg.periodicSync.unregister(BG_SYNC_TAG);
+    }catch(e){}
+    idbSetBg({enabled:false}).catch(()=>{});
+    return;
+  }
+  const denyBack=async(toastKey)=>{
+    notifPref="off";
+    try{localStorage.setItem(LS_NOTIF,"off");}catch(e){}
+    renderReadPref();
+    toast(T(toastKey));
+  };
+  try{
+    if(Notification.permission!=="granted"){
+      const perm=await Notification.requestPermission();
+      if(perm!=="granted"){await denyBack("toast.notifDenied");return;}
+    }
+    const reg=await navigator.serviceWorker.ready;
+    if(!reg.periodicSync){await denyBack("toast.notifWebNeedsInstall");return;}
+    // Pas de dialogue ici : Chrome accorde ou refuse cette permission tout
+    // seul, selon que le site est installé et assez utilisé — la vérifier
+    // est la seule façon de savoir si register() a une chance d'aboutir.
+    let state="granted";
+    try{
+      const status=await navigator.permissions.query({name:"periodic-background-sync"});
+      state=status.state;
+    }catch(e){/* API absente (Firefox/Safari, déjà écartés par webBgSyncSupported) */}
+    if(state!=="granted"){await denyBack("toast.notifWebNeedsInstall");return;}
+    await reg.periodicSync.register(BG_SYNC_TAG,{minInterval:BG_SYNC_MIN_INTERVAL_MS});
+    // Repère de départ posé tout de suite, même raison que côté natif.
+    await idbSetBg({enabled:true,lang:LANG,feeds:backgroundFeedSnapshot()});
+  }catch(e){
+    await denyBack("toast.notifWebNeedsInstall");
+  }
 }
 /* Instantané envoyé à NewsCheckWorker (natif) : uniquement les sources
    actives, avec l'URL RÉELLEMENT interrogée (urlDuFlux — la playlist Shorts
@@ -6876,12 +7022,20 @@ function backgroundFeedSnapshot(){
   return out;
 }
 function syncBackgroundFeeds(){
-  if(!isNativeApp)return;
-  try{
-    const p=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
-    if(!p||!p.syncBackgroundFeeds)return;
-    p.syncBackgroundFeeds({feeds:backgroundFeedSnapshot()}).catch(()=>{});
-  }catch(e){}
+  if(isNativeApp){
+    try{
+      const p=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
+      if(!p||!p.syncBackgroundFeeds)return;
+      p.syncBackgroundFeeds({feeds:backgroundFeedSnapshot()}).catch(()=>{});
+    }catch(e){}
+    return;
+  }
+  // Web : même instantané, écrit dans l'IndexedDB que periodicsync (sw.js)
+  // relira à son prochain réveil — seul canal partagé entre cette page et un
+  // service worker (voir BG_DB). Rien à faire si le réglage n'est pas actif :
+  // sans ça, chaque fil renouvelé ouvrirait puis fermerait la base pour rien.
+  if(!webBgSyncSupported()||notifPref!=="on")return;
+  idbSetBg({feeds:backgroundFeedSnapshot(),lang:LANG}).catch(()=>{});
 }
 /* Ligne « Exclure de l'optimisation de batterie » sous le réglage notifs —
    seul levier qui rend NewsCheckWorker (natif) vraiment fiable en arrière-

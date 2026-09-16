@@ -14,9 +14,10 @@
   h1{font-size:20px;margin:0 0 8px}
   p{color:#baadab;margin:0 0 20px;word-break:break-word}
   .name{color:#f7f6ff;font-weight:600}
-  a.btn{display:inline-block;background:#fa5838;color:#190501;font-weight:700;text-decoration:none;
-    padding:14px 22px;border-radius:999px;margin-bottom:16px}
-  .fallback{font-size:14px;color:#baadab}
+  a.btn{display:block;background:#fa5838;color:#190501;font-weight:700;text-decoration:none;
+    padding:14px 22px;border-radius:999px;margin-bottom:12px}
+  a.btn--alt{background:transparent;color:#f7f6ff;box-shadow:inset 0 0 0 1.5px #baadab}
+  .fallback{font-size:14px;color:#baadab;margin-top:8px}
   .fallback code{display:block;margin-top:8px;color:#f7f6ff;word-break:break-all;
     background:#340a01;border-radius:8px;padding:10px}
 </style>
@@ -28,14 +29,21 @@
    les schémas personnalisés — un lien swipernews://… partagé tel quel restait
    du texte inerte, jamais cliquable (voir handleDeepLink/feedDeepLink dans
    index.html). Cette page https://news.lielu.eu/add.html sert donc de sas :
-   un lien normal, cliquable partout, qui rebondit vers swipernews:// une fois
-   ouvert. Pas d'App Links (assetlinks.json signé avec la clé de RELEASE,
-   invérifiable dans cet environnement de dev, voir CLAUDE.md) — ce
-   contournement ne demande aucun secret ni build signé.
+   un lien normal, cliquable partout.
+   DEUX destinations, pas une : l'APK Android (swipernews://, résolu par
+   l'intent-filter — pas d'App Links, assetlinks.json signé avec la clé de
+   RELEASE invérifiable dans cet environnement de dev, voir CLAUDE.md) OU
+   cette même app en PWA/navigateur (index.html?url=…&name=…, lu une seule
+   fois par handleSharedFeedLink). Un lien de partage reçu par qui n'a QUE le
+   web — desktop, iPhone, Android sans l'APK — ne menait auparavant qu'à
+   "ajoute la source à la main" : le même site est pourtant capable d'ajouter
+   la source tout seul, exactement comme l'app.
    Le bond automatique (location.replace) échoue silencieusement hors Android
    ou sans l'app installée ; le bouton, lui, est un VRAI geste utilisateur
    (clic sur une ancre), la forme la plus fiable pour faire naviguer un
-   navigateur mobile vers un schéma personnalisé. */
+   navigateur mobile vers un schéma personnalisé — on ne le tente donc QUE
+   pour swipernews://, jamais pour le lien web (une navigation http(s)
+   normale n'a pas ce problème). */
 (function(){
   var q=new URLSearchParams(location.search);
   var url=q.get("url"), name=(q.get("name")||"").trim();
@@ -46,15 +54,23 @@
       "<p>"+(fr?"Il manque l'adresse de la source à ajouter.":"The source's address is missing.")+"</p>";
     return;
   }
+  var isAndroid=/android/i.test(navigator.userAgent||"");
   var deep="swipernews://add?url="+encodeURIComponent(url)+(name?"&name="+encodeURIComponent(name):"");
+  var web=location.origin+"/?url="+encodeURIComponent(url)+(name?"&name="+encodeURIComponent(name):"");
   var label=name?('<span class="name">'+escapeHtml(name)+'</span>'):(fr?"cette source":"this source");
   card.innerHTML=
     "<h1>"+(fr?"Ajouter "+label+" à SwiperNews":"Add "+label+" to SwiperNews")+"</h1>"+
-    "<p>"+(fr?"Ouverture de l'app…":"Opening the app…")+"</p>"+
-    '<a class="btn" href="'+escapeHtml(deep)+'">'+(fr?"📲 Ouvrir dans l'app":"📲 Open in the app")+"</a>"+
+    "<p>"+(fr?"Ouverture…":"Opening…")+"</p>"+
+    (isAndroid?'<a class="btn" href="'+escapeHtml(deep)+'">'+(fr?"📲 Ouvrir dans l'app":"📲 Open in the app")+"</a>":"")+
+    '<a class="btn'+(isAndroid?" btn--alt":"")+'" href="'+escapeHtml(web)+'">'+
+      (fr?"🌐 Ouvrir dans SwiperNews (navigateur)":"🌐 Open in SwiperNews (browser)")+"</a>"+
     '<p class="fallback">'+(fr
-      ?"Sur Android, avec SwiperNews installé. Sinon, ajoute la source à la main :"
-      :"On Android, with SwiperNews installed. Otherwise, add the source by hand:")+
+      ?(isAndroid
+        ?"Le premier bouton ouvre l'appli Android si elle est installée. Sinon, utilise le second — ta source s'ajoute automatiquement. À défaut, ajoute-la à la main :"
+        :"Ce bouton ouvre SwiperNews (dans ton navigateur, ou l'app installée) et ajoute ta source automatiquement. À défaut, ajoute-la à la main :")
+      :(isAndroid
+        ?"The first button opens the Android app if it's installed. Otherwise, use the second one — your source is added automatically. Failing that, add it by hand:"
+        :"This button opens SwiperNews (in your browser, or the installed app) and adds your source automatically. Failing that, add it by hand:"))+
       "<code>"+escapeHtml(url)+"</code></p>";
   function escapeHtml(s){return String(s).replace(/[&<>"']/g,function(c){
     return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
@@ -62,8 +78,10 @@
   // rebond interrompait le navigateur en plein chargement — certains
   // navigateurs mobiles ignorent alors la redirection au lieu de proposer
   // d'ouvrir l'app. Le bouton reste le repli fiable dans tous les cas (un
-  // vrai geste utilisateur, jamais bloqué).
-  setTimeout(function(){try{location.replace(deep);}catch(e){}},50);
+  // vrai geste utilisateur, jamais bloqué). Uniquement sur Android : ailleurs,
+  // rien ne sait résoudre swipernews://, et forcer la tentative ne ferait que
+  // gaspiller le battement avant que la personne ne touche le bouton web.
+  if(isAndroid)setTimeout(function(){try{location.replace(deep);}catch(e){}},50);
 })();
 </script>
 </body>
