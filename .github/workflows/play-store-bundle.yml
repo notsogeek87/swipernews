@@ -1,6 +1,8 @@
 name: Play Store AAB
 
-# Build ET publication automatique sur Google Play, canal Tests fermés.
+# Build ET publication automatique sur Google Play — canal choisi à
+# l'exécution (Tests fermés par défaut, ou Tests ouverts/Production sur choix
+# explicite, voir l'input `track` ci-dessous).
 # --track Swipernews, PAS "alpha" : "alpha" est le nom historique de Google
 # pour un canal de tests fermés, mais Play Console a nommé CE canal d'après
 # le nom de l'app au moment de sa création — "alpha" existe bien côté API
@@ -11,6 +13,14 @@ name: Play Store AAB
 # l'historique git de tools/publish_play_store.py) : le nom du canal était
 # simplement faux. Vérifié par un diagnostic tracks.list() ajouté exprès
 # (même fichier) — à relancer si ce canal est un jour renommé ou recréé.
+#
+# Tests ouverts et Production utilisent les noms standard de l'API ("beta",
+# "production") — seul le canal de tests fermés a été renommé par Play
+# Console. Le choix du canal est un INPUT du déclenchement manuel, jamais une
+# valeur par défaut différente de "Swipernews" : Production republie l'app
+# pour tous les utilisateurs réels, donc rien ne doit pouvoir l'atteindre par
+# un lancement inattentif du workflow sans avoir explicitement changé le menu
+# déroulant.
 #
 # Séparé d'android.yml/release.yml : ceux-là produisent des .apk signés de la
 # clé du PROJET (celle que F-Droid vérifie, AllowedAPKSigningKeys). Play
@@ -46,6 +56,15 @@ name: Play Store AAB
 # l'API elle-même, quel que soit le status testé).
 on:
   workflow_dispatch:
+    inputs:
+      track:
+        description: "Canal Google Play visé"
+        type: choice
+        default: Swipernews
+        options:
+          - Swipernews
+          - beta
+          - production
 
 permissions:
   contents: read
@@ -146,7 +165,7 @@ jobs:
       - name: Installe le client Google Play
         run: pip install --quiet google-api-python-client google-auth
 
-      - name: Publie sur Google Play (Tests fermés)
+      - name: Publie sur Google Play (${{ inputs.track }})
         env:
           PLAY_STORE_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
         run: |
@@ -158,4 +177,4 @@ jobs:
           python3 tools/publish_play_store.py \
             --package eu.lielu.news \
             --aab "${{ steps.build.outputs.aab }}" \
-            --track Swipernews
+            --track "${{ inputs.track }}"
