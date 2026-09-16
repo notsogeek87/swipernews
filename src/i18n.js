@@ -49,6 +49,7 @@
       "menu.title": "Menu",
       "menu.stats": "Mon activité",
       "menu.changelog": "Nouveautés",
+      "menu.github": "Code source sur GitHub ↗",
 
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
@@ -489,6 +490,7 @@
       "menu.title": "Menu",
       "menu.stats": "My activity",
       "menu.changelog": "What's new",
+      "menu.github": "Source code on GitHub ↗",
 
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
