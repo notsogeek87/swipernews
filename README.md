@@ -1202,7 +1202,7 @@ Points de conception :
   cas d'échec, l'intégrée reste en service, et un téléchargement raté ne
   dégrade rien (remplacement du cache en une fois, jamais à moitié écrit) ;
 - **télécharger à l'exécution n'est pas redistribuer** : c'est ce qui permet
-  d'utiliser une liste CC BY-SA ou GPL sans changer la licence MIT du dépôt.
+  d'utiliser une liste CC BY-SA ou GPL sans changer la licence GPL-3.0 du dépôt.
   Elle n'entre jamais dans le paquet, seulement dans le cache de l'appareil, et
   la source est créditée dans les réglages. L'embarquer, elle, aurait imposé sa
   licence — c'est pourquoi la liste intégrée reste maison ;
@@ -1465,4 +1465,8 @@ ouvrir la demande d'inclusion sur `gitlab.com/fdroid/fdroiddata`.
 
 ## Licence
 
-MIT
+GNU General Public License v3.0 (GPL-3.0) — voir [`LICENSE`](LICENSE).
+
+Les versions publiées avant ce changement (jusqu'au tag `v1.5.3` inclus) sont restées, et
+demeurent, sous licence MIT pour quiconque les a déjà obtenues : ce changement ne s'applique qu'au
+code publié à partir de maintenant.

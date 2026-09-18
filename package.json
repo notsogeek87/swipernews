@@ -14,7 +14,7 @@
     "android:open": "cap open android",
     "android:assets": "capacitor-assets generate --android"
   },
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "devDependencies": {
     "@capacitor/android": "^8.5.0",
     "@capacitor/app": "^8.1.1",

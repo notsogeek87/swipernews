@@ -23,7 +23,7 @@ soit ensuite rapide à faire manuellement.
   `fastlane/metadata/android/fr-FR/images/phoneScreenshots/` : les deux modes,
   Actus et Apprendre. F-Droid en demande au moins une.
 - **Le tag `v1.3.0`**, posé sur le `main` publié.
-- Licence MIT, permission Android unique (`INTERNET`), aucune dépendance
+- Licence GPL-3.0, permission Android unique (`INTERNET`), aucune dépendance
   Google Play Services / Firebase / SDK propriétaire — l'app remplit déjà les
   critères de base d'inclusion (logiciel libre, buildable sans service tiers
   non libre pour la compilation elle-même).

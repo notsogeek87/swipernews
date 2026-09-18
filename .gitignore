@@ -11,3 +11,11 @@ www/
 
 # Configuration workspace Android Studio, locale à la machine
 .idea/
+
+# Clé de signature Android : le README explique comment en générer une avec
+# `keytool -genkey -v -keystore release.keystore …` depuis la racine du dépôt
+# (section « Signature ») — sans cette règle, un tel fichier atterrirait ici et
+# risquerait d'être ajouté par un `git add` large. La CI, elle, ne lit la clé
+# que depuis les secrets (ANDROID_KEYSTORE_BASE64), jamais du disque versionné.
+*.jks
+*.keystore

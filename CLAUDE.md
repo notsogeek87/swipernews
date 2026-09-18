@@ -156,7 +156,7 @@ roulante sur `staging`.
 doit rester équivalente à `android.yml`, sans dépendre de GitHub Actions.
 Conséquence pratique : **tout ce qui est nécessaire au build doit venir des
 sources**, ce qui interdit d'embarquer quoi que ce soit sous une licence
-incompatible avec le MIT (voir « décisions à ne pas défaire »).
+incompatible avec la GPL-3.0 (voir « décisions à ne pas défaire »).
 
 La demande d'inclusion (`fdroiddata!44729`) est **ouverte, en cours de revue** —
 rien n'est encore publié chez eux. La recette vise `AutoUpdateMode: Version` :
@@ -729,8 +729,10 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   « ne marche pas » à qui n'a rien demandé.
 - **Les listes de blocage sont téléchargées, jamais embarquées.** Télécharger à
   l'exécution n'est pas redistribuer : c'est ce qui permet d'utiliser EasyList
-  (CC BY-SA / GPL) sans changer la licence MIT du dépôt. Rien n'est téléchargé
-  tant que l'utilisateur n'a pas choisi une source.
+  (CC BY-SA / GPL) sans changer la licence GPL-3.0 du dépôt — CC BY-SA reste
+  incompatible avec la GPL, donc la distinction embarqué/téléchargé continue de
+  compter même à licence de projet inchangée sur ce point. Rien n'est
+  téléchargé tant que l'utilisateur n'a pas choisi une source.
 - **Le mode lecture ne touche pas aux pages de connexion** (`input[type=
   password]` ou URL évocatrice) : sans ça, plus de champ à remplir et plus
   d'autoremplissage possible sur les sites sur abonnement.
