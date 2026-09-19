@@ -54,6 +54,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v266.item1":
+        "📱 Corrige une grande bande noire en bas des cartes sur iPhone installée en PWA (bug iOS entre la barre d'état colorée et la hauteur d'écran).",
       "changelog.v265.item1":
         "📱 Sur iPhone installée en PWA, la barre d'état reprend maintenant les couleurs de l'app au lieu de rester blanche, et l'écran d'accueil affiche le bon nom court.",
       "changelog.v263.item1":
@@ -497,6 +499,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v266.item1":
+        "📱 Fixed a large black band at the bottom of cards on iPhone installed as a PWA (an iOS quirk between the colored status bar and screen height).",
       "changelog.v265.item1":
         "📱 On iPhone installed as a PWA, the status bar now takes on the app's colors instead of staying white, and the home screen shows the right short name.",
       "changelog.v263.item1":

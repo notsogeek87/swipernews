@@ -125,7 +125,7 @@
   /* position:relative — les cartes sont ainsi positionnées PAR RAPPORT au fil,
      donc card.offsetTop donne directement l'offset dans le contenu défilable
      (c'est ce qui sert à repérer la carte courante et à restaurer la position). */
-  #feed{height:100vh;height:100dvh;width:100%;overflow-y:scroll;scroll-snap-type:y mandatory;
+  #feed{height:100vh;height:100dvh;height:var(--card-h,100dvh);width:100%;overflow-y:scroll;scroll-snap-type:y mandatory;
     -webkit-overflow-scrolling:touch;scrollbar-width:none;position:relative}
   #feed::-webkit-scrollbar{display:none}
 
@@ -133,7 +133,7 @@
      images de fond pour les cartes hors écran. Sans cela, un fil de 120 cartes
      plein écran garde 120 images décodées en mémoire GPU.
      contain-intrinsic-size évite l'effondrement de la hauteur de défilement. */
-  .card{height:100vh;height:100dvh;width:100%;scroll-snap-align:start;scroll-snap-stop:always;
+  .card{height:100vh;height:100dvh;height:var(--card-h,100dvh);width:100%;scroll-snap-align:start;scroll-snap-stop:always;
     position:relative;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;
     content-visibility:auto;contain-intrinsic-size:auto 100vh;contain-intrinsic-size:auto 100dvh}
   /* Carte de fin PROVISOIRE, ajoutée par renderLoadMoreCard() tant que loadMore()
@@ -1340,6 +1340,30 @@
     .brand__text .ch::after,.brand__text .caret{display:none}
   }
 </style>
+<script>
+  /* Filet pour un bug WebKit connu : en PWA iOS installée (standalone) avec
+     viewport-fit=cover + apple-mobile-web-app-status-bar-style=black-translucent
+     (nécessaire pour passer le contenu SOUS la barre d'état, voir plus haut),
+     `100dvh` peut se résoudre sur le viewport « sûr » (hors zone de la barre
+     d'accueil du bas, ~59px de moins) plutôt que sur le vrai plein écran que
+     viewport-fit=cover livre à la page — laissant une bande noire non peinte
+     en bas de chaque carte, `window.innerHeight` restant lui correct. Posé en
+     tête de <body>, AVANT tout layout, pour éviter un sursaut visuel ; ne
+     touche `--card-h` que sur iOS standalone, où le bug est mesuré — ailleurs
+     `var(--card-h,100dvh)` retombe sur 100dvh, comportement inchangé. */
+  (function () {
+    var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    var standalone =
+      window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
+    if (!isIos || !standalone) return;
+    var setH = function () {
+      document.documentElement.style.setProperty("--card-h", window.innerHeight + "px");
+    };
+    setH();
+    addEventListener("resize", setH);
+    addEventListener("orientationchange", setH);
+  })();
+</script>
 </head>
 <body>
 
@@ -1767,9 +1791,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=260"></script>
-<script src="src/learn-core.js?v=254"></script>
-<script src="src/i18n.js?v=262"></script>
+<script src="src/lib.js?v=261"></script>
+<script src="src/learn-core.js?v=255"></script>
+<script src="src/i18n.js?v=263"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2822,7 +2846,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="265";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="266";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2833,6 +2857,8 @@ const APP_VERSION="265";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:266,date:"2026-09-19",items:[
+    "changelog.v266.item1"]},
   {v:265,date:"2026-09-19",items:[
     "changelog.v265.item1"]},
   {v:263,date:"2026-09-16",items:[
