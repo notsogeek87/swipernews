@@ -54,6 +54,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v265.item1":
+        "📱 Sur iPhone installée en PWA, la barre d'état reprend maintenant les couleurs de l'app au lieu de rester blanche, et l'écran d'accueil affiche le bon nom court.",
       "changelog.v263.item1":
         "📱 Correctif : sur un écran large déplié (pliant, tablette) en paysage, l'app pouvait à tort demander de repasser en portrait.",
       "changelog.v262.item1":
@@ -495,6 +497,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v265.item1":
+        "📱 On iPhone installed as a PWA, the status bar now takes on the app's colors instead of staying white, and the home screen shows the right short name.",
       "changelog.v263.item1":
         "📱 Fix: on a large unfolded screen (foldable, tablet) in landscape, the app could wrongly ask to switch back to portrait.",
       "changelog.v262.item1":
