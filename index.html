@@ -1813,9 +1813,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=262"></script>
-<script src="src/learn-core.js?v=256"></script>
-<script src="src/i18n.js?v=264"></script>
+<script src="src/lib.js?v=263"></script>
+<script src="src/learn-core.js?v=257"></script>
+<script src="src/i18n.js?v=265"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2868,7 +2868,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="267";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="268";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2978,7 +2978,29 @@ let systopPx=0;
 function renderAbout(){
   const el=document.getElementById("about");
   if(!el||!window.__aboutReady)return;
-  el.textContent=T("about.version",{v:APP_VERSION});
+  let txt=T("about.version",{v:APP_VERSION});
+  /* Diagnostic TEMPORAIRE (à retirer une fois la bande noire en bas des
+     cartes confirmée réglée sur iPhone) : aucun Mac pour brancher le
+     Web Inspector sur une PWA installée, donc pas d'autre moyen de savoir ce
+     que le device calcule réellement pour --card-h/env(safe-area-inset-bottom)
+     que de l'écrire quelque part de consultable — ici, au pied du panneau
+     Réglages, déjà atteignable dans l'app installée sans barre d'URL. */
+  if(
+    /iphone|ipad|ipod/i.test(navigator.userAgent) &&
+    (matchMedia("(display-mode: standalone)").matches || navigator.standalone)
+  ) {
+    const probe=document.createElement("div");
+    probe.style.cssText="position:fixed;bottom:0;left:0;height:env(safe-area-inset-bottom);width:1px;pointer-events:none;opacity:0";
+    document.body.appendChild(probe);
+    const sab=probe.getBoundingClientRect().height;
+    probe.remove();
+    const card=document.querySelector(".card");
+    const vv=window.visualViewport&&window.visualViewport.height;
+    txt+=` · dbg ih=${window.innerHeight} vv=${vv?Math.round(vv):"–"} `+
+      `ch=${getComputedStyle(document.documentElement).getPropertyValue("--card-h")||"–"} `+
+      `cardH=${card?Math.round(card.getBoundingClientRect().height):"–"} sab=${Math.round(sab)}`;
+  }
+  el.textContent=txt;
 }
 function setSystop(px){
   systopPx=Math.max(0,Math.min(120,Math.round(px)||0));
