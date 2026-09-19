@@ -1347,29 +1347,29 @@
      `100dvh` peut se résoudre sur le viewport « sûr » (hors zone de la barre
      d'accueil du bas, ~59px de moins) plutôt que sur le vrai plein écran que
      viewport-fit=cover livre à la page — laissant une bande noire non peinte
-     en bas de chaque carte, `window.innerHeight` restant lui correct. Posé en
-     tête de <body>, AVANT tout layout, pour éviter un sursaut visuel ; ne
-     touche `--card-h` que sur iOS standalone, où le bug est mesuré — ailleurs
-     `var(--card-h,100dvh)` retombe sur 100dvh, comportement inchangé. */
+     en bas de chaque carte. `window.innerHeight`/`visualViewport.height`
+     SE SONT AUSSI mesurés fautifs sur un device réel (diagnostic embarqué au
+     pied du panneau Réglages) : les deux rendent la MÊME valeur, plus petite
+     que l'écran d'un montant qui correspond à la barre d'état — ils partagent
+     donc le bug de 100dvh au lieu de le contourner. `window.screen.height`
+     (la résolution CSS du device, jamais recalculée par le viewport) sert de
+     repère indépendant, pris seulement s'il DÉPASSE les deux autres : sur les
+     appareils où innerHeight/visualViewport sont bons, screen.height ne peut
+     que les égaler ou les dépasser légèrement (barres d'outils système), donc
+     ce plus grand des trois ne peut jamais SOUS-dimensionner une carte.
+     Posé en tête de <body>, AVANT tout layout, pour éviter un sursaut visuel ;
+     ne touche `--card-h` que sur iOS standalone, où le bug est mesuré —
+     ailleurs `var(--card-h,100dvh)` retombe sur 100dvh, comportement inchangé. */
   (function () {
     var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
     var standalone =
       window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
     if (!isIos || !standalone) return;
-    /* window.innerHeight n'est pas fiable dès CE tick : au lancement à froid
-       d'une PWA iOS, le moteur n'a pas encore « exercé » le viewport dynamique
-       — la première lecture peut retomber sur le même viewport « sûr » que
-       100dvh, le bug qu'on corrige. On mesure tout de suite (pour limiter le
-       sursaut visuel), puis on RE-mesure à plusieurs moments qui suivent tous
-       une vraie passe de layout : deux frames plus tard, à `load`, au retour
-       de suspension (pageshow/visibilitychange) — c'est celui-ci qui compte
-       le plus, une PWA iOS étant généralement SUSPENDUE et non relancée à
-       froid en la rouvrant depuis l'écran d'accueil. visualViewport.height
-       est pris en plus de innerHeight (le plus grand des deux) : sur certains
-       relevés c'est lui qui reflète le plein cadre en premier. */
     var setH = function () {
       const vv = window.visualViewport && window.visualViewport.height;
-      const h = Math.max(window.innerHeight, vv || 0);
+      const landscape = window.matchMedia("(orientation: landscape)").matches;
+      const sh = window.screen && (landscape ? window.screen.width : window.screen.height);
+      const h = Math.max(window.innerHeight, vv || 0, sh || 0);
       document.documentElement.style.setProperty("--card-h", h + "px");
     };
     setH();
@@ -1813,9 +1813,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=263"></script>
-<script src="src/learn-core.js?v=257"></script>
-<script src="src/i18n.js?v=265"></script>
+<script src="src/lib.js?v=264"></script>
+<script src="src/learn-core.js?v=258"></script>
+<script src="src/i18n.js?v=266"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2868,7 +2868,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="268";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="269";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2996,7 +2996,8 @@ function renderAbout(){
     probe.remove();
     const card=document.querySelector(".card");
     const vv=window.visualViewport&&window.visualViewport.height;
-    txt+=` · dbg ih=${window.innerHeight} vv=${vv?Math.round(vv):"–"} `+
+    const sh=window.screen&&window.screen.height;
+    txt+=` · dbg ih=${window.innerHeight} vv=${vv?Math.round(vv):"–"} sh=${sh||"–"} `+
       `ch=${getComputedStyle(document.documentElement).getPropertyValue("--card-h")||"–"} `+
       `cardH=${card?Math.round(card.getBoundingClientRect().height):"–"} sab=${Math.round(sab)}`;
   }
