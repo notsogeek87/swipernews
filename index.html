@@ -125,7 +125,7 @@
   /* position:relative — les cartes sont ainsi positionnées PAR RAPPORT au fil,
      donc card.offsetTop donne directement l'offset dans le contenu défilable
      (c'est ce qui sert à repérer la carte courante et à restaurer la position). */
-  #feed{height:100vh;height:100dvh;height:var(--card-h,100dvh);width:100%;overflow-y:scroll;scroll-snap-type:y mandatory;
+  #feed{height:100vh;height:100dvh;width:100%;overflow-y:scroll;scroll-snap-type:y mandatory;
     -webkit-overflow-scrolling:touch;scrollbar-width:none;position:relative}
   #feed::-webkit-scrollbar{display:none}
 
@@ -133,7 +133,7 @@
      images de fond pour les cartes hors écran. Sans cela, un fil de 120 cartes
      plein écran garde 120 images décodées en mémoire GPU.
      contain-intrinsic-size évite l'effondrement de la hauteur de défilement. */
-  .card{height:100vh;height:100dvh;height:var(--card-h,100dvh);width:100%;scroll-snap-align:start;scroll-snap-stop:always;
+  .card{height:100vh;height:100dvh;width:100%;scroll-snap-align:start;scroll-snap-stop:always;
     position:relative;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;
     content-visibility:auto;contain-intrinsic-size:auto 100vh;contain-intrinsic-size:auto 100dvh}
   /* Carte de fin PROVISOIRE, ajoutée par renderLoadMoreCard() tant que loadMore()
@@ -482,6 +482,27 @@
   @media (pointer:coarse) and (max-width:560px){
     @media (display-mode:standalone),(display-mode:fullscreen),(display-mode:minimal-ui){
       :root{--systop-min:34px}
+      /* `.rail` (bookmark/partager) est en position:fixed avec un simple
+         `bottom:…`, sans jamais déclarer de hauteur : son cadre de référence
+         est donc TOUJOURS le vrai viewport, tel que le navigateur le calcule
+         pour le positionnement fixe — jamais 100dvh/100vh, dont la valeur
+         résolue peut diverger de ce cadre sur une PWA iOS standalone (mesuré
+         sur device : bouton d'ouverture de carte visiblement décalé du rail,
+         alors que les deux visent le même 44px + safe-area-inset-bottom).
+         Plutôt que deviner la bonne mesure en JS (tenté et insuffisant :
+         window.innerHeight, visualViewport.height ET window.screen.height se
+         sont chacun révélés faux ou excessifs selon le moment), on fait
+         partager à #feed le MÊME mécanisme que .rail : figé en position:fixed
+         sur les quatre bords du viewport (inset:0), sa hauteur RÉELLE — jamais
+         une valeur en dvh/vh — découle alors de ce cadrage, comme celle du
+         rail. .card passe à height:100% (du parent #feed ainsi calé, pas du
+         viewport) pour hériter cette même valeur sans reformuler le problème
+         en vh/dvh. Étendu jusqu'à height:100% : `justify-content:flex-end`
+         (voir .card) continue d'ancrer .card__body en bas, donc son bouton
+         d'ouverture retombe exactement sur le bord bas du rail, par
+         construction plutôt que par coïncidence de mesure. */
+      #feed{position:fixed;inset:0;height:auto}
+      .card{height:100%}
     }
   }
   /* Second filet, posé par majPleinEcran() : `display-mode` ne suffit pas. Un
@@ -1340,52 +1361,6 @@
     .brand__text .ch::after,.brand__text .caret{display:none}
   }
 </style>
-<script>
-  /* Filet pour un bug WebKit connu : en PWA iOS installée (standalone) avec
-     viewport-fit=cover + apple-mobile-web-app-status-bar-style=black-translucent
-     (nécessaire pour passer le contenu SOUS la barre d'état, voir plus haut),
-     `100dvh` peut se résoudre sur le viewport « sûr » (hors zone de la barre
-     d'accueil du bas, ~59px de moins) plutôt que sur le vrai plein écran que
-     viewport-fit=cover livre à la page — laissant une bande noire non peinte
-     en bas de chaque carte. `window.innerHeight`/`visualViewport.height`
-     SE SONT AUSSI mesurés fautifs sur un device réel (diagnostic embarqué au
-     pied du panneau Réglages) : les deux rendent la MÊME valeur, plus petite
-     que l'écran d'un montant qui correspond à la barre d'état — ils partagent
-     donc le bug de 100dvh au lieu de le contourner. `window.screen.height`
-     (la résolution CSS du device, jamais recalculée par le viewport) sert de
-     repère indépendant, pris seulement s'il DÉPASSE les deux autres : sur les
-     appareils où innerHeight/visualViewport sont bons, screen.height ne peut
-     que les égaler ou les dépasser légèrement (barres d'outils système), donc
-     ce plus grand des trois ne peut jamais SOUS-dimensionner une carte.
-     Posé en tête de <body>, AVANT tout layout, pour éviter un sursaut visuel ;
-     ne touche `--card-h` que sur iOS standalone, où le bug est mesuré —
-     ailleurs `var(--card-h,100dvh)` retombe sur 100dvh, comportement inchangé. */
-  (function () {
-    var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    var standalone =
-      window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
-    if (!isIos || !standalone) return;
-    var setH = function () {
-      const vv = window.visualViewport && window.visualViewport.height;
-      const landscape = window.matchMedia("(orientation: landscape)").matches;
-      const sh = window.screen && (landscape ? window.screen.width : window.screen.height);
-      const h = Math.max(window.innerHeight, vv || 0, sh || 0);
-      document.documentElement.style.setProperty("--card-h", h + "px");
-    };
-    setH();
-    requestAnimationFrame(() => requestAnimationFrame(setH));
-    addEventListener("load", setH);
-    addEventListener("pageshow", setH);
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") setH();
-    });
-    addEventListener("resize", setH);
-    addEventListener("orientationchange", () => {
-      setTimeout(setH, 50);
-      setTimeout(setH, 300);
-    });
-  })();
-</script>
 </head>
 <body>
 
@@ -1813,9 +1788,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=264"></script>
-<script src="src/learn-core.js?v=258"></script>
-<script src="src/i18n.js?v=266"></script>
+<script src="src/lib.js?v=265"></script>
+<script src="src/learn-core.js?v=259"></script>
+<script src="src/i18n.js?v=267"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2868,7 +2843,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="269";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="270";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2979,27 +2954,29 @@ function renderAbout(){
   const el=document.getElementById("about");
   if(!el||!window.__aboutReady)return;
   let txt=T("about.version",{v:APP_VERSION});
-  /* Diagnostic TEMPORAIRE (à retirer une fois la bande noire en bas des
-     cartes confirmée réglée sur iPhone) : aucun Mac pour brancher le
-     Web Inspector sur une PWA installée, donc pas d'autre moyen de savoir ce
-     que le device calcule réellement pour --card-h/env(safe-area-inset-bottom)
-     que de l'écrire quelque part de consultable — ici, au pied du panneau
-     Réglages, déjà atteignable dans l'app installée sans barre d'URL. */
+  /* Diagnostic TEMPORAIRE (à retirer une fois l'alignement rail/bouton
+     confirmé sur iPhone) : aucun Mac pour brancher le Web Inspector sur une
+     PWA installée, donc pas d'autre moyen de vérifier que le bord bas du
+     bouton d'ouverture de carte tombe bien sur celui du rail (bookmark/
+     partager) que de l'écrire quelque part de consultable — ici, au pied du
+     panneau Réglages, déjà atteignable dans l'app installée sans barre
+     d'URL. Compare les deux bords RÉELLEMENT rendus plutôt que des mesures de
+     viewport (ih/vv/screen.height se sont chacune révélées trompeuses à un
+     moment ou un autre sur ce device). */
   if(
     /iphone|ipad|ipod/i.test(navigator.userAgent) &&
     (matchMedia("(display-mode: standalone)").matches || navigator.standalone)
   ) {
-    const probe=document.createElement("div");
-    probe.style.cssText="position:fixed;bottom:0;left:0;height:env(safe-area-inset-bottom);width:1px;pointer-events:none;opacity:0";
-    document.body.appendChild(probe);
-    const sab=probe.getBoundingClientRect().height;
-    probe.remove();
     const card=document.querySelector(".card");
-    const vv=window.visualViewport&&window.visualViewport.height;
-    const sh=window.screen&&window.screen.height;
-    txt+=` · dbg ih=${window.innerHeight} vv=${vv?Math.round(vv):"–"} sh=${sh||"–"} `+
-      `ch=${getComputedStyle(document.documentElement).getPropertyValue("--card-h")||"–"} `+
-      `cardH=${card?Math.round(card.getBoundingClientRect().height):"–"} sab=${Math.round(sab)}`;
+    const openBtn=card&&card.querySelector(".card__open");
+    const rail=document.getElementById("rail");
+    const feed=document.getElementById("feed");
+    const openBottom=openBtn?openBtn.getBoundingClientRect().bottom:null;
+    const railBottom=rail?rail.getBoundingClientRect().bottom:null;
+    txt+=` · dbg feedH=${feed?Math.round(feed.getBoundingClientRect().height):"–"} `+
+      `cardH=${card?Math.round(card.getBoundingClientRect().height):"–"} `+
+      `openB=${openBottom!=null?Math.round(openBottom):"–"} railB=${railBottom!=null?Math.round(railBottom):"–"} `+
+      `delta=${(openBottom!=null&&railBottom!=null)?Math.round(openBottom-railBottom):"–"}`;
   }
   el.textContent=txt;
 }
