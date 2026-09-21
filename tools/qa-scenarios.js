@@ -986,10 +986,23 @@ const scenarios = {
     await browser.close();
   },
 
-  /* 19. Le rafraîchissement des 30 minutes se déclenche-t-il tout seul ?
-     Horloge SIMULÉE : Date.now(), setInterval et setTimeout suivent le temps
-     qu'on avance à la main, donc le filet périodique et le seuil de fraîcheur
-     jouent leur vraie partition, sans attendre une demi-heure. */
+  /* 19. Le rafraîchissement des 30 minutes se déclenche-t-il tout seul ? Et
+     ne saute-t-il pas directement d'un article à un autre sous le doigt de
+     l'utilisateur ? Horloge SIMULÉE : Date.now(), setInterval et setTimeout
+     suivent le temps qu'on avance à la main, donc le filet périodique et le
+     seuil de fraîcheur jouent leur vraie partition, sans attendre une
+     demi-heure.
+     L'app n'a ici JAMAIS été tuée (`sameFeed` : la clé n'a pas changé, le fil
+     est encore en mémoire) — contrairement à une réouverture après un vrai
+     redémarrage (cache disque, voir `lentnews`/`teteouverture`), qui, elle,
+     passait déjà par l'écran de chargement. Avant correctif, ce cas-ci ne
+     passait PAS par lui : la vieille carte restait affichée jusqu'au
+     remplacement en un instant par le lot neuf — le sursaut remonté par un
+     utilisateur (« je lis un article, et op, il est remplacé par un
+     autre »). Le rendu est donc surveillé (wrapper sur `render`, pas un
+     minutage réel) pour vérifier qu'un passage à zéro carte (l'écran de
+     chargement) a bien lieu ENTRE la dernière carte périmée et la première
+     carte neuve. */
   async autorefresh() {
     const lot = (prefixe, n, ageMin) =>
       '<?xml version="1.0"?><rss><channel>' +
@@ -1036,10 +1049,29 @@ const scenarios = {
     await page.clock.runFor(25 * 60 * 1000);
     await page.waitForTimeout(1500);
     console.log(`t+25min  ${requetes} requêtes  ${await etat()}   ← doit être INCHANGÉ`);
+    // Surveille le passage par l'écran de chargement (0 carte) pendant le
+    // franchissement du seuil, plutôt que d'attraper l'instant au vol : le
+    // rendu qui vide le fil et celui qui le repeuple peuvent survenir dans le
+    // même tick simulé, invisible à un simple sondage entre deux `waitForTimeout`.
+    await page.evaluate(() => {
+      window.__renders = [];
+      const orig = window.render;
+      window.render = function (...a) {
+        const r = orig.apply(this, a);
+        window.__renders.push(items.length);
+        return r;
+      };
+    });
     await page.clock.runFor(6 * 60 * 1000);
     await page.waitForTimeout(2500);
+    const renders = await page.evaluate(() => window.__renders);
+    const vide = renders.some((n) => n === 0);
     console.log(
       `t+31min  ${requetes} requêtes  ${await etat()}   ← doit s'être RAFRAÎCHI`
+    );
+    console.log(
+      `écran de chargement pendant la transition : ${vide ? "oui ✓" : "NON — sursaut, l'ancien article reste jusqu'au remplacement brutal"}` +
+        `  (rendus : ${renders.join(",")})`
     );
     await browser.close();
   },

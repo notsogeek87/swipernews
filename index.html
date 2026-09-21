@@ -1788,9 +1788,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=265"></script>
-<script src="src/learn-core.js?v=259"></script>
-<script src="src/i18n.js?v=267"></script>
+<script src="src/lib.js?v=266"></script>
+<script src="src/learn-core.js?v=260"></script>
+<script src="src/i18n.js?v=268"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2843,7 +2843,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="270";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="271";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2854,6 +2854,8 @@ const APP_VERSION="270";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:271,date:"2026-09-21",items:[
+    "changelog.v271.item1"]},
   {v:266,date:"2026-09-19",items:[
     "changelog.v266.item1"]},
   {v:265,date:"2026-09-19",items:[
@@ -4188,16 +4190,25 @@ async function loadFeeds(force){
   // en cours de lecture.
   let cached=sameFeed?null:cacheLoad(key);
   let cacheAge=cached?Date.now()-cacheTime(key):0;
-  /* Périmé PAR L'ÂGE, détecté ICI, avant toute peinture : peindre un cache
-     qu'on sait déjà au-delà du seuil ferait apparaître la vieille carte une
-     fraction de seconde avant que le lot neuf ne la remplace d'un coup — deux
-     cartes perçues comme un sursaut, précisément le cas « ouverture après
-     30 min ». Le traiter comme absent (`cached=null`) réutilise tel quel le
-     chemin juste en dessous (écran de chargement), au lieu d'une repeinture
-     bruyante suivie d'un remplacement. `force` (↻ explicite) garde son
-     comportement inchangé : peindre puis remplacer, l'action vient de
-     l'utilisateur donc rien ne le surprend. */
+  // Âge du fil déjà EN MÉMOIRE (app jamais tuée, seulement mise en
+  // arrière-plan — le cas ordinaire d'une réouverture) : même notion que
+  // `cacheAge`, pour la même décision juste en dessous.
+  const sameFeedAge=sameFeed?Date.now()-lastNewsLoad:0;
+  /* Périmé PAR L'ÂGE, détecté ICI, avant toute peinture : peindre un cache —
+     ou laisser voir le fil déjà en mémoire — qu'on sait déjà au-delà du seuil
+     ferait apparaître (ou rester) la vieille carte jusqu'à ce que le lot neuf
+     la remplace d'un coup — un sursaut, précisément le cas « ouverture après
+     30 min », que le fil vienne du cache disque (cold start, `cached`) ou
+     soit resté en mémoire (reprise depuis l'arrière-plan, `sameFeed` — celui
+     qu'un utilisateur d'app a fini par signaler : « je lis un article, et
+     op, il est remplacé par un autre »). Les deux sont donc traités comme
+     absents (`cached=null` / vidage plus bas), qui réutilisent le même
+     chemin — écran de chargement — au lieu d'une repeinture bruyante suivie
+     d'un remplacement. `force` (↻ explicite) garde son comportement
+     inchangé : peindre puis remplacer, l'action vient de l'utilisateur donc
+     rien ne le surprend. */
   if(cached&&!force&&cacheAge>=AUTO_RELOAD_MS){cached=null;cacheAge=0;}
+  const sameFeedStale=sameFeed&&!force&&sameFeedAge>=AUTO_RELOAD_MS;
   /* Le cache ne peint que VITE : il n'a pas à décider si le fil se charge. Tout
      ce qui échoue ici est donc rattrapé, et le chargement réseau suit quand
      même — c'est la seule chose qui garantit qu'aucune donnée locale, quelle
@@ -4211,9 +4222,11 @@ async function loadFeeds(force){
     try{adoptItems(cached);render();hideStates();feedKeyShown=key;}
     catch(e){warn("cache paint",e);cached=null;}
   }
-  if(!cached&&!sameFeed){
-    // On change de fil sans cache : vider explicitement. L'écran de chargement
-    // est transparent, il ne masquerait pas les cartes du fil précédent.
+  if((!cached&&!sameFeed)||sameFeedStale){
+    // On change de fil sans cache, OU le fil déjà affiché est périmé : vider
+    // explicitement plutôt que de le laisser à l'écran jusqu'au remplacement
+    // brutal par le lot neuf. L'écran de chargement est transparent, il ne
+    // masquerait pas les cartes d'un fil qui, lui, reste à jour.
     newsItems=[];learnItems=[];items=[];render();show("loading");
   }
   /* Fraîcheur : UNE seule décision, pour les DEUX moitiés.
@@ -4227,7 +4240,7 @@ async function loadFeeds(force){
      Le tirage neuf écarte ce qui est déjà vu (dropSeen, mémoire persistante) :
      un fil rafraîchi est donc réellement neuf, pas un nouveau tirage au hasard
      dans ce qu'on vient de lire. */
-  const age=cached?cacheAge:Date.now()-lastNewsLoad;
+  const age=cached?cacheAge:sameFeedAge;
   const perime=!!force||!(cached||sameFeed)||age>=AUTO_RELOAD_MS;
   /* Reprise de lecture : elle ne vaut QUE dans la fenêtre de fraîcheur.
      Rouvrir l'app avant AUTO_RELOAD_MS ne déclenche aucun appel réseau, le fil
@@ -4244,7 +4257,13 @@ async function loadFeeds(force){
      reste mutualisé : c'est le cas le plus fréquent (chaque lancement d'app),
      et lui faire manquer le cache CDN ralentirait tout le monde pour rien. */
   loadLearnPart(my,key,perime,0,!!force);
-  loadNewsPart(my,key,perime,cached,sameFeed);
+  // `sameFeed` dit ici : « ce qui est affiché EN CE MOMENT appartient à ce
+  // fil » — faux dès qu'on vient de le vider pour l'écran de chargement
+  // (`sameFeedStale`), sous peine de laisser croire à un échec total qu'il
+  // reste un fil à l'écran (toast « resté ancien ») alors qu'il n'y a plus
+  // qu'un écran de chargement à sortir de son silence (voir showEmpty juste
+  // en dessous du même test, côté loadNewsPart).
+  loadNewsPart(my,key,perime,cached,sameFeed&&!sameFeedStale);
 }
 
 /* Délais des tentatives automatiques après un premier échec (news ET learn) :

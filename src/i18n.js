@@ -54,6 +54,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v271.item1":
+        "🔄 Réouvrir l'app après une longue pause ne fait plus disparaître d'un coup l'article en cours : un écran de chargement s'affiche le temps que le fil neuf soit prêt.",
       "changelog.v266.item1":
         "📱 Corrige une grande bande noire en bas des cartes sur iPhone installée en PWA (bug iOS entre la barre d'état colorée et la hauteur d'écran).",
       "changelog.v265.item1":
@@ -499,6 +501,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v271.item1":
+        "🔄 Reopening the app after a long pause no longer swaps out the article you were on all at once: a loading screen shows while the fresh feed gets ready.",
       "changelog.v266.item1":
         "📱 Fixed a large black band at the bottom of cards on iPhone installed as a PWA (an iOS quirk between the colored status bar and screen height).",
       "changelog.v265.item1":

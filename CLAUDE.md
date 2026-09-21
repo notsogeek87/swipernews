@@ -756,6 +756,25 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   `perime` est vrai, AVANT la peinture du cache : le défaire après coup
   repositionnait sur l'ancien article pour le quitter d'un saut une seconde plus
   tard (voir §2.3 de `AUDIT-ROBUSTESSE-2026-08.md`).
+  **Le fil PÉRIMÉ ne doit jamais rester à l'écran jusqu'au remplacement.**
+  `loadFeeds` traitait déjà un cache disque périmé comme absent (repeint via
+  l'écran de chargement plutôt que peint puis remplacé), mais seulement pour
+  le cache — pas pour le fil déjà EN MÉMOIRE (`sameFeed` : l'app n'a jamais
+  été tuée, juste mise en arrière-plan, ce qui est le cas ORDINAIRE d'une
+  réouverture). Ce chemin-là laissait l'ancienne carte à l'écran jusqu'au
+  remplacement brutal par le lot neuf — remonté par un utilisateur : « je lis
+  un article, et op, il est remplacé par un autre ». `sameFeedStale` (même
+  seuil `AUTO_RELOAD_MS`, même exception `force`) applique désormais le même
+  traitement aux deux : vidé et montré via l'écran de chargement, jamais
+  laissé en place à se faire remplacer sous le doigt. Contrepartie
+  obligatoire côté `loadNewsPart` : `sameFeed` y devient faux dans ce cas
+  (`sameFeed&&!sameFeedStale`), sinon un échec total après le vidage
+  affichait un toast « resté ancien » sur un écran de chargement resté
+  bloqué pour de bon, au lieu de `showEmpty()`. Vérifié par `autorefresh`
+  (surveille un passage à zéro carte pendant la transition, pas seulement le
+  nombre de requêtes) et par le reste du banc, qui ne bouge pas — c'est
+  précisément le même chemin (écran de chargement) qu'un premier lancement
+  sans cache, déjà emprunté partout ailleurs.
 - **Les DEUX moitiés du fil partagent une seule décision de fraîcheur**
   (`perime`, calculé dans `loadFeeds`) : passé `AUTO_RELOAD_MS`, actus ET
   Wikipédia repartent ensemble. Wikipédia avait sa règle à part (« jamais
