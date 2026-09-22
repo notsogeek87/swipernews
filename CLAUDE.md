@@ -848,6 +848,31 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   Contrepartie ASSUMÉE de la réservation : si les actus se la réservent puis
   échouent toutes, personne ne remonte en tête pour ce chargement — ce qui est
   le bon comportement, rien de neuf n'étant arrivé côté actus.
+  **La réservation du jeton NE SUFFIT PAS à empêcher la carte VISIBLE de
+  changer.** Elle protège le SAUT de défilement (`top`), pas le CONTENU de
+  `items[0]` — `remix()` interlace toujours `newsItems`/`learnItems` tels
+  qu'ils sont AU MOMENT du rendu, réservation ou non. Sur un renouvellement où
+  rien n'est encore affiché, Wikipédia (UNE requête) répond quasi toujours
+  avant les actus (plusieurs flux RSS) : sa repeinture peint alors la
+  première carte avec `newsItems` encore vide, donc un article Wikipédia en
+  position 0 — et dès que les actus répondent, souvent moins d'une seconde
+  après, `remix()` REFAIT le mélange avec des actus cette fois, qui prennent
+  la position 0 par construction (voir le tri « tête par la date la plus
+  récente » plus haut). Résultat, sous les yeux de l'utilisateur : un
+  article, puis un autre à sa place en moins d'une seconde — remonté ainsi :
+  « je vois un article, et même pas 1 s après, un autre arrive ». Rien à voir
+  avec la fraîcheur du fil (l'entrée juste au-dessus) : ça arrivait aussi sur
+  un chargement tout neuf, sans aucun cache en jeu. `loadLearnPart` retient
+  donc sa PREMIÈRE révélation d'un renouvellement (rien affiché à l'écran)
+  tant que les actus sont dans la course pour la tête (`teteReservee===my`)
+  et n'ont pas conclu leur première tentative (`!newsSettled`) — borné par
+  `HEAD_COORD_MS` (court, et PAS `NEWS_DEADLINE_MS` : il ne s'agit que de
+  laisser une chance aux actus de répondre en premier, pas d'attendre leur
+  diversité ni leur budget complet) pour ne jamais faire attendre Wikipédia
+  plus d'un instant sur un réseau mort côté actus ou une dose sans actus
+  actives. Une repeinture d'APPOINT, un ↻ explicite (rien n'est vidé, donc
+  jamais « rien affiché ») ou un chargement où quelque chose est déjà visible
+  ne patientent jamais. Scénario `coursetete` (actus lentes, mortes, absentes).
 - **Le paysage se décide sur la HAUTEUR, et le fil n'y change que de LARGEUR.**
   Deux paysages, pas un : le téléphone couché (large et plat) garde son verrou
   d'orientation, l'écran large ET haut (pliant déplié, tablette, desktop) gagne
@@ -1386,6 +1411,14 @@ périmé peint tout de suite, les deux moitiés qui repartent, et l'utilisateur 
 glisse dès la première carte. Il compte les remontées en tête SUBIES — il en faut
 exactement UNE — et journalise chaque `render()` avec son ancre, pour dire
 laquelle des deux moitiés a provoqué le saut.
+
+`coursetete` couvre un symptôme voisin mais différent : la carte 0 elle-même qui
+change d'IDENTITÉ (pas seulement le SAUT de défilement, que `teteouverture`
+couvre déjà) quand Wikipédia répond avant les actus sur un renouvellement.
+Trois cas, chacun surveillant `items[0]` render après render : actus lentes
+(aucune reprise ne doit être visible), actus mortes (Wikipédia s'affiche quand
+même, après une attente bornée plutôt qu'immédiatement), et dose sans actus
+actives (aucune attente, rien à coordonner).
 
 Deux d'entre eux signalent des lignes qui ne sont PAS des régressions, et qu'il
 ne faut pas partir corriger : `offline` fait remonter des

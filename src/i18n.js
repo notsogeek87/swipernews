@@ -54,6 +54,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v272.item1":
+        "🔄 Corrige aussi le cas où Wikipédia s'affichait en premier puis se faisait remplacer par une actu — même sur un fil tout neuf, sans lien avec une réouverture.",
       "changelog.v271.item1":
         "🔄 Réouvrir l'app après une longue pause ne fait plus disparaître d'un coup l'article en cours : un écran de chargement s'affiche le temps que le fil neuf soit prêt.",
       "changelog.v266.item1":
@@ -501,6 +503,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v272.item1":
+        "🔄 Also fixed the case where Wikipedia showed first and then got swapped for a news article — even on a brand-new feed, unrelated to reopening.",
       "changelog.v271.item1":
         "🔄 Reopening the app after a long pause no longer swaps out the article you were on all at once: a loading screen shows while the fresh feed gets ready.",
       "changelog.v266.item1":

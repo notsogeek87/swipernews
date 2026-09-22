@@ -2761,6 +2761,111 @@ ${Array.from({ length: 12 }, (_, k) => {
     console.log("erreurs :", errors);
     await browser.close();
   },
+
+  /* 36. Sur un renouvellement (chargement à froid, ou ↻), Wikipédia répond
+     presque toujours le premier — UNE requête, contre plusieurs flux RSS pour
+     les actus. Sans coordination, la toute première carte visible est donc un
+     article Wikipédia... qui se fait reprendre par un article d'actu dès que
+     les actus répondent à leur tour, souvent moins d'une seconde plus tard :
+     remonté par un utilisateur, « je vois un article, et même pas 1 s après,
+     un autre arrive ». `loadLearnPart` retient sa première révélation le
+     temps que les actus (qui réservent la tête, voir teteReservee) aient une
+     chance de répondre — borné par HEAD_COORD_MS pour ne jamais bloquer sur
+     un réseau mort côté actus. Trois cas : actus RAPIDES (aucune reprise
+     visible), actus MORTES (Wikipédia s'affiche quand même, après une
+     attente bornée plutôt qu'immédiatement), et dose SANS actus actives
+     (aucune attente, rien à coordonner). */
+  async coursetete() {
+    const WIKI_OK = JSON.stringify({
+      query: {
+        pages: Array.from({ length: 20 }, (_, i) => ({
+          title: "Wiki " + i,
+          extract: "x".repeat(200) + " article " + i,
+          canonicalurl: "https://fr.wikipedia.org/wiki/W" + i,
+          thumbnail: { source: "https://img.test/w" + i + ".jpg" },
+        })),
+      },
+    });
+    const rss = () =>
+      '<?xml version="1.0"?><rss><channel>' +
+      Array.from(
+        { length: 10 },
+        (_, i) =>
+          `<item><title>Actu ${i}</title><link>https://ex.test/a${i}</link>` +
+          `<description>Un resume de longueur ordinaire pour eviter le rejet</description>` +
+          `<pubDate>${new Date(Date.now() - i * 60000).toUTCString()}</pubDate></item>`
+      ).join("") +
+      "</channel></rss>";
+
+    async function essai(label, newsMode) {
+      const browser = await chromium.launch({
+        executablePath: "/opt/pw-browsers/chromium",
+      });
+      const page = await (
+        await browser.newContext({ viewport: { width: 412, height: 900 } })
+      ).newPage();
+      const errors = [];
+      page.on("pageerror", (e) => errors.push("PAGEERROR: " + e.message));
+      await page.addInitScript(
+        (kv) => {
+          for (const [k, v] of Object.entries(kv)) localStorage.setItem(k, v);
+        },
+        Object.assign(
+          { "fluxswipe.changelog.seen.v1": "999999" },
+          READY,
+          newsMode === "sansactus" ? { "fluxswipe.feeds.v1": "[]" } : {}
+        )
+      );
+      await page.route("**/*", async (r) => {
+        const u = r.request().url();
+        if (/wikipedia|api\/learn/.test(u))
+          return r.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: WIKI_OK,
+          });
+        if (/allorigins|corsproxy|codetabs|thingproxy|api\/feed/.test(u)) {
+          if (newsMode === "mortes") return r.abort("connectionrefused").catch(() => {});
+          if (newsMode === "lentes") await new Promise((res) => setTimeout(res, 400));
+          return r.fulfill({ status: 200, contentType: "application/xml", body: rss() });
+        }
+        if (u.startsWith("http://localhost:8124")) return r.continue();
+        return r.fulfill({ status: 200, body: "" });
+      });
+
+      const t0 = Date.now();
+      await page.goto(URL_APP);
+      await page.evaluate(() => {
+        window.__log = [];
+        const orig = window.render;
+        window.render = function (...a) {
+          const r = orig.apply(this, a);
+          const first = items[0];
+          window.__log.push({
+            dt: Date.now(),
+            first: first ? { kind: first.kind, title: first.title } : null,
+          });
+          return r;
+        };
+      });
+      await page.waitForTimeout(newsMode === "mortes" ? 2000 : 1500);
+      const log = await page.evaluate(() => window.__log);
+      const kinds = log.map((e) => e.first && e.first.kind);
+      const repris =
+        kinds.includes("learn") &&
+        kinds.slice(kinds.indexOf("learn") + 1).includes("news");
+      console.log(
+        `${label} — têtes successives : ${kinds.join(" → ")} (${log.map((e) => `+${e.dt - t0}ms`).join(", ")})` +
+          `  ${repris ? "← REPRISE visible (régression)" : "✓ pas de reprise"}`
+      );
+      console.log(`  erreurs : ${JSON.stringify(errors)}`);
+      await browser.close();
+    }
+
+    await essai("actus lentes (400 ms)", "lentes");
+    await essai("actus mortes", "mortes");
+    await essai("sans actus actives", "sansactus");
+  },
 };
 
 const which = process.argv[2];
