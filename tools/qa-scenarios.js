@@ -2771,10 +2771,13 @@ ${Array.from({ length: 12 }, (_, k) => {
      un autre arrive ». `loadLearnPart` retient sa première révélation le
      temps que les actus (qui réservent la tête, voir teteReservee) aient une
      chance de répondre — borné par HEAD_COORD_MS pour ne jamais bloquer sur
-     un réseau mort côté actus. Trois cas : actus RAPIDES (aucune reprise
-     visible), actus MORTES (Wikipédia s'affiche quand même, après une
-     attente bornée plutôt qu'immédiatement), et dose SANS actus actives
-     (aucune attente, rien à coordonner). */
+     un réseau mort côté actus. Trois cas : actus LENTES (1,7 s — un réseau
+     mobile ordinaire pour plusieurs flux RSS, PAS un cas dégénéré : c'est ce
+     délai précisément qui a fait passer un premier correctif à HEAD_COORD_MS
+     trop court, 900 ms, inaperçu par ce scénario tant qu'il ne testait qu'un
+     délai bien plus favorable), actus MORTES (Wikipédia s'affiche quand
+     même, après l'attente bornée plutôt qu'immédiatement), et dose SANS
+     actus actives (aucune attente, rien à coordonner). */
   async coursetete() {
     const WIKI_OK = JSON.stringify({
       query: {
@@ -2826,7 +2829,9 @@ ${Array.from({ length: 12 }, (_, k) => {
           });
         if (/allorigins|corsproxy|codetabs|thingproxy|api\/feed/.test(u)) {
           if (newsMode === "mortes") return r.abort("connectionrefused").catch(() => {});
-          if (newsMode === "lentes") await new Promise((res) => setTimeout(res, 400));
+          // 1,7 s : voir le commentaire du scénario — délibérément AU-DESSUS
+          // de l'ancien HEAD_COORD_MS (900 ms) qui a laissé passer ce cas.
+          if (newsMode === "lentes") await new Promise((res) => setTimeout(res, 1700));
           return r.fulfill({ status: 200, contentType: "application/xml", body: rss() });
         }
         if (u.startsWith("http://localhost:8124")) return r.continue();
@@ -2848,7 +2853,9 @@ ${Array.from({ length: 12 }, (_, k) => {
           return r;
         };
       });
-      await page.waitForTimeout(newsMode === "mortes" ? 2000 : 1500);
+      await page.waitForTimeout(
+        newsMode === "mortes" ? 3800 : newsMode === "lentes" ? 2500 : 1500
+      );
       const log = await page.evaluate(() => window.__log);
       const kinds = log.map((e) => e.first && e.first.kind);
       const repris =
@@ -2862,7 +2869,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       await browser.close();
     }
 
-    await essai("actus lentes (400 ms)", "lentes");
+    await essai("actus lentes (1,7 s)", "lentes");
     await essai("actus mortes", "mortes");
     await essai("sans actus actives", "sansactus");
   },

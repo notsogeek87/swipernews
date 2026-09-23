@@ -866,13 +866,25 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   donc sa PREMIÈRE révélation d'un renouvellement (rien affiché à l'écran)
   tant que les actus sont dans la course pour la tête (`teteReservee===my`)
   et n'ont pas conclu leur première tentative (`!newsSettled`) — borné par
-  `HEAD_COORD_MS` (court, et PAS `NEWS_DEADLINE_MS` : il ne s'agit que de
-  laisser une chance aux actus de répondre en premier, pas d'attendre leur
-  diversité ni leur budget complet) pour ne jamais faire attendre Wikipédia
-  plus d'un instant sur un réseau mort côté actus ou une dose sans actus
-  actives. Une repeinture d'APPOINT, un ↻ explicite (rien n'est vidé, donc
-  jamais « rien affiché ») ou un chargement où quelque chose est déjà visible
-  ne patientent jamais. Scénario `coursetete` (actus lentes, mortes, absentes).
+  `HEAD_COORD_MS`, STRICTEMENT PLUS LONG que `NEWS_DEADLINE_MS` et pas une
+  valeur indépendante : `armerEcheance` (`loadNewsPart`) force de toute façon
+  une repeinture des actus à `NEWS_DEADLINE_MS` si rien n'a suffi avant, donc
+  quel que soit l'état du réseau, elles auront PEINT quelque chose à cette
+  échéance — la marge au-delà n'est qu'une garde d'ordonnancement entre deux
+  minuteurs programmés au même instant, jamais un délai qu'on s'attend à
+  ATTEINDRE en pratique. Une première version le fixait à 900 ms, bien plus
+  court que `NEWS_DEADLINE_MS` — pour ne pas pénaliser un réseau MORT côté
+  actus — mais ne couvrait pas des actus simplement plus LENTES que 900 ms
+  (plusieurs flux RSS sur un réseau mobile ordinaire, PAS un cas dégénéré) :
+  Wikipédia se révélait quand même avant elles et se faisait reprendre
+  l'instant d'après, symptôme identique en apparence remonté après ce premier
+  correctif. Un réseau mort qui retarde un peu plus Wikipédia (rare) vaut
+  mieux qu'un réseau simplement lent qui laisse la reprise visible (le cas
+  ordinaire que ce délai existe pour couvrir). Une repeinture d'APPOINT, un ↻
+  explicite (rien n'est vidé, donc jamais « rien affiché ») ou un chargement
+  où quelque chose est déjà visible ne patientent jamais. Scénario
+  `coursetete` (actus lentes à 1,7 s — le délai précis qui a démasqué le
+  premier réglage trop court —, mortes, absentes).
 - **Le paysage se décide sur la HAUTEUR, et le fil n'y change que de LARGEUR.**
   Deux paysages, pas un : le téléphone couché (large et plat) garde son verrou
   d'orientation, l'écran large ET haut (pliant déplié, tablette, desktop) gagne

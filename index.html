@@ -1788,9 +1788,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=267"></script>
-<script src="src/learn-core.js?v=261"></script>
-<script src="src/i18n.js?v=269"></script>
+<script src="src/lib.js?v=268"></script>
+<script src="src/learn-core.js?v=262"></script>
+<script src="src/i18n.js?v=270"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1897,15 +1897,26 @@ const CONFIG = {
      (teteReservee) : le temps qu'elles aient une chance de répondre avant
      Wikipédia, qui n'a qu'UNE requête à faire quand elles en ont plusieurs
      (voir loadLearnPart pour le symptôme — un article affiché puis repris
-     en moins d'une seconde). SANS RAPPORT avec NEWS_DEADLINE_MS ci-dessus
-     (qui vise la diversité de sources d'un fil déjà affiché) : ici, il ne
-     s'agit que d'éviter qu'une tête fraîchement révélée soit aussitôt
-     reprise, jamais d'attendre que les actus aient fini tout leur travail —
-     un réseau mort côté actus ne doit retarder Wikipédia que d'un instant,
-     pas des secondes. Volontairement COURT et pas encore mesuré sur un vrai
-     panel de sources (contrairement aux autres délais de ce bloc) : à
-     ajuster si des flux sains se révèlent régulièrement plus lents que ça. */
-  HEAD_COORD_MS: 900,
+     un instant plus tard).
+     STRICTEMENT PLUS LONG que NEWS_DEADLINE_MS ci-dessus, et pas une valeur
+     indépendante : `armerEcheance` (loadNewsPart) force de toute façon une
+     repeinture des actus à NEWS_DEADLINE_MS si rien n'a suffi avant — donc,
+     quel que soit l'état du réseau, les actus auront PEINT quelque chose au
+     plus tard à cette échéance, et rienAffiche (voir plus bas) sera déjà
+     retombé à faux quand le délai ici expirerait. La marge au-delà (500 ms)
+     n'est qu'une garde contre l'ordre d'exécution de deux minuteurs distincts
+     programmés au même instant, jamais un délai qu'on s'attend à ATTEINDRE en
+     pratique. Une première version fixait ce délai à 900 ms, bien plus COURT
+     que NEWS_DEADLINE_MS — un choix délibéré pour ne pas pénaliser le cas
+     d'un réseau mort côté actus, mais qui ne couvrait pas des actus
+     simplement plus LENTES que 900 ms (plusieurs flux RSS sur un réseau
+     mobile ordinaire) : Wikipédia se révélait quand même avant elles, et se
+     faisait reprendre l'instant d'après — remonté par un utilisateur après le
+     premier correctif, symptôme identique en apparence, cause non couverte.
+     Revenu sur ce choix : mieux vaut un réseau mort qui retarde un peu plus
+     Wikipédia (rare) qu'un réseau simplement lent qui laisse la reprise
+     visible (le cas ordinaire que ce délai existe pour couvrir). */
+  HEAD_COORD_MS: 3000,
   HEAD_COORD_RECHECK_MS: 120,
   /* Budget total accordé à UNE source, tous replis compris (backend, proxys
      publics, rss2json). Sans lui, une source morte cumulait les délais de
@@ -2858,7 +2869,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="272";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="273";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4467,14 +4478,14 @@ async function loadLearnPart(my,key,perime,attempt=0,frais=false,renouv=perime){
          si les actus sont dans la course pour cette génération ; tant que rien
          n'est affiché ET qu'elles y sont ET que leur PREMIÈRE tentative n'a
          pas conclu, on patiente au lieu de peindre une tête vouée à être
-         reprise. Borné par HEAD_COORD_MS, volontairement COURT — voir sa
-         définition — pour ne jamais faire attendre Wikipédia plus d'un
-         instant sur un réseau mort côté actus ou une dose sans actus
-         actives. Pur AFFICHAGE : aucun réseau de plus, seulement l'instant
-         où le résultat apparaît. Une repeinture d'APPOINT (renouv faux) ou
-         un chargement où quelque chose est déjà visible ne patiente
-         jamais — seule la toute première révélation d'un renouvellement est
-         concernée. */
+         reprise. Borné par HEAD_COORD_MS — voir sa définition pour pourquoi
+         il dépasse volontairement NEWS_DEADLINE_MS plutôt que de le
+         sous-couper — pour ne jamais bloquer sur un réseau mort côté actus
+         ou une dose sans actus actives. Pur AFFICHAGE : aucun réseau de
+         plus, seulement l'instant où le résultat apparaît. Une repeinture
+         d'APPOINT (renouv faux) ou un chargement où quelque chose est déjà
+         visible ne patiente jamais — seule la toute première révélation
+         d'un renouvellement est concernée. */
       const depart=Date.now();
       function revealLearn(){
         if(my!==loadSeq)return;
