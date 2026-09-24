@@ -318,7 +318,14 @@ const scenarios = {
     for (const [nom, rss] of Object.entries(cases)) {
       const { browser, page, errors } = await boot({ rss, storage: READY });
       await page.goto(URL_APP);
-      await page.waitForTimeout(3000);
+      // Les 3 sources par défaut répondent (200) mais ne livrent RIEN
+      // d'exploitable (les cas ci-dessus) : `collected` reste vide, et comme
+      // elles répondent plus vite que leur propre échéance de 2,5 s, chaque
+      // tentative de loadNewsPart annule le minuteur d'armerEcheance avant
+      // qu'il n'ait pu se prononcer (voir teteDecidee/HEAD_COORD_MS) — c'est
+      // le filet de sécurité qui révèle finalement Wikipédia, pas la
+      // décision normale des actus. D'où le délai généreux ici.
+      await page.waitForTimeout(7200);
       const n = await page.$$eval("#feed .card", (e) => e.length);
       const bytes = await page.evaluate(
         () => (localStorage.getItem("fluxswipe.cache.v1") || "").length
@@ -1895,11 +1902,18 @@ const scenarios = {
       if (!s.sync && i > 30) break;
       await page.waitForTimeout(100);
     }
+    // 0 ou 1, jamais plus : 0 est même le résultat IDÉAL depuis que la toute
+    // première révélation attend d'avoir un contenu déjà stable (voir
+    // scheduleRender/rienEncoreAffiche) — rien n'est montré tant que ça peut
+    // encore changer, donc il n'y a parfois plus rien à « reprendre » : le
+    // premier swipe simulé tombe alors sur un fil déjà définitif. 2 ou plus
+    // est la seule vraie régression (deux remontées disjointes, chacune
+    // arrachant l'utilisateur à ce qu'il venait de commencer à lire).
     console.log(
       `remontées en tête SUBIES : ${remontees.length}` +
-        (remontees.length === 1
-          ? "  → une seule, comme prévu ✓"
-          : "  ← il en faut UNE (régression)")
+        (remontees.length <= 1
+          ? "  → au plus une, comme prévu ✓"
+          : "  ← plus d'une (régression)")
     );
     remontees.forEach((r) => console.log("   " + r));
     console.log("--- journal des rendus");
@@ -2416,8 +2430,15 @@ const scenarios = {
     // Le doigt glisse dès la première carte affichée, sans jamais attendre la
     // fin du chargement (ni même l'échéance) — voir teteouverture pour le même
     // principe de simulation.
+    // La toute première révélation n'arrive plus au fil de l'eau depuis
+    // rienEncoreAffiche() (voir scheduleRender) : elle attend l'échéance ou la
+    // diversité, donc un SEUL lot déjà conséquent apparaît d'un coup au lieu
+    // de plusieurs petits — d'où la garde `st.n<=dernierIndex+2` en plus de
+    // `!sync`, sinon la boucle sortait dès que le chargement se terminait,
+    // avant même d'avoir fini de glisser dans ce premier (et souvent unique)
+    // lot.
     let dernierIndex = 0;
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 300; i++) {
       const st = await page.evaluate(() => ({
         n: feedEl.children.length,
         sync: document.getElementById("syncbar").classList.contains("on"),
@@ -2429,7 +2450,7 @@ const scenarios = {
           onCardChange();
         }, dernierIndex);
       }
-      if (!st.sync && i > 30) break;
+      if (!st.sync && i > 30 && st.n <= dernierIndex + 2) break;
       await page.waitForTimeout(100);
     }
     const r = await page.evaluate(
@@ -2550,6 +2571,12 @@ ${Array.from({ length: 12 }, (_, k) => {
     });
     await page.route(/\/api\/feed\?url=|presse\d+\.test/, async (r) => {
       const raw = r.request().url();
+      // `/api/og?url=…presse0.test…` matche AUSSI ce motif (la cible encodée
+      // porte le même sous-texte) : sans cette sortie, les sondes de carte
+      // (checkPaywall/checkMissingImage, IntersectionObserver) recevaient du
+      // XML de flux là où elles attendent le JSON de boot() — laisser
+      // retomber sur son mock générique, correct.
+      if (/\/api\/og/.test(raw)) return r.fallback();
       // Le web passe par le backend même origine (`/api/feed?url=`, voir
       // PROXIES dans index.html), qui encode la cible en `encodeURIComponent`
       // — les `/` d'une vraie URL YouTube y deviennent `%2F` : il faut décoder
@@ -2593,9 +2620,11 @@ ${Array.from({ length: 12 }, (_, k) => {
     });
     await page.goto(URL_APP);
     // Le doigt glisse dès la première carte affichée, sans jamais attendre la
-    // fin du chargement — voir melangeprecoce pour le même principe.
+    // fin du chargement — voir melangeprecoce pour le même principe, et pour
+    // la garde `st.n<=dernierIndex+2` (la révélation arrive maintenant en un
+    // seul gros lot, voir rienEncoreAffiche/scheduleRender).
     let dernierIndex = 0;
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 300; i++) {
       const st = await page.evaluate(() => ({
         n: feedEl.children.length,
         sync: document.getElementById("syncbar").classList.contains("on"),
@@ -2607,7 +2636,7 @@ ${Array.from({ length: 12 }, (_, k) => {
           onCardChange();
         }, dernierIndex);
       }
-      if (!st.sync && i > 30) break;
+      if (!st.sync && i > 30 && st.n <= dernierIndex + 2) break;
       await page.waitForTimeout(100);
     }
     const r = await page.evaluate(
@@ -2768,16 +2797,22 @@ ${Array.from({ length: 12 }, (_, k) => {
      article Wikipédia... qui se fait reprendre par un article d'actu dès que
      les actus répondent à leur tour, souvent moins d'une seconde plus tard :
      remonté par un utilisateur, « je vois un article, et même pas 1 s après,
-     un autre arrive ». `loadLearnPart` retient sa première révélation le
-     temps que les actus (qui réservent la tête, voir teteReservee) aient une
-     chance de répondre — borné par HEAD_COORD_MS pour ne jamais bloquer sur
-     un réseau mort côté actus. Trois cas : actus LENTES (1,7 s — un réseau
-     mobile ordinaire pour plusieurs flux RSS, PAS un cas dégénéré : c'est ce
-     délai précisément qui a fait passer un premier correctif à HEAD_COORD_MS
-     trop court, 900 ms, inaperçu par ce scénario tant qu'il ne testait qu'un
-     délai bien plus favorable), actus MORTES (Wikipédia s'affiche quand
-     même, après l'attente bornée plutôt qu'immédiatement), et dose SANS
-     actus actives (aucune attente, rien à coordonner). */
+     un autre arrive ». `loadLearnPart` retient sa première révélation tant
+     que les actus (qui réservent la tête, voir teteReservee) n'ont pas
+     PRIS DE DÉCISION sur cette tête (`teteDecidee`, voir sa définition) —
+     `HEAD_COORD_MS` n'est qu'un filet de sécurité généreux, pas le signal
+     normal. Trois cas : actus LENTES (1,7 s — un réseau mobile ordinaire
+     pour plusieurs flux RSS, PAS un cas dégénéré : c'est ce délai
+     précisément qui a fait passer un premier correctif, à minuteur fixe, de
+     900 ms puis 3000 ms, chacun trop court pour un cas que le suivant ne
+     couvrait pas non plus — inaperçu par ce scénario tant qu'il ne testait
+     qu'un délai plus favorable), actus MORTES (échec de connexion IMMÉDIAT
+     et systématique sur toutes les tentatives — un cas dégénéré où même
+     `armerEcheance` n'arrive jamais à son terme, voir HEAD_COORD_MS : chaque
+     tentative échoue plus vite que sa propre échéance de 2,5 s et la relance
+     suivante annule le minuteur avant qu'il n'ait pu se prononcer — Wikipédia
+     s'affiche quand même, après le filet de sécurité), et dose SANS actus
+     actives (aucune attente, rien à coordonner). */
   async coursetete() {
     const WIKI_OK = JSON.stringify({
       query: {
@@ -2854,7 +2889,7 @@ ${Array.from({ length: 12 }, (_, k) => {
         };
       });
       await page.waitForTimeout(
-        newsMode === "mortes" ? 3800 : newsMode === "lentes" ? 2500 : 1500
+        newsMode === "mortes" ? 7200 : newsMode === "lentes" ? 2500 : 1500
       );
       const log = await page.evaluate(() => window.__log);
       const kinds = log.map((e) => e.first && e.first.kind);

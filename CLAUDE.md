@@ -865,26 +865,81 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
   un chargement tout neuf, sans aucun cache en jeu. `loadLearnPart` retient
   donc sa PREMIÈRE révélation d'un renouvellement (rien affiché à l'écran)
   tant que les actus sont dans la course pour la tête (`teteReservee===my`)
-  et n'ont pas conclu leur première tentative (`!newsSettled`) — borné par
-  `HEAD_COORD_MS`, STRICTEMENT PLUS LONG que `NEWS_DEADLINE_MS` et pas une
-  valeur indépendante : `armerEcheance` (`loadNewsPart`) force de toute façon
-  une repeinture des actus à `NEWS_DEADLINE_MS` si rien n'a suffi avant, donc
-  quel que soit l'état du réseau, elles auront PEINT quelque chose à cette
-  échéance — la marge au-delà n'est qu'une garde d'ordonnancement entre deux
-  minuteurs programmés au même instant, jamais un délai qu'on s'attend à
-  ATTEINDRE en pratique. Une première version le fixait à 900 ms, bien plus
-  court que `NEWS_DEADLINE_MS` — pour ne pas pénaliser un réseau MORT côté
-  actus — mais ne couvrait pas des actus simplement plus LENTES que 900 ms
-  (plusieurs flux RSS sur un réseau mobile ordinaire, PAS un cas dégénéré) :
-  Wikipédia se révélait quand même avant elles et se faisait reprendre
-  l'instant d'après, symptôme identique en apparence remonté après ce premier
-  correctif. Un réseau mort qui retarde un peu plus Wikipédia (rare) vaut
-  mieux qu'un réseau simplement lent qui laisse la reprise visible (le cas
-  ordinaire que ce délai existe pour couvrir). Une repeinture d'APPOINT, un ↻
-  explicite (rien n'est vidé, donc jamais « rien affiché ») ou un chargement
-  où quelque chose est déjà visible ne patientent jamais. Scénario
-  `coursetete` (actus lentes à 1,7 s — le délai précis qui a démasqué le
-  premier réglage trop court —, mortes, absentes).
+  et n'ont pas encore PRIS DE DÉCISION sur cette tête (`teteDecidee!==my` —
+  voir plus bas pour ce que « décision » veut dire précisément et pourquoi ce
+  n'est ni `newsSettled` ni un simple minuteur). `HEAD_COORD_MS` n'est qu'un
+  FILET DE SÉCURITÉ généreux au-delà de `teteDecidee`, pas le signal normal.
+  Deux réglages plus courts ont été essayés et ont chacun laissé passer la
+  reprise qu'ils devaient empêcher, remontée à chaque fois par un
+  utilisateur : 900 ms d'abord (ne couvrait pas des actus simplement plus
+  LENTES que ça — plusieurs flux RSS sur un réseau mobile ordinaire, PAS un
+  cas dégénéré), puis `NEWS_DEADLINE_MS`+500 ms (ne couvrait pas le ou les
+  tours de relecture de diversité qu'`armerEcheance` peut légitimement
+  prendre au-delà de l'échéance initiale — mesuré : des actus à pile 3 s de
+  latence se décidaient à ~3,3 s, juste après qu'un délai à 3 s ait déjà
+  cédé). Une repeinture d'APPOINT, un ↻ explicite (rien n'est vidé, donc
+  jamais « rien affiché ») ou un chargement où quelque chose est déjà
+  visible ne patientent jamais. Scénario `coursetete` (actus lentes à 1,7 s
+  — le délai précis qui a démasqué le premier réglage trop court —, mortes,
+  absentes).
+  **`HEAD_COORD_MS` ne couvre que Wikipédia contre les actus — pas les actus
+  contre ELLES-MÊMES.** Une fois les actus dans la course, `revealLearn`
+  s'efface et laisse `loadNewsPart` peindre — mais RIEN n'empêchait alors CE
+  peintre-là de se reprendre lui-même : une source RAPIDE mais avec un
+  article VIEUX peint la tête la première, puis une source plus LENTE mais
+  plus FRAÎCHE la reprend dès qu'elle répond à son tour (`rebuild()` trie
+  toujours les files par la date de leur tête, voir plus haut « un tour de
+  rôle entre sources »). Même symptôme, remonté une TROISIÈME fois après les
+  deux premiers correctifs — et en fait le PLUS ANCIEN des trois, documenté
+  dès l'origine de `scheduleRender` mais jamais couvert hors du cas où un
+  cache périmé est affiché : « Si un cache est déjà affiché, on ne repeint
+  pas au fil de l'eau : la carte du haut se mettrait à changer d'article 2-3
+  fois… ce qui se voit comme un scintillement ». Ce commentaire ajoutait,
+  d'un cas qui n'avait simplement pas été éprouvé : « les retardataires se
+  voient au fil de l'eau comme dans le cas SANS cache » — faux : le
+  mécanisme du scintillement ne dépend en rien de la présence d'un cache,
+  seulement de l'absence de contenu STABLE déjà affiché. `rienEncoreAffiche()`
+  (partagée avec `revealLearn`) étend donc la même garde : tant que rien
+  n'est affiché ET que l'échéance des actus n'est pas passée ET que la tête
+  n'a pas déjà été prise, `scheduleRender` ne programme AUCUNE repeinture —
+  la toute première ne se produit qu'à l'échéance (`armerEcheance`) ou
+  quand la tête est établie, jamais au fil de l'eau. Conséquence assumée,
+  vérifiée par `teteouverture` : zéro remontée en tête « subie » y est
+  devenu le résultat COURANT (pas seulement UNE) — le tout premier contenu
+  visible est déjà stable, il n'y a donc plus rien à reprendre après coup.
+  **Attendre que les actus PEIGNENT ne suffit pas non plus : il faut
+  attendre qu'elles se DÉCIDENT**, même sans rien à peindre. `armerEcheance`
+  a deux issues à son échéance — peindre (`paint(true,false)`) ou constater
+  qu'il n'y a rien à peindre pour l'instant (`!collected.size`, qui compte
+  sur `scheduleRender` pour repeindre PLUS TARD si jamais quelque chose
+  arrive) — et seule la première appelait `paint()`, le seul endroit qui
+  posait `enTeteFait`. `revealLearn` attendait `!newsSettled`, un drapeau
+  bien plus tardif que « les actus ont tranché » : `newsSettled` n'arrive
+  qu'après RETRY_DELAYS_MS au complet (1,5 s + 3 s + 5 s), jusqu'à ~9,5 s,
+  quand `collected.size` reste nul à chaque tentative alors que la vraie
+  décision « rien à peindre pour l'instant » est prise dès NEWS_DEADLINE_MS
+  côté `armerEcheance` — sauf que ce cas-là ne POSAIT rien de lisible depuis
+  `loadLearnPart`, la forçant à deviner un délai indépendant du système
+  qu'il devait couvrir : 900 ms d'abord, puis `NEWS_DEADLINE_MS`+marge —
+  chacun pris en défaut par un cas que le suivant ne couvrait pas non plus
+  (voir `HEAD_COORD_MS` plus haut pour l'historique complet des deux
+  échecs). D'où `teteDecidee` (génération, comme `teteReservee`) : posé
+  DANS `paint()` (n'importe quel appel, `top` ou non) ET dans la branche
+  `!collected.size` d'`armerEcheance` — les deux moments où les actus ont
+  RÉELLEMENT tranché, qu'elles aient quelque chose à montrer ou non.
+  `revealLearn` attend `teteDecidee===my` plutôt que `newsSettled` :
+  `HEAD_COORD_MS` redevient alors un pur FILET DE SÉCURITÉ (couvre
+  `NEWS_DEADLINE_HARD_MS` avec marge), qui ne devrait normalement jamais se
+  déclencher — sauf dégénérescence mesurée où même `armerEcheance` n'arrive
+  jamais à son terme : des sources qui échouent plus vite que leur propre
+  échéance de 2,5 s (refus de connexion immédiat et systématique) voient
+  chaque `finish()` annuler le minuteur d'`armerEcheance` de la tentative
+  AVANT qu'il ait pu se prononcer, puis relancer une tentative suivante qui
+  répète le même sort — scénarios `coursetete` (« actus mortes ») et
+  `badrss` (sources qui répondent mais sans rien d'exploitable, donc
+  `collected` reste vide de la même façon). Wikipédia s'y révèle alors
+  seulement au filet de sécurité, ~6,5 s — nettement mieux que les ~9,5 s
+  qu'aurait pris `newsSettled`, et borné, contrairement à lui.
 - **Le paysage se décide sur la HAUTEUR, et le fil n'y change que de LARGEUR.**
   Deux paysages, pas un : le téléphone couché (large et plat) garde son verrou
   d'orientation, l'écran large ET haut (pliant déplié, tablette, desktop) gagne
@@ -1420,9 +1475,12 @@ régression.
 
 `teteouverture` est le pendant de `forcetop` pour l'OUVERTURE à froid : cache
 périmé peint tout de suite, les deux moitiés qui repartent, et l'utilisateur qui
-glisse dès la première carte. Il compte les remontées en tête SUBIES — il en faut
-exactement UNE — et journalise chaque `render()` avec son ancre, pour dire
-laquelle des deux moitiés a provoqué le saut.
+glisse dès la première carte. Il compte les remontées en tête SUBIES — au plus
+UNE, jamais deux — et journalise chaque `render()` avec son ancre, pour dire
+laquelle des deux moitiés a provoqué le saut. Zéro est même devenu le résultat
+COURANT depuis que la première révélation attend un contenu déjà stable (voir
+`rienEncoreAffiche` plus haut) : le premier swipe simulé tombe alors sur un fil
+qui ne bougera plus, il n'y a donc plus rien à « reprendre ».
 
 `coursetete` couvre un symptôme voisin mais différent : la carte 0 elle-même qui
 change d'IDENTITÉ (pas seulement le SAUT de défilement, que `teteouverture`

@@ -1788,9 +1788,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=268"></script>
-<script src="src/learn-core.js?v=262"></script>
-<script src="src/i18n.js?v=270"></script>
+<script src="src/lib.js?v=269"></script>
+<script src="src/learn-core.js?v=263"></script>
+<script src="src/i18n.js?v=271"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1892,31 +1892,28 @@ const CONFIG = {
   // pauvre en sources rapides (peu de sources au total, la plupart lentes)
   // bloquer l'affichage en attendant une diversité qui ne viendra pas.
   NEWS_DEADLINE_HARD_MS: 6000,
-  /* Délai pendant lequel loadLearnPart retient la TOUTE PREMIÈRE révélation
-     d'un renouvellement quand les actus sont dans la course pour la tête
-     (teteReservee) : le temps qu'elles aient une chance de répondre avant
-     Wikipédia, qui n'a qu'UNE requête à faire quand elles en ont plusieurs
-     (voir loadLearnPart pour le symptôme — un article affiché puis repris
-     un instant plus tard).
-     STRICTEMENT PLUS LONG que NEWS_DEADLINE_MS ci-dessus, et pas une valeur
-     indépendante : `armerEcheance` (loadNewsPart) force de toute façon une
-     repeinture des actus à NEWS_DEADLINE_MS si rien n'a suffi avant — donc,
-     quel que soit l'état du réseau, les actus auront PEINT quelque chose au
-     plus tard à cette échéance, et rienAffiche (voir plus bas) sera déjà
-     retombé à faux quand le délai ici expirerait. La marge au-delà (500 ms)
-     n'est qu'une garde contre l'ordre d'exécution de deux minuteurs distincts
-     programmés au même instant, jamais un délai qu'on s'attend à ATTEINDRE en
-     pratique. Une première version fixait ce délai à 900 ms, bien plus COURT
-     que NEWS_DEADLINE_MS — un choix délibéré pour ne pas pénaliser le cas
-     d'un réseau mort côté actus, mais qui ne couvrait pas des actus
-     simplement plus LENTES que 900 ms (plusieurs flux RSS sur un réseau
-     mobile ordinaire) : Wikipédia se révélait quand même avant elles, et se
-     faisait reprendre l'instant d'après — remonté par un utilisateur après le
-     premier correctif, symptôme identique en apparence, cause non couverte.
-     Revenu sur ce choix : mieux vaut un réseau mort qui retarde un peu plus
-     Wikipédia (rare) qu'un réseau simplement lent qui laisse la reprise
-     visible (le cas ordinaire que ce délai existe pour couvrir). */
-  HEAD_COORD_MS: 3000,
+  /* FILET DE SÉCURITÉ seulement — le signal normal est `teteDecidee` (voir sa
+     définition dans index.html, posé par `paint()` et par `armerEcheance`),
+     que `loadLearnPart` (revealLearn) attend pour ne pas peindre une tête que
+     les actus reprendraient l'instant d'après. Ce délai-ci ne sert que si
+     `teteDecidee` n'était jamais posé (incident) : il doit donc dépasser tout
+     ce qu'`armerEcheance` peut légitimement prendre pour se décider —
+     NEWS_DEADLINE_HARD_MS (la diversité de sources peut réclamer jusque-là),
+     pas seulement NEWS_DEADLINE_MS.
+     Deux valeurs plus courtes ont été essayées et ONT LAISSÉ PASSER LA REPRISE
+     qu'elles devaient empêcher, remontée à chaque fois par un utilisateur :
+     900 ms (ne couvrait pas des actus simplement plus lentes, un réseau
+     mobile ordinaire) puis NEWS_DEADLINE_MS+500 ms (ne couvrait pas le cas où
+     `armerEcheance` a besoin d'un ou plusieurs tours de relecture de
+     diversité au-delà de l'échéance initiale — mesuré : des actus à pile 3 s
+     de latence se décidaient à ~3,3 s, juste après qu'un délai à 3 s ait déjà
+     cédé, scénarios `coursetete`/`seriesvideo`). Le point commun aux deux
+     échecs : deviner un délai INDÉPENDANT du système qu'il doit couvrir finit
+     toujours par être pris en défaut par un cas qu'il n'avait pas prévu — d'où
+     `teteDecidee`, qui REFLÈTE la décision plutôt que de la deviner, et fait
+     de ce nombre-ci un filet qui ne devrait normalement jamais se
+     déclencher. */
+  HEAD_COORD_MS: 6500,
   HEAD_COORD_RECHECK_MS: 120,
   /* Budget total accordé à UNE source, tous replis compris (backend, proxys
      publics, rss2json). Sans lui, une source morte cumulait les délais de
@@ -2869,7 +2866,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="273";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="274";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4185,6 +4182,15 @@ let loadSeq=0,feedLoadStarted=false;
    actus — et la moitié Wikipédia, elle, a déjà repeint en gardant la position. */
 let teteSeq=0;        // génération qui a DÉJÀ remonté en tête
 let teteReservee=0;   // génération dont la moitié actus s'est réservé la tête
+/* Génération pour laquelle les actus ont PRIS UNE DÉCISION sur la tête — peint
+   quelque chose (paint(), quel que soit `top`) OU constaté qu'il n'y a rien à
+   peindre pour l'instant (armerEcheance, cas `!collected.size`). Sert de
+   signal à loadLearnPart (revealLearn) : voir sa définition et celle de
+   HEAD_COORD_MS pour pourquoi un simple minuteur indépendant ne suffisait
+   pas — un timeout DEVINÉ doit forcément dépasser le pire cas d'un système
+   de relances/diversité qu'il ne consulte pas, alors que ce jeton REFLÈTE ce
+   système directement, sans deviner. */
+let teteDecidee=0;
 function teteAPrendre(my,prioritaire){
   if(teteSeq===my)return false;                      // déjà fait pour ce chargement
   if(!prioritaire&&teteReservee===my)return false;   // réservée par les actus
@@ -4476,12 +4482,23 @@ async function loadLearnPart(my,key,perime,attempt=0,frais=false,renouv=perime){
          haut), ça arrive aussi sur un chargement tout neuf. `teteReservee` (…
          voir loadNewsPart) dit dès le départ, AVANT tout aller-retour réseau,
          si les actus sont dans la course pour cette génération ; tant que rien
-         n'est affiché ET qu'elles y sont ET que leur PREMIÈRE tentative n'a
-         pas conclu, on patiente au lieu de peindre une tête vouée à être
-         reprise. Borné par HEAD_COORD_MS — voir sa définition pour pourquoi
-         il dépasse volontairement NEWS_DEADLINE_MS plutôt que de le
-         sous-couper — pour ne jamais bloquer sur un réseau mort côté actus
-         ou une dose sans actus actives. Pur AFFICHAGE : aucun réseau de
+         n'est affiché ET qu'elles y sont ET qu'elles n'ont PAS ENCORE PRIS DE
+         DÉCISION sur la tête (`teteDecidee`, posé par `paint()` et par
+         `armerEcheance` — voir leurs définitions), on patiente au lieu de
+         peindre une tête vouée à être reprise.
+         `teteDecidee` REFLÈTE la décision des actus plutôt que de la DEVINER
+         par un minuteur : une première version bornait l'attente à un délai
+         fixe (900 ms, puis NEWS_DEADLINE_MS+marge) — mais les actus peuvent
+         légitimement mettre plus longtemps à se décider (`armerEcheance`
+         attend une diversité de sources suffisante, jusqu'à
+         NEWS_DEADLINE_HARD_MS), et un minuteur plus court que ce pire cas
+         laissait passer exactement la reprise qu'il devait empêcher — remonté
+         deux fois de suite avant ce correctif (voir `coursetete`/`seriesvideo`,
+         où des actus à pile 3 s se décidaient à ~3,3 s, juste après qu'un
+         minuteur à 3 s ait déjà cédé). `HEAD_COORD_MS` reste néanmoins un
+         FILET DE SÉCURITÉ, généreux (couvre NEWS_DEADLINE_HARD_MS avec marge)
+         : il ne devrait normalement jamais se déclencher, sauf incident qui
+         empêcherait `teteDecidee` d'être posé. Pur AFFICHAGE : aucun réseau de
          plus, seulement l'instant où le résultat apparaît. Une repeinture
          d'APPOINT (renouv faux) ou un chargement où quelque chose est déjà
          visible ne patiente jamais — seule la toute première révélation
@@ -4489,8 +4506,7 @@ async function loadLearnPart(my,key,perime,attempt=0,frais=false,renouv=perime){
       const depart=Date.now();
       function revealLearn(){
         if(my!==loadSeq)return;
-        const rienAffiche=!document.getElementById("loading").classList.contains("hidden");
-        if(renouv&&rienAffiche&&teteReservee===my&&!newsSettled&&Date.now()-depart<CONFIG.HEAD_COORD_MS){
+        if(renouv&&rienEncoreAffiche()&&teteReservee===my&&teteDecidee!==my&&Date.now()-depart<CONFIG.HEAD_COORD_MS){
           setTimeout(revealLearn,CONFIG.HEAD_COORD_RECHECK_MS);
           return;
         }
@@ -4803,6 +4819,7 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
   function paint(top,cloture){
     renderT=null;painted=true;
     if(top)enTeteFait=true;
+    teteDecidee=my;   // les actus se décident MAINTENANT — voir sa définition
     if(my!==loadSeq)return;
     whenFeedIdle(()=>{
       if(cloture)rendreJeton();                     // repeinture finale : le chargement s'achève ICI
@@ -4830,19 +4847,27 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
   }
   /* Fenêtre progressive : courte pour le tout premier rendu (le contenu doit
      apparaître vite), large ensuite (le fil doit cesser de bouger).
-     Si un cache est déjà affiché, on ne repeint PAS au fil de l'eau : la
-     carte du haut se mettrait à changer d'article 2-3 fois en quelques
-     centaines de ms (cache → lot partiel → lot complet), ce qui se voit
-     comme un scintillement au lancement. Le cache reste affiché tel quel
-     (la barre de sync du haut signale le chargement en cours) jusqu'à
-     l'unique repeinture finale de finish(). */
+     Si un cache est déjà affiché, ou si RIEN n'est encore affiché (écran de
+     chargement), on ne repeint PAS au fil de l'eau : la carte du haut se
+     mettrait à changer d'article 2-3 fois en quelques centaines de ms
+     (cache/rien → lot partiel → lot complet), ce qui se voit comme un
+     scintillement au lancement — remonté par un utilisateur qui ouvrait sur
+     un fil tout neuf : « je vois un article, et même pas 1 s après, un autre
+     arrive ». Cru longtemps propre au cache affiché (le seul cas gardé
+     jusqu'ici), alors que le mécanisme est EXACTEMENT le même sans cache :
+     une source RAPIDE mais avec un article VIEUX peut peindre la tête la
+     première, puis se faire reprendre par une source plus LENTE mais plus
+     FRAÎCHE dès qu'elle répond à son tour (voir `rebuild()`, qui trie
+     toujours les files par la date de leur tête). Le cache reste affiché tel
+     quel (ou l'écran de chargement, selon le cas) — la barre de sync du haut
+     signale le chargement en cours — jusqu'à l'unique repeinture finale de
+     finish(). */
   function scheduleRender(){
-    // Le silence imposé par un cache affiché ne vaut que TANT QUE le fil neuf
-    // n'est pas encore apparu : une fois l'échéance passée (ou la tête déjà
-    // renouvelée), le cache n'est plus à l'écran et il n'y a plus rien à
-    // protéger du scintillement — les retardataires se voient au fil de l'eau
-    // comme dans le cas sans cache.
-    if(cached&&!enTeteFait&&!echeancePassee)return;
+    // Le silence imposé ne vaut que TANT QUE le fil neuf n'est pas encore
+    // apparu : une fois l'échéance passée (ou la tête déjà renouvelée), il
+    // n'y a plus rien à protéger du scintillement — les retardataires se
+    // voient au fil de l'eau comme d'habitude.
+    if((cached||rienEncoreAffiche())&&!enTeteFait&&!echeancePassee)return;
     if(renderT)return;
     // Repeintures progressives : elles gardent l'ancrage sur l'article lu. Sauf
     // la première d'après l'échéance quand celle-ci n'a rien eu à peindre
@@ -4927,7 +4952,7 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
     function verifier(){
       echeanceT=null;
       if(my!==loadSeq||enTeteFait)return;
-      if(!collected.size){echeancePassee=true;return;}   // rien reçu : scheduleRender s'en chargera
+      if(!collected.size){echeancePassee=true;teteDecidee=my;return;}   // rien reçu : scheduleRender s'en chargera
       const d=diversiteCollectee();
       const seuil=Math.min(groupesActifs,CONFIG.NEWS_DIVERSITY_MIN);
       const manque=d.sources<seuil||(melangeAttendu&&!(d.vid&&d.art));
@@ -9096,6 +9121,12 @@ function show(id){
   ["loading","empty"].forEach(s=>document.getElementById(s).classList.toggle("hidden",s!==id));
 }
 function hideStates(){document.getElementById("loading").classList.add("hidden");document.getElementById("empty").classList.add("hidden");}
+/* Vrai tant que RIEN n'a encore été peint pour ce chargement — l'écran de
+   chargement est toujours à l'écran. Décision partagée par loadLearnPart
+   (revealLearn) et loadNewsPart (scheduleRender) : les deux doivent suspendre
+   leur toute première repeinture pendant que rien n'est affiché, pour la même
+   raison, voir leurs commentaires respectifs. */
+function rienEncoreAffiche(){return !document.getElementById("loading").classList.contains("hidden");}
 /* Écran d'erreur, désormais réservé au cas où il ne reste VRAIMENT rien : le fil
    mêle deux origines, il faut que les deux aient échoué pour qu'il soit vide.
    Un seul message, donc — « aucune source active » n'est plus une impasse,
