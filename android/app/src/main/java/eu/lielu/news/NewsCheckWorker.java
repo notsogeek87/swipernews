@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.util.Xml;
 
@@ -31,8 +32,10 @@ import org.xmlpull.v1.XmlPullParser;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.util.Locale;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -138,6 +141,7 @@ public class NewsCheckWorker extends Worker {
         int newCount = 0;
         String firstNewName = null;
         String firstNewTitle = null;
+        String firstNewLink = null;
         JSONArray updated = new JSONArray();
         int checkedMax = Math.min(feeds.length(), MAX_FEEDS);
 
@@ -174,6 +178,7 @@ public class NewsCheckWorker extends Worker {
                 if (firstNewName == null) {
                     firstNewName = name;
                     firstNewTitle = head.title;   // voir le rôle du titre en tête de fichier
+                    firstNewLink = freshLink;     // voir postNotification : cible du tap
                 }
             }
             JSONObject nf = new JSONObject();
@@ -188,7 +193,7 @@ public class NewsCheckWorker extends Worker {
         }
 
         prefs.edit().putString(KEY_FEEDS, updated.toString()).apply();
-        if (newCount > 0) postNotification(ctx, newCount, firstNewName, firstNewTitle);
+        if (newCount > 0) postNotification(ctx, newCount, firstNewName, firstNewTitle, firstNewLink);
         return Result.success();
     }
 
@@ -276,7 +281,36 @@ public class NewsCheckWorker extends Worker {
         return t.substring(0, MAX).trim() + "…";
     }
 
-    private void postNotification(Context ctx, int count, String firstName, String firstTitle) {
+    /** Intent posé sur la notification : swipernews://open?url=…&title=…,
+     *  relayé côté web par @capacitor/app (appUrlOpen) vers handleDeepLink,
+     *  qui appelle openArticle() — même schéma personnalisé et même relais que
+     *  le partage de source (host "add"), voir AndroidManifest.xml. C'est un
+     *  ACTION_VIEW explicite (setClass + setData), pas un simple
+     *  Intent(ctx, MainActivity.class) : sans action ni données, le plugin App
+     *  de Capacitor n'a rien à relayer et handleDeepLink ne serait jamais
+     *  appelé, ni à froid ni à chaud (singleTask -> onNewIntent).
+     *  URLEncoder (pas encodeURIComponent, ce code ne tourne pas en JS) encode
+     *  l'espace en "+" — sans conséquence, URLSearchParams côté web décode "+"
+     *  comme l'espace, exactement le comportement attendu d'une query string.
+     *  Repli sur le lancement nu si le lien est absent ou illisible : ouvrir
+     *  l'app reste préférable à ne pas notifier du tout. */
+    private static Intent deepLinkIntent(Context ctx, String link, String title) {
+        if (link != null && !link.isEmpty()) {
+            try {
+                String url = URLEncoder.encode(link, "UTF-8");
+                StringBuilder deepLink = new StringBuilder("swipernews://open?url=").append(url);
+                if (title != null && !title.trim().isEmpty()) {
+                    deepLink.append("&title=").append(URLEncoder.encode(title, "UTF-8"));
+                }
+                return new Intent(Intent.ACTION_VIEW, Uri.parse(deepLink.toString()), ctx, MainActivity.class);
+            } catch (UnsupportedEncodingException | RuntimeException e) {
+                // lien illisible : on retombe sur le lancement nu ci-dessous
+            }
+        }
+        return new Intent(ctx, MainActivity.class);
+    }
+
+    private void postNotification(Context ctx, int count, String firstName, String firstTitle, String firstLink) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
             && ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -293,7 +327,11 @@ public class NewsCheckWorker extends Worker {
                 nm.createNotificationChannel(channel);
             }
         }
-        Intent launch = new Intent(ctx, MainActivity.class);
+        // Cible du tap : l'article annoncé plutôt que le fil en général — voir
+        // handleDeepLink côté web (hostname "open"). Sans lien exploitable
+        // (échec de parsing ponctuel), on retombe sur le lancement nu d'avant :
+        // ouvrir l'app reste préférable à ne pas notifier du tout.
+        Intent launch = deepLinkIntent(ctx, firstLink, firstTitle);
         launch.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
         PendingIntent pi = PendingIntent.getActivity(ctx, 0, launch, flags);

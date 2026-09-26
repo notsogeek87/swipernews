@@ -30,12 +30,18 @@
                  messagerie ne le reconnaît comme lien) mais via le sas
                  https://news.lielu.eu/add.html, qui y rebondit — voir add.html.
                  Relayé côté web par @capacitor/app (appUrlOpen), voir
-                 handleDeepLink. -->
+                 handleDeepLink.
+
+                 host="open" : même schéma, réutilisé par la notification « du
+                 neuf » (voir NewsCheckWorker.postNotification) pour pointer
+                 vers l'article annoncé au lieu du fil en général — même relais
+                 appUrlOpen/handleDeepLink, à froid comme à chaud. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="swipernews" android:host="add" />
+                <data android:scheme="swipernews" android:host="open" />
             </intent-filter>
         </activity>
 

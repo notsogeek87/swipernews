@@ -54,6 +54,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v275.item1":
+        "🔔 Toucher une notification « du neuf » ouvre maintenant directement l'article annoncé, au lieu de revenir sur le fil sans lien avec elle.",
       "changelog.v272.item1":
         "🔄 Corrige aussi le cas où Wikipédia s'affichait en premier puis se faisait remplacer par une actu — même sur un fil tout neuf, sans lien avec une réouverture.",
       "changelog.v271.item1":
@@ -503,6 +505,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v275.item1":
+        "🔔 Tapping a \"new articles\" notification now opens the announced article directly, instead of just landing back on the feed.",
       "changelog.v272.item1":
         "🔄 Also fixed the case where Wikipedia showed first and then got swapped for a news article — even on a brand-new feed, unrelated to reopening.",
       "changelog.v271.item1":
