@@ -506,7 +506,7 @@
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
       "changelog.v275.item1":
-        "🔔 Tapping a \"new articles\" notification now opens the announced article directly, instead of just landing back on the feed.",
+        '🔔 Tapping a "new articles" notification now opens the announced article directly, instead of just landing back on the feed.',
       "changelog.v272.item1":
         "🔄 Also fixed the case where Wikipedia showed first and then got swapped for a news article — even on a brand-new feed, unrelated to reopening.",
       "changelog.v271.item1":
