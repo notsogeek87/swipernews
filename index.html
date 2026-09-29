@@ -1788,9 +1788,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=271"></script>
-<script src="src/learn-core.js?v=265"></script>
-<script src="src/i18n.js?v=273"></script>
+<script src="src/lib.js?v=277"></script>
+<script src="src/learn-core.js?v=277"></script>
+<script src="src/i18n.js?v=277"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1882,7 +1882,13 @@ const CONFIG = {
      mélangé qu'on observe alors — même code, seul le moment du premier swipe
      diffère. Voir NEWS_DEADLINE_HARD_MS pour la garantie que cette exigence
      ne bloque jamais l'affichage indéfiniment. */
-  NEWS_DIVERSITY_MIN: 5,
+  // Abaissé de 5 à 3 (retour utilisateur : le seuil de 5 n'était quasiment
+  // jamais atteint en 2,5 s dès qu'on a beaucoup de sources sur un réseau
+  // mobile ordinaire, donc CHAQUE chargement payait l'échéance dure de 6 s
+  // au lieu de l'échéance normale — pas le cas rare qu'elle est censée
+  // couvrir). 3 sources distinctes suffisent déjà à éviter le biais qu'elle
+  // corrige (un tout premier tour de rôle figé sur 1-2 chaînes YouTube).
+  NEWS_DIVERSITY_MIN: 3,
   // Intervalle de nouvelle vérification quand la diversité manque encore à
   // l'échéance : court, pour ne pas ajouter un délai perceptible une fois le
   // seuil enfin atteint.
@@ -1891,7 +1897,10 @@ const CONFIG = {
   // quand même — diversité suffisante ou non — plutôt que de laisser un lot
   // pauvre en sources rapides (peu de sources au total, la plupart lentes)
   // bloquer l'affichage en attendant une diversité qui ne viendra pas.
-  NEWS_DEADLINE_HARD_MS: 6000,
+  // Abaissé de 6000 à 4000 avec NEWS_DIVERSITY_MIN ci-dessus, pour la même
+  // raison : ce plafond ne doit être payé que dans les cas vraiment pauvres
+  // en sources rapides, pas devenir le temps de chargement normal.
+  NEWS_DEADLINE_HARD_MS: 4000,
   /* FILET DE SÉCURITÉ seulement — le signal normal est `teteDecidee` (voir sa
      définition dans index.html, posé par `paint()` et par `armerEcheance`),
      que `loadLearnPart` (revealLearn) attend pour ne pas peindre une tête que
@@ -1912,8 +1921,9 @@ const CONFIG = {
      toujours par être pris en défaut par un cas qu'il n'avait pas prévu — d'où
      `teteDecidee`, qui REFLÈTE la décision plutôt que de la deviner, et fait
      de ce nombre-ci un filet qui ne devrait normalement jamais se
-     déclencher. */
-  HEAD_COORD_MS: 6500,
+     déclencher. Abaissé de 6500 à 4500 avec NEWS_DEADLINE_HARD_MS ci-dessus,
+     pour garder la même marge (+500 ms) au-dessus de lui. */
+  HEAD_COORD_MS: 4500,
   HEAD_COORD_RECHECK_MS: 120,
   /* Budget total accordé à UNE source, tous replis compris (backend, proxys
      publics, rss2json). Sans lui, une source morte cumulait les délais de
@@ -2866,7 +2876,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="276";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="277";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
