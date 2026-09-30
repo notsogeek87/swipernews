@@ -326,6 +326,137 @@ public class InAppBrowserPlugin extends Plugin {
     }
 
     /**
+     * Export automatique : ouvre le sélecteur de DOSSIER du système
+     * ({@code ACTION_OPEN_DOCUMENT_TREE}), garde l'accès de façon persistante
+     * (indispensable pour écrire depuis un worker, app fermée) et résout avec
+     * le nom du dossier. Annuler rejette avec « annulé », comme
+     * {@link #saveFile}. N'active rien par lui-même : voir
+     * {@link #setAutoExport}.
+     */
+    @PluginMethod
+    public void pickAutoExportFolder(PluginCall call) {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        try {
+            startActivityForResult(call, intent, "handlePickAutoExportFolder");
+        } catch (ActivityNotFoundException e) {
+            call.reject("aucune application pour choisir un dossier");
+        }
+    }
+
+    @ActivityCallback
+    private void handlePickAutoExportFolder(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null
+            || result.getData().getData() == null) {
+            call.reject("annulé");
+            return;
+        }
+        Uri tree = result.getData().getData();
+        try {
+            AutoExportWorker.takePermission(getContext(), tree);
+        } catch (SecurityException e) {
+            call.reject("accès au dossier refusé");
+            return;
+        }
+        SharedPreferences prefs = getContext()
+            .getSharedPreferences(AutoExportWorker.PREFS_NAME, Context.MODE_PRIVATE);
+        String old = prefs.getString(AutoExportWorker.KEY_FOLDER, null);
+        if (old != null && !old.equals(tree.toString())) {
+            AutoExportWorker.releasePermission(getContext(), Uri.parse(old));
+        }
+        prefs.edit().putString(AutoExportWorker.KEY_FOLDER, tree.toString())
+            .remove(AutoExportWorker.KEY_LAST_AT).remove(AutoExportWorker.KEY_LAST_OK).apply();
+        call.resolve(autoExportState());
+    }
+
+    /**
+     * Active ({@code enabled} + {@code days}, {@code opml}, {@code settings})
+     * ou désactive l'export automatique. Le contenu vient du web, déjà
+     * sérialisé : le worker ne fait que l'écrire. L'activation suppose un
+     * dossier déjà choisi ({@link #pickAutoExportFolder}) et lance aussitôt un
+     * premier export.
+     */
+    @PluginMethod
+    public void setAutoExport(PluginCall call) {
+        boolean enabled = Boolean.TRUE.equals(call.getBoolean("enabled", Boolean.FALSE));
+        SharedPreferences prefs = getContext()
+            .getSharedPreferences(AutoExportWorker.PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor ed = prefs.edit();
+        if (!enabled) {
+            String old = prefs.getString(AutoExportWorker.KEY_FOLDER, null);
+            if (old != null) AutoExportWorker.releasePermission(getContext(), Uri.parse(old));
+            ed.putBoolean(AutoExportWorker.KEY_ENABLED, false)
+                .remove(AutoExportWorker.KEY_FOLDER).remove(AutoExportWorker.KEY_OPML)
+                .remove(AutoExportWorker.KEY_SETTINGS).remove(AutoExportWorker.KEY_LAST_AT)
+                .remove(AutoExportWorker.KEY_LAST_OK).apply();
+            AutoExportWorker.cancel(getContext());
+            call.resolve(autoExportState());
+            return;
+        }
+        if (prefs.getString(AutoExportWorker.KEY_FOLDER, null) == null) {
+            call.reject("aucun dossier choisi");
+            return;
+        }
+        int days = call.getInt("days", 7);
+        if (days != 1 && days != 7 && days != 30) days = 7;
+        String opml = call.getString("opml");
+        String settings = call.getString("settings");
+        if (opml != null) ed.putString(AutoExportWorker.KEY_OPML, opml);
+        if (settings != null) ed.putString(AutoExportWorker.KEY_SETTINGS, settings);
+        ed.putBoolean(AutoExportWorker.KEY_ENABLED, true).putInt(AutoExportWorker.KEY_DAYS, days).commit();
+        AutoExportWorker.schedule(getContext(), days);
+        AutoExportWorker.runNow(getContext());
+        call.resolve(autoExportState());
+    }
+
+    /** Met à jour le contenu que le prochain export écrira — appelé par le web
+     *  quand l'app passe en arrière-plan, sans effet si l'export est éteint. */
+    @PluginMethod
+    public void syncAutoExport(PluginCall call) {
+        SharedPreferences prefs = getContext()
+            .getSharedPreferences(AutoExportWorker.PREFS_NAME, Context.MODE_PRIVATE);
+        if (prefs.getBoolean(AutoExportWorker.KEY_ENABLED, false)) {
+            SharedPreferences.Editor ed = prefs.edit();
+            String opml = call.getString("opml");
+            String settings = call.getString("settings");
+            if (opml != null) ed.putString(AutoExportWorker.KEY_OPML, opml);
+            if (settings != null) ed.putString(AutoExportWorker.KEY_SETTINGS, settings);
+            ed.apply();
+        }
+        call.resolve();
+    }
+
+    /** État pour l'affichage : actif, dossier (nom, ou vide s'il est perdu),
+     *  fréquence, résultat du dernier passage. */
+    @PluginMethod
+    public void autoExportStatus(PluginCall call) {
+        call.resolve(autoExportState());
+    }
+
+    private JSObject autoExportState() {
+        SharedPreferences prefs = getContext()
+            .getSharedPreferences(AutoExportWorker.PREFS_NAME, Context.MODE_PRIVATE);
+        JSObject res = new JSObject();
+        res.put("enabled", prefs.getBoolean(AutoExportWorker.KEY_ENABLED, false));
+        res.put("days", prefs.getInt(AutoExportWorker.KEY_DAYS, 7));
+        String folder = prefs.getString(AutoExportWorker.KEY_FOLDER, null);
+        res.put("hasFolder", folder != null);
+        if (folder != null) {
+            Uri tree = Uri.parse(folder);
+            String name = AutoExportWorker.displayName(getContext(), tree);
+            res.put("folder", name == null ? "" : name);
+            res.put("permission", AutoExportWorker.hasPermission(getContext(), tree));
+        }
+        if (prefs.contains(AutoExportWorker.KEY_LAST_AT)) {
+            res.put("lastAt", prefs.getLong(AutoExportWorker.KEY_LAST_AT, 0L));
+            res.put("lastOk", prefs.getBoolean(AutoExportWorker.KEY_LAST_OK, false));
+        }
+        return res;
+    }
+
+    /**
      * Instantané des sources actives que {@link NewsCheckWorker} relira à son
      * prochain réveil : chaque entrée porte l'URL RÉELLEMENT interrogée (déjà
      * résolue côté web par {@code urlDuFlux}, jamais recalculée ici) et le

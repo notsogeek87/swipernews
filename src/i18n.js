@@ -315,6 +315,19 @@
       "sheet.backup.export": "↓ Exporter tous les réglages",
       "sheet.backup.import": "↑ Importer tous les réglages",
 
+      "autoexport.label": "Export automatique",
+      "autoexport.desc":
+        "Écrit tout seul tes sources (OPML) et tes réglages (JSON) dans un dossier de ton choix, même app fermée.",
+      "autoexport.opt.off": "Non",
+      "autoexport.opt.1": "Chaque jour",
+      "autoexport.opt.7": "Chaque semaine",
+      "autoexport.opt.30": "Chaque mois",
+      "autoexport.folder": "Dossier : {name}",
+      "autoexport.lastOk": "dernier export {date}",
+      "autoexport.lastKo": "dernier export ÉCHOUÉ ({date}) — rechoisis le dossier",
+      "autoexport.lost": "Le dossier n'est plus accessible — rechoisis-le.",
+      "autoexport.change": "Changer de dossier",
+
       "sheet.apply": "Voir mon fil",
 
       "lang.title": "🌐 Langue",
@@ -759,6 +772,19 @@
         "Export or import ALL your settings in one file (mix, interests, sources, YouTube API key, reader settings) — handy when switching devices.",
       "sheet.backup.export": "↓ Export all settings",
       "sheet.backup.import": "↑ Import all settings",
+
+      "autoexport.label": "Automatic export",
+      "autoexport.desc":
+        "Writes your sources (OPML) and settings (JSON) to a folder you choose, even when the app is closed.",
+      "autoexport.opt.off": "Off",
+      "autoexport.opt.1": "Daily",
+      "autoexport.opt.7": "Weekly",
+      "autoexport.opt.30": "Monthly",
+      "autoexport.folder": "Folder: {name}",
+      "autoexport.lastOk": "last export {date}",
+      "autoexport.lastKo": "last export FAILED ({date}) — pick the folder again",
+      "autoexport.lost": "The folder is no longer accessible — pick it again.",
+      "autoexport.change": "Change folder",
 
       "sheet.apply": "See my feed",
 
