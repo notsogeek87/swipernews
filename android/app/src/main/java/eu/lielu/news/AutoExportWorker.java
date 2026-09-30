@@ -9,8 +9,6 @@ import android.provider.DocumentsContract;
 import androidx.annotation.NonNull;
 import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
-import androidx.work.ExistingWorkPolicy;
-import androidx.work.OneTimeWorkRequest;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
 import androidx.work.Worker;
@@ -22,10 +20,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Export périodique, APP FERMÉE, des sources (OPML) et des réglages (JSON)
+ * Export périodique, APP FERMÉE, de la sauvegarde complète (réglages ET sources, JSON)
  * dans le dossier choisi une fois par l'utilisateur (Storage Access Framework,
  * {@code ACTION_OPEN_DOCUMENT_TREE}) — le pendant automatique des boutons
- * « Exporter » du panneau.
+ * « Exporter tous les réglages » du panneau.
  *
  * <p>Les données vivent dans le localStorage de la WebView, inaccessible d'ici :
  * le web POUSSE donc le contenu déjà sérialisé (voir
@@ -34,7 +32,7 @@ import java.util.concurrent.TimeUnit;
  * {@link NewsCheckWorker} : le natif ne recalcule rien.
  *
  * <p>Chaque passage ÉCRASE les mêmes fichiers (SAF créerait sinon
- * « xxx (1).opml » à chaque fois). Un échec est mémorisé, pas rejoué : un
+ * « xxx (1).json » à chaque fois). Un échec est mémorisé, pas rejoué : un
  * dossier perdu demande l'utilisateur, un backoff n'y changerait rien.
  */
 public class AutoExportWorker extends Worker {
@@ -43,16 +41,15 @@ public class AutoExportWorker extends Worker {
     static final String KEY_ENABLED = "enabled";
     static final String KEY_FOLDER = "folder";
     static final String KEY_DAYS = "days";
-    static final String KEY_OPML = "opml";
     static final String KEY_SETTINGS = "settings";
     static final String KEY_LAST_AT = "last_at";
     static final String KEY_LAST_OK = "last_ok";
 
-    static final String OPML_NAME = "swipernews-sources.opml";
-    static final String SETTINGS_NAME = "swipernews-reglages.json";
+    /** UN seul fichier : la sauvegarde complète (réglages ET sources), la même
+     *  que « Exporter tous les réglages », réimportable telle quelle. */
+    static final String BACKUP_NAME = "swipernews-sauvegarde.json";
 
     private static final String WORK_NAME = "auto-export";
-    private static final String WORK_NAME_NOW = "auto-export-now";
 
     public AutoExportWorker(@NonNull Context context, @NonNull WorkerParameters params) {
         super(context, params);
@@ -69,18 +66,8 @@ public class AutoExportWorker extends Worker {
             .enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request);
     }
 
-    /** Un premier export tout de suite : sans lui, rien n'apparaîtrait dans le
-     *  dossier avant la fin de la première période. */
-    public static void runNow(Context context) {
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            WORK_NAME_NOW, ExistingWorkPolicy.REPLACE,
-            new OneTimeWorkRequest.Builder(AutoExportWorker.class).build());
-    }
-
     public static void cancel(Context context) {
-        WorkManager wm = WorkManager.getInstance(context);
-        wm.cancelUniqueWork(WORK_NAME);
-        wm.cancelUniqueWork(WORK_NAME_NOW);
+        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME);
     }
 
     /** Vrai tant que le système nous garde l'accès en lecture ET écriture au dossier. */
@@ -133,13 +120,11 @@ public class AutoExportWorker extends Worker {
             if (!hasPermission(ctx, tree)) {
                 ok = false;
             } else {
-                String opml = prefs.getString(KEY_OPML, null);
                 String settings = prefs.getString(KEY_SETTINGS, null);
                 // Rien poussé par le web (app jamais ouverte depuis l'activation) :
                 // écrire un fichier vide écraserait une bonne sauvegarde.
-                if (opml == null && settings == null) return Result.success();
-                if (opml != null) write(ctx, tree, OPML_NAME, "text/xml", opml);
-                if (settings != null) write(ctx, tree, SETTINGS_NAME, "application/json", settings);
+                if (settings == null) return Result.success();
+                write(ctx, tree, BACKUP_NAME, "application/json", settings);
                 ok = true;
             }
         } catch (Exception e) {

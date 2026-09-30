@@ -317,7 +317,7 @@
 
       "autoexport.label": "Export automatique",
       "autoexport.desc":
-        "Écrit tout seul tes sources (OPML) et tes réglages (JSON) dans un dossier de ton choix, même app fermée.",
+        "Écrit tout seul la sauvegarde complète (réglages et sources) dans un seul fichier, dans un dossier de ton choix, même app fermée.",
       "autoexport.opt.off": "Non",
       "autoexport.opt.1": "Chaque jour",
       "autoexport.opt.7": "Chaque semaine",
@@ -775,7 +775,7 @@
 
       "autoexport.label": "Automatic export",
       "autoexport.desc":
-        "Writes your sources (OPML) and settings (JSON) to a folder you choose, even when the app is closed.",
+        "Writes the full backup (settings and sources) as a single file to a folder you choose, even when the app is closed.",
       "autoexport.opt.off": "Off",
       "autoexport.opt.1": "Daily",
       "autoexport.opt.7": "Weekly",

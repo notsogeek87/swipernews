@@ -372,11 +372,12 @@ public class InAppBrowserPlugin extends Plugin {
     }
 
     /**
-     * Active ({@code enabled} + {@code days}, {@code opml}, {@code settings})
+     * Active ({@code enabled} + {@code days}, {@code settings})
      * ou désactive l'export automatique. Le contenu vient du web, déjà
      * sérialisé : le worker ne fait que l'écrire. L'activation suppose un
-     * dossier déjà choisi ({@link #pickAutoExportFolder}) et lance aussitôt un
-     * premier export.
+     * dossier déjà choisi ({@link #pickAutoExportFolder}). Pas de lancement
+     * manuel en plus : WorkManager exécute déjà la tâche périodique tout de
+     * suite, et un second passage écrivait le fichier deux fois.
      */
     @PluginMethod
     public void setAutoExport(PluginCall call) {
@@ -388,7 +389,7 @@ public class InAppBrowserPlugin extends Plugin {
             String old = prefs.getString(AutoExportWorker.KEY_FOLDER, null);
             if (old != null) AutoExportWorker.releasePermission(getContext(), Uri.parse(old));
             ed.putBoolean(AutoExportWorker.KEY_ENABLED, false)
-                .remove(AutoExportWorker.KEY_FOLDER).remove(AutoExportWorker.KEY_OPML)
+                .remove(AutoExportWorker.KEY_FOLDER)
                 .remove(AutoExportWorker.KEY_SETTINGS).remove(AutoExportWorker.KEY_LAST_AT)
                 .remove(AutoExportWorker.KEY_LAST_OK).apply();
             AutoExportWorker.cancel(getContext());
@@ -401,13 +402,10 @@ public class InAppBrowserPlugin extends Plugin {
         }
         int days = call.getInt("days", 7);
         if (days != 1 && days != 7 && days != 30) days = 7;
-        String opml = call.getString("opml");
         String settings = call.getString("settings");
-        if (opml != null) ed.putString(AutoExportWorker.KEY_OPML, opml);
         if (settings != null) ed.putString(AutoExportWorker.KEY_SETTINGS, settings);
         ed.putBoolean(AutoExportWorker.KEY_ENABLED, true).putInt(AutoExportWorker.KEY_DAYS, days).commit();
         AutoExportWorker.schedule(getContext(), days);
-        AutoExportWorker.runNow(getContext());
         call.resolve(autoExportState());
     }
 
@@ -419,9 +417,7 @@ public class InAppBrowserPlugin extends Plugin {
             .getSharedPreferences(AutoExportWorker.PREFS_NAME, Context.MODE_PRIVATE);
         if (prefs.getBoolean(AutoExportWorker.KEY_ENABLED, false)) {
             SharedPreferences.Editor ed = prefs.edit();
-            String opml = call.getString("opml");
             String settings = call.getString("settings");
-            if (opml != null) ed.putString(AutoExportWorker.KEY_OPML, opml);
             if (settings != null) ed.putString(AutoExportWorker.KEY_SETTINGS, settings);
             ed.apply();
         }
