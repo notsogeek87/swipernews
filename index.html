@@ -1496,13 +1496,13 @@
       <h2 data-i18n="welcome.title">Bienvenue sur SwiperNews</h2>
     </div>
     <p class="intro" data-i18n="welcome.pitch">✨ Le swipe qui rend plus malin. Un seul fil : tes actus, et entre elles des articles Wikipédia qui t'apprennent un truc que tu ne connaissais pas.</p>
-    <!-- Choix binaire majeur/mineur, UNIQUEMENT pour pré-cocher les sources
-         d'actu (voir setAgeCategory/MINOR_FEEDS) — jamais persisté à part,
-         jamais revu ensuite : c'est un remplacement en un tap de `feeds`, au
-         même titre qu'un bouton de SUGGESTED_FEEDS, pas un réglage permanent.
-         Pas de secttl/sub séparé, même raison que data-cardsmount juste en
-         dessous : prefRow porte déjà son libellé + la description de l'option
-         choisie. -->
+    <!-- Choix binaire +15/-15 ans, UNIQUEMENT pour pré-cocher les sources
+         d'actu (voir setAgeCategory/MINOR_FEEDS — noms internes "major"/
+         "minor", jamais exposés) — jamais persisté à part, jamais revu
+         ensuite : c'est un remplacement en un tap de `feeds`, au même titre
+         qu'un bouton de SUGGESTED_FEEDS, pas un réglage permanent. Pas de
+         secttl/sub séparé, même raison que data-cardsmount juste en dessous :
+         prefRow porte déjà son libellé + la description de l'option choisie. -->
     <div data-agemount></div>
     <h3 class="secttl" data-i18n="sheet.mix.title">🎚️ Dose d'apprentissage</h3>
     <p class="sub" data-i18n="dose.sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
@@ -1793,7 +1793,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=281"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=281"></script>
+<script src="src/i18n.js?v=282"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2110,8 +2110,8 @@ const DEFAULT_FEEDS = [
   {name:"20 Minutes", url:"https://www.20minutes.fr/feeds/rss-une.xml", on:true},
 ];
 /* Sources posées à la place de DEFAULT_FEEDS quand l'accueil du 1er lancement
-   se déclare "mineur" (voir #welcomeSheet, setAgeCategory) — un remplacement
-   complet, jamais un ajout : la case "Majeur" doit garder EXACTEMENT les
+   déclare "- de 15 ans" (voir #welcomeSheet, setAgeCategory) — un remplacement
+   complet, jamais un ajout : la case "+ de 15 ans" doit garder EXACTEMENT les
    sources d'aujourd'hui. Choisies pour un public plus jeune (actu expliquée,
    podcasts jeunesse France Info, actu jeux vidéo), toutes modifiables ensuite
    comme n'importe quelle source. */
@@ -2885,7 +2885,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="281";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="282";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -7127,8 +7127,9 @@ function setCardsPerSwipe(v){
   renderCardsPref();
   render();   // recompose les cartes groupées ; aucun appel réseau (comme applyMix)
 }
-/* Choix "Majeur"/"Mineur" de l'accueil du 1er lancement (voir #welcomeSheet) :
-   ne vaut que pour pré-cocher des sources, jamais relu ensuite — pas de clé
+/* Choix "+ de 15 ans"/"- de 15 ans" de l'accueil du 1er lancement (voir
+   #welcomeSheet) — valeurs internes "major"/"minor", jamais affichées : ne
+   vaut que pour pré-cocher des sources, jamais relu ensuite — pas de clé
    localStorage dédiée, contrairement à cardsPerSwipe/apptheme ci-dessus. Un
    utilisateur déjà en place ne revoit jamais ce choix (welcomeSheet ne
    s'ouvre qu'au 1er lancement, voir firstRun) ; changer d'avis après coup se
@@ -7144,9 +7145,9 @@ function setAgeCategory(v){
   if(next===ageCategory)return;
   ageCategory=next;
   // Remplacement COMPLET de `feeds`, jamais un ajout : sinon un aller-retour
-  // Mineur→Majeur→Mineur empilerait les deux jeux de sources. save() persiste
-  // et remet à jour la pastille de filtre des sources, comme tout changement
-  // de feeds ailleurs dans l'app.
+  // -15→+15→-15 ans empilerait les deux jeux de sources. save() persiste et
+  // remet à jour la pastille de filtre des sources, comme tout changement de
+  // feeds ailleurs dans l'app.
   feeds=structuredClone(next==="minor"?MINOR_FEEDS:DEFAULT_FEEDS);
   save();
   renderAgePref();

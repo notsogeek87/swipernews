@@ -225,12 +225,13 @@
         "Choisis les thèmes qui t'intéressent — ou aucun, pour un peu de tout. Modifiable à tout moment depuis les réglages ⚙.",
       "welcome.start": "C'est parti →",
 
-      "age.label": "👤 Tu es",
-      "age.desc.major": "Majeur : les sources d'actu généralistes proposées par défaut.",
+      "age.label": "👤 Tu as",
+      "age.desc.major":
+        "Plus de 15 ans : les sources d'actu généralistes proposées par défaut.",
       "age.desc.minor":
-        "Mineur : des sources pensées pour les plus jeunes, à la place des sources par défaut.",
-      "age.opt.major": "Majeur",
-      "age.opt.minor": "Mineur",
+        "Moins de 15 ans : des sources pensées pour les plus jeunes, à la place des sources par défaut.",
+      "age.opt.major": "+ de 15 ans",
+      "age.opt.minor": "- de 15 ans",
 
       "sheet.aria": "Réglages de ton fil",
       "sheet.title": "Ton fil",
@@ -686,11 +687,11 @@
       "welcome.start": "Let's go →",
 
       "age.label": "👤 You are",
-      "age.desc.major": "An adult: the general-news sources used by default.",
+      "age.desc.major": "Over 15: the general-news sources used by default.",
       "age.desc.minor":
-        "A minor: sources aimed at younger readers, instead of the default ones.",
-      "age.opt.major": "Adult",
-      "age.opt.minor": "Minor",
+        "Under 15: sources aimed at younger readers, instead of the default ones.",
+      "age.opt.major": "15+",
+      "age.opt.minor": "Under 15",
 
       "sheet.aria": "Your feed's settings",
       "sheet.title": "Your feed",
