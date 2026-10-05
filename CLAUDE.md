@@ -201,7 +201,7 @@ revue de la MR ont appris.
 > **trois** en même temps :
 >
 > - `APP_VERSION` dans `index.html`
-> - le `?v=` des deux balises `<script src="src/…">`
+> - le `?v=` des balises `<script src="src/…">` dont le fichier a changé
 > - `CACHE` dans `sw.js` (`flux-vN`)
 
 `index.html` et `src/*.js` forment un ensemble indivisible : servir l'un sans
@@ -210,6 +210,20 @@ périmé en cache ne peut pas être servi à un `index.html` neuf.
 
 **Une modification purement native (`android/`) ne demande aucun bump** — rien
 ne change côté web.
+
+---
+
+## Skills du dépôt (`.claude/skills/`)
+
+Les procédures répétitives vivent dans des skills ; ce fichier garde le *pourquoi*.
+
+| Skill | Quand |
+| --- | --- |
+| `swipernews-bump` | toute modif de `index.html` / `src/*.js` : bump de version + `check.sh` |
+| `swipernews-verifier` | avant de pousser du web : tests, lint, syntaxe du JS en ligne, banc de QA |
+| `swipernews-natif-sans-sdk` | toute modif de `android/` sans SDK |
+| `swipernews-release` | publier `vX.Y.Z` (versionCode, tag, F-Droid) |
+| `swipernews-i18n-changelog` | nouveau texte d'interface ou « Nouveautés » |
 
 ---
 
