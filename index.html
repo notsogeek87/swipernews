@@ -1191,10 +1191,17 @@
      fenêtre desktop resterait à tort « large » sans ce garde-fou. 1024 px de
      large reste la borne d'origine du verrou (viewport, pas écran — une
      fenêtre desktop redimensionnée doit continuer à se comporter en fenêtre
-     redimensionnée). */
+     redimensionnée).
+
+     Le CLAVIER VIRTUEL, lui, n'est pas une rotation : il raccourcit le
+     viewport, et un téléphone resté debout se met alors à répondre
+     `orientation:landscape` (largeur > hauteur visible) — le verrou
+     recouvrait les réglages dès qu'on touchait un champ texte. La classe
+     `clavier` (posée par JS, voir majClavier()) le retire tant qu'un champ
+     est actif ET que l'écran physique, lui, est resté en portrait. */
   .orientlock{display:none}
   @media (orientation:landscape) and (max-width:1024px){
-    html:not(.paysagelarge) .orientlock{display:flex;position:fixed;inset:0;z-index:9999;flex-direction:column;
+    html:not(.paysagelarge):not(.clavier) .orientlock{display:flex;position:fixed;inset:0;z-index:9999;flex-direction:column;
       align-items:center;justify-content:center;gap:16px;padding:32px;text-align:center;
       background:var(--bg)}
     .orientlock__ic{font-size:44px;animation:orientspin 1.8s ease-in-out infinite}
@@ -1793,7 +1800,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=281"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=282"></script>
+<script src="src/i18n.js?v=283"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2885,7 +2892,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="282";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="283";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -7710,10 +7717,26 @@ histList.addEventListener("click",e=>{
    UNIQUEMENT quand le viewport est court ET l'appareil est tactile ET
    l'écran, lui, ne l'est pas. */
 function paysageLargeActif(){
+  if(ecranPortrait())return false;   // clavier ouvert sur un écran debout : pas un vrai paysage
   if(!matchMedia("(orientation:landscape)").matches||innerWidth<900)return false;
   if(innerHeight>=560)return true;
   return matchMedia("(pointer:coarse)").matches&&screen.height>=560;
 }
+// L'écran PHYSIQUE est-il debout ? Contrairement au viewport, `screen` ne
+// rétrécit pas quand le clavier virtuel monte.
+function ecranPortrait(){
+  const o=screen.orientation&&screen.orientation.type;
+  return o?o.startsWith("portrait"):screen.height>=screen.width;
+}
+// Un champ texte actif sur un écran debout : le viewport raccourci par le
+// clavier ne doit pas déclencher le verrou « portrait » (CSS .orientlock).
+function majClavier(){
+  const a=document.activeElement,champ=!!a&&(a.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
+  document.documentElement.classList.toggle("clavier",champ&&ecranPortrait());
+}
+addEventListener("focusin",majClavier);
+addEventListener("focusout",()=>setTimeout(majClavier,0));
+addEventListener("resize",majClavier);
 function majPaysageLarge(){
   const actif=paysageLargeActif();
   if(document.documentElement.classList.contains("paysagelarge")===actif)return;
