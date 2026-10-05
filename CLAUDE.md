@@ -265,73 +265,20 @@ travail (pas de commit de merge). Vercel déploie `main` pour le web.
 
 **Il n'y a pas de SDK Android** (`dl.google.com` est bloqué par la politique
 réseau). Impossible de lancer Gradle, donc impossible de compiler `android/`
-ici. Ce qui reste possible, et qu'il faut faire systématiquement avant de
-pousser du natif :
+ici : la CI s'en charge. Ce qui reste vérifiable (syntaxe Java, XML, scripts
+injectés, JS en ligne d'`index.html`, banc de QA dans Chromium) est décrit dans
+les skills, à lancer avant de pousser :
 
-```bash
-# Syntaxe Java : toutes les erreurs « package android.* does not exist » et
-# « cannot find symbol » sont NORMALES (pas d'android.jar). Ce qu'on cherche,
-# c'est l'absence d'erreur de syntaxe.
-javac -d /tmp/out android/app/src/main/java/eu/lielu/news/*.java 2>&1 \
-  | grep -vE "package .* does not exist|cannot find symbol|^import |^ *\^|symbol:|location:"
+- `swipernews-natif-sans-sdk` — `javac` filtré, XML, `node --check` sur
+  `reader_*.js` ;
+- `swipernews-verifier` — tests, lint, JS en ligne, banc de QA ; le simulateur
+  du pont Capacitor (pour exercer les chemins natifs depuis le navigateur) est
+  dans `references/pont-capacitor.md`.
 
-# Ressources XML bien formées
-python3 -c "
-import xml.dom.minidom,glob,sys
-for f in glob.glob('android/app/src/main/res/**/*.xml',recursive=True):
-    xml.dom.minidom.parse(f)
-print('XML OK')"
-
-# Scripts injectés dans la WebView
-node --check android/app/src/main/res/raw/reader_*.js
-```
-
-Le JS en ligne d'`index.html` n'est pas couvert par eslint : l'extraire pour le
-vérifier.
-
-```bash
-node -e 'const fs=require("fs"),h=fs.readFileSync("index.html","utf8");
-const re=/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;let m,i=0;
-while((m=re.exec(h)))fs.writeFileSync("/tmp/chk"+(++i)+".js",m[1]);' \
-  && for f in /tmp/chk*.js; do node --check "$f"; done
-```
-
-### Vérifier pour de vrai, dans un navigateur
-
-Chromium est préinstallé. `playwright-core` s'installe dans le scratchpad (ne
-pas l'ajouter au `package.json`) :
-
-```bash
-npm i playwright-core --prefix "$SCRATCHPAD"
-# chromium : executablePath: "/opt/pw-browsers/chromium"
-python3 -m http.server 8124   # servir le dépôt, puis http://localhost:8124/index.html
-```
-
-Pour exercer les chemins **natifs** depuis le navigateur, simuler le pont
-Capacitor avant chargement — c'est ainsi qu'ont été vérifiés les réglages du
-lecteur :
-
-```js
-await page.addInitScript(() => {
-  // sinon le panneau d'accueil s'ouvre tout seul et bloque les clics
-  localStorage.setItem("fluxswipe.interests.v1", JSON.stringify(["sciences"]));
-  window.__opened = [];
-  window.Capacitor = {
-    isNativePlatform: () => true,
-    Plugins: { InAppBrowser: {
-      open: (o) => { window.__opened.push(o); return Promise.resolve(); },
-      syncBlocklist: () => Promise.resolve({ count: 50047 }),
-      clearBlocklist: () => Promise.resolve(),
-    } },
-  };
-});
-```
-
-Les scripts injectés (`reader_cmp.js`, `reader_ads.js`, `reader_read.js`) se
-testent directement avec `page.evaluate(fs.readFileSync(...))` sur une page
-piégée — **toujours inclure des faux positifs** (un article qui *parle* de
-cookies, un conteneur nommé `ad-…` qui porte une vraie image) : c'est là que ce
-genre de script dérape.
+Deux règles qui valent partout : les scripts injectés se testent sur une page
+piégée avec des **faux positifs** (un article qui *parle* de cookies, un
+conteneur `ad-…` portant une vraie image) ; et `playwright-core` s'installe
+hors du dépôt, jamais dans `package.json`.
 
 ---
 
@@ -1511,12 +1458,9 @@ ne faut pas partir corriger : `offline` fait remonter des
 `about:blank`, qui n'y a pas accès). Les deux sont présents à l'identique sur
 `main` — les comparer à un checkout propre avant d'y voir autre chose.
 
-```bash
-npm i playwright-core --prefix /tmp/qa       # hors package.json, à dessein
-python3 -m http.server 8124                  # servir le dépôt
-NODE_PATH=/tmp/qa/node_modules node tools/qa-scenarios.js          # liste
-NODE_PATH=/tmp/qa/node_modules node tools/qa-scenarios.js corruptcache
-```
+Mise en place et choix des scénarios selon la zone touchée : skill
+`swipernews-verifier`. Un scénario seul : `node tools/qa-scenarios.js <nom>`
+(sans argument, il liste les scénarios).
 
 C'est ce banc qui a trouvé les deux pannes critiques de
 `AUDIT-ROBUSTESSE-2026-08.md` — invisibles en lecture de code, parce qu'elles

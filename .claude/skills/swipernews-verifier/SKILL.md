@@ -48,3 +48,7 @@ En cas de doute sur la zone, tout rejouer. Après un changement du chargement, d
 ## 4. Rendre compte
 
 Dire clairement ce qui a tourné et ce qui a échoué (sortie à l'appui), et ce qui n'a pas été joué. Ne pas annoncer « vérifié » sur la seule base de `npm test`.
+
+## Pour exercer le natif depuis le navigateur
+
+Voir `references/pont-capacitor.md` (simulateur du pont Capacitor à injecter avant le chargement).
