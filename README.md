@@ -45,6 +45,24 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
   que le fil garde sous la main, dans l'ordre, avec un repère sur celle qu'on
   lit — pour revenir sur un article dépassé d'un swipe de trop, sans remonter à
   l'aveugle
+- **Écouter le fil** (menu) : l'app lit à voix haute la carte à l'écran — source,
+  titre, résumé — puis passe d'elle-même à la suivante, comme une revue de presse
+  à la radio. Swiper reprend la lecture sur la carte d'arrivée ; la pilule
+  « Arrêter l'écoute », un panneau, une vidéo, un article ouvert ou l'app mise en
+  arrière-plan l'arrêtent. Voix **du système** uniquement : `speechSynthesis` sur
+  le web, le moteur `TextToSpeech` d'Android dans l'APK (la WebView n'implémente
+  pas `speechSynthesis`) — aucun service tiers
+- **Mots masqués** (réglages) : tout article, actu ou Wikipédia, dont le titre,
+  le résumé ou les catégories contiennent un de ces mots sort du fil. Mot entier,
+  sans tenir compte de la casse ni des accents ; un `*` final couvre les
+  variantes (`chat*` → « chats »). Appliqué à l'entrelacement, pas à la
+  récupération : ajouter ou retirer un mot agit à l'instant, sans réseau. Voir
+  `mutedMatcher` (`src/lib.js`)
+- **Pause douce** (réglages, désactivée par défaut) : tous les 25, 50 ou 100
+  cartes défilées dans la journée, une feuille propose de s'arrêter. « Continuer »
+  la referme sans rien bloquer ; « J'arrête là » met l'app en arrière-plan dans
+  l'APK. Le fil n'a pas de fin par construction — c'est ce qui manquait pour
+  reprendre le geste des réseaux sociaux *sans* ce qui va avec
 - Lisibilité sur photo : l'image n'est **jamais assombrie**, mais elle est floutée
   localement derrière le bloc de texte, et les textes portent un halo discret. Un flou
   supprime le détail sans changer la luminance — c'est le halo qui rend lisible sur un

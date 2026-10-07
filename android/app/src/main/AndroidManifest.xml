@@ -69,4 +69,14 @@
          qui rend NewsCheckWorker vraiment fiable en arrière-plan, Doze
          retardant sinon un WorkManager périodique quelle que soit sa cadence. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- « Écouter le fil » (InAppBrowserPlugin.speak) : depuis Android 11, la
+         visibilité des paquets cache le moteur de synthèse vocale à une app
+         qui ne le déclare pas ici — TextToSpeech échouerait alors à s'initialiser
+         sans autre message. Aucune permission, seulement une déclaration. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
 </manifest>

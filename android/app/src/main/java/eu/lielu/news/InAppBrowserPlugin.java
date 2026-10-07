@@ -10,6 +10,8 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 
 import androidx.activity.result.ActivityResult;
 
@@ -17,6 +19,12 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -589,5 +597,137 @@ public class InAppBrowserPlugin extends Plugin {
         JSObject res = new JSObject();
         res.put("ignoring", isIgnoringBatteryOptimizationsNow());
         call.resolve(res);
+    }
+
+    // ---------- Synthèse vocale (« Écouter le fil ») ----------
+    //
+    // La WebView d'Android n'implémente pas speechSynthesis : sans ce pont,
+    // « Écouter le fil » n'existerait que sur le web. Le moteur est celui du
+    // système (aucun tiers, aucun réseau de notre part), créé à la PREMIÈRE
+    // demande seulement — qui n'écoute jamais ne paie aucune initialisation.
+    //
+    // Une demande = une phrase : speak() ne se résout qu'à la FIN de la lecture
+    // (onDone), et se rejette si elle est coupée (stopSpeaking, ou une demande
+    // suivante en QUEUE_FLUSH). C'est ce qui permet au web d'enchaîner les
+    // cartes sans écouteur d'événements.
+
+    private TextToSpeech tts;
+    /** 0 : jamais demandé, 1 : initialisation en cours, 2 : prêt, -1 : indisponible. */
+    private int ttsState = 0;
+    private final List<Runnable> ttsWaiting = new ArrayList<>();
+    private final Map<String, PluginCall> ttsCalls = new HashMap<>();
+
+    @PluginMethod
+    public void speak(PluginCall call) {
+        String text = call.getString("text", "");
+        if (text == null || text.trim().isEmpty()) {
+            call.reject("rien à lire");
+            return;
+        }
+        String lang = call.getString("lang", "fr-FR");
+        synchronized (this) {
+            if (ttsState == -1) {
+                call.reject("synthèse vocale indisponible");
+                return;
+            }
+            if (ttsState != 2) {
+                ttsWaiting.add(() -> doSpeak(call, text, lang));
+                if (ttsState == 0) {
+                    ttsState = 1;
+                    // Affecté SOUS le verrou : onTtsInit (fil principal) le
+                    // prend aussi, donc ne peut pas voir un champ encore nul.
+                    tts = new TextToSpeech(getContext(), this::onTtsInit);
+                }
+                return;
+            }
+        }
+        doSpeak(call, text, lang);
+    }
+
+    @PluginMethod
+    public void stopSpeaking(PluginCall call) {
+        synchronized (this) {
+            if (tts != null && ttsState == 2) tts.stop();
+        }
+        call.resolve();
+    }
+
+    private void onTtsInit(int status) {
+        List<Runnable> waiting;
+        synchronized (this) {
+            ttsState = status == TextToSpeech.SUCCESS && tts != null ? 2 : -1;
+            if (ttsState == 2) {
+                tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                    @Override
+                    public void onStart(String id) { }
+
+                    @Override
+                    public void onDone(String id) { finishUtterance(id, null); }
+
+                    @Override
+                    @Deprecated
+                    public void onError(String id) { finishUtterance(id, "erreur de lecture"); }
+
+                    @Override
+                    public void onError(String id, int errorCode) { finishUtterance(id, "erreur de lecture"); }
+
+                    @Override
+                    public void onStop(String id, boolean interrupted) { finishUtterance(id, "interrompu"); }
+                });
+            }
+            waiting = new ArrayList<>(ttsWaiting);
+            ttsWaiting.clear();
+        }
+        for (Runnable r : waiting) r.run();
+    }
+
+    private void doSpeak(PluginCall call, String text, String lang) {
+        synchronized (this) {
+            if (ttsState != 2 || tts == null) {
+                call.reject("synthèse vocale indisponible");
+                return;
+            }
+            int support = tts.setLanguage(Locale.forLanguageTag(lang));
+            if (support == TextToSpeech.LANG_MISSING_DATA || support == TextToSpeech.LANG_NOT_SUPPORTED) {
+                call.reject("langue indisponible");
+                return;
+            }
+            int max = TextToSpeech.getMaxSpeechInputLength();
+            String t = text.length() > max ? text.substring(0, max) : text;
+            String id = UUID.randomUUID().toString();
+            ttsCalls.put(id, call);
+            if (tts.speak(t, TextToSpeech.QUEUE_FLUSH, null, id) == TextToSpeech.ERROR) {
+                ttsCalls.remove(id);
+                call.reject("lecture impossible");
+            }
+        }
+    }
+
+    private void finishUtterance(String id, String error) {
+        PluginCall c;
+        synchronized (this) {
+            c = ttsCalls.remove(id);
+        }
+        if (c == null) return;
+        if (error == null) c.resolve();
+        else c.reject(error);
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        List<PluginCall> pending;
+        synchronized (this) {
+            if (tts != null) {
+                tts.stop();
+                tts.shutdown();
+                tts = null;
+            }
+            ttsState = 0;
+            pending = new ArrayList<>(ttsCalls.values());
+            ttsCalls.clear();
+            ttsWaiting.clear();
+        }
+        for (PluginCall c : pending) c.reject("arrêté");
+        super.handleOnDestroy();
     }
 }

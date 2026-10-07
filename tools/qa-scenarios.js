@@ -2908,6 +2908,309 @@ ${Array.from({ length: 12 }, (_, k) => {
     await essai("actus mortes", "mortes");
     await essai("sans actus actives", "sansactus");
   },
+
+  /* Mots masqués : un mot ajouté sort du fil À L'INSTANT et sans réseau (les
+     articles restent dans les réserves, seul l'entrelacement change), un mot
+     retiré les ramène, et le réglage survit à un relancement. Le titre visé
+     est « Actu 3 » : mot entier, il ne doit PAS emporter « Actu 30 » ni
+     « Actu 0 ». Couvre aussi Wikipédia (« Wiki 5 »). */
+  async motsmasques() {
+    const { browser, page, errors } = await boot({ storage: READY });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    const titres = () => page.evaluate(() => items.map((i) => i.title));
+    const avant = await titres();
+    let requetes = 0;
+    page.on("request", (r) => {
+      if (/api\/(feed|learn)|wikipedia/.test(r.url())) requetes++;
+    });
+    await page.evaluate(() => setMutedWords(["actu 3", "WIKI 5"]));
+    await page.waitForTimeout(300);
+    const apres = await titres();
+    const dom = await page.evaluate(() =>
+      [...document.querySelectorAll(".card__title")].map((t) => t.textContent.trim())
+    );
+    console.log(
+      `avant : ${avant.length} articles (Actu 3 : ${avant.includes("Actu 3")}, Wiki 5 : ${avant.includes("Wiki 5")})`
+    );
+    console.log(
+      `après : ${apres.length} articles | Actu 3 : ${apres.includes("Actu 3")} | Wiki 5 : ${apres.includes("Wiki 5")} | dans le DOM : ${dom.includes("Actu 3") || dom.includes("Wiki 5")}`
+    );
+    console.log(
+      `autres gardés : ${["Actu 0", "Actu 4", "Wiki 4"].every((t) => apres.includes(t) === avant.includes(t))}`
+    );
+    console.log(`requêtes réseau déclenchées : ${requetes} (attendu 0)`);
+    // Relancement : le réglage persiste
+    await page.reload();
+    await page.waitForTimeout(2500);
+    const relance = await page.evaluate(() => ({
+      mots: mutedWords,
+      present: items.some((i) => i.title === "Actu 3"),
+    }));
+    console.log(
+      `après relancement : mots ${JSON.stringify(relance.mots)}, Actu 3 présent : ${relance.present}`
+    );
+    // Puces dans le panneau, puis retrait d'un mot par sa puce
+    await page.evaluate(() => openSettings());
+    await page.waitForTimeout(300);
+    const puces = await page.$$eval("#muteList [data-unmute]", (b) =>
+      b.map((x) => x.textContent)
+    );
+    await page.click('#muteList [data-unmute="0"]');
+    await page.waitForTimeout(300);
+    const retour = await page.evaluate(() => ({
+      mots: mutedWords,
+      present: items.some((i) => i.title === "Actu 3"),
+    }));
+    console.log(
+      `puces : ${JSON.stringify(puces)} → après retrait : ${JSON.stringify(retour.mots)}, Actu 3 revenu : ${retour.present}`
+    );
+    // Saisie libre au clavier
+    await page.fill("#muteInput", "foo, bar ; foo");
+    await page.press("#muteInput", "Enter");
+    const saisie = await page.evaluate(() => mutedWords);
+    console.log(`saisie « foo, bar ; foo » → ${JSON.stringify(saisie)}`);
+    // Stockage abîmé : aucun mot, jamais d'exception
+    await page.evaluate(() =>
+      localStorage.setItem("fluxswipe.mutes.v1", '{"pas":"un tableau"}')
+    );
+    await page.reload();
+    await page.waitForTimeout(2500);
+    const abime = await page.evaluate(() => ({
+      mots: mutedWords,
+      cartes: feedEl.children.length,
+    }));
+    console.log(
+      `stockage abîmé : mots ${JSON.stringify(abime.mots)}, ${abime.cartes} cartes affichées`
+    );
+    console.log(`erreurs : ${JSON.stringify(errors)}`);
+    await browser.close();
+  },
+
+  /* Pause douce : désactivée par défaut (aucune feuille), proposée au palier
+     choisi, jamais deux fois au même palier, et « Continuer » la referme. */
+  async pausedouce() {
+    const { browser, page, errors } = await boot({ storage: READY });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(2500);
+    const swiper = async (n) => {
+      for (let k = 0; k < n; k++) {
+        await page.evaluate(() => {
+          const i = currentIndex();
+          scrollToCard(i + 1);
+          onCardChange(true);
+        });
+        await page.waitForTimeout(30);
+      }
+      await page.waitForTimeout(900);
+    };
+    const ouverte = () =>
+      page.evaluate(() =>
+        document.getElementById("pauseSheet").classList.contains("open")
+      );
+    await swiper(30);
+    console.log(
+      `défaut (désactivée), 30 cartes : feuille ouverte = ${await ouverte()} (attendu false)`
+    );
+    // Retour en tête : le fil simulé n'a qu'une trentaine de cartes, et un
+    // swipe au-delà de la dernière ne compte rien.
+    await page.evaluate(() => {
+      cardCounter.reset();
+      setPausePref("25");
+      scrollToCard(0);
+      onCardChange(false);
+    });
+    await page.waitForTimeout(300);
+    await swiper(24);
+    const a24 = await ouverte();
+    await swiper(1);
+    const a25 = await ouverte();
+    const msg = await page.$eval("#pauseMsg", (e) => e.textContent);
+    console.log(
+      `réglée à 25 : après 24 = ${a24} (attendu false), après 25 = ${a25} (attendu true) — « ${msg} »`
+    );
+    await page.click("#pauseContinue");
+    await page.waitForTimeout(300);
+    console.log(`« Continuer » referme : ${!(await ouverte())}`);
+    await swiper(10);
+    console.log(`10 cartes de plus : rouverte = ${await ouverte()} (attendu false)`);
+    await page.click("#pauseStop").catch(() => {});
+    const persiste = await page.evaluate(() =>
+      localStorage.getItem("fluxswipe.pause.v1")
+    );
+    console.log(`réglage enregistré : ${persiste}`);
+    console.log(`erreurs : ${JSON.stringify(errors)}`);
+    await browser.close();
+  },
+
+  /* Écouter le fil : un faux moteur de synthèse (web, puis pont natif simulé)
+     enregistre ce qui est lu. Vérifie que la lecture avance d'elle-même de
+     carte en carte, qu'un swipe la reprend sur la carte d'arrivée (sans
+     relire celle qu'on quitte), et que l'ouverture d'un panneau ou le passage
+     en arrière-plan la coupe. */
+  async ecoute() {
+    for (const natif of [false, true]) {
+      const { browser, page, errors } = await boot({
+        // Le rappel « active les notifications » s'ouvre sinon tout seul
+        // dans l'app packagée et intercepte les clics.
+        storage: Object.assign({ "fluxswipe.notifnudge.answered.v1": "1" }, READY),
+        rss: RSS_OK,
+        init: natif
+          ? () => {
+              window.__dits = [];
+              window.__stops = 0;
+              let fin = null;
+              window.Capacitor = {
+                isNativePlatform: () => true,
+                Plugins: {
+                  CapacitorHttp: {
+                    request: async (o) => {
+                      // Pages d'articles (sondes payant/image) : une page
+                      // banale, servie ici — un fetch passerait par le service
+                      // worker, donc hors de la simulation réseau du banc.
+                      if (/^https:\/\/ex\.test\//.test(o.url))
+                        return {
+                          status: 200,
+                          data:
+                            "<!doctype html><title>a</title>" + "<p>texte</p>".repeat(40),
+                        };
+                      const r = await fetch(
+                        "http://localhost:8124/__qa_feed?u=" + encodeURIComponent(o.url)
+                      );
+                      return { status: 200, data: await r.text() };
+                    },
+                  },
+                  InAppBrowser: {
+                    open: () => Promise.resolve(),
+                    speak: (o) =>
+                      new Promise((ok, ko) => {
+                        if (fin) fin.ko(new Error("interrompu"));
+                        window.__dits.push(o);
+                        const t = setTimeout(() => {
+                          fin = null;
+                          ok();
+                        }, 250);
+                        fin = { ko: (e) => (clearTimeout(t), ko(e)) };
+                      }),
+                    stopSpeaking: () => {
+                      window.__stops++;
+                      if (fin) fin.ko(new Error("interrompu"));
+                      fin = null;
+                      return Promise.resolve();
+                    },
+                  },
+                },
+              };
+            }
+          : () => {
+              window.__dits = [];
+              window.__stops = 0;
+              let cur = null;
+              const fake = {
+                speak(u) {
+                  cur = u;
+                  window.__dits.push({ text: u.text, lang: u.lang });
+                  u.__t = setTimeout(() => {
+                    if (cur === u) {
+                      cur = null;
+                      u.onend && u.onend();
+                    }
+                  }, 250);
+                },
+                cancel() {
+                  window.__stops++;
+                  if (cur) {
+                    const u = cur;
+                    cur = null;
+                    clearTimeout(u.__t);
+                    u.onerror && u.onerror({ error: "interrupted" });
+                  }
+                },
+              };
+              Object.defineProperty(window, "speechSynthesis", {
+                value: fake,
+                configurable: true,
+              });
+              window.SpeechSynthesisUtterance = function (t) {
+                this.text = t;
+              };
+            },
+      });
+      if (natif)
+        await page.route("**/__qa_feed*", (r) =>
+          r.fulfill({ status: 200, contentType: "application/xml", body: RSS_OK })
+        );
+      await page.goto(URL_APP);
+      await page.waitForTimeout(3000);
+      const label = natif ? "pont natif" : "web";
+      const visible = await page.evaluate(
+        () => !document.getElementById("listenBtn").classList.contains("hidden")
+      );
+      await page.evaluate(() => showTop());
+      await page.waitForTimeout(400);
+      await page.click("#menuBtn");
+      await page.waitForTimeout(300);
+      await page.click("#listenBtn");
+      await page.waitForTimeout(1500);
+      const r1 = await page.evaluate(() => ({
+        dits: window.__dits.map((d) => d.text.slice(0, 40)),
+        lang: window.__dits[0] && window.__dits[0].lang,
+        idx: currentIndex(),
+        pilule: !document.getElementById("listenPill").classList.contains("hidden"),
+      }));
+      console.log(
+        `[${label}] entrée de menu visible : ${visible} | pilule : ${r1.pilule} | langue : ${r1.lang}`
+      );
+      console.log(
+        `[${label}] lu en 1,5 s : ${r1.dits.length} cartes, index courant ${r1.idx} → ${JSON.stringify(r1.dits)}`
+      );
+      // Swipe manuel de 3 cartes : la lecture reprend sur la carte d'arrivée
+      const cible = await page.evaluate(() => {
+        const i = currentIndex() + 3;
+        feedEl.scrollTop = feedEl.children[i].offsetTop;
+        onCardChange(true);
+        return { i, titre: cardItems(feedEl.children[i])[0].title };
+      });
+      await page.waitForTimeout(600);
+      const r2 = await page.evaluate(() => window.__dits[window.__dits.length - 1].text);
+      console.log(
+        `[${label}] swipe vers « ${cible.titre} » → dernière lecture : « ${r2.slice(0, 60)} » (reprise juste : ${r2.includes(cible.titre + ".")})`
+      );
+      // Un panneau ouvert coupe l'écoute
+      await page.evaluate(() => openSettings());
+      await page.waitForTimeout(200);
+      const n = await page.evaluate(() => window.__dits.length);
+      await page.waitForTimeout(800);
+      const r3 = await page.evaluate(() => ({
+        actif: ecouteActive,
+        nouvelles: window.__dits.length,
+        pilule: !document.getElementById("listenPill").classList.contains("hidden"),
+      }));
+      console.log(
+        `[${label}] panneau ouvert : écoute active = ${r3.actif}, pilule = ${r3.pilule}, lectures après = ${r3.nouvelles - n} (attendu 0)`
+      );
+      // Arrière-plan coupe aussi
+      await page.evaluate(() => closeDialog(sheet));
+      await page.evaluate(() => demarrerEcoute());
+      await page.waitForTimeout(300);
+      await page.evaluate(() => {
+        Object.defineProperty(document, "visibilityState", {
+          value: "hidden",
+          configurable: true,
+        });
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await page.waitForTimeout(100);
+      console.log(
+        `[${label}] arrière-plan : écoute active = ${await page.evaluate(() => ecouteActive)} (attendu false)`
+      );
+      console.log(
+        `[${label}] rejets non gérés : ${JSON.stringify(await page.evaluate(() => window.__rejections))}`
+      );
+      console.log(`[${label}] erreurs : ${JSON.stringify(errors)}`);
+      await browser.close();
+    }
+  },
 };
 
 const which = process.argv[2];

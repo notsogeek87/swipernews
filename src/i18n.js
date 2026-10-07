@@ -54,6 +54,38 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v284.item1":
+        "🔊 Écouter le fil : depuis le menu, l'app lit à voix haute chaque carte puis passe toute seule à la suivante. Swipe pour sauter, touche « Arrêter l'écoute » pour couper.",
+      "changelog.v284.item2":
+        "🚫 Mots masqués : dans les réglages, ajoute les mots ou sujets que tu ne veux plus voir — les articles qui en parlent disparaissent du fil.",
+      "changelog.v284.item3":
+        "🧘 Pause douce (optionnelle) : tous les 25, 50 ou 100 cartes dans la journée, l'app te propose de faire une pause. À activer dans les réglages.",
+
+      "listen.start": "Écouter le fil",
+      "listen.stop": "Arrêter l'écoute",
+      "listen.failed": "Lecture à voix haute impossible sur cet appareil",
+      "listen.end": "Fin du fil — écoute terminée",
+
+      "mute.title": "🚫 Mots masqués",
+      "mute.sub":
+        "Les articles qui contiennent un de ces mots disparaissent du fil. Ajoute * à la fin pour couvrir aussi les variantes (chat* → chats).",
+      "mute.placeholder": "Un mot, ou plusieurs séparés par des virgules",
+      "mute.add": "Masquer",
+      "mute.remove": "Ne plus masquer « {w} »",
+
+      "pause.label": "Pause douce",
+      "pause.desc.off": "Jamais : le fil défile sans interruption.",
+      "pause.desc.25": "Te propose une pause toutes les 25 cartes de la journée.",
+      "pause.desc.50": "Te propose une pause toutes les 50 cartes de la journée.",
+      "pause.desc.100": "Te propose une pause toutes les 100 cartes de la journée.",
+      "pause.opt.off": "Non",
+      "pause.title": "🧘 Une pause ?",
+      "pause.msg":
+        "Tu as déjà parcouru {n} cartes aujourd'hui. Le fil sera encore là plus tard.",
+      "pause.stop": "J'arrête là",
+      "pause.continue": "Continuer encore un peu",
+      "pause.bye": "Bonne pause ! Tu peux fermer cet onglet.",
+
       "changelog.v276.item1":
         "🔔 Toucher une notification « du neuf » ouvre maintenant le fil sur la carte de l'article annoncé, plutôt que le lecteur directement — à vous de swiper ou de la toucher.",
       "changelog.v272.item1":
@@ -519,6 +551,38 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v284.item1":
+        '🔊 Listen to the feed: from the menu, the app reads each card aloud and moves on to the next by itself. Swipe to skip, tap "Stop listening" to stop.',
+      "changelog.v284.item2":
+        "🚫 Muted words: in settings, add the words or topics you no longer want to see — articles mentioning them disappear from the feed.",
+      "changelog.v284.item3":
+        "🧘 Gentle break (optional): every 25, 50 or 100 cards in a day, the app suggests taking a break. Turn it on in settings.",
+
+      "listen.start": "Listen to the feed",
+      "listen.stop": "Stop listening",
+      "listen.failed": "Read-aloud isn't available on this device",
+      "listen.end": "End of the feed — finished listening",
+
+      "mute.title": "🚫 Muted words",
+      "mute.sub":
+        "Articles containing any of these words disappear from the feed. Add * at the end to also cover variants (cat* → cats).",
+      "mute.placeholder": "A word, or several separated by commas",
+      "mute.add": "Mute",
+      "mute.remove": 'Unmute "{w}"',
+
+      "pause.label": "Gentle break",
+      "pause.desc.off": "Never: the feed scrolls without interruption.",
+      "pause.desc.25": "Suggests a break every 25 cards in a day.",
+      "pause.desc.50": "Suggests a break every 50 cards in a day.",
+      "pause.desc.100": "Suggests a break every 100 cards in a day.",
+      "pause.opt.off": "Off",
+      "pause.title": "🧘 Time for a break?",
+      "pause.msg":
+        "You've already gone through {n} cards today. The feed will still be here later.",
+      "pause.stop": "I'll stop here",
+      "pause.continue": "Keep going a bit",
+      "pause.bye": "Enjoy your break! You can close this tab.",
+
       "changelog.v276.item1":
         '🔔 Tapping a "new articles" notification now opens the feed on the announced article\'s card, instead of the reader directly — swipe past it or tap it, your call.',
       "changelog.v272.item1":

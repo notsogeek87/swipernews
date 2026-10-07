@@ -230,7 +230,7 @@ Les procédures répétitives vivent dans des skills ; ce fichier garde le *pour
 ## Commandes
 
 ```bash
-npm test            # node --test — 95 tests, aucune dépendance à installer
+npm test            # node --test — 141 tests, aucune dépendance à installer
 npm run lint        # eslint api src test eslint.config.js  (PAS index.html)
 npm run format:check
 npm run cap:sync    # régénère www/ puis cap sync android
@@ -418,6 +418,30 @@ hors du dépôt, jamais dans `package.json`.
   graphique à zéro partout alors que le total ne l'est pas. Se résorbe tout
   seul le lendemain (nouveau jour, nouveau `today` écrit dans le format
   courant) ; le bouton permet de repartir propre tout de suite si on préfère.
+- `mutedWords` / `estMasque` / `setMutedWords()` (et `mutedMatcher`,
+  `src/lib.js`, testée) — les mots masqués. Filtrés dans `remix()`, donc à
+  l'ENTRELACEMENT, jamais à la récupération : `newsItems`/`learnItems` gardent
+  tout, retirer un mot ramène ses articles sans réseau, et `feedKey()` n'en sait
+  rien (un instantané compare seulement `muet`, comme `mix`). Comparaison sur
+  texte replié, jamais `\b` (voir les pièges). La regex Unicode est construite à
+  l'exécution avec un repli : en littéral, un vieux moteur refuserait d'analyser
+  tout `src/lib.js`. Les notifications natives (`NewsCheckWorker`) ne les
+  appliquent pas.
+- `demarrerEcoute()` / `arreterEcoute()` / `lireEnBoucle()` — « Écouter le
+  fil ». Une GÉNÉRATION (`ecouteGen`) comme `loadSeq` : toute promesse d'une
+  lecture dépassée est ignorée. `ecouteCarte` est posée AVANT le défilement
+  automatique, pour qu'`onCardChange` ne prenne pas ce défilement pour un swipe ;
+  un vrai swipe reprend la lecture sur la carte d'arrivée, et la boucle ne
+  ramène JAMAIS en arrière quelqu'un qui a bougé pendant la respiration entre
+  deux cartes. Arrêts : `openDialog` (sauf le menu, qui porte le bouton),
+  `replaceDialog`, `startVideo`, `openArticle`, `visibilitychange`. Natif :
+  `InAppBrowserPlugin.speak`/`stopSpeaking` (`TextToSpeech`, créé à la première
+  demande ; `speak` se résout à la FIN de la phrase), et la déclaration
+  `<queries>` `TTS_SERVICE` du manifeste — sans elle, Android 11+ cache le moteur.
+- `pausePref` / `verifierPause()` — la pause douce. Lit le compteur de « Mon
+  activité » (`cardCounter`, jamais un second), appelé au même endroit que
+  `bumpCardScroll`. Jamais par-dessus un panneau, une vidéo ou l'écoute ; un
+  palier manqué attend le suivant.
 - `CHANGELOG` / `openChangelogIfNew()` / `renderChangelog()` — la feuille
   « Nouveautés » (`changelogSheet`), accessible en permanence depuis le menu
   (`changelogBtn`) et ouverte AUTOMATIQUEMENT dès qu'`APP_VERSION` a changé
@@ -1381,7 +1405,7 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 
 `npm test` ne voit que `src/` et `api/` : **tout le JS en ligne d'`index.html`
 — le fil, l'état, le stockage local — n'est couvert par aucun test**. Ce banc
-comble le trou en jouant 35 scénarios réels dans Chromium, réseau entièrement
+comble le trou en jouant 39 scénarios réels dans Chromium, réseau entièrement
 simulé (rien ne part vers une vraie source) : hors-ligne, réseau lent, coupure en
 cours de requête, API en 500, RSS vide/tronqué/HTML, contenu démesuré, doublons,
 120 sources, stockage et cache abîmés, quota saturé, actions enchaînées, retour
@@ -1450,6 +1474,13 @@ Trois cas, chacun surveillant `items[0]` render après render : actus lentes
 (aucune reprise ne doit être visible), actus mortes (Wikipédia s'affiche quand
 même, après une attente bornée plutôt qu'immédiatement), et dose sans actus
 actives (aucune attente, rien à coordonner).
+
+`motsmasques`, `pausedouce` et `ecoute` couvrent les trois fonctions du même
+nom. `motsmasques` vérifie qu'un mot agit SANS requête réseau, survit au
+relancement et à un stockage abîmé ; `pausedouce` le palier exact (rien à 24,
+la feuille à 25, rien de plus avant le palier suivant) ; `ecoute` joue un faux
+moteur de synthèse, côté web PUIS pont natif simulé, et vérifie l'avance
+automatique, la reprise après un swipe et les arrêts (panneau, arrière-plan).
 
 Deux d'entre eux signalent des lignes qui ne sont PAS des régressions, et qu'il
 ne faut pas partir corriger : `offline` fait remonter des

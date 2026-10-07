@@ -1423,3 +1423,51 @@ test("les imports écartent les URL non http(s)", () => {
     ["https://ok.fr/rss"]
   );
 });
+
+test("mutedMatcher : mot entier, insensible à la casse et aux accents", () => {
+  const m = lib.mutedMatcher(["Élection"]);
+  assert.ok(m({ title: "Les ELECTIONS approchent" }) === false);
+  assert.ok(m({ title: "Une élection anticipée" }));
+  assert.ok(m({ title: "Rien", desc: "…après l'election, le calme" }));
+  assert.ok(m({ title: "Rien", tags: "Politique Élection" }));
+  assert.ok(!m({ title: "Électionnaire n'existe pas" }));
+});
+
+test("mutedMatcher : un * final en fait un préfixe", () => {
+  const m = lib.mutedMatcher(["chat*"]);
+  assert.ok(m({ title: "Les chats dorment" }));
+  assert.ok(m({ title: "Un château" }));
+  assert.ok(!m({ title: "Le achat du siècle" }));
+  assert.ok(!lib.mutedMatcher(["chat"])({ title: "Un château" }));
+});
+
+test("mutedMatcher : expression de plusieurs mots, ponctuation ignorée", () => {
+  const m = lib.mutedMatcher(["coupe du monde"]);
+  assert.ok(m({ title: "Coupe-du-monde : le tirage" }));
+  assert.ok(!m({ title: "La coupe est pleine, le monde attend" }));
+});
+
+test("mutedMatcher : rien à masquer rend null", () => {
+  assert.equal(lib.mutedMatcher([]), null);
+  assert.equal(lib.mutedMatcher(["  ", "*", 42]), null);
+  assert.equal(lib.isMutedItem({ title: "x" }, []), false);
+});
+
+test("sanitizeMutedWords : valide, dédoublonne et borne", () => {
+  assert.deepEqual(lib.sanitizeMutedWords("pas un tableau"), []);
+  assert.deepEqual(lib.sanitizeMutedWords(["Foot", "foot", "FOOT ", null, "  "]), [
+    "Foot",
+  ]);
+  const beaucoup = Array.from({ length: 300 }, (_, i) => "mot" + i);
+  assert.equal(lib.sanitizeMutedWords(beaucoup).length, lib.MUTE_MAX_WORDS);
+  assert.equal(lib.sanitizeMutedWords(["x".repeat(500)])[0].length, 60);
+});
+
+test("parseMutedInput : virgules, points-virgules et retours à la ligne", () => {
+  assert.deepEqual(lib.parseMutedInput("foot, Trump ;spoiler\n  télé réalité "), [
+    "foot",
+    "Trump",
+    "spoiler",
+    "télé réalité",
+  ]);
+});

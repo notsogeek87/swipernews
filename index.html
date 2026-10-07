@@ -432,6 +432,17 @@
     display:flex;flex-direction:row;gap:18px;align-items:center;
     transition:transform .25s ease,opacity .25s ease}
   .rail.hidden{display:none}
+  /* Pilule « Arrêter l'écoute » : centrée, au-dessus du fil et de la barre du
+     haut ; `top` posé par placerPilule() (sous la barre quand elle est là). */
+  .listenpill{position:fixed;left:50%;transform:translateX(-50%);z-index:6;
+    top:calc(max(env(safe-area-inset-top),var(--systop,0px)) + 10px);
+    display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;
+    background:var(--surface);color:var(--ink);border:1.5px solid var(--flare);
+    font:600 14px/1 var(--font-sans);box-shadow:0 6px 18px rgba(0,0,0,.35);cursor:pointer;
+    transition:top .25s ease}
+  .listenpill.hidden{display:none}
+  .listenpill__i svg{width:16px;height:16px;display:block}
+  .pausecont{display:block;width:100%;margin-top:10px}
   /* Posée par startVideo()/retirée par stopVideo() : enregistrer/partager
      n'ont rien à faire sur l'image pendant la lecture d'une vidéo. */
   .rail.rail--away{transform:translateY(12px);opacity:0;pointer-events:none}
@@ -694,6 +705,10 @@
      percevoir le corail ; le libellé reste au-dessus de 4,5:1 (6,13:1).
      La bordure garde la même épaisseur dans les deux états : sans quoi la
      grille se réagencerait à chaque appui. */
+  .mutelist{margin-bottom:18px}
+  .mutelist:empty{display:none}
+  .mutechip{display:inline-flex;align-items:center;gap:6px}
+  .mutechip b{font-weight:700;font-size:16px;line-height:1}
   .intchip.on{background:var(--flare);border-color:var(--flare);color:var(--bg);font-weight:700}
   /* « Warm Blush » : le lavis décoratif que la charte réserve aux zones de
      respiration — ici pour l'encart d'accueil, jamais sous forme de texte coloré. */
@@ -1426,6 +1441,7 @@
     <div class="menulist">
       <button type="button" class="menurow" id="histBtn"><span class="menurow__i"></span><span data-i18n="top.history.aria">Liste des articles</span></button>
       <button type="button" class="menurow" id="savedBtn"><span class="menurow__i"></span><span data-i18n="top.saved.aria">Enregistrés</span></button>
+      <button type="button" class="menurow hidden" id="listenBtn"><span class="menurow__i"></span><span id="listenBtnTxt" data-i18n="listen.start">Écouter le fil</span></button>
       <button type="button" class="menurow" id="menuStatsBtn"><span class="menurow__i"></span><span data-i18n="menu.stats">Mon activité</span></button>
       <button type="button" class="menurow" id="changelogBtn"><span class="menurow__i"></span><span data-i18n="menu.changelog">Nouveautés</span></button>
       <button type="button" class="menurow" id="openSheet"><span class="menurow__i"></span><span data-i18n="top.settings.aria">Réglages</span></button>
@@ -1437,6 +1453,11 @@
 <div class="demobadge hidden" id="demobadge" role="status" data-i18n="demobadge.text">Wikipédia injoignable — articles de démo</div>
 
 <div id="feed" data-i18n-attr="aria-label:top.feed.aria"></div>
+
+<!-- Écoute du fil en cours (voir demarrerEcoute) : le seul moyen de l'arrêter
+     sans repasser par le menu. Placée sous la barre du haut quand celle-ci est
+     là (placerPilule), en haut de l'écran sinon. -->
+<button type="button" class="listenpill hidden" id="listenPill"><span class="listenpill__i" aria-hidden="true"></span><span data-i18n="listen.stop">Arrêter l'écoute</span></button>
 
 <!-- Rail unique, partagé par toutes les cartes (agit sur la carte visible) -->
 <div class="rail hidden" id="rail">
@@ -1560,9 +1581,21 @@
          libellé + description de l'option en cours. -->
     <div data-cardsmount></div>
 
+    <!-- Pause douce (voir renderPausePref/verifierPause) : même forme prefRow. -->
+    <div data-pausemount></div>
+
     <h3 class="secttl" data-i18n="sheet.interests.title">🎓 Centres d'intérêt</h3>
     <p class="sub" data-i18n="sheet.interests.sub">Les thèmes des articles Wikipédia glissés entre tes actus.</p>
     <div class="intgrid" id="intGrid"></div>
+
+    <!-- Mots masqués : rempli par renderMutes() (voir mutedWords). -->
+    <h3 class="secttl" data-i18n="mute.title">🚫 Mots masqués</h3>
+    <p class="sub" data-i18n="mute.sub">Les articles qui contiennent un de ces mots disparaissent du fil. Ajoute * à la fin pour couvrir aussi les variantes (chat* → chats).</p>
+    <div class="addbox">
+      <input id="muteInput" type="text" autocomplete="off" spellcheck="false" maxlength="200" data-i18n-attr="placeholder:mute.placeholder,aria-label:mute.placeholder" placeholder="Un mot, ou plusieurs séparés par des virgules">
+      <button type="button" id="muteAddBtn" data-i18n="mute.add">Masquer</button>
+    </div>
+    <div class="intgrid mutelist" id="muteList"></div>
 
     <h3 class="secttl" data-i18n="sheet.sources.title">📰 Sources d'actualité</h3>
     <p class="sub" data-i18n="sheet.sources.sub">Coche les flux à afficher, ajoute ceux que tu veux.</p>
@@ -1687,6 +1720,19 @@
      métrique et la période choisies (deux onglets, puis cinq onglets
      heure/jour/semaine/mois/année), le détail de la période choisie en
      graphique ET en tableau — voir le commentaire de STATS_HTML. -->
+<!-- Pause douce (voir verifierPause) : proposée tous les N cartes du jour si
+     l'utilisateur l'a demandé dans les réglages — jamais imposée, « Continuer »
+     referme simplement la feuille. -->
+<div class="sheet" id="pauseSheet" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
+  <div class="sheet__panel" tabindex="-1">
+    <div class="sheet__grip"></div>
+    <h2 id="pauseTitle" data-i18n="pause.title">🧘 Une pause ?</h2>
+    <p class="sub" id="pauseMsg"></p>
+    <button class="applybtn" id="pauseStop" data-i18n="pause.stop">J'arrête là</button>
+    <button class="iobtn pausecont" id="pauseContinue" data-i18n="pause.continue">Continuer encore un peu</button>
+  </div>
+</div>
+
 <div class="sheet" id="statsSheet" role="dialog" aria-modal="true" aria-labelledby="statsTitle">
   <div class="sheet__panel" tabindex="-1">
     <div class="sheet__grip"></div>
@@ -1798,9 +1844,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=281"></script>
+<script src="src/lib.js?v=284"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=283"></script>
+<script src="src/i18n.js?v=284"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1808,7 +1854,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","roundRobin","weightedRoundRobin","dedupNews","feedLabels","isPromotionalItem","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeShortsFeedUrl","isYoutubeShortsFeedUrl","youtubeFeedName","isLequipeFeedUrl","lequipeRubrique","lequipeFeedName","feedLinkFromHtml","commonFeedUrlCandidates"],
+  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","roundRobin","weightedRoundRobin","dedupNews","feedLabels","isPromotionalItem","mutedMatcher","sanitizeMutedWords","parseMutedInput","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeShortsFeedUrl","isYoutubeShortsFeedUrl","youtubeFeedName","isLequipeFeedUrl","lequipeRubrique","lequipeFeedName","feedLinkFromHtml","commonFeedUrlCandidates"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket","perCatLimit"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -2028,7 +2074,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,dayKey,quarterIndex,statsBuckets,shuffle,
-  seenKey,dropSeen,roundRobin,weightedRoundRobin,groupItems,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,YT_SHORT_MAX_DURATION_S,youtubeApiVideosDurationUrl,youtubeApiDurationsFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities,feedLinkFromHtml,commonFeedUrlCandidates}=self.SwiperLib;
+  seenKey,dropSeen,roundRobin,weightedRoundRobin,groupItems,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,YT_SHORT_MAX_DURATION_S,youtubeApiVideosDurationUrl,youtubeApiDurationsFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,mutedMatcher,sanitizeMutedWords,parseMutedInput,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities,feedLinkFromHtml,commonFeedUrlCandidates}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -2232,6 +2278,19 @@ const LS_CARDSPERSWIPE="fluxswipe.cardspercard.v1";
 const CARDS_PER_SWIPE_DEFAULT=1;
 const clampCardsPerSwipe=n=>(Number.isInteger(n)&&n>=1&&n<=5)?n:CARDS_PER_SWIPE_DEFAULT;
 let cardsPerSwipe=(()=>{try{return clampCardsPerSwipe(parseInt(localStorage.getItem(LS_CARDSPERSWIPE),10));}catch(e){return CARDS_PER_SWIPE_DEFAULT;}})();
+/* Mots masqués (voir mutedMatcher, src/lib.js) : tout article — actu OU
+   Wikipédia — dont le titre, le résumé ou les catégories contiennent un de ces
+   mots sort du fil. Appliqué dans remix(), donc à l'ENTRELACEMENT et jamais à la
+   récupération : `newsItems`/`learnItems` gardent tout. Retirer un mot ramène
+   donc ses articles sans aucun appel réseau, et le cache disque, l'instantané
+   de fil et feedKey() n'ont rien à savoir de ce réglage (restoreFeed compare
+   seulement la signature, comme pour la dose). Validé à la lecture comme tout
+   ce qui vient du stockage local : une valeur d'une autre forme vaut « aucun
+   mot », jamais une exception. */
+const LS_MUTES="fluxswipe.mutes.v1";
+let mutedWords=(()=>{try{return sanitizeMutedWords(JSON.parse(localStorage.getItem(LS_MUTES)||"[]"));}catch(e){return [];}})();
+let estMasque=mutedMatcher(mutedWords)||(()=>false);
+function mutedSig(){return mutedWords.join("\n");}
 function persistCardsPerSwipe(n){
   cardsPerSwipe=clampCardsPerSwipe(n);
   try{localStorage.setItem(LS_CARDSPERSWIPE,String(cardsPerSwipe));}catch(e){warn("save cardspercard",e);}
@@ -2305,9 +2364,12 @@ function remix(geleAvant){
   // sponsorisé (voir sponsorOut) : c'est précisément une carte proche de
   // l'écran, donc dans cette fenêtre, et la figer la garderait à jamais.
   if(filterSponsored&&sponsorOut.size)fige=fige.filter(i=>!sponsorOut.has(i.link));
+  // Même règle pour un mot masqué à l'instant : la carte sous le doigt sort
+  // aussi, c'est précisément ce qu'on vient de demander.
+  fige=fige.filter(i=>!estMasque(i));
   const pris=new Set(fige.map(seenKey));
-  const resteNews=newsItems.filter(i=>!pris.has(seenKey(i)));
-  const resteLearn=learnItems.filter(i=>!pris.has(seenKey(i)));
+  const resteNews=newsItems.filter(i=>!pris.has(seenKey(i))&&!estMasque(i));
+  const resteLearn=learnItems.filter(i=>!pris.has(seenKey(i))&&!estMasque(i));
   items=fige.concat(mixLists(resteNews,resteLearn,mixLevel()));
   if(items.length<=CONFIG.MAX_ITEMS)return;
   const partis=new Set(items.slice(0,items.length-CONFIG.MAX_ITEMS).map(seenKey));
@@ -2850,6 +2912,185 @@ let pendingSeenAt=Date.now();
    montait tout seul à l'ouverture, avant le premier swipe. `markVisibleSeen`,
    lui, doit continuer à tourner dans les deux cas (un article remplacé sous
    les yeux est bien sorti du fil, qu'on l'ait swipé ou non). */
+/* ---------- Écouter le fil (lecture à voix haute) ----------
+   Lit la carte à l'écran (source, titre, résumé — tous ses articles quand elle
+   en porte plusieurs), puis passe d'elle-même à la suivante, comme une revue de
+   presse à la radio. Voix du SYSTÈME, jamais d'un tiers : speechSynthesis sur le
+   web, InAppBrowserPlugin.speak dans l'APK (la WebView d'Android n'implémente
+   pas speechSynthesis). Rien n'est chargé tant qu'on ne l'a pas demandé.
+   Une seule lecture à la fois, identifiée par une GÉNÉRATION (ecouteGen) : toute
+   promesse d'une génération dépassée est ignorée à son retour, comme loadSeq
+   pour les chargements. Swiper pendant l'écoute la reprend sur la carte où l'on
+   s'arrête (onCardChange, une fois le geste posé) ; un panneau, une vidéo, un
+   article ouvert ou l'app mise en arrière-plan l'arrêtent — même liste que les
+   arrêts de la vidéo, et pour la même raison (du son que plus rien à l'écran ne
+   permet de couper). */
+const TTS_LANG={fr:"fr-FR",en:"en-US"};
+let ecouteGen=0,ecouteActive=false,ecouteCarte=null,ecouteRepriseT=null;
+function ttsNatif(){
+  const p=isNativeApp&&window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
+  return p&&typeof p.speak==="function"?p:null;
+}
+function ttsDispo(){
+  if(isNativeApp)return !!ttsNatif();
+  return typeof window.speechSynthesis!=="undefined"&&typeof window.SpeechSynthesisUtterance==="function";
+}
+function parler(texte){
+  const n=ttsNatif();
+  if(n)return n.speak({text:texte,lang:TTS_LANG[LANG]||LANG});
+  return new Promise((ok,ko)=>{
+    const u=new SpeechSynthesisUtterance(texte);
+    u.lang=TTS_LANG[LANG]||LANG;
+    u.onend=()=>ok();
+    u.onerror=e=>ko(new Error((e&&e.error)||"tts"));
+    try{speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){ko(e);}
+  });
+}
+function taire(){
+  const n=ttsNatif();
+  if(n){try{n.stopSpeaking();}catch(e){}return;}
+  try{if(typeof window.speechSynthesis!=="undefined")speechSynthesis.cancel();}catch(e){}
+}
+function texteDeCarte(card){
+  return cardItems(card).map(it=>{
+    const morceaux=[it.source,it.title];
+    if(!videoIdOf(it)&&it.desc)morceaux.push(it.desc);
+    return morceaux.filter(Boolean).map(t=>String(t).trim().replace(/[.…!?:;,]+$/,"")).join(". ")+".";
+  }).join(" … ");
+}
+const attendre=ms=>new Promise(r=>setTimeout(r,ms));
+async function lireEnBoucle(gen){
+  while(gen===ecouteGen){
+    const i=currentIndex();
+    const card=i>=0?feedEl.children[i]:null;
+    if(!card||!cardItems(card).length){arreterEcoute();return;}
+    ecouteCarte=card;
+    const texte=texteDeCarte(card);
+    if(texte){
+      try{await parler(texte);}
+      catch(e){
+        if(gen!==ecouteGen)return;                 // coupée exprès (swipe, arrêt) : rien à dire
+        warn("écoute",e);arreterEcoute();toast(T("listen.failed"));return;
+      }
+    }
+    if(gen!==ecouteGen)return;
+    await attendre(450);                            // un temps de respiration entre deux cartes
+    if(gen!==ecouteGen)return;
+    // Swipe pendant la lecture ou la respiration : on ne ramène JAMAIS
+    // l'utilisateur sur la carte qu'il vient de quitter — on reprend là où il est.
+    if(currentCardEl()!==card){demarrerEcoute();return;}
+    let j=Array.prototype.indexOf.call(feedEl.children,card);
+    if(j<0)j=currentIndex();                        // carte retirée entre-temps (render)
+    // Bout du fil : loadMore() est déjà parti (le défilement l'a déclenché),
+    // on lui laisse le temps d'ajouter la suite avant de conclure.
+    let suivante=feedEl.children[j+1];
+    for(let t=0;t<20&&gen===ecouteGen&&!(suivante&&cardItems(suivante).length)&&(loadingMore||!suivante);t++){
+      await attendre(500);suivante=feedEl.children[j+1];
+    }
+    if(gen!==ecouteGen)return;
+    if(!suivante||!cardItems(suivante).length){arreterEcoute();toast(T("listen.end"));return;}
+    ecouteCarte=suivante;                           // AVANT le défilement : onCardChange n'y verra pas un swipe
+    scrollToCard(j+1);
+    await attendre(120);
+  }
+}
+function demarrerEcoute(){
+  if(!ttsDispo())return;
+  clearTimeout(ecouteRepriseT);
+  stopVideo();
+  taire();
+  const gen=++ecouteGen;
+  ecouteActive=true;
+  renderEcouteUI();
+  lireEnBoucle(gen);
+}
+function arreterEcoute(){
+  clearTimeout(ecouteRepriseT);
+  if(!ecouteActive)return;
+  ecouteActive=false;ecouteCarte=null;
+  ecouteGen++;                                      // toute promesse en vol devient muette
+  taire();
+  renderEcouteUI();
+}
+function renderEcouteUI(){
+  const btn=document.getElementById("listenBtn");
+  btn.classList.toggle("hidden",!ttsDispo());
+  document.getElementById("listenBtnTxt").textContent=T(ecouteActive?"listen.stop":"listen.start");
+  btn.querySelector(".menurow__i").innerHTML=ecouteActive?ICON_STOP:ICON_VOLUME;
+  const pill=document.getElementById("listenPill");
+  pill.classList.toggle("hidden",!ecouteActive);
+  if(ecouteActive)placerPilule();
+}
+/* Sous la barre du haut quand elle est affichée (sinon la pilule masquerait ses
+   filtres), tout en haut quand elle est partie. Rappelée par showTop/hideTop. */
+function placerPilule(){
+  const pill=document.getElementById("listenPill");
+  if(!pill||pill.classList.contains("hidden"))return;
+  if(topEl.classList.contains("top--away")){pill.style.top="";return;}
+  pill.style.top=Math.round(topEl.getBoundingClientRect().bottom+8)+"px";
+}
+document.getElementById("listenBtn").onclick=()=>{
+  closeDialog(menuSheet);
+  if(ecouteActive)arreterEcoute();else demarrerEcoute();
+};
+document.getElementById("listenPill").onclick=arreterEcoute;
+/* ---------- Pause douce ----------
+   Le fil n'a pas de fin : c'est voulu (la moitié Wikipédia le rend infini), et
+   c'est aussi le mécanisme qu'on reproche aux réseaux sociaux. Réglage
+   OPTIONNEL (désactivé par défaut) : tous les N cartes défilées dans la journée
+   — le compteur de « Mon activité », cardCounter, jamais un second — une
+   feuille propose de s'arrêter. « Continuer » la referme, sans rien bloquer.
+   Jamais par-dessus un autre panneau, une vidéo ou l'écoute (mains libres par
+   définition) : la proposition attend alors le palier suivant. */
+const PAUSE_VALS=["off","25","50","100"];
+const LS_PAUSE="fluxswipe.pause.v1";
+let pausePref=(()=>{try{const v=localStorage.getItem(LS_PAUSE);return PAUSE_VALS.includes(v)?v:"off";}catch(e){return "off";}})();
+let pauseVueA=0,pauseT=null;
+function renderPausePref(){
+  const html=prefRow("pause",T("pause.label"),T("pause.desc."+pausePref),
+    PAUSE_VALS.map(v=>({v,t:v==="off"?T("pause.opt.off"):v})),pausePref);
+  document.querySelectorAll("[data-pausemount]").forEach(el=>{el.innerHTML=html;});
+}
+function setPausePref(v){
+  const next=PAUSE_VALS.includes(v)?v:"off";
+  if(next===pausePref)return;
+  pausePref=next;
+  try{localStorage.setItem(LS_PAUSE,next);}catch(e){warn("save pause",e);}
+  renderPausePref();
+}
+function cartesDuJour(){return cardCounter.data.days[dayKey(new Date())]||0;}
+function verifierPause(){
+  if(pausePref==="off"||ecouteActive)return;
+  const n=cartesDuJour(),seuil=+pausePref;
+  if(!n||n%seuil||n===pauseVueA)return;
+  pauseVueA=n;
+  clearTimeout(pauseT);
+  // Une fois le geste terminé : ouvrir la feuille en plein swipe la poserait
+  // pendant que le fil s'aimante encore sur la carte suivante.
+  pauseT=setTimeout(()=>{
+    if(document.querySelector(".sheet.open")||playingCard||ecouteActive)return;
+    if(document.visibilityState==="hidden")return;
+    document.getElementById("pauseMsg").textContent=T("pause.msg",{n:String(n)});
+    document.getElementById("pauseStop").classList.remove("hidden");
+    openDialog(pauseSheet);
+  },700);
+}
+const pauseSheet=document.getElementById("pauseSheet");
+pauseSheet.onclick=e=>{if(e.target===pauseSheet)closeDialog(pauseSheet);};
+document.getElementById("pauseContinue").onclick=()=>closeDialog(pauseSheet);
+document.getElementById("pauseStop").onclick=()=>{
+  // Dans l'APK, « J'arrête là » met l'app en arrière-plan (comme le retour
+  // depuis le fil, voir MainActivity) ; sur le web, aucun script ne peut fermer
+  // l'onglet qu'il n'a pas ouvert — on le dit simplement.
+  const CapApp=isNativeApp&&window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
+  if(CapApp&&typeof CapApp.minimizeApp==="function"){
+    closeDialog(pauseSheet);
+    CapApp.minimizeApp().catch(()=>{});
+    return;
+  }
+  document.getElementById("pauseMsg").textContent=T("pause.bye");
+  document.getElementById("pauseStop").classList.add("hidden");
+};
 function onCardChange(userScroll){
   const i=currentIndex();
   const card=i>=0?feedEl.children[i]:null;
@@ -2860,12 +3101,19 @@ function onCardChange(userScroll){
   if(playingCard&&feedEl.children[i]!==playingCard)stopVideo();
   const samePending=pendingSeenItem===it||(pendingSeenItem&&it&&pendingSeenItem.link&&pendingSeenItem.link===it.link);
   if(!samePending){
-    if(pendingSeenItem&&userScroll)bumpCardScroll();   // VRAI swipe seulement : une de plus au compteur
+    if(pendingSeenItem&&userScroll){bumpCardScroll();verifierPause();}   // VRAI swipe seulement : une de plus au compteur
     markVisibleSeen(pendingSeenItem,pendingSeenCardId);   // on quitte cette carte : c'est CE geste qui la marque vue
     pendingSeenItem=it;pendingSeenCardId=cardId;pendingSeenAt=Date.now();
   }
   rememberPos(it);
   updateRail(it);
+  // Écoute en cours et carte changée sans elle : l'utilisateur a swipé. On
+  // reprend la lecture là où il s'arrête, une fois le geste posé (sinon chaque
+  // frame du défilement relancerait une phrase).
+  if(ecouteActive&&ecouteCarte&&card!==ecouteCarte){
+    clearTimeout(ecouteRepriseT);
+    ecouteRepriseT=setTimeout(()=>{if(ecouteActive&&currentCardEl()!==ecouteCarte)demarrerEcoute();},450);
+  }
   majVolet();     // paysage large seulement ; ailleurs, un test de media query
   if(DEBUG)dbgImage();
   return i;
@@ -2892,7 +3140,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="283";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="284";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -2903,6 +3151,8 @@ const APP_VERSION="283";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:284,date:"2026-10-07",items:[
+    "changelog.v284.item1","changelog.v284.item2","changelog.v284.item3"]},
   {v:276,date:"2026-09-27",items:[
     "changelog.v276.item1"]},
   {v:272,date:"2026-09-22",items:[
@@ -3486,6 +3736,7 @@ async function dropBlocklist(){
    `data:` documenté dans CLAUDE.md, qui décrit le même `Bridge.launchIntent`
    pour tout le reste, http(s) compris. */
 function openArticle(url,title,opts){
+  arreterEcoute();               // on part lire : la revue de presse s'arrête
   if(!isNativeApp||readPref==="browser")return false;
   if(opts&&opts.external)return false;
   const iab=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
@@ -3584,6 +3835,7 @@ document.addEventListener("visibilitychange",()=>{
     // vidéo d'un cadre tiers continuer — donc du son qui sort d'une app qu'on
     // vient de quitter, et que rien à l'écran ne permet plus d'arrêter.
     stopVideo();
+    arreterEcoute();
     persistAll();return;
   }
   onRetourPremierPlan();
@@ -6097,6 +6349,9 @@ const ICON_SAVED=`<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentCo
 // Même tracé que #shareBtn (rail) et .feedrow .share (panneau Sources) : une
 // 3e icône de partage aurait dû rester identique aux deux premières de toute
 // façon, autant en faire la référence commune (voir pvRowHTML).
+// Écouter le fil (menu) et l'arrêter (menu, pilule) : même famille de tracés.
+const ICON_VOLUME=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`;
+const ICON_STOP=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="1" fill="currentColor"></rect></svg>`;
 const ICON_SHARE=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>`;
 const ICON_GITHUB=`<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>`;
 /* Identifiant de la vidéo intégrable portée par un article, "" sinon —
@@ -6234,6 +6489,7 @@ function startVideo(card){
   const id=card&&card.dataset.vid;
   if(!id||playingCard===card)return;
   stopVideo();                   // jamais deux lecteurs vivants à la fois
+  arreterEcoute();               // ni une vidéo par-dessus une voix
   const f=document.createElement("iframe");
   f.className="card__video";
   f.title=T("card.playVideo");
@@ -6686,6 +6942,7 @@ function showTop(){
   // le nom se réécrirait à chaque tap.
   const revenait=topEl.classList.contains("top--away");
   topEl.classList.remove("top--away");document.body.classList.remove("top-away");
+  placerPilule();
   armerRetraitBarre();   // elle repartira seule, voir plus bas
   if(revenait)typeBrand();
   if(peekEl.classList.contains("peek--new")){
@@ -6693,7 +6950,7 @@ function showTop(){
     try{localStorage.setItem(LS_PEEK,"1");}catch(e){warn("save peek",e);}
   }
 }
-function hideTop(){clearTimeout(topAwayTimer);topEl.classList.add("top--away");document.body.classList.add("top-away");}
+function hideTop(){clearTimeout(topAwayTimer);topEl.classList.add("top--away");document.body.classList.add("top-away");placerPilule();}
 /* Retrait AUTOMATIQUE de la barre du haut. Elle ne partait jusqu'ici que sur
    un vrai défilement (onScrollFrame) : revenue d'un tap, elle restait posée
    là indéfiniment tant que le doigt ne bougeait plus — sur une carte à parts
@@ -6927,7 +7184,9 @@ addEventListener("popstate",()=>{
 function openDialog(el){
   // Un panneau recouvre le fil : la vidéo continuerait à jouer derrière, hors de
   // vue et hors d'atteinte. Même raison que l'arrêt sur passage en arrière-plan.
+  // Sauf le menu pour l'écoute : c'est lui qui porte « Arrêter l'écoute ».
   stopVideo();
+  if(el.id!=="menuSheet")arreterEcoute();
   lastFocused=document.activeElement;
   el.classList.add("open");
   pushDialogState();
@@ -6958,6 +7217,7 @@ function closeDialog(el,fromHistory){
    celui affiché. Réservé aux lignes de menuSheet ; le fond est déjà inert
    depuis l'ouverture du menu, inutile d'y retoucher. */
 function replaceDialog(from,to){
+  arreterEcoute();               // même règle qu'openDialog : le menu seul la laisse filer
   from.classList.remove("open");
   to.classList.add("open");
   const f=to.querySelector(".sheet__panel");
@@ -7170,6 +7430,7 @@ function setPref(name,v){
   if(name==="lang"){setLang(v);return;}   // effets de bord propres : voir setLang
   if(name==="apptheme"){setAppTheme(v);return;}   // idem : attribut sur <html>
   if(name==="cardsPerSwipe"){setCardsPerSwipe(v);return;}   // idem : recompose le fil
+  if(name==="pause"){setPausePref(v);return;}   // propre clé, voir pausePref
   if(name==="age"){setAgeCategory(v);return;}   // idem : remplace `feeds`, voir setAgeCategory
   if(name==="contentFilter"){setContentFilter(v);return;}   // idem : recharge le fil
   if(name==="notif"){setNotifPref(v);return;}   // idem : aller-retour natif (permission), voir setNotifPref
@@ -7195,6 +7456,7 @@ function setLang(l){
   document.documentElement.lang=LANG;
   applyI18n();
   renderLangPref();renderReadPref();renderThemePref();renderAutoExport();renderIntGrid("intGrid");renderList();renderSuggest();renderMixUI();
+  renderPausePref();renderEcouteUI();renderMutes();
   switchFeed();
 }
 /* Contrairement à setLang(), ne touche à AUCUN état du fil : c'est pour ça
@@ -7382,6 +7644,8 @@ renderLangPref();
 renderReadPref();
 renderThemePref();
 renderCardsPref();
+renderPausePref();
+renderEcouteUI();
 renderAutoExport();refreshAutoExport();
 /* Rafraîchissement hebdomadaire, en silence : une liste de blocage vieille de
    plusieurs mois laisse passer les régies apparues depuis. Rien ne part si
@@ -7483,7 +7747,7 @@ function snapshotFeed(){
     // `cards` joue pour la granularité le rôle que `mix` joue pour la dose :
     // voir restoreFeed.
     items:items.slice(),reg:new Map(cardReg),groups:new Map(cardGroups),
-    seq:cardSeq,mix:mixScore,cards:cardsPerSwipe,n:++snapSeq
+    seq:cardSeq,mix:mixScore,cards:cardsPerSwipe,muet:mutedSig(),n:++snapSeq
   };
   const keys=Object.keys(feedSnap);
   if(keys.length>SNAP_MAX){
@@ -7519,7 +7783,9 @@ function restoreFeed(){
   // regroupement d'alors, et le réglage a pu changer entre-temps — sans ce
   // test, revenir sur un filtre resservait l'ancien groupement (des cartes à
   // parts égales alors que cardsPerSwipe est repassé à 1, et l'inverse).
-  if(s.mix!==mixScore||s.cards!==cardsPerSwipe)render();
+  // Et pour les mots masqués : adoptItems() vient de remélanger SANS les
+  // articles masqués depuis, mais le HTML mémorisé les porte encore.
+  if(s.mix!==mixScore||s.cards!==cardsPerSwipe||s.muet!==mutedSig())render();
   /* La carte « chargement d'autres articles » fait partie du HTML mémorisé si
      l'instantané a été pris pendant un loadMore. Restaurée telle quelle, elle
      restait en queue de fil À JAMAIS quand aucun render() ne suivait (dose
@@ -7882,6 +8148,7 @@ function setIcons(){
   document.getElementById("menuStatsBtn").querySelector(".menurow__i").innerHTML=ICON_STATS;
   document.getElementById("changelogBtn").querySelector(".menurow__i").innerHTML=ICON_GIFT;
   document.getElementById("githubLink").querySelector(".menurow__i").innerHTML=ICON_GITHUB;
+  document.getElementById("listenPill").querySelector(".listenpill__i").innerHTML=ICON_STOP;
   srcBtn.querySelector(".filterbtn__i").innerHTML=ICON_RSS;
   catBtn.querySelector(".filterbtn__i").innerHTML=ICON_TAG;
   document.querySelectorAll(".filterbtn__c").forEach(el=>{el.innerHTML=ICON_CHEV;});
@@ -8414,6 +8681,7 @@ function openSettings(replaceFrom){
   suggestGroupOpen={};
   renderMix();renderIntGrid("intGrid");renderList();renderSuggest();renderReadPref();renderLangPref();renderThemePref();renderAutoExport();refreshAutoExport();
   document.getElementById("sponsorFilterChk").checked=filterSponsored;
+  renderMutes();
   document.getElementById("ytApiKeyInput").value=ytApiKey;
   if(replaceFrom)replaceDialog(replaceFrom,sheet);else openDialog(sheet);
 }
@@ -8615,6 +8883,41 @@ document.getElementById("sponsorFilterChk").onchange=e=>{
   try{localStorage.setItem(LS_SPONSOR,filterSponsored?"1":"0");}catch(_){}
   feedsDirty=true;   // même flag que save() : signale un rechargement dû à applySettings()
 };
+/* Mots masqués : une puce par mot, × pour le retirer. S'applique à l'instant,
+   sans réseau (voir mutedWords) : remix(true) garde la carte sous le doigt et
+   son aperçu, sauf s'ils sont eux-mêmes masqués. Pas de toast (il se poserait
+   devant le champ qu'on vient de toucher) : la puce qui apparaît suffit. */
+function renderMutes(){
+  const el=document.getElementById("muteList");
+  if(!el)return;
+  el.innerHTML=mutedWords.map((w,k)=>`<button type="button" class="intchip mutechip" data-unmute="${k}" aria-label="${escAttr(T("mute.remove",{w}))}">${esc(w)}<b aria-hidden="true">×</b></button>`).join("");
+}
+function setMutedWords(list){
+  const next=sanitizeMutedWords(list);
+  if(next.join("\n")===mutedSig())return;
+  mutedWords=next;
+  estMasque=mutedMatcher(mutedWords)||(()=>false);
+  try{localStorage.setItem(LS_MUTES,JSON.stringify(mutedWords));}catch(e){warn("save mutes",e);}
+  renderMutes();
+  if(items.length||newsItems.length||learnItems.length){remix(true);render(false);}
+}
+function addMutesFromInput(){
+  const inp=document.getElementById("muteInput");
+  const nouveaux=parseMutedInput(inp.value);
+  if(!nouveaux.length)return;
+  setMutedWords(mutedWords.concat(nouveaux));
+  inp.value="";
+}
+document.getElementById("muteAddBtn").onclick=addMutesFromInput;
+document.getElementById("muteInput").addEventListener("keydown",e=>{
+  if(e.key==="Enter"){e.preventDefault();addMutesFromInput();}
+});
+document.getElementById("muteList").addEventListener("click",e=>{
+  const b=e.target.closest("[data-unmute]");
+  if(!b)return;
+  const k=+b.dataset.unmute;
+  setMutedWords(mutedWords.filter((_,i)=>i!==k));
+});
 /* Filtre de contenu à 3 choix, en tête de la feuille des sources d'actus
    (voir [data-cfmount] dans le HTML, prefRow) : remplace l'ancien
    interrupteur binaire « Shorts YouTube uniquement ». Entièrement
@@ -9098,6 +9401,8 @@ function settingsSnapshot(){
     newsSrc,
     feeds,
     filterSponsored,
+    mutedWords,
+    pause:pausePref,
     contentFilter,
     hideSeen,
     ytApiKey,
@@ -9239,6 +9544,12 @@ function applySettingsImport(obj){
   }
   if(typeof obj.filterSponsored==="boolean"){
     localStorage.setItem(LS_SPONSOR,obj.filterSponsored?"1":"0");n++;
+  }
+  if(typeof obj.pause==="string"&&PAUSE_VALS.includes(obj.pause)){
+    localStorage.setItem(LS_PAUSE,obj.pause);n++;
+  }
+  if(Array.isArray(obj.mutedWords)){
+    localStorage.setItem(LS_MUTES,JSON.stringify(sanitizeMutedWords(obj.mutedWords)));n++;
   }
   if(typeof obj.contentFilter==="string"&&["all","video","articles"].includes(obj.contentFilter)){
     localStorage.setItem(LS_CONTENT_FILTER,obj.contentFilter);n++;

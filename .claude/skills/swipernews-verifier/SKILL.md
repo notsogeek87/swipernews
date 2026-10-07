@@ -38,6 +38,7 @@ Choisir les scénarios selon la zone touchée :
 | ordre/équité des actus, « vu »          | `equite`, `redites`, `quitte`                                  |
 | vidéo / YouTube                         | `video`, `shortsvide`                                          |
 | flux invalides                          | `badrss`                                                       |
+| mots masqués, pause, écoute             | `motsmasques`, `pausedouce`, `ecoute`                          |
 
 En cas de doute sur la zone, tout rejouer. Après un changement du chargement, du cache ou de l'état, rejouer le banc entier.
 

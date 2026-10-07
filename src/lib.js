@@ -1432,6 +1432,89 @@
     return DEAL_PATH_PATTERN.test((item && item.link) || "");
   }
 
+  /* ---------- Mots masqués ----------
+   * Une liste de mots ou d'expressions choisie par l'utilisateur : tout article
+   * dont le titre, le résumé ou les catégories en contiennent un sort du fil.
+   * Comparaison sur un texte REPLIÉ (minuscules, sans accents, ponctuation
+   * ramenée à une espace) et entre espaces, jamais avec `\b` : `\b` échoue
+   * après une lettre accentuée en JS (« é » n'est pas un caractère de mot sans
+   * indicateur Unicode). Mot ENTIER par défaut — « chat » ne masque pas
+   * « château » ; un `*` final en fait un préfixe (« chat* » masque « chats »).
+   * Bornes : MUTE_MAX_WORDS mots de MUTE_MAX_LEN caractères au plus, pour qu'une
+   * valeur locale démesurée ne coûte jamais rien au fil. */
+  const MUTE_MAX_WORDS = 100;
+  const MUTE_MAX_LEN = 60;
+
+  /* Construite à l'exécution, jamais en littéral : un moteur sans `\p{…}`
+   * (vieille WebView Android 7 non mise à jour) refuserait sinon d'analyser
+   * TOUT ce fichier, et l'app entière avec. Repli : latin, grec, cyrillique. */
+  const MUTE_SEP = (() => {
+    try {
+      return new RegExp("[^\\p{L}\\p{N}]+", "gu");
+    } catch (e) {
+      return /[^a-z0-9\u00c0-\u024f\u0370-\u03ff\u0400-\u04ff]+/g;
+    }
+  })();
+
+  function muteFold(s) {
+    const t = String(s || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(MUTE_SEP, " ")
+      .trim();
+    return t ? ` ${t} ` : "";
+  }
+
+  /** Liste propre depuis n'importe quelle valeur (stockage local, import) :
+   *  chaînes seulement, espaces resserrés, doublons (au sens replié) retirés,
+   *  bornée. Jamais d'exception. */
+  function sanitizeMutedWords(raw) {
+    if (!Array.isArray(raw)) return [];
+    const out = [];
+    const vus = new Set();
+    for (const w of raw) {
+      if (typeof w !== "string") continue;
+      const t = collapse(w).slice(0, MUTE_MAX_LEN);
+      const k = muteFold(t.replace(/\*+$/, "")) + (/\*$/.test(t) ? "*" : "");
+      if (!k.replace("*", "").trim() || vus.has(k)) continue;
+      vus.add(k);
+      out.push(t);
+      if (out.length >= MUTE_MAX_WORDS) break;
+    }
+    return out;
+  }
+
+  /** Saisie libre (« foot, Trump ; spoiler ») → liste de mots. */
+  function parseMutedInput(str) {
+    return sanitizeMutedWords(String(str || "").split(/[,;\n]+/));
+  }
+
+  /** Fabrique un prédicat `item -> masqué ?`, ou `null` sans aucun mot (le cas
+   *  ordinaire : rien à payer par article). Les clés sont repliées une seule
+   *  fois, pas à chaque article. */
+  function mutedMatcher(words) {
+    const keys = sanitizeMutedWords(words)
+      .map((w) => {
+        const prefixe = /\*$/.test(w);
+        const k = muteFold(w.replace(/\*+$/, ""));
+        return prefixe ? k.replace(/ $/, "") : k;
+      })
+      .filter((k) => k.trim());
+    if (!keys.length) return null;
+    return (item) => {
+      if (!item) return false;
+      const tags = Array.isArray(item.tags) ? item.tags.join(" ") : item.tags || "";
+      const text = muteFold(`${item.title || ""} ${item.desc || ""} ${tags}`);
+      return keys.some((k) => text.includes(k));
+    };
+  }
+
+  function isMutedItem(item, words) {
+    const m = mutedMatcher(words);
+    return !!m && m(item);
+  }
+
   /** Sites où au moins UNE PARTIE du contenu est réservée aux abonnés — quasi
    *  aucun site de presse n'est payant à 100 %, même ceux au paywall le plus
    *  strict publient des dépêches ou de l'actu chaude en accès libre. Cette
@@ -1701,6 +1784,11 @@
     interleave,
     groupItems,
     isPromotionalItem,
+    MUTE_MAX_WORDS,
+    sanitizeMutedWords,
+    parseMutedInput,
+    mutedMatcher,
+    isMutedItem,
     isPaywallCandidateDomain,
     isPaywalledHtml,
     isSponsoredHtml,
