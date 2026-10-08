@@ -3050,11 +3050,21 @@ ${Array.from({ length: 12 }, (_, k) => {
      en arrière-plan la coupe. */
   async ecoute() {
     for (const natif of [false, true]) {
+      const RSS_LONG = RSS_OK.replace(
+        "<title>Actu 0</title>",
+        "<title>Actu 0 🔥</title>"
+      ).replace(
+        "Resume 0 un peu de texte",
+        "Resume 0 un peu de texte. " +
+          "Une phrase de détail qui allonge nettement le résumé de cette carte. ".repeat(
+            8
+          )
+      );
       const { browser, page, errors } = await boot({
         // Le rappel « active les notifications » s'ouvre sinon tout seul
         // dans l'app packagée et intercepte les clics.
         storage: Object.assign({ "fluxswipe.notifnudge.answered.v1": "1" }, READY),
-        rss: RSS_OK,
+        rss: RSS_LONG,
         init: natif
           ? () => {
               window.__dits = [];
@@ -3138,7 +3148,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       });
       if (natif)
         await page.route("**/__qa_feed*", (r) =>
-          r.fulfill({ status: 200, contentType: "application/xml", body: RSS_OK })
+          r.fulfill({ status: 200, contentType: "application/xml", body: RSS_LONG })
         );
       await page.goto(URL_APP);
       await page.waitForTimeout(3000);
@@ -3152,6 +3162,18 @@ ${Array.from({ length: 12 }, (_, k) => {
       await page.waitForTimeout(300);
       await page.click("#listenBtn");
       await page.waitForTimeout(1500);
+      // Le DÉTAIL de la carte doit être lu, pas seulement son titre — et en
+      // morceaux courts (au-delà de ~15 s d'un bloc, certains moteurs
+      // abandonnent sans prévenir).
+      const detail = await page.evaluate(() => ({
+        lu: window.__dits.map((d) => d.text).join(" "),
+        attendu: (cardItems(feedEl.children[0])[0] || {}).desc || "",
+        plusLong: Math.max(...window.__dits.map((d) => d.text.length)),
+        emoji: window.__dits.some((d) => /🔥/.test(d.text)),
+      }));
+      console.log(
+        `[${natif ? "pont natif" : "web"}] détail de la 1re carte lu : ${detail.lu.includes(detail.attendu.slice(0, 20).trim())} | plus long morceau : ${detail.plusLong} car. (≤ 200 attendu) | emoji prononcé : ${detail.emoji} (attendu false)`
+      );
       const r1 = await page.evaluate(() => ({
         dits: window.__dits.map((d) => d.text.slice(0, 40)),
         lang: window.__dits[0] && window.__dits[0].lang,
@@ -3162,9 +3184,10 @@ ${Array.from({ length: 12 }, (_, k) => {
         `[${label}] entrée de menu visible : ${visible} | pilule : ${r1.pilule} | langue : ${r1.lang}`
       );
       console.log(
-        `[${label}] lu en 1,5 s : ${r1.dits.length} cartes, index courant ${r1.idx} → ${JSON.stringify(r1.dits)}`
+        `[${label}] lu en 1,5 s : ${r1.dits.length} morceaux, index courant ${r1.idx} → ${JSON.stringify(r1.dits)}`
       );
       // Swipe manuel de 3 cartes : la lecture reprend sur la carte d'arrivée
+      const avantSwipe = await page.evaluate(() => window.__dits.length);
       const cible = await page.evaluate(() => {
         const i = currentIndex() + 3;
         feedEl.scrollTop = feedEl.children[i].offsetTop;
@@ -3172,9 +3195,18 @@ ${Array.from({ length: 12 }, (_, k) => {
         return { i, titre: cardItems(feedEl.children[i])[0].title };
       });
       await page.waitForTimeout(600);
-      const r2 = await page.evaluate(() => window.__dits[window.__dits.length - 1].text);
+      // Le premier morceau lu APRÈS le swipe doit être le titre de la carte
+      // d'arrivée (le détail suit en morceaux, d'où le premier et pas le dernier).
+      const r2 = await page.evaluate(
+        (n) =>
+          window.__dits
+            .slice(n)
+            .map((d) => d.text)
+            .find((t) => !t.startsWith("France Info. Actu ")) || "",
+        avantSwipe
+      );
       console.log(
-        `[${label}] swipe vers « ${cible.titre} » → dernière lecture : « ${r2.slice(0, 60)} » (reprise juste : ${r2.includes(cible.titre + ".")})`
+        `[${label}] swipe vers « ${cible.titre} » → lecture reprise sur : « ${r2.slice(0, 60)} » (reprise juste : ${r2.includes(cible.titre + ".")})`
       );
       // Un panneau ouvert coupe l'écoute
       await page.evaluate(() => openSettings());

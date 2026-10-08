@@ -1844,9 +1844,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=284"></script>
+<script src="src/lib.js?v=285"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=284"></script>
+<script src="src/i18n.js?v=285"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1854,7 +1854,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","roundRobin","weightedRoundRobin","dedupNews","feedLabels","isPromotionalItem","mutedMatcher","sanitizeMutedWords","parseMutedInput","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeShortsFeedUrl","isYoutubeShortsFeedUrl","youtubeFeedName","isLequipeFeedUrl","lequipeRubrique","lequipeFeedName","feedLinkFromHtml","commonFeedUrlCandidates"],
+  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","roundRobin","weightedRoundRobin","dedupNews","feedLabels","isPromotionalItem","ttsChunks","sansEmoji","mutedMatcher","sanitizeMutedWords","parseMutedInput","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeShortsFeedUrl","isYoutubeShortsFeedUrl","youtubeFeedName","isLequipeFeedUrl","lequipeRubrique","lequipeFeedName","feedLinkFromHtml","commonFeedUrlCandidates"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket","perCatLimit"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -2074,7 +2074,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,dayKey,quarterIndex,statsBuckets,shuffle,
-  seenKey,dropSeen,roundRobin,weightedRoundRobin,groupItems,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,YT_SHORT_MAX_DURATION_S,youtubeApiVideosDurationUrl,youtubeApiDurationsFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,mutedMatcher,sanitizeMutedWords,parseMutedInput,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities,feedLinkFromHtml,commonFeedUrlCandidates}=self.SwiperLib;
+  seenKey,dropSeen,roundRobin,weightedRoundRobin,groupItems,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,YT_SHORT_MAX_DURATION_S,youtubeApiVideosDurationUrl,youtubeApiDurationsFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,ttsChunks,sansEmoji,mutedMatcher,sanitizeMutedWords,parseMutedInput,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities,feedLinkFromHtml,commonFeedUrlCandidates}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -2926,7 +2926,17 @@ let pendingSeenAt=Date.now();
    arrêts de la vidéo, et pour la même raison (du son que plus rien à l'écran ne
    permet de couper). */
 const TTS_LANG={fr:"fr-FR",en:"en-US"};
-let ecouteGen=0,ecouteActive=false,ecouteCarte=null,ecouteRepriseT=null;
+let ecouteGen=0,ecouteActive=false,ecouteCle="",ecouteRepriseT=null;
+/* La carte lue est suivie par son ARTICLE (seenKey du premier), jamais par son
+   nœud DOM : un rendu qui touche au fil pendant l'écoute ne doit pas passer pour
+   un swipe — sinon la lecture repartait du titre à chaque lot arrivé. */
+function cleDeCarte(el){const its=el?cardItems(el):[];return its.length?seenKey(its[0]):"";}
+function indexDeCle(cle){
+  if(!cle)return -1;
+  const kids=feedEl.children;
+  for(let k=0;k<kids.length;k++)if(cleDeCarte(kids[k])===cle)return k;
+  return -1;
+}
 function ttsNatif(){
   const p=isNativeApp&&window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
   return p&&typeof p.speak==="function"?p:null;
@@ -2955,7 +2965,9 @@ function texteDeCarte(card){
   return cardItems(card).map(it=>{
     const morceaux=[it.source,it.title];
     if(!videoIdOf(it)&&it.desc)morceaux.push(it.desc);
-    return morceaux.filter(Boolean).map(t=>String(t).trim().replace(/[.…!?:;,]+$/,"")).join(". ")+".";
+    // sansEmoji AVANT le filtre : une source ou un titre fait d'emoji seuls
+    // ne doit pas laisser un « . » orphelin à prononcer.
+    return morceaux.map(sansEmoji).filter(Boolean).map(t=>t.replace(/[.…!?:;,]+$/,"")).join(". ")+".";
   }).join(" … ");
 }
 const attendre=ms=>new Promise(r=>setTimeout(r,ms));
@@ -2964,22 +2976,25 @@ async function lireEnBoucle(gen){
     const i=currentIndex();
     const card=i>=0?feedEl.children[i]:null;
     if(!card||!cardItems(card).length){arreterEcoute();return;}
-    ecouteCarte=card;
-    const texte=texteDeCarte(card);
-    if(texte){
-      try{await parler(texte);}
+    const cle=cleDeCarte(card);
+    ecouteCle=cle;
+    // Titre PUIS détail, phrase par phrase (voir ttsChunks) : d'un seul bloc,
+    // certains moteurs abandonnaient au bout de ~15 s, donc après le titre.
+    for(const morceau of ttsChunks(texteDeCarte(card))){
+      try{await parler(morceau);}
       catch(e){
         if(gen!==ecouteGen)return;                 // coupée exprès (swipe, arrêt) : rien à dire
         warn("écoute",e);arreterEcoute();toast(T("listen.failed"));return;
       }
+      if(gen!==ecouteGen)return;
     }
     if(gen!==ecouteGen)return;
     await attendre(450);                            // un temps de respiration entre deux cartes
     if(gen!==ecouteGen)return;
     // Swipe pendant la lecture ou la respiration : on ne ramène JAMAIS
     // l'utilisateur sur la carte qu'il vient de quitter — on reprend là où il est.
-    if(currentCardEl()!==card){demarrerEcoute();return;}
-    let j=Array.prototype.indexOf.call(feedEl.children,card);
+    if(cleDeCarte(currentCardEl())!==cle){demarrerEcoute();return;}
+    let j=indexDeCle(cle);
     if(j<0)j=currentIndex();                        // carte retirée entre-temps (render)
     // Bout du fil : loadMore() est déjà parti (le défilement l'a déclenché),
     // on lui laisse le temps d'ajouter la suite avant de conclure.
@@ -2989,7 +3004,7 @@ async function lireEnBoucle(gen){
     }
     if(gen!==ecouteGen)return;
     if(!suivante||!cardItems(suivante).length){arreterEcoute();toast(T("listen.end"));return;}
-    ecouteCarte=suivante;                           // AVANT le défilement : onCardChange n'y verra pas un swipe
+    ecouteCle=cleDeCarte(suivante);                 // AVANT le défilement : onCardChange n'y verra pas un swipe
     scrollToCard(j+1);
     await attendre(120);
   }
@@ -3007,7 +3022,7 @@ function demarrerEcoute(){
 function arreterEcoute(){
   clearTimeout(ecouteRepriseT);
   if(!ecouteActive)return;
-  ecouteActive=false;ecouteCarte=null;
+  ecouteActive=false;ecouteCle="";
   ecouteGen++;                                      // toute promesse en vol devient muette
   taire();
   renderEcouteUI();
@@ -3110,9 +3125,9 @@ function onCardChange(userScroll){
   // Écoute en cours et carte changée sans elle : l'utilisateur a swipé. On
   // reprend la lecture là où il s'arrête, une fois le geste posé (sinon chaque
   // frame du défilement relancerait une phrase).
-  if(ecouteActive&&ecouteCarte&&card!==ecouteCarte){
+  if(ecouteActive&&ecouteCle&&cleDeCarte(card)!==ecouteCle){
     clearTimeout(ecouteRepriseT);
-    ecouteRepriseT=setTimeout(()=>{if(ecouteActive&&currentCardEl()!==ecouteCarte)demarrerEcoute();},450);
+    ecouteRepriseT=setTimeout(()=>{if(ecouteActive&&cleDeCarte(currentCardEl())!==ecouteCle)demarrerEcoute();},450);
   }
   majVolet();     // paysage large seulement ; ailleurs, un test de media query
   if(DEBUG)dbgImage();
@@ -3140,7 +3155,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="284";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="285";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -3151,6 +3166,8 @@ const APP_VERSION="284";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:285,date:"2026-10-08",items:[
+    "changelog.v285.item1"]},
   {v:284,date:"2026-10-07",items:[
     "changelog.v284.item1","changelog.v284.item2","changelog.v284.item3"]},
   {v:276,date:"2026-09-27",items:[

@@ -1515,6 +1515,59 @@
     return !!m && m(item);
   }
 
+  /* Emoji retirés avant la lecture à voix haute : un moteur de synthèse les
+   * LIT (« visage qui pleure de rire », « drapeau France »…), ce qui hache la
+   * phrase. Pictogrammes, drapeaux (indicateurs régionaux), teintes de peau,
+   * sélecteurs de variante, liants ZWJ et capuchons de touche. Construite à
+   * l'exécution avec un repli, comme MUTE_SEP : un littéral `\p{…}` ferait
+   * refuser tout ce fichier à un vieux moteur. */
+  const EMOJI_RE = (() => {
+    try {
+      return new RegExp(
+        "[\\p{Extended_Pictographic}\\u{1F1E6}-\\u{1F1FF}\\u{1F3FB}-\\u{1F3FF}\\uFE0F\\uFE0E\\u200D\\u20E3]",
+        "gu"
+      );
+    } catch (e) {
+      return /[\uD83C-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF\u2B00-\u2BFF\uFE0F\uFE0E\u200D\u20E3]/g;
+    }
+  })();
+
+  function sansEmoji(text) {
+    return collapse(String(text || "").replace(EMOJI_RE, " "));
+  }
+
+  /** « Écouter le fil » : découpe le texte d'une carte en morceaux de `max`
+   *  caractères au plus, aux fins de phrase quand c'est possible. Lu d'un seul
+   *  bloc, le détail d'une carte dure 20 à 40 s — et plusieurs moteurs de
+   *  synthèse (Chrome en tête) abandonnent une lecture au-delà de ~15 s, sans
+   *  le signaler : on n'entendait que le titre. Une phrase démesurée est coupée
+   *  au dernier espace. */
+  function ttsChunks(text, max = 200) {
+    const phrases = collapse(text).match(/[^.!?…]+[.!?…]*\s*/g) || [];
+    const out = [];
+    let cur = "";
+    for (let ph of phrases) {
+      ph = ph.trim();
+      if (!ph) continue;
+      while (ph.length > max) {
+        const coupe = ph.slice(0, max).lastIndexOf(" ");
+        const n = coupe > max * 0.5 ? coupe : max;
+        if (cur) {
+          out.push(cur);
+          cur = "";
+        }
+        out.push(ph.slice(0, n).trim());
+        ph = ph.slice(n).trim();
+      }
+      if (cur && cur.length + 1 + ph.length > max) {
+        out.push(cur);
+        cur = ph;
+      } else cur = cur ? cur + " " + ph : ph;
+    }
+    if (cur) out.push(cur);
+    return out;
+  }
+
   /** Sites où au moins UNE PARTIE du contenu est réservée aux abonnés — quasi
    *  aucun site de presse n'est payant à 100 %, même ceux au paywall le plus
    *  strict publient des dépêches ou de l'actu chaude en accès libre. Cette
@@ -1789,6 +1842,8 @@
     parseMutedInput,
     mutedMatcher,
     isMutedItem,
+    ttsChunks,
+    sansEmoji,
     isPaywallCandidateDomain,
     isPaywalledHtml,
     isSponsoredHtml,

@@ -230,7 +230,7 @@ Les procédures répétitives vivent dans des skills ; ce fichier garde le *pour
 ## Commandes
 
 ```bash
-npm test            # node --test — 141 tests, aucune dépendance à installer
+npm test            # node --test — 143 tests, aucune dépendance à installer
 npm run lint        # eslint api src test eslint.config.js  (PAS index.html)
 npm run format:check
 npm run cap:sync    # régénère www/ puis cap sync android
@@ -429,7 +429,12 @@ hors du dépôt, jamais dans `package.json`.
   appliquent pas.
 - `demarrerEcoute()` / `arreterEcoute()` / `lireEnBoucle()` — « Écouter le
   fil ». Une GÉNÉRATION (`ecouteGen`) comme `loadSeq` : toute promesse d'une
-  lecture dépassée est ignorée. `ecouteCarte` est posée AVANT le défilement
+  lecture dépassée est ignorée. Le texte (titre PUIS détail) est lu PHRASE PAR
+  PHRASE (`ttsChunks`, `src/lib.js`, morceaux ≤ 200 caractères) : d'un seul bloc,
+  certains moteurs abandonnaient au bout de ~15 s sans le signaler, et on
+  n'entendait que le titre. Les emoji sont retirés avant (`sansEmoji`) : un moteur
+  les prononce (« visage qui pleure de rire »). La carte lue est suivie par son ARTICLE (`ecouteCle`,
+  `seenKey`), jamais par son nœud. `ecouteCle` est posée AVANT le défilement
   automatique, pour qu'`onCardChange` ne prenne pas ce défilement pour un swipe ;
   un vrai swipe reprend la lecture sur la carte d'arrivée, et la boucle ne
   ramène JAMAIS en arrière quelqu'un qui a bougé pendant la respiration entre

@@ -1471,3 +1471,25 @@ test("parseMutedInput : virgules, points-virgules et retours à la ligne", () =>
     "télé réalité",
   ]);
 });
+
+test("ttsChunks : morceaux bornés, coupés aux fins de phrase, rien de perdu", () => {
+  const txt =
+    "Phrase un. Phrase deux est un peu plus longue ! Trois ? " + "mot ".repeat(120);
+  const c = lib.ttsChunks(txt, 60);
+  assert.ok(c.every((x) => x.length <= 60));
+  assert.equal(c[0], "Phrase un. Phrase deux est un peu plus longue ! Trois ?");
+  assert.equal(c.join(" ").replace(/\s+/g, " "), txt.trim().replace(/\s+/g, " "));
+  assert.deepEqual(lib.ttsChunks(""), []);
+});
+
+test("sansEmoji : retire emoji, drapeaux, teintes et liants, garde le texte", () => {
+  assert.equal(lib.sansEmoji("🔥 Incendie 🚒 en cours"), "Incendie en cours");
+  assert.equal(lib.sansEmoji("Victoire 🇫🇷 !"), "Victoire !");
+  assert.equal(lib.sansEmoji("Bravo 👍🏽 à la famille 👨‍👩‍👧"), "Bravo à la famille");
+  assert.equal(lib.sansEmoji("Il fait ☀️ beau"), "Il fait beau");
+  assert.equal(
+    lib.sansEmoji("Été, à 10 h : 25 °C — « ok » #1"),
+    "Été, à 10 h : 25 °C — « ok » #1"
+  );
+  assert.equal(lib.sansEmoji(""), "");
+});

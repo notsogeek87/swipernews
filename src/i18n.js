@@ -54,6 +54,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v285.item1":
+        "🔊 Écouter le fil lit maintenant le détail de chaque carte en entier, pas seulement son titre — et ne prononce plus les emoji.",
       "changelog.v284.item1":
         "🔊 Écouter le fil : depuis le menu, l'app lit à voix haute chaque carte puis passe toute seule à la suivante. Swipe pour sauter, touche « Arrêter l'écoute » pour couper.",
       "changelog.v284.item2":
@@ -551,6 +553,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v285.item1":
+        "🔊 Listen to the feed now reads each card's full details, not just its title — and no longer reads emoji aloud.",
       "changelog.v284.item1":
         '🔊 Listen to the feed: from the menu, the app reads each card aloud and moves on to the next by itself. Swipe to skip, tap "Stop listening" to stop.',
       "changelog.v284.item2":
