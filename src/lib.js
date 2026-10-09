@@ -1729,6 +1729,155 @@
     }
   }
 
+  /** Les façons d'ajouter une source, avec un exemple de chacune : c'est ce
+   *  que montre l'aide « Que peut-on ajouter ? » du panneau Sources
+   *  (index.html, renderSourceHelp). `social` : le type est reconnu par
+   *  socialFeedCandidates ; `fill` : l'exemple est réel et se pose dans le champ
+   *  d'un tap ; `note` : pas une source, une précision.
+   *  RÈGLE : toute nouvelle façon d'ajouter une source s'ajoute ICI et reçoit
+   *  ses textes `src.<kind>.title` / `src.<kind>.desc` (src/i18n.js, fr ET en) —
+   *  test/lib.test.js échoue sinon. */
+  const SOURCE_KINDS = [
+    { kind: "feed", example: "https://www.lemonde.fr/rss/une.xml", fill: true },
+    { kind: "site", example: "https://www.numerama.com", fill: true },
+    { kind: "youtube", example: "https://www.youtube.com/@YouTube", fill: true },
+    { kind: "reddit", example: "r/france", social: true, fill: true },
+    { kind: "reddituser", example: "u/spez", social: true, fill: true },
+    { kind: "mastodon", example: "@Gargron@mastodon.social", social: true, fill: true },
+    {
+      kind: "mastotag",
+      example: "#photography@mastodon.social",
+      social: true,
+      fill: true,
+    },
+    { kind: "bluesky", example: "@bsky.app", social: true, fill: true },
+    { kind: "lemmy", example: "!technology@lemmy.world", social: true, fill: true },
+    {
+      kind: "peertube",
+      example: "https://exemple.org/feeds/videos.xml?videoChannelId=3",
+    },
+    { kind: "opml", example: "" },
+    { kind: "nosocial", example: "Instagram · TikTok · Facebook", note: true },
+  ];
+
+  // Hôtes dont une adresse `/@nom` n'est PAS un compte Mastodon.
+  const NOT_MASTODON_HOSTS =
+    /(^|\.)(youtube\.com|youtu\.be|tiktok\.com|medium\.com|threads\.(net|com)|instagram\.com|facebook\.com|x\.com|twitter\.com|bsky\.app)$/i;
+  const HOST_RE = "((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,})";
+
+  /** Ce que l'utilisateur a tapé, vu comme une source de réseau social :
+   *  `r/france`, `u/nom`, `@nom@instance` (Mastodon), `#tag@instance`,
+   *  `@nom.bsky.social` (Bluesky), `!communaute@instance` (Lemmy), ou l'adresse
+   *  de la page correspondante. Rend les flux RSS à essayer, DANS L'ORDRE :
+   *  [{kind, url, name}] — [] si ce n'est rien de reconnu (l'appelant retombe
+   *  alors sur le chemin ordinaire : flux collé, ou découverte sur un site).
+   *  Aucune requête ici : l'appelant vérifie chaque candidat avant de l'adopter
+   *  (une adresse peut avoir la bonne forme sans exister). */
+  function socialFeedCandidates(input) {
+    const s = String(input == null ? "" : input).trim();
+    if (!s || s.length > 300 || /\s/.test(s)) return [];
+    const out = [];
+    const add = (kind, url, name) => out.push({ kind, url, name });
+    let m;
+
+    // Reddit : r/sous, u/nom, ou la page. Un lien déjà en .rss/.json reste un flux collé tel quel.
+    m = s.match(/^\/?(r|u|user)\/([A-Za-z0-9_+-]{2,60})\/?$/i);
+    if (!m) {
+      m = s.match(
+        /^https?:\/\/(?:www\.|old\.|new\.)?reddit\.com\/(r|u|user)\/([A-Za-z0-9_+-]{2,60})\/?(?:[?#].*)?$/i
+      );
+    }
+    if (m) {
+      const sub = m[1].toLowerCase() === "r";
+      add(
+        sub ? "reddit" : "reddituser",
+        "https://www.reddit.com/" + (sub ? "r/" : "user/") + m[2] + "/.rss",
+        (sub ? "r/" : "u/") + m[2]
+      );
+      return out;
+    }
+
+    // Mastodon, compte : @nom@instance
+    m = s.match(new RegExp("^@([A-Za-z0-9_.-]{1,64})@" + HOST_RE + "$", "i"));
+    if (m) {
+      const host = m[2].toLowerCase();
+      add("mastodon", "https://" + host + "/@" + m[1] + ".rss", "@" + m[1] + "@" + host);
+      return out;
+    }
+    // Mastodon, mot-dièse : #tag@instance
+    m = s.match(new RegExp("^#([^\\s@#/?]{1,100})@" + HOST_RE + "$", "i"));
+    if (m) {
+      const host = m[2].toLowerCase();
+      add(
+        "mastotag",
+        "https://" + host + "/tags/" + encodeURIComponent(m[1]) + ".rss",
+        "#" + m[1] + "@" + host
+      );
+      return out;
+    }
+    // Lemmy : !communaute@instance
+    m = s.match(new RegExp("^!([A-Za-z0-9_]{1,64})@" + HOST_RE + "$", "i"));
+    if (m) {
+      const host = m[2].toLowerCase();
+      add(
+        "lemmy",
+        "https://" + host + "/feeds/c/" + m[1] + ".xml",
+        "!" + m[1] + "@" + host
+      );
+      return out;
+    }
+    // Bluesky : @nom.bsky.social (UN seul @, et un point — sinon c'est Mastodon ou rien)
+    m = s.match(/^@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)$/);
+    if (m) {
+      add(
+        "bluesky",
+        "https://bsky.app/profile/" + m[1].toLowerCase() + "/rss",
+        "@" + m[1].toLowerCase()
+      );
+      return out;
+    }
+
+    // Les mêmes, depuis l'adresse d'une page.
+    let u;
+    try {
+      u = new URL(s);
+    } catch (_) {
+      return out;
+    }
+    if (u.protocol !== "http:" && u.protocol !== "https:") return out;
+    const host = u.hostname.toLowerCase();
+    const path = u.pathname.replace(/\/+$/, "");
+    if (host === "bsky.app" || host === "www.bsky.app") {
+      m = path.match(/^\/profile\/([^/]+)$/);
+      if (m)
+        add(
+          "bluesky",
+          "https://bsky.app/profile/" + m[1] + "/rss",
+          "@" + decodeURIComponent(m[1])
+        );
+      return out;
+    }
+    if (NOT_MASTODON_HOSTS.test(host) || !host.includes(".")) return out;
+    m = path.match(/^\/@([A-Za-z0-9_.-]{1,64})$/);
+    if (m) add("mastodon", u.origin + "/@" + m[1] + ".rss", "@" + m[1] + "@" + host);
+    m = path.match(/^\/tags\/([^/.]+)$/);
+    if (m)
+      add(
+        "mastotag",
+        u.origin + "/tags/" + m[1] + ".rss",
+        "#" + decodeURIComponent(m[1]) + "@" + host
+      );
+    // `/c/nom` : Lemmy… ou PeerTube, que le flux ci-dessous ne trouvera pas — l'appelant retombe alors sur la découverte.
+    m = path.match(/^\/c\/([A-Za-z0-9_]{1,64}(?:@[A-Za-z0-9.-]+)?)$/);
+    if (m)
+      add(
+        "lemmy",
+        u.origin + "/feeds/c/" + m[1] + ".xml",
+        "!" + m[1].split("@")[0] + "@" + host
+      );
+    return out;
+  }
+
   /** Sources depuis un export JSON (tableau, ou objet {feeds:[...]}) . */
   function parseJsonFeeds(text) {
     const data = JSON.parse(text);
@@ -1783,6 +1932,8 @@
     clampText,
     isFeedUrl,
     commonFeedUrlCandidates,
+    SOURCE_KINDS,
+    socialFeedCandidates,
     imgFromHtml,
     safeLink,
     safeImg,

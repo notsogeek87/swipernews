@@ -230,7 +230,7 @@ Les procédures répétitives vivent dans des skills ; ce fichier garde le *pour
 ## Commandes
 
 ```bash
-npm test            # node --test — 143 tests, aucune dépendance à installer
+npm test            # node --test — 146 tests, aucune dépendance à installer
 npm run lint        # eslint api src test eslint.config.js  (PAS index.html)
 npm run format:check
 npm run cap:sync    # régénère www/ puis cap sync android
@@ -518,6 +518,25 @@ hors du dépôt, jamais dans `package.json`.
   est concaténé dans l'`src` sans échappement, ce qui n'est légitime QUE parce
   que `youtubeId` ne rend rien d'autre que `[A-Za-z0-9_-]{11}` — même rôle que
   `oneOf()` côté natif. Scénario `video`.
+- `SOURCE_KINDS` / `socialFeedCandidates()` / `renderSourceHelp()` — les façons
+  d'ajouter une source, et leur AIDE. `socialFeedCandidates` (`src/lib.js`, pure,
+  testée) lit ce que l'utilisateur tape — `r/france`, `u/nom`, `@nom@instance`
+  (Mastodon), `#tag@instance`, `@nom.bsky.social`, `!communauté@instance`
+  (Lemmy), ou l'adresse de la page — et rend les flux RSS À ESSAYER. Aucune
+  requête dans la lib : `addFeed` VÉRIFIE chaque candidat (`docFluxChaine`)
+  avant de l'adopter, et une forme reconnue qui ne donne rien retombe sur la
+  découverte ordinaire si c'est une adresse (un `/c/nom` PeerTube passe d'abord
+  pour du Lemmy). Le nom enregistré est celui qu'on a tapé (`r/france`), pas le
+  titre du flux. Instagram, TikTok et Facebook n'ont aucun flux : ils ne sont
+  PAS pris en charge, et passer par RSSHub ou un équivalent tiers non choisi irait
+  contre « aucun appel à un tiers non choisi » (l'aide le dit, entrée `nosocial`).
+  **RÈGLE : toute nouvelle façon d'ajouter une source se déclare dans
+  `SOURCE_KINDS` (type, exemple) ET reçoit ses textes `src.<type>.title` /
+  `src.<type>.desc` en fr et en dans `src/i18n.js`** — c'est l'aide « Que peut-on
+  ajouter ? » du panneau Sources (`renderSourceHelp`, exemples touchables qui
+  remplissent le champ). `test/lib.test.js` échoue si un type n'est pas documenté
+  dans les deux langues ou si son exemple n'est pas reconnu : l'aide ne peut pas
+  rester en retard sur ce que l'app sait ajouter.
 - `urlDuFlux()` / `fluxShorts()` — l'URL réellement INTERROGÉE pour une source.
   Elle ne diffère de l'URL enregistrée que pour une chaîne YouTube, dont on
   interroge la playlist « Shorts » (`youtubeShortsFeedUrl`, `src/lib.js`, testée).

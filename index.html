@@ -860,6 +860,14 @@
   /* Secours optionnel (clé API YouTube) : replié par défaut, discret — un
      <details> plutôt qu'une section pleine, pour ne pas donner à un réglage
      que quasi personne ne touche le même poids visuel que les autres. */
+  .srchelp{margin-top:12px;font-size:13px;color:var(--ash)}
+  .srchelp summary{cursor:pointer;font-weight:500;color:var(--ink)}
+  .srchelp p.sub{margin:8px 0;font-size:13px}
+  .srchelp .srcrow{padding:9px 0;border-top:1px solid rgba(var(--redline-rgb),.25)}
+  .srchelp .srcrow b{display:block;color:var(--ink);font-weight:500}
+  .srchelp .srcrow span{display:block;margin:2px 0 6px}
+  .srchelp code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--ink);word-break:break-all}
+  .srchelp button.intchip{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;max-width:100%;word-break:break-all;text-align:left}
   .ytadv{margin-top:14px;font-size:13px;color:var(--ash)}
   .ytadv summary{cursor:pointer;font-weight:500;color:var(--ink)}
   .ytadv p.sub{margin:8px 0;font-size:13px}
@@ -1602,9 +1610,17 @@
     <label class="sponsorrow"><input type="checkbox" id="sponsorFilterChk"><span data-i18n="sheet.sources.filterSponsored">Filtrer les articles sponsorisés et bons plans</span></label>
     <div id="feedList"></div>
     <div class="addbox">
-      <input id="newUrl" type="url" data-i18n-attr="placeholder:sheet.sources.placeholder" placeholder="https://exemple.com/rss" inputmode="url">
+      <input id="newUrl" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-attr="placeholder:sheet.sources.placeholder" placeholder="Adresse, r/sous-reddit, @compte…" inputmode="url">
       <button id="addFeedBtn" data-i18n="sheet.sources.add">Ajouter</button>
     </div>
+
+    <!-- Aide à l'ajout : rempli par renderSourceHelp() depuis SOURCE_KINDS
+         (src/lib.js). Toute nouvelle façon d'ajouter une source doit y figurer. -->
+    <details class="srchelp">
+      <summary data-i18n="sheet.sources.help.summary">ℹ️ Que peut-on ajouter ?</summary>
+      <p class="sub" data-i18n="sheet.sources.help.intro">Tape ou colle n'importe laquelle de ces formes dans le champ ci-dessus. Touche un exemple pour le mettre dans le champ.</p>
+      <div id="srcHelpList"></div>
+    </details>
 
     <div id="suggestBox"></div>
 
@@ -1844,9 +1860,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=285"></script>
+<script src="src/lib.js?v=286"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=285"></script>
+<script src="src/i18n.js?v=286"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -1854,7 +1870,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","roundRobin","weightedRoundRobin","dedupNews","feedLabels","isPromotionalItem","ttsChunks","sansEmoji","mutedMatcher","sanitizeMutedWords","parseMutedInput","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeShortsFeedUrl","isYoutubeShortsFeedUrl","youtubeFeedName","isLequipeFeedUrl","lequipeRubrique","lequipeFeedName","feedLinkFromHtml","commonFeedUrlCandidates"],
+  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","roundRobin","weightedRoundRobin","dedupNews","feedLabels","isPromotionalItem","ttsChunks","sansEmoji","mutedMatcher","sanitizeMutedWords","parseMutedInput","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeShortsFeedUrl","isYoutubeShortsFeedUrl","youtubeFeedName","isLequipeFeedUrl","lequipeRubrique","lequipeFeedName","feedLinkFromHtml","commonFeedUrlCandidates","SOURCE_KINDS","socialFeedCandidates"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket","perCatLimit"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -2074,7 +2090,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,dayKey,quarterIndex,statsBuckets,shuffle,
-  seenKey,dropSeen,roundRobin,weightedRoundRobin,groupItems,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,YT_SHORT_MAX_DURATION_S,youtubeApiVideosDurationUrl,youtubeApiDurationsFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,ttsChunks,sansEmoji,mutedMatcher,sanitizeMutedWords,parseMutedInput,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities,feedLinkFromHtml,commonFeedUrlCandidates}=self.SwiperLib;
+  seenKey,dropSeen,roundRobin,weightedRoundRobin,groupItems,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,YT_SHORT_MAX_DURATION_S,youtubeApiVideosDurationUrl,youtubeApiDurationsFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,ttsChunks,sansEmoji,mutedMatcher,sanitizeMutedWords,parseMutedInput,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities,feedLinkFromHtml,commonFeedUrlCandidates,SOURCE_KINDS,socialFeedCandidates}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -3155,7 +3171,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="285";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="286";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -3166,6 +3182,8 @@ const APP_VERSION="285";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:286,date:"2026-10-09",items:[
+    "changelog.v286.item1"]},
   {v:285,date:"2026-10-08",items:[
     "changelog.v285.item1"]},
   {v:284,date:"2026-10-07",items:[
@@ -7473,7 +7491,7 @@ function setLang(l){
   document.documentElement.lang=LANG;
   applyI18n();
   renderLangPref();renderReadPref();renderThemePref();renderAutoExport();renderIntGrid("intGrid");renderList();renderSuggest();renderMixUI();
-  renderPausePref();renderEcouteUI();renderMutes();
+  renderPausePref();renderEcouteUI();renderMutes();renderSourceHelp();
   switchFeed();
 }
 /* Contrairement à setLang(), ne touche à AUCUN état du fil : c'est pour ça
@@ -8698,7 +8716,7 @@ function openSettings(replaceFrom){
   suggestGroupOpen={};
   renderMix();renderIntGrid("intGrid");renderList();renderSuggest();renderReadPref();renderLangPref();renderThemePref();renderAutoExport();refreshAutoExport();
   document.getElementById("sponsorFilterChk").checked=filterSponsored;
-  renderMutes();
+  renderMutes();renderSourceHelp();
   document.getElementById("ytApiKeyInput").value=ytApiKey;
   if(replaceFrom)replaceDialog(replaceFrom,sheet);else openDialog(sheet);
 }
@@ -9059,6 +9077,24 @@ function renderList(){const lbl=feedLabels(feeds);
    sources = plus d'articles), regroupées par catégorie. Réutilise le motif
    .feedgroup/.intgrid déjà posé par renderList() pour actus/vidéos — empilé
    verticalement, jamais une rangée qui défile horizontalement. */
+/* Aide « Que peut-on ajouter ? » : une ligne par entrée de SOURCE_KINDS
+   (src/lib.js), textes `src.<kind>.title/desc`. Un exemple marqué `fill` se pose
+   dans le champ d'ajout d'un tap (délégué sur #srcHelpList : la liste est
+   refaite à chaque changement de langue). */
+function renderSourceHelp(){
+  const box=document.getElementById("srcHelpList");
+  if(!box)return;
+  box.innerHTML=SOURCE_KINDS.map(k=>{
+    const ex=!k.example?"":k.fill?`<button type="button" class="intchip" data-srcex="${escAttr(k.example)}">${esc(k.example)}</button>`:`<code>${esc(k.example)}</code>`;
+    return `<div class="srcrow"><b>${esc(T("src."+k.kind+".title"))}</b><span>${esc(T("src."+k.kind+".desc"))}</span>${ex}</div>`;
+  }).join("");
+}
+document.getElementById("srcHelpList").addEventListener("click",e=>{
+  const b=e.target.closest("[data-srcex]");
+  if(!b)return;
+  const inp=document.getElementById("newUrl");
+  inp.value=b.dataset.srcex;inp.focus();
+});
 function renderSuggest(){
   const box=document.getElementById("suggestBox");
   const have=new Set(feeds.map(f=>f.url));
@@ -9144,6 +9180,23 @@ async function addFeed(){const inp=document.getElementById("newUrl");const url=i
     if(!rss){toast(T("toast.youtubeChannelNotFound"));return;}
     pushFeedUrl(rss,inp);
     return;
+  }
+  // Réseau social (r/…, @nom@instance, #tag@instance, @nom.bsky.social,
+  // !communauté@instance, ou l'adresse de la page) : on construit le flux, et
+  // chaque candidat est VÉRIFIÉ avant d'être adopté. Une forme reconnue qui ne
+  // donne rien retombe sur le chemin ordinaire si c'est une adresse (un
+  // `/c/nom` PeerTube, par exemple), sinon c'est un échec annoncé comme tel.
+  const sociaux=socialFeedCandidates(url);
+  if(sociaux.length){
+    toast(T("toast.feedDiscovering"));
+    resolutionFluxEnCours(true,T("toast.feedDiscovering"));
+    try{
+      for(const c of sociaux){
+        if(feeds.some(f=>f.url===c.url)){toast(T("toast.feedsAlreadyPresent"));inp.value="";return;}
+        if(await docFluxChaine(c.url)){pushFeedUrl(c.url,inp,c.name);return;}
+      }
+    }finally{resolutionFluxEnCours(false);}
+    if(!isFeedUrl(url)){toast(T("toast.socialNotFound"));return;}
   }
   if(!isFeedUrl(url)){toast(T("toast.invalidUrl"));return;}
   if(feeds.some(f=>f.url===url)){toast(T("toast.feedsAlreadyPresent"));return;}

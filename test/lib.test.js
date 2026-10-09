@@ -1493,3 +1493,104 @@ test("sansEmoji : retire emoji, drapeaux, teintes et liants, garde le texte", ()
   );
   assert.equal(lib.sansEmoji(""), "");
 });
+
+// ---------- Sources de réseaux sociaux (socialFeedCandidates) ----------
+
+test("socialFeedCandidates : Reddit, Mastodon, Bluesky, Lemmy", () => {
+  const un = (s) => lib.socialFeedCandidates(s)[0];
+  assert.deepEqual(un("r/france"), {
+    kind: "reddit",
+    url: "https://www.reddit.com/r/france/.rss",
+    name: "r/france",
+  });
+  assert.equal(un("/r/a+b").url, "https://www.reddit.com/r/a+b/.rss");
+  assert.deepEqual(un("u/spez"), {
+    kind: "reddituser",
+    url: "https://www.reddit.com/user/spez/.rss",
+    name: "u/spez",
+  });
+  assert.equal(
+    un("https://old.reddit.com/r/france/top/?t=day"),
+    undefined,
+    "une page profonde n'est pas devinée"
+  );
+  assert.equal(
+    un("https://www.reddit.com/r/france/").url,
+    "https://www.reddit.com/r/france/.rss"
+  );
+  assert.deepEqual(un("@Gargron@Mastodon.Social"), {
+    kind: "mastodon",
+    url: "https://mastodon.social/@Gargron.rss",
+    name: "@Gargron@mastodon.social",
+  });
+  assert.equal(un("https://piaille.fr/@nom").url, "https://piaille.fr/@nom.rss");
+  assert.equal(
+    un("#photo@mastodon.social").url,
+    "https://mastodon.social/tags/photo.rss"
+  );
+  assert.equal(
+    un("https://mastodon.social/tags/photo").url,
+    "https://mastodon.social/tags/photo.rss"
+  );
+  assert.equal(un("@bsky.app").url, "https://bsky.app/profile/bsky.app/rss");
+  assert.equal(
+    un("https://bsky.app/profile/bsky.app").url,
+    "https://bsky.app/profile/bsky.app/rss"
+  );
+  assert.equal(
+    un("!technology@lemmy.world").url,
+    "https://lemmy.world/feeds/c/technology.xml"
+  );
+  assert.equal(
+    un("https://lemmy.world/c/technology").url,
+    "https://lemmy.world/feeds/c/technology.xml"
+  );
+});
+
+test("socialFeedCandidates ignore ce qui n'est pas un réseau social", () => {
+  for (const s of [
+    "",
+    "   ",
+    null,
+    "r",
+    "france",
+    "nom@exemple.fr",
+    "@nom",
+    "https://www.lemonde.fr/rss/une.xml",
+    "https://www.youtube.com/@YouTube",
+    "https://www.tiktok.com/@nom",
+    "https://medium.com/@nom",
+    "https://www.instagram.com/nom",
+    "r/avec espace",
+  ]) {
+    assert.deepEqual(lib.socialFeedCandidates(s), [], String(s));
+  }
+});
+
+test("SOURCE_KINDS : chaque type est documenté (fr et en) et reconnu", () => {
+  const i18n = require("../src/i18n.js");
+  const kinds = new Set();
+  for (const k of lib.SOURCE_KINDS) {
+    assert.ok(!kinds.has(k.kind), "type en double : " + k.kind);
+    kinds.add(k.kind);
+    for (const lang of ["fr", "en"]) {
+      for (const part of ["title", "desc"]) {
+        const key = "src." + k.kind + "." + part;
+        assert.ok(i18n.STRINGS[lang][key], key + " manque en " + lang);
+      }
+    }
+    if (k.social) {
+      const c = lib.socialFeedCandidates(k.example);
+      assert.equal(
+        c.length && c[0].kind,
+        k.kind,
+        "l'exemple de " + k.kind + " n'est pas reconnu"
+      );
+    }
+  }
+  // Tout type que socialFeedCandidates sait produire figure dans l'aide.
+  for (const ex of ["r/a", "u/a", "@a@b.fr", "#a@b.fr", "@a.bsky.social", "!a@b.fr"]) {
+    for (const c of lib.socialFeedCandidates(ex))
+      assert.ok(kinds.has(c.kind), c.kind + " absent de SOURCE_KINDS");
+  }
+});

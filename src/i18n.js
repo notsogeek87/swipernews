@@ -54,6 +54,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v286.item1":
+        "➕ Sources : ajoute un sous-reddit (r/france), un compte ou mot-dièse Mastodon, un compte Bluesky ou une communauté Lemmy en tapant simplement son nom. Une aide « Que peut-on ajouter ? » liste toutes les façons d'ajouter une source, avec des exemples.",
       "changelog.v285.item1":
         "🔊 Écouter le fil lit maintenant le détail de chaque carte en entier, pas seulement son titre — et ne prononce plus les emoji.",
       "changelog.v284.item1":
@@ -327,7 +329,43 @@
       "sheet.sources.noVideoFeed.cta": "Ajouter une chaîne YouTube",
       "sheet.sources.groupRss": "Flux RSS",
       "sheet.sources.groupVideo": "Chaînes YouTube",
-      "sheet.sources.placeholder": "https://exemple.com/rss",
+      "sheet.sources.placeholder": "Adresse, r/sous-reddit, @compte…",
+      "sheet.sources.help.summary": "ℹ️ Que peut-on ajouter ?",
+      "sheet.sources.help.intro":
+        "Tape ou colle n'importe laquelle de ces formes dans le champ ci-dessus. Touche un exemple pour le mettre dans le champ.",
+      "src.feed.title": "Un flux RSS / Atom",
+      "src.feed.desc": "L'adresse exacte du flux, quand tu la connais.",
+      "src.site.title": "Un site web",
+      "src.site.desc": "L'adresse d'un site : l'app cherche son flux RSS toute seule.",
+      "src.youtube.title": "Une chaîne YouTube",
+      "src.youtube.desc":
+        "Son adresse (@nom, /channel/…) : seuls ses Shorts sont servis.",
+      "src.reddit.title": "Un sous-reddit",
+      "src.reddit.desc":
+        "r/nom, ou l'adresse de la page. Reddit limite parfois les accès : un sous-reddit peut ne pas répondre.",
+      "src.reddituser.title": "Un compte Reddit",
+      "src.reddituser.desc": "u/nom : ses derniers messages.",
+      "src.mastodon.title": "Un compte Mastodon",
+      "src.mastodon.desc":
+        "@nom@instance, ou l'adresse de son profil. Fonctionne pour tout le fediverse qui publie un flux.",
+      "src.mastotag.title": "Un mot-dièse Mastodon",
+      "src.mastotag.desc":
+        "#mot@instance : tout ce que l'instance voit passer sur ce mot-dièse.",
+      "src.bluesky.title": "Un compte Bluesky",
+      "src.bluesky.desc":
+        "@nom.bsky.social, ou l'adresse de son profil. Seuls ses propres messages sont servis.",
+      "src.lemmy.title": "Une communauté Lemmy",
+      "src.lemmy.desc": "!communauté@instance, ou l'adresse de la communauté.",
+      "src.peertube.title": "Une chaîne PeerTube",
+      "src.peertube.desc":
+        "Colle l'adresse du flux de la chaîne (l'icône RSS de sa page).",
+      "src.opml.title": "Une liste de sources (OPML)",
+      "src.opml.desc":
+        "Plus bas, « Importer » reprend d'un coup toutes les sources d'un autre lecteur RSS.",
+      "src.nosocial.title": "Pas possible : Instagram, TikTok, Facebook",
+      "src.nosocial.desc":
+        "Ces réseaux ne publient aucun flux, et passer par un service tiers non choisi irait contre le principe de l'app.",
+      "toast.socialNotFound": "Impossible de trouver ce compte ou cette communauté.",
       "sheet.sources.add": "Ajouter",
       "sheet.sources.exportOpml": "↓ Exporter (OPML)",
       "sheet.sources.exportJson": "↓ Exporter (JSON)",
@@ -553,6 +591,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v286.item1":
+        "➕ Sources: add a subreddit (r/france), a Mastodon account or hashtag, a Bluesky account or a Lemmy community just by typing its name. A “What can I add?” help lists every way to add a source, with examples.",
       "changelog.v285.item1":
         "🔊 Listen to the feed now reads each card's full details, not just its title — and no longer reads emoji aloud.",
       "changelog.v284.item1":
@@ -819,7 +859,41 @@
       "sheet.sources.noVideoFeed.cta": "Add a YouTube channel",
       "sheet.sources.groupRss": "RSS feeds",
       "sheet.sources.groupVideo": "YouTube channels",
-      "sheet.sources.placeholder": "https://example.com/rss",
+      "sheet.sources.placeholder": "Address, r/subreddit, @account…",
+      "sheet.sources.help.summary": "ℹ️ What can I add?",
+      "sheet.sources.help.intro":
+        "Type or paste any of these forms in the field above. Tap an example to put it in the field.",
+      "src.feed.title": "An RSS / Atom feed",
+      "src.feed.desc": "The exact feed address, when you know it.",
+      "src.site.title": "A website",
+      "src.site.desc": "A site's address: the app finds its RSS feed by itself.",
+      "src.youtube.title": "A YouTube channel",
+      "src.youtube.desc": "Its address (@name, /channel/…): only its Shorts are served.",
+      "src.reddit.title": "A subreddit",
+      "src.reddit.desc":
+        "r/name, or the page's address. Reddit sometimes limits access: a subreddit may not respond.",
+      "src.reddituser.title": "A Reddit account",
+      "src.reddituser.desc": "u/name: their latest posts.",
+      "src.mastodon.title": "A Mastodon account",
+      "src.mastodon.desc":
+        "@name@instance, or its profile address. Works across the fediverse wherever a feed is published.",
+      "src.mastotag.title": "A Mastodon hashtag",
+      "src.mastotag.desc":
+        "#word@instance: everything that instance sees on this hashtag.",
+      "src.bluesky.title": "A Bluesky account",
+      "src.bluesky.desc":
+        "@name.bsky.social, or its profile address. Only its own posts are served.",
+      "src.lemmy.title": "A Lemmy community",
+      "src.lemmy.desc": "!community@instance, or the community's address.",
+      "src.peertube.title": "A PeerTube channel",
+      "src.peertube.desc": "Paste the channel's feed address (the RSS icon on its page).",
+      "src.opml.title": "A list of sources (OPML)",
+      "src.opml.desc":
+        "Further down, “Import” brings in all the sources from another RSS reader at once.",
+      "src.nosocial.title": "Not possible: Instagram, TikTok, Facebook",
+      "src.nosocial.desc":
+        "These networks publish no feed, and going through an unchosen third-party service would go against the app's principle.",
+      "toast.socialNotFound": "Could not find this account or community.",
       "sheet.sources.add": "Add",
       "sheet.sources.exportOpml": "↓ Export (OPML)",
       "sheet.sources.exportJson": "↓ Export (JSON)",
