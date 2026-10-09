@@ -1860,9 +1860,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=286"></script>
+<script src="src/lib.js?v=287"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=286"></script>
+<script src="src/i18n.js?v=287"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -3171,7 +3171,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="286";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="287";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -3182,6 +3182,8 @@ const APP_VERSION="286";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:287,date:"2026-10-09",items:[
+    "changelog.v287.item1"]},
   {v:286,date:"2026-10-09",items:[
     "changelog.v286.item1"]},
   {v:285,date:"2026-10-08",items:[
@@ -3898,6 +3900,7 @@ if(isNativeApp){
   // CETTE page avec les mêmes paramètres `url`/`name` — le seul chemin qui
   // marche pour qui n'a pas l'APK (navigateur, PWA installée, iOS).
   try{handleSharedFeedLink();}catch(err){warn("sharedfeedlink",err);}
+  try{handleSharedArticle();}catch(err){warn("sharedarticle",err);}
 }
 /* Filet de sécurité : visibilitychange seul ne suffit pas. Le commentaire de
    rememberPos() le dit déjà pour un autre cas — « quand l'app est tuée depuis
@@ -6888,6 +6891,32 @@ function handleSharedFeedLink(){
   if(feeds.some(f=>f.url===feedUrl)){toast(T("toast.feedsAlreadyPresent"));return;}
   feeds.push({name:finalName,url:feedUrl,on:true});save();renderList();renderSuggest();
   toast(T("toast.feedAdded",{name:finalName}));
+}
+
+/* Cible de partage du manifeste (`share_target`, GET) : « Partager > SwiperNews »
+   depuis le navigateur arrive ici avec `st` (titre), `sx` (texte) et `su` (lien).
+   Noms distincts de `url`/`name` ci-dessus, qui servent à AJOUTER UNE SOURCE.
+   Beaucoup de navigateurs mobiles mettent le lien dans le texte plutôt que dans
+   `su`, d'où la recherche d'une adresse http(s) dans les deux. Aucune requête :
+   le titre vient du partage (repli : nom d'hôte), jamais d'un appel à un tiers.
+   Le résultat est un article ENREGISTRÉ (liste « Enregistrés »), à lire plus tard.
+   Les paramètres sont retirés de la barre d'adresse aussitôt lus (F5 ne doit pas
+   rejouer l'ajout). */
+function handleSharedArticle(){
+  const q=new URLSearchParams(location.search);
+  if(!q.has("su")&&!q.has("sx")&&!q.has("st"))return;
+  const st=(q.get("st")||"").trim(),sx=(q.get("sx")||"").trim(),su=(q.get("su")||"").trim();
+  history.replaceState(null,"",location.pathname+location.hash);
+  const find=t=>{const m=/https?:\/\/[^\s<>"']+/i.exec(t||"");return m?m[0]:"";};
+  const link=find(su)||find(sx);
+  let u;
+  try{u=new URL(link);}catch(_){toast(T("toast.shareNoLink"));return;}
+  if(u.protocol!=="http:"&&u.protocol!=="https:"){toast(T("toast.shareNoLink"));return;}
+  const title=clampText(st||sx.replace(link,"").trim()||hostOf(link),200);
+  const it={title,link:u.href,img:"",source:hostOf(link),date:new Date().toISOString(),kind:"news",cat:""};
+  if(isSaved(it)){toast(T("toast.shareAlready"));return;}
+  toggleSave(it);
+  toast(T("toast.shareSaved"));
 }
 
 /* Menu de partage de repli (desktop, ou si aucune feuille de partage n'existe) */

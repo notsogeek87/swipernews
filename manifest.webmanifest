@@ -13,6 +13,11 @@
   "theme_color": "#190501",
   "orientation": "portrait",
   "categories": ["news", "education"],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": { "title": "st", "text": "sx", "url": "su" }
+  },
   "icons": [
     {
       "src": "logo-192.png?v=42",
