@@ -43,6 +43,17 @@
                 <data android:scheme="swipernews" android:host="add" />
                 <data android:scheme="swipernews" android:host="open" />
             </intent-filter>
+
+            <!-- Menu Partager du système (navigateur, autre appli) : un lien
+                 reçu en texte brut. MainActivity le réécrit en
+                 swipernews://share (voir sa méthode partageVersLien) pour le
+                 faire passer par appUrlOpen/handleDeepLink, comme les autres
+                 liens entrants : l'article rejoint les Enregistrés. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
 
         <!-- Navigateur intégré : ouvert par-dessus le fil (pas de LAUNCHER, pas

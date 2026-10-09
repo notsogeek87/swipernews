@@ -54,8 +54,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
-      "changelog.v287.item1":
-        "🔗 Partager vers SwiperNews : depuis ton navigateur, le bouton Partager > SwiperNews met un article de côté dans « Enregistrés », à lire plus tard (app web installée).",
+      "changelog.v288.item1":
+        "🔗 Partager vers SwiperNews : depuis ton navigateur, le bouton Partager > SwiperNews met un article de côté dans « Enregistrés », à lire plus tard (app web installée ou APK).",
       "changelog.v286.item1":
         "➕ Sources : ajoute un sous-reddit (r/france), un compte ou mot-dièse Mastodon, un compte Bluesky ou une communauté Lemmy en tapant simplement son nom. Une aide « Que peut-on ajouter ? » liste toutes les façons d'ajouter une source, avec des exemples.",
       "changelog.v285.item1":
@@ -596,8 +596,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
-      "changelog.v287.item1":
-        "🔗 Share to SwiperNews: from your browser, Share > SwiperNews puts an article aside in “Saved” to read later (installed web app).",
+      "changelog.v288.item1":
+        "🔗 Share to SwiperNews: from your browser, Share > SwiperNews puts an article aside in “Saved” to read later (installed web app or Android app).",
       "changelog.v286.item1":
         "➕ Sources: add a subreddit (r/france), a Mastodon account or hashtag, a Bluesky account or a Lemmy community just by typing its name. A “What can I add?” help lists every way to add a source, with examples.",
       "changelog.v285.item1":

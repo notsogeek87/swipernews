@@ -1,5 +1,7 @@
 package eu.lielu.news;
 
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 
 import androidx.activity.OnBackPressedCallback;
@@ -98,6 +100,9 @@ public class MainActivity extends BridgeActivity {
         // Avant super.onCreate : c'est lui qui construit le pont et fige la liste
         // des plugins exposés à la WebView.
         registerPlugin(InAppBrowserPlugin.class);
+        // Partage reçu à froid : réécrit AVANT super.onCreate, pour que le
+        // plugin App le relaie comme n'importe quel lien entrant.
+        setIntent(partageVersLien(getIntent()));
         super.onCreate(savedInstanceState);
 
         // Cartes vidéo : l'iframe du lecteur est créée PAR SCRIPT au moment de
@@ -171,6 +176,34 @@ public class MainActivity extends BridgeActivity {
                 }
             }
         });
+    }
+
+    /**
+     * Partage Android (ACTION_SEND, text/plain) -> swipernews://share?st=&sx=&su=,
+     * traité côté web par handleDeepLink (saveSharedArticle). Le lien est cherché
+     * dans le texte par le JS : les navigateurs le mettent souvent là plutôt que
+     * dans un champ à part. Tout autre intent est rendu tel quel.
+     */
+    private static Intent partageVersLien(Intent in) {
+        if (in == null || !Intent.ACTION_SEND.equals(in.getAction())
+            || !"text/plain".equals(in.getType())) {
+            return in;
+        }
+        String texte = in.getStringExtra(Intent.EXTRA_TEXT);
+        String sujet = in.getStringExtra(Intent.EXTRA_SUBJECT);
+        if (texte == null && sujet == null) {
+            return in;
+        }
+        Uri.Builder b = new Uri.Builder().scheme("swipernews").authority("share");
+        if (sujet != null) b.appendQueryParameter("st", sujet);
+        if (texte != null) b.appendQueryParameter("sx", texte);
+        return new Intent(Intent.ACTION_VIEW, b.build());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        // singleTask : un partage reçu app ouverte arrive ici, pas dans onCreate.
+        super.onNewIntent(partageVersLien(intent));
     }
 
     @Override
