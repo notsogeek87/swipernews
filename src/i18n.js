@@ -54,6 +54,8 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v289.item1":
+        "🔖 Enregistrés : retirer un article demande maintenant un second appui sur ✕ pour confirmer, et un article reçu par « Partager » récupère son image.",
       "changelog.v288.item1":
         "🔗 Partager vers SwiperNews : depuis ton navigateur, le bouton Partager > SwiperNews met un article de côté dans « Enregistrés », à lire plus tard (app web installée ou APK).",
       "changelog.v286.item1":
@@ -228,6 +230,7 @@
       "saved.subEmpty": "Rien d'enregistré pour l'instant.",
       "saved.empty": "Enregistre une carte pour la retrouver ici.",
       "saved.removeAria": "Retirer des enregistrés",
+      "saved.removeConfirmAria": "Confirmer le retrait des enregistrés ?",
 
       "about.version": "Version {v}",
       "about.contact.label": "Nous contacter",
@@ -596,6 +599,8 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v289.item1":
+        "🔖 Saved: removing an article now takes a second tap on ✕ to confirm, and an article received through “Share” gets its image.",
       "changelog.v288.item1":
         "🔗 Share to SwiperNews: from your browser, Share > SwiperNews puts an article aside in “Saved” to read later (installed web app or Android app).",
       "changelog.v286.item1":
@@ -766,6 +771,7 @@
       "saved.subEmpty": "Nothing saved yet.",
       "saved.empty": "Save a card to find it here.",
       "saved.removeAria": "Remove from saved",
+      "saved.removeConfirmAria": "Confirm removing from saved?",
 
       "about.version": "Version {v}",
       "about.contact.label": "Contact us",
