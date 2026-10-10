@@ -54,6 +54,17 @@
       "changelog.title": "Nouveautés",
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v290.item1":
+        "↔️ Trois positions en haut : Articles | Tout | Vidéos. Glisse le fil vers la gauche pour n'avoir que des articles, vers la droite pour n'avoir que des vidéos (depuis « Tout »).",
+      "nature.articles": "📰 Articles",
+      "nature.tout": "Tout",
+      "nature.videos": "▶ Vidéos",
+      "empty.nature-articles.title": "Aucun article",
+      "empty.nature-articles.msg":
+        "Aucune actu à afficher pour l'instant. Repasse sur « Tout » ou actualise.",
+      "empty.nature-videos.title": "Aucune vidéo",
+      "empty.nature-videos.msg":
+        "Aucune vidéo dans ton fil. Ajoute une chaîne YouTube dans les sources, ou repasse sur « Tout ».",
       "changelog.v289.item1":
         "🔖 Enregistrés : retirer un article demande maintenant un second appui sur ✕ pour confirmer, et un article reçu par « Partager » récupère son image.",
       "changelog.v288.item1":
@@ -599,6 +610,17 @@
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
+      "changelog.v290.item1":
+        "↔️ Three positions at the top: Articles | All | Videos. Swipe the feed left for articles only, right for videos only (from “All”).",
+      "nature.articles": "📰 Articles",
+      "nature.tout": "All",
+      "nature.videos": "▶ Videos",
+      "empty.nature-articles.title": "No articles",
+      "empty.nature-articles.msg":
+        "No news to show right now. Go back to “All” or refresh.",
+      "empty.nature-videos.title": "No videos",
+      "empty.nature-videos.msg":
+        "There are no videos in your feed. Add a YouTube channel in Sources, or go back to “All”.",
       "changelog.v289.item1":
         "🔖 Saved: removing an article now takes a second tap on ✕ to confirm, and an article received through “Share” gets its image.",
       "changelog.v288.item1":
