@@ -1878,9 +1878,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=292"></script>
+<script src="src/lib.js?v=293"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=292"></script>
+<script src="src/i18n.js?v=293"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2297,6 +2297,10 @@ let mixScore=(()=>{try{return clampMix(parseInt(localStorage.getItem(LS_MIX),10)
 const NATURES=["articles","tout","videos"];
 let nature="tout";
 const mixLevel=()=>nature==="tout"?MIX_LEVELS[mixScore]:MIX_LEVELS[0];
+/* Le fil SANS le filtre de nature : ce qu'on enregistre (cache disque,
+   instantané). `items` est filtré — y puiser écrivait un cache de vidéos seules
+   après un passage en « Vidéos », et « Articles » restait vide à la réouverture. */
+const feedComplet=()=>nature==="tout"?items.slice():mixLists(newsItems,learnItems,MIX_LEVELS[mixScore]);
 const natureOk=it=>nature==="tout"||(it.kind!=="learn"&&!!videoIdOf(it)===(nature==="videos"));
 function persistMix(n){
   mixScore=clampMix(n);
@@ -3210,7 +3214,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="292";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="293";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4492,9 +4496,10 @@ function cacheEntry(key){try{const e=(JSON.parse(localStorage.getItem(LS_CACHE)|
    mémoire, feedSnap, sert déjà les allers-retours immédiats) ; au-delà, ce sont
    les plus anciennement écrits qui partent. */
 const CACHE_KEYS_MAX=5;
-function cacheSave(key){try{if(!items||items.length<3)return; // on ne met pas en cache un lot trop maigre
+function cacheSave(key){try{const full=feedComplet();
+  if(!full.length||(nature==="tout"&&full.length<3))return; // on ne met pas en cache un lot trop maigre
   const all=JSON.parse(localStorage.getItem(LS_CACHE)||"{}");
-  all[key]={t:Date.now(),items:items.slice(0,CONFIG.CACHE_ITEMS)};
+  all[key]={t:Date.now(),items:full.slice(0,CONFIG.CACHE_ITEMS)};
   const keys=Object.keys(all);
   if(keys.length>CACHE_KEYS_MAX){
     keys.sort((a,b)=>((all[b]&&all[b].t)||0)-((all[a]&&all[a].t)||0))
@@ -7867,7 +7872,7 @@ function snapshotFeed(){
     // réaffiché à tort, marquage « vu » réduit à un seul membre du groupe).
     // `cards` joue pour la granularité le rôle que `mix` joue pour la dose :
     // voir restoreFeed.
-    items:items.slice(),reg:new Map(cardReg),groups:new Map(cardGroups),
+    items:feedComplet(),nature,reg:new Map(cardReg),groups:new Map(cardGroups),
     seq:cardSeq,mix:mixScore,cards:cardsPerSwipe,muet:mutedSig(),n:++snapSeq
   };
   const keys=Object.keys(feedSnap);
@@ -7906,7 +7911,7 @@ function restoreFeed(){
   // parts égales alors que cardsPerSwipe est repassé à 1, et l'inverse).
   // Et pour les mots masqués : adoptItems() vient de remélanger SANS les
   // articles masqués depuis, mais le HTML mémorisé les porte encore.
-  if(s.mix!==mixScore||s.cards!==cardsPerSwipe||s.muet!==mutedSig())render();
+  if(s.mix!==mixScore||s.cards!==cardsPerSwipe||s.muet!==mutedSig()||s.nature!==nature)render();
   /* La carte « chargement d'autres articles » fait partie du HTML mémorisé si
      l'instantané a été pris pendant un loadMore. Restaurée telle quelle, elle
      restait en queue de fil À JAMAIS quand aucun render() ne suivait (dose
@@ -7978,6 +7983,7 @@ function renderNatures(){
    après l'ouverture, les vidéos (flux rapides) arrivent avant les actus —
    « Articles » est alors vide pour un instant, pas pour de bon. Les rendus
    suivants (render) effacent le message dès que le fil se remplit. */
+let natureRetente=false;
 function verifierNatureVide(n=0){
   setTimeout(()=>{
     if(items.length||nature==="tout")return;
@@ -7993,9 +7999,16 @@ function setNature(k){
   remix();render(true);
   renderNatures();renderMixUI();hideStates();
   const m=mixLevel();
-  if(!items.length&&newsItems.length)verifierNatureVide();
-  // Une moitié réclamée qui n'a jamais été chargée : loadFeeds va la chercher.
-  else if((m.news&&!newsItems.length)||(m.learn&&!learnItems.length)||(m.news&&!avant.news))loadFeeds();
+  if(!items.length&&newsItems.length){
+    // Rien dans cette nature : le fil en mémoire est peut-être incomplet (cache
+    // d'une version antérieure, chargement partiel). Un rechargement, UNE fois.
+    if(!natureRetente){natureRetente=true;loadFeeds(true);}
+    verifierNatureVide();
+  }else{
+    if(items.length)natureRetente=false;
+    // Une moitié réclamée qui n'a jamais été chargée : loadFeeds va la chercher.
+    if((m.news&&!newsItems.length)||(m.learn&&!learnItems.length)||(m.news&&!avant.news))loadFeeds();
+  }
 }
 naturesEl.addEventListener("click",e=>{const b=e.target.closest("button[data-nature]");if(b)setNature(b.dataset.nature);});
 /* Glissement horizontal sur le fil : à gauche → Articles, à droite → Vidéos

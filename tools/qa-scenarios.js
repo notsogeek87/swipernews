@@ -2058,6 +2058,104 @@ const scenarios = {
     await browser.close();
   },
 
+  // `nature` : le sélecteur Articles | Tout | Vidéos. Cas qui a trahi la 1re
+  // version — une chaîne YouTube répond tout de suite, les actus 2,5 s plus tard,
+  // et l'utilisateur bascule sur « Articles » juste après l'ouverture. Le fil ne
+  // doit jamais rester sur « Aucun article » : il doit se remplir tout seul.
+  async nature() {
+    const feeds = [
+      {
+        name: "YT · Chaîne",
+        url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC" + YT_CHAN,
+        on: true,
+      },
+      { name: "Actus", url: "https://src1.test/rss", on: true },
+    ];
+    const { browser, page, errors } = await boot({
+      storage: { ...READY, "fluxswipe.feeds.v1": JSON.stringify(feeds) },
+    });
+    await page.route(/api\/feed/, async (route) => {
+      const cible = decodeURIComponent(
+        /url=([^&]+)/.exec(route.request().url())?.[1] || ""
+      );
+      if (/youtube/.test(cible))
+        return route.fulfill({
+          status: 200,
+          contentType: "application/xml",
+          body: RSS_YT,
+        });
+      await new Promise((r) => setTimeout(r, 2500));
+      return route.fulfill({ status: 200, contentType: "application/xml", body: RSS_OK });
+    });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(400);
+    await page.evaluate(() => setNature("articles"));
+    const trace = [];
+    for (let i = 0; i < 14; i++) {
+      await page.waitForTimeout(500);
+      trace.push(
+        await page.evaluate(() => ({
+          items: items.length,
+          news: newsItems.length,
+          vide: !document.getElementById("empty").classList.contains("hidden"),
+          cartes: document.querySelectorAll(".card").length,
+        }))
+      );
+    }
+    console.log(
+      "trace (items/news/message/cartes) :",
+      trace
+        .map((t) => `${t.items}/${t.news}/${t.vide ? "MSG" : "-"}/${t.cartes}`)
+        .join(" ")
+    );
+    const fin = trace[trace.length - 1];
+    console.log(
+      "à la fin — cartes :",
+      fin.cartes,
+      "message « aucun article » :",
+      fin.vide,
+      "(attendu : >0, false)"
+    );
+    await page.evaluate(() => setNature("videos"));
+    await page.waitForTimeout(800);
+    console.log(
+      "vidéos seules — cartes :",
+      await page.evaluate(() => document.querySelectorAll(".card").length),
+      "(attendu : >0)"
+    );
+    // Le cache disque ne doit PAS être celui du filtre : après un passage en
+    // « Vidéos », il garde les actus (un cache de vidéos seules rendait
+    // « Articles » vide à la réouverture, jusqu'à un ↻ forcé).
+    await page.evaluate(() => persistAll());
+    const cache = await page.evaluate(() => {
+      const c = JSON.parse(localStorage.getItem(LS_CACHE) || "{}");
+      const l = (Object.values(c)[0] || { items: [] }).items;
+      return { total: l.length, videos: l.filter((i) => videoIdOf(i)).length };
+    });
+    console.log(
+      "cache disque après « Vidéos » :",
+      cache.total,
+      "articles dont",
+      cache.videos,
+      "vidéos (attendu : plus de vidéos que 0 ET des actus)"
+    );
+    await page.reload();
+    await page.waitForTimeout(600);
+    await page.evaluate(() => setNature("articles"));
+    await page.waitForTimeout(4500);
+    console.log(
+      "réouverture → Articles — cartes :",
+      await page.evaluate(() => document.querySelectorAll(".card").length),
+      "message :",
+      await page.evaluate(
+        () => !document.getElementById("empty").classList.contains("hidden")
+      ),
+      "(attendu : >0, false)"
+    );
+    console.log("erreurs :", errors);
+    await browser.close();
+  },
+
   // 28. Cartes vidéo : lecture SUR la carte, sans ouvrir le lecteur d'articles.
   // Quatre choses qui ne se lisent pas dans le code :
   //   a) le flux YouTube est de l'Atom avec <media:group> — il faut vérifier que
