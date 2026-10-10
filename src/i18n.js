@@ -55,7 +55,7 @@
       "changelog.sub": "Ce qui a changé dans SwiperNews.",
       "changelog.version": "Version {v}",
       "changelog.v290.item1":
-        "↔️ Trois positions en haut : Articles | Tout | Vidéos. Glisse le fil vers la gauche pour n'avoir que des articles, vers la droite pour n'avoir que des vidéos (depuis « Tout »).",
+        "↔️ Trois positions en haut : Articles | Tout | Vidéos. Pousse le fil vers la droite pour n'avoir que des articles, vers la gauche pour n'avoir que des vidéos (depuis « Tout »).",
       "nature.articles": "📰 Articles",
       "nature.tout": "Tout",
       "nature.videos": "▶ Vidéos",
@@ -611,7 +611,7 @@
       "changelog.sub": "What changed in SwiperNews.",
       "changelog.version": "Version {v}",
       "changelog.v290.item1":
-        "↔️ Three positions at the top: Articles | All | Videos. Swipe the feed left for articles only, right for videos only (from “All”).",
+        "↔️ Three positions at the top: Articles | All | Videos. Swipe the feed right for articles only, left for videos only (from “All”).",
       "nature.articles": "📰 Articles",
       "nature.tout": "All",
       "nature.videos": "▶ Videos",
