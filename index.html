@@ -3222,7 +3222,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="294";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="295";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -7330,13 +7330,13 @@ function openDialog(el){
   // pose sur la 1ère puce de catégorie et donne l'impression trompeuse
   // qu'elle est déjà sélectionnée, alors que rien n'a été choisi.
   const f=el.querySelector(".sheet__panel");
-  if(f){try{f.focus();}catch(_){}}
+  if(f){try{f.focus({preventScroll:true});}catch(_){}}
 }
 function closeDialog(el,fromHistory){
   el.classList.remove("open");
   if(!fromHistory)popDialogState();
   bgLayers().forEach(n=>{if(n)n.inert=false;});
-  if(lastFocused){try{lastFocused.focus();}catch(_){}lastFocused=null;}
+  if(lastFocused){try{lastFocused.focus({preventScroll:true});}catch(_){}lastFocused=null;}
   // Panneau refermé sans valider au 1er lancement : le fil n'a encore rien
   // chargé (on ne charge plus derrière la feuille), il faut le faire.
   if(!feedLoadStarted)loadFeeds();
