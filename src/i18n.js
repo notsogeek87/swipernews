@@ -290,6 +290,15 @@
       "sheet.subtitle":
         "Tes actus et des articles Wikipédia, en alternance dans un seul fil.",
 
+      "appscheme.label": "🌓 Apparence",
+      "appscheme.desc.auto": "Suit le réglage clair ou sombre de ton appareil.",
+      "appscheme.desc.light": "Toujours clair, quel que soit l'appareil.",
+      "appscheme.desc.dark": "Toujours sombre, quel que soit l'appareil.",
+      "appscheme.opt.auto": "Auto",
+      "appscheme.opt.light": "Clair",
+      "appscheme.opt.dark": "Sombre",
+      "changelog.v296.item1":
+        "Mode clair : choisis Clair, Sombre ou Auto (suit ton appareil) dans les réglages, Apparence.",
       "apptheme.label": "🎨 Thème",
       "apptheme.desc.flamme":
         "L'habillage d'origine : braises sur fond noir, un accent corail vif.",
@@ -840,6 +849,15 @@
       "sheet.title": "Your feed",
       "sheet.subtitle": "Your news and Wikipedia articles, alternating in a single feed.",
 
+      "appscheme.label": "🌓 Appearance",
+      "appscheme.desc.auto": "Follows your device's light or dark setting.",
+      "appscheme.desc.light": "Always light, whatever the device.",
+      "appscheme.desc.dark": "Always dark, whatever the device.",
+      "appscheme.opt.auto": "Auto",
+      "appscheme.opt.light": "Light",
+      "appscheme.opt.dark": "Dark",
+      "changelog.v296.item1":
+        "Light mode: pick Light, Dark or Auto (follows your device) in settings, Appearance.",
       "apptheme.label": "🎨 Theme",
       "apptheme.desc.flamme": "The original look: embers on black, a vivid coral accent.",
       "apptheme.desc.bleu": "Same intensity as Flamme, in blue instead of coral.",

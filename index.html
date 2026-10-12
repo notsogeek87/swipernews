@@ -11,6 +11,10 @@
 <link rel="apple-touch-icon" href="logo-192.png?v=42">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#190501">
+<!-- Schéma clair/sombre posé AVANT le premier rendu : applyAppTheme() (plus bas)
+     arrive trop tard, un utilisateur en clair verrait un éclair sombre. Même
+     logique, volontairement minimale ; la source de vérité reste applyAppTheme. -->
+<script>try{var s=localStorage.getItem("fluxswipe.appscheme.v1");if(s==="light"||(s!=="dark"&&matchMedia("(prefers-color-scheme: light)").matches))document.documentElement.dataset.scheme="light"}catch(e){}</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <!-- Sans ce méta, iOS installé garde une barre d'état BLANCHE, hors du
@@ -61,7 +65,7 @@
        non) réglables par thème, une fonction CSS n'acceptant pas une couleur
        entière en paramètre. Redéclarées ensemble avec --redline/--blush dans
        chaque thème ci-dessous : les deux formes doivent rester synchronisées. */
-    --redline-rgb:149,28,4;--blush-rgb:252,172,156;
+    --redline-rgb:149,28,4;--blush-rgb:252,172,156;--bg-rgb:25,5,1;
     --radius-sm:4px;--radius-md:8px;
     /* Ce que le système dessine PAR-DESSUS le haut de la page : barre d'état et
        poinçon/encoche de caméra. Zéro par défaut ; l'app packagée le remplit
@@ -103,15 +107,71 @@
   :root[data-apptheme="bleu"]{
     --bg:#050b16;--surface:#0d1b30;--molten:#12294a;--redline:#1f4a7a;
     --flare:#4da3ff;--blush:#a8d4ff;--ink:#f2f7ff;--ash:#7f93ab;
-    --redline-rgb:31,74,122;--blush-rgb:168,212,255;
+    --redline-rgb:31,74,122;--blush-rgb:168,212,255;--bg-rgb:5,11,22;
     --shadow-ember:inset 0 0 20px rgba(18,41,74,.7);
   }
   :root[data-apptheme="sobre"]{
     --bg:#15161a;--surface:#232429;--molten:#33353c;--redline:#43454d;
     --flare:#8fa3b8;--blush:#c3ccd6;--ink:#eef0f3;--ash:#9296a1;
-    --redline-rgb:67,69,77;--blush-rgb:195,204,214;
+    --redline-rgb:67,69,77;--blush-rgb:195,204,214;--bg-rgb:21,22,26;
     --shadow-ember:inset 0 0 20px rgba(51,53,60,.6);
   }
+  /* Schéma CLAIR (réglage « Apparence », voir applyAppTheme) : posé par
+     `data-scheme="light"` sur <html>, le sombre n'ayant pas d'attribut (comme
+     « flamme » pour le thème). Un jeu de variables par habillage, de même
+     teinte que son pendant sombre : --flare y est assombri (il sert de couleur
+     de TEXTE sur fond clair, ≥ 4,5:1) et --redline éclairci (ce n'est qu'un
+     liseré). Spécificité (0,3,0) pour « bleu »/« sobre », volontairement au-dessus
+     des habillages sombres, indépendante de l'ordre des règles. */
+  :root[data-scheme="light"]{
+    --bg:#fbf4f1;--surface:#f3e2dc;--molten:#e8c9be;--redline:#e3b3a5;
+    --flare:#c2310f;--blush:#8a2a14;--ink:#1d0f0b;--ash:#6b5750;
+    --redline-rgb:227,179,165;--blush-rgb:138,42,20;--bg-rgb:251,244,241;
+    --shadow-ember:inset 0 0 20px rgba(232,201,190,.7);
+  }
+  :root[data-scheme="light"][data-apptheme="bleu"]{
+    --bg:#f3f8ff;--surface:#e1ecfa;--molten:#c9dcf3;--redline:#a9c5e6;
+    --flare:#0b5cc2;--blush:#123f7a;--ink:#0a1626;--ash:#556a82;
+    --redline-rgb:169,197,230;--blush-rgb:18,63,122;--bg-rgb:243,248,255;
+    --shadow-ember:inset 0 0 20px rgba(201,220,243,.8);
+  }
+  :root[data-scheme="light"][data-apptheme="sobre"]{
+    --bg:#f4f5f7;--surface:#e6e8ec;--molten:#d3d6dc;--redline:#bfc3cb;
+    --flare:#4a5d72;--blush:#2f3a47;--ink:#15171b;--ash:#5d626c;
+    --redline-rgb:191,195,203;--blush-rgb:47,58,71;--bg-rgb:244,245,247;
+    --shadow-ember:inset 0 0 20px rgba(211,214,220,.8);
+  }
+  /* Une carte AVEC photo garde sa palette SOMBRE même en schéma clair : son
+     dégradé et ses halos de lettres sont noirs en dur (le texte se pose sur
+     une image, pas sur --bg), et un texte sombre dessus serait illisible. On
+     redéclare donc les variables sur la carte elle-même — une déclaration
+     directe l'emporte sur l'héritage de <html>. */
+  :root[data-scheme="light"] .card--img{
+    --bg:#190501;--surface:#340a01;--molten:#631303;--redline:#951c04;
+    --flare:#fa5838;--blush:#fcac9c;--ink:#f7f6ff;--ash:#baadab;
+    --redline-rgb:149,28,4;--blush-rgb:252,172,156;--bg-rgb:25,5,1;
+    --shadow-ember:inset 0 0 20px rgb(99,19,3);
+  }
+  :root[data-scheme="light"][data-apptheme="bleu"] .card--img{
+    --bg:#050b16;--surface:#0d1b30;--molten:#12294a;--redline:#1f4a7a;
+    --flare:#4da3ff;--blush:#a8d4ff;--ink:#f2f7ff;--ash:#7f93ab;
+    --redline-rgb:31,74,122;--blush-rgb:168,212,255;--bg-rgb:5,11,22;
+    --shadow-ember:inset 0 0 20px rgba(18,41,74,.7);
+  }
+  :root[data-scheme="light"][data-apptheme="sobre"] .card--img{
+    --bg:#15161a;--surface:#232429;--molten:#33353c;--redline:#43454d;
+    --flare:#8fa3b8;--blush:#c3ccd6;--ink:#eef0f3;--ash:#9296a1;
+    --redline-rgb:67,69,77;--blush-rgb:195,204,214;--bg-rgb:21,22,26;
+    --shadow-ember:inset 0 0 20px rgba(51,53,60,.6);
+  }
+  /* Ce qui reste codé en dur et ne suit pas les variables. Le rail flotte sur
+     des photos ET sur des cartes claires : un fond translucide de la couleur de
+     la page lui donne un support dans les deux cas. */
+  :root[data-scheme="light"] .pvrow{border-bottom-color:rgba(0,0,0,.08)}
+  :root[data-scheme="light"] .rail button{background:rgba(var(--bg-rgb),.78)}
+  :root[data-scheme="light"] .feedrow .del--confirm,
+  :root[data-scheme="light"] .savedrow__del--confirm,
+  :root[data-scheme="light"] .statsresetbtn--armed{background:var(--flare)}
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--font-sans);
     letter-spacing:-.01em;overscroll-behavior:none}
@@ -527,7 +587,7 @@
   html.plein{--systop-min:34px}
   .top{position:fixed;top:0;left:0;right:0;z-index:15;padding:12px 16px 14px;
     padding-top:calc(12px + max(env(safe-area-inset-top),var(--systop,0px),var(--systop-min,0px)));
-    display:flex;flex-direction:column;gap:11px;background:linear-gradient(rgba(25,5,1,.82),rgba(25,5,1,.5) 65%,transparent);
+    display:flex;flex-direction:column;gap:11px;background:linear-gradient(rgba(var(--bg-rgb),.82),rgba(var(--bg-rgb),.5) 65%,transparent);
     transition:transform .32s ease,opacity .32s ease;
     pointer-events:none}   /* voir .top button ci-dessous : seuls SES boutons captent le clic */
   .top.top--away{transform:translateY(-115%);opacity:0;pointer-events:none}  /* masqué pendant le swipe */
@@ -1606,6 +1666,10 @@
          fait doublon"). -->
     <div data-thememount></div>
 
+    <!-- Apparence clair/sombre/auto (voir renderSchemePref/setAppScheme) :
+         même forme prefRow que le thème juste au-dessus. -->
+    <div data-schememount></div>
+
     <h3 class="secttl" data-i18n="sheet.mix.title">🎚️ Dose d'apprentissage</h3>
     <p class="sub" data-i18n="dose.sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
     <div data-mixmount></div>
@@ -1888,7 +1952,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=294"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=294"></script>
+<script src="src/i18n.js?v=296"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2176,6 +2240,14 @@ applyI18n();
    "flamme" dans applyAppTheme(). */
 const LS_APPTHEME="fluxswipe.apptheme.v1";
 const APP_THEMES=["flamme","bleu","sobre"];
+/* Apparence : clair / sombre / « auto » (suit le système, défaut). Indépendante
+   de l'habillage ci-dessus — chacun des trois existe dans les deux schémas.
+   Le sombre n'a pas d'attribut sur <html>, le clair pose data-scheme="light". */
+const LS_APPSCHEME="fluxswipe.appscheme.v1";
+const APP_SCHEMES=["auto","light","dark"];
+let appScheme=(()=>{try{const v=localStorage.getItem(LS_APPSCHEME);return APP_SCHEMES.includes(v)?v:APP_SCHEMES[0];}catch(e){return APP_SCHEMES[0];}})();
+const mqClair=window.matchMedia?matchMedia("(prefers-color-scheme: light)"):null;
+function schemeIsLight(){return appScheme==="light"||(appScheme==="auto"&&!!mqClair&&mqClair.matches);}
 let appTheme=(()=>{try{const v=localStorage.getItem(LS_APPTHEME);return APP_THEMES.includes(v)?v:APP_THEMES[0];}catch(e){return APP_THEMES[0];}})();
 /* Le <meta name="theme-color"> (couleur de la barre d'état/l'UI du
    navigateur) est lu depuis --bg calculé plutôt que dupliqué en dur ici : la
@@ -2183,11 +2255,16 @@ let appTheme=(()=>{try{const v=localStorage.getItem(LS_APPTHEME);return APP_THEM
 function applyAppTheme(){
   if(appTheme==="flamme")document.documentElement.removeAttribute("data-apptheme");
   else document.documentElement.dataset.apptheme=appTheme;
+  if(schemeIsLight())document.documentElement.dataset.scheme="light";
+  else document.documentElement.removeAttribute("data-scheme");
   const meta=document.querySelector('meta[name="theme-color"]');
   const bg=getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
   if(meta&&bg)meta.setAttribute("content",bg);
 }
 applyAppTheme();
+/* En « auto », un changement du système (réglage manuel, coucher du soleil)
+   s'applique tout de suite, sans recharger. */
+try{mqClair&&mqClair.addEventListener("change",()=>{if(appScheme==="auto")applyAppTheme();});}catch(e){}
 
 /* ---------- Articles Wikipédia de démo (repli hors-ligne) ---------- */
 const DEMO_LEARN = [
@@ -3222,7 +3299,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="295";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="296";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -3233,6 +3310,8 @@ const APP_VERSION="295";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:296,date:"2026-10-12",items:[
+    "changelog.v296.item1"]},
   {v:290,date:"2026-10-10",items:[
     "changelog.v290.item1"]},
   {v:289,date:"2026-10-10",items:[
@@ -7511,6 +7590,11 @@ function renderThemePref(){
     APP_THEMES.map(v=>({v,t:T("apptheme.opt."+v)})),appTheme);
   document.querySelectorAll("[data-thememount]").forEach(el=>{el.innerHTML=html;});
 }
+function renderSchemePref(){
+  const html=prefRow("appscheme",T("appscheme.label"),T("appscheme.desc."+appScheme),
+    APP_SCHEMES.map(v=>({v,t:T("appscheme.opt."+v)})),appScheme);
+  document.querySelectorAll("[data-schememount]").forEach(el=>{el.innerHTML=html;});
+}
 /* Articles par carte : même position et même forme que renderThemePref() —
    effet de bord sur le fil affiché (render(), voir setCardsPerSwipe), donc
    hors PREFS/setPref comme lang/apptheme. Monté dans l'accueil du 1er
@@ -7563,6 +7647,7 @@ const PREFS={
 function setPref(name,v){
   if(name==="lang"){setLang(v);return;}   // effets de bord propres : voir setLang
   if(name==="apptheme"){setAppTheme(v);return;}   // idem : attribut sur <html>
+  if(name==="appscheme"){setAppScheme(v);return;}   // idem : clair/sombre/auto
   if(name==="cardsPerSwipe"){setCardsPerSwipe(v);return;}   // idem : recompose le fil
   if(name==="pause"){setPausePref(v);return;}   // propre clé, voir pausePref
   if(name==="age"){setAgeCategory(v);return;}   // idem : remplace `feeds`, voir setAgeCategory
@@ -7589,7 +7674,7 @@ function setLang(l){
   try{localStorage.setItem(LS_LANG,LANG);}catch(e){warn("save lang",e);}
   document.documentElement.lang=LANG;
   applyI18n();
-  renderLangPref();renderReadPref();renderThemePref();renderAutoExport();renderIntGrid("intGrid");renderList();renderSuggest();renderMixUI();
+  renderLangPref();renderReadPref();renderThemePref();renderSchemePref();renderAutoExport();renderIntGrid("intGrid");renderList();renderSuggest();renderMixUI();
   renderPausePref();renderEcouteUI();renderMutes();renderSourceHelp();renderNatures();
   switchFeed();
 }
@@ -7603,6 +7688,14 @@ function setAppTheme(v){
   try{localStorage.setItem(LS_APPTHEME,appTheme);}catch(e){warn("save apptheme",e);}
   applyAppTheme();
   renderThemePref();
+}
+function setAppScheme(v){
+  const next=APP_SCHEMES.includes(v)?v:APP_SCHEMES[0];
+  if(next===appScheme)return;
+  appScheme=next;
+  try{localStorage.setItem(LS_APPSCHEME,appScheme);}catch(e){warn("save appscheme",e);}
+  applyAppTheme();
+  renderSchemePref();
 }
 /* Notification de nouveaux articles : contrairement au reste de PREFS/setPref,
    l'état réellement appliqué dépend d'une permission SYSTÈME (Android 13+,
@@ -7776,7 +7869,7 @@ document.addEventListener("click",e=>{
 });
 renderLangPref();
 renderReadPref();
-renderThemePref();
+renderThemePref();renderSchemePref();
 renderCardsPref();
 renderPausePref();
 renderEcouteUI();
@@ -8909,7 +9002,7 @@ function openSettings(replaceFrom){
   // déplié pour le reste de la session.
   feedGroupOpen={rss:false,vid:false};
   suggestGroupOpen={};
-  renderMix();renderIntGrid("intGrid");renderList();renderSuggest();renderReadPref();renderLangPref();renderThemePref();renderAutoExport();refreshAutoExport();
+  renderMix();renderIntGrid("intGrid");renderList();renderSuggest();renderReadPref();renderLangPref();renderThemePref();renderSchemePref();renderAutoExport();refreshAutoExport();
   document.getElementById("sponsorFilterChk").checked=filterSponsored;
   renderMutes();renderSourceHelp();
   document.getElementById("ytApiKeyInput").value=ytApiKey;
@@ -9659,6 +9752,7 @@ function settingsSnapshot(){
     app:"swipernews",type:"settings",version:1,
     lang:LANG,
     appTheme,
+    appScheme,
     mix:mixScore,
     cardsPerSwipe,
     interests,
@@ -9784,6 +9878,9 @@ function applySettingsImport(obj){
   }
   if(typeof obj.appTheme==="string"&&APP_THEMES.includes(obj.appTheme)){
     localStorage.setItem(LS_APPTHEME,obj.appTheme);n++;
+  }
+  if(typeof obj.appScheme==="string"&&APP_SCHEMES.includes(obj.appScheme)){
+    localStorage.setItem(LS_APPSCHEME,obj.appScheme);n++;
   }
   if(Number.isInteger(obj.mix)&&obj.mix===clampMix(obj.mix)){
     localStorage.setItem(LS_MIX,String(obj.mix));n++;
