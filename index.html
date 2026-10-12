@@ -141,34 +141,42 @@
     --redline-rgb:191,195,203;--blush-rgb:47,58,71;--bg-rgb:244,245,247;
     --shadow-ember:inset 0 0 20px rgba(211,214,220,.8);
   }
-  /* Une carte AVEC photo garde sa palette SOMBRE même en schéma clair : son
-     dégradé et ses halos de lettres sont noirs en dur (le texte se pose sur
-     une image, pas sur --bg), et un texte sombre dessus serait illisible. On
-     redéclare donc les variables sur la carte elle-même — une déclaration
+  /* Tout ce qui se pose SUR une photo garde sa palette SOMBRE même en schéma
+     clair : la carte avec image (dégradé et halos de lettres noirs en dur), la
+     barre du haut et le rail (qui flottent sur des photos autant que sur des
+     cartes claires — un voile clair sur une photo la délave, c'était laid).
+     On redéclare les variables sur l'élément lui-même : une déclaration
      directe l'emporte sur l'héritage de <html>. */
-  :root[data-scheme="light"] .card--img{
+  :root[data-scheme="light"] .card--img,
+  :root[data-scheme="light"] .top,
+  :root[data-scheme="light"] .rail{
+    color:var(--ink);   /* la couleur du texte s'HÉRITE déjà résolue de <body> : redéclarer --ink ne suffit pas */
     --bg:#190501;--surface:#340a01;--molten:#631303;--redline:#951c04;
     --flare:#fa5838;--blush:#fcac9c;--ink:#f7f6ff;--ash:#baadab;
     --redline-rgb:149,28,4;--blush-rgb:252,172,156;--bg-rgb:25,5,1;
     --shadow-ember:inset 0 0 20px rgb(99,19,3);
   }
-  :root[data-scheme="light"][data-apptheme="bleu"] .card--img{
+  :root[data-scheme="light"][data-apptheme="bleu"] .card--img,
+  :root[data-scheme="light"][data-apptheme="bleu"] .top,
+  :root[data-scheme="light"][data-apptheme="bleu"] .rail{
     --bg:#050b16;--surface:#0d1b30;--molten:#12294a;--redline:#1f4a7a;
     --flare:#4da3ff;--blush:#a8d4ff;--ink:#f2f7ff;--ash:#7f93ab;
     --redline-rgb:31,74,122;--blush-rgb:168,212,255;--bg-rgb:5,11,22;
     --shadow-ember:inset 0 0 20px rgba(18,41,74,.7);
   }
-  :root[data-scheme="light"][data-apptheme="sobre"] .card--img{
+  :root[data-scheme="light"][data-apptheme="sobre"] .card--img,
+  :root[data-scheme="light"][data-apptheme="sobre"] .top,
+  :root[data-scheme="light"][data-apptheme="sobre"] .rail{
     --bg:#15161a;--surface:#232429;--molten:#33353c;--redline:#43454d;
     --flare:#8fa3b8;--blush:#c3ccd6;--ink:#eef0f3;--ash:#9296a1;
     --redline-rgb:67,69,77;--blush-rgb:195,204,214;--bg-rgb:21,22,26;
     --shadow-ember:inset 0 0 20px rgba(51,53,60,.6);
   }
   /* Ce qui reste codé en dur et ne suit pas les variables. Le rail flotte sur
-     des photos ET sur des cartes claires : un fond translucide de la couleur de
-     la page lui donne un support dans les deux cas. */
+     des photos ET sur des cartes claires : un verre sombre lui donne un support
+     lisible dans les deux cas. */
   :root[data-scheme="light"] .pvrow{border-bottom-color:rgba(0,0,0,.08)}
-  :root[data-scheme="light"] .rail button{background:rgba(var(--bg-rgb),.78)}
+  :root[data-scheme="light"] .rail button{background:rgba(var(--bg-rgb),.55)}
   :root[data-scheme="light"] .feedrow .del--confirm,
   :root[data-scheme="light"] .savedrow__del--confirm,
   :root[data-scheme="light"] .statsresetbtn--armed{background:var(--flare)}
@@ -1952,7 +1960,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=294"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=296"></script>
+<script src="src/i18n.js?v=297"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -3299,7 +3307,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="296";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="297";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
