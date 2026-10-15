@@ -100,9 +100,12 @@
       "pause.opt.off": "Non",
       "autoplay.label": "Lecture auto des vidéos",
       "autoplay.desc.off": "Tu lances chaque vidéo toi-même avec ▶.",
-      "autoplay.desc.on": "En mode Vidéos seules, la vidéo démarre 0,5 s après le swipe.",
+      "autoplay.desc.on":
+        "Dans les modes Vidéos (filtre ou onglet Vidéos), la vidéo démarre 0,5 s après le swipe.",
       "autoplay.opt.off": "Non",
       "autoplay.opt.on": "Oui",
+      "changelog.v299.item1":
+        "Lecture auto : elle marche aussi avec l'onglet Vidéos (balayage horizontal), pas seulement avec le filtre.",
       "changelog.v298.item1":
         "Lecture auto : en mode Vidéos, la vidéo se lance 0,5 s après le swipe (réglage Lecture auto des vidéos, désactivé par défaut).",
       "pause.title": "🧘 Une pause ?",
@@ -672,9 +675,12 @@
       "pause.opt.off": "Off",
       "autoplay.label": "Autoplay videos",
       "autoplay.desc.off": "You start each video yourself with ▶.",
-      "autoplay.desc.on": "In Videos-only mode, the video starts 0.5 s after the swipe.",
+      "autoplay.desc.on":
+        "In Videos modes (filter or Videos tab), the video starts 0.5 s after the swipe.",
       "autoplay.opt.off": "Off",
       "autoplay.opt.on": "On",
+      "changelog.v299.item1":
+        "Autoplay: now also works with the Videos tab (horizontal swipe), not only the filter.",
       "changelog.v298.item1":
         "Autoplay: in Videos mode, the video starts 0.5 s after the swipe (Autoplay videos setting, off by default).",
       "pause.title": "🧘 Time for a break?",
