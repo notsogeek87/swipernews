@@ -98,6 +98,13 @@
       "pause.desc.50": "Te propose une pause toutes les 50 cartes de la journée.",
       "pause.desc.100": "Te propose une pause toutes les 100 cartes de la journée.",
       "pause.opt.off": "Non",
+      "autoplay.label": "Lecture auto des vidéos",
+      "autoplay.desc.off": "Tu lances chaque vidéo toi-même avec ▶.",
+      "autoplay.desc.on": "En mode Vidéos seules, la vidéo démarre 0,5 s après le swipe.",
+      "autoplay.opt.off": "Non",
+      "autoplay.opt.on": "Oui",
+      "changelog.v298.item1":
+        "Lecture auto : en mode Vidéos, la vidéo se lance 0,5 s après le swipe (réglage Lecture auto des vidéos, désactivé par défaut).",
       "pause.title": "🧘 Une pause ?",
       "pause.msg":
         "Tu as déjà parcouru {n} cartes aujourd'hui. Le fil sera encore là plus tard.",
@@ -663,6 +670,13 @@
       "pause.desc.50": "Suggests a break every 50 cards in a day.",
       "pause.desc.100": "Suggests a break every 100 cards in a day.",
       "pause.opt.off": "Off",
+      "autoplay.label": "Autoplay videos",
+      "autoplay.desc.off": "You start each video yourself with ▶.",
+      "autoplay.desc.on": "In Videos-only mode, the video starts 0.5 s after the swipe.",
+      "autoplay.opt.off": "Off",
+      "autoplay.opt.on": "On",
+      "changelog.v298.item1":
+        "Autoplay: in Videos mode, the video starts 0.5 s after the swipe (Autoplay videos setting, off by default).",
       "pause.title": "🧘 Time for a break?",
       "pause.msg":
         "You've already gone through {n} cards today. The feed will still be here later.",

@@ -1690,6 +1690,9 @@
     <!-- Pause douce (voir renderPausePref/verifierPause) : même forme prefRow. -->
     <div data-pausemount></div>
 
+    <!-- Lecture auto des vidéos (voir renderAutoplayPref/armerAutoplay) : même forme prefRow. -->
+    <div data-autoplaymount></div>
+
     <h3 class="secttl" data-i18n="sheet.interests.title">🎓 Centres d'intérêt</h3>
     <p class="sub" data-i18n="sheet.interests.sub">Les thèmes des articles Wikipédia glissés entre tes actus.</p>
     <div class="intgrid" id="intGrid"></div>
@@ -1960,7 +1963,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=294"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=297"></script>
+<script src="src/i18n.js?v=298"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -3213,6 +3216,42 @@ const PAUSE_VALS=["off","25","50","100"];
 const LS_PAUSE="fluxswipe.pause.v1";
 let pausePref=(()=>{try{const v=localStorage.getItem(LS_PAUSE);return PAUSE_VALS.includes(v)?v:"off";}catch(e){return "off";}})();
 let pauseVueA=0,pauseT=null;
+/* ---------- Lecture auto des vidéos ----------
+   Réglage OPTIONNEL (désactivé par défaut) : en filtre « Vidéos » SEULEMENT
+   (contentFilter==="video"), la vidéo de la carte d'arrivée se lance toute seule
+   AUTOPLAY_MS après un vrai swipe. Ailleurs (Tout, Articles) rien ne change : le
+   fil mélange alors des articles, et lancer un lecteur sans que personne ne l'ait
+   demandé contredirait la façade de la carte vidéo (voir startVideo). Armé par
+   onCardChange(userScroll), jamais par un simple recalage ; annulé dès qu'on
+   quitte la carte avant l'échéance. */
+const AUTOPLAY_MS=500;
+const LS_AUTOPLAY="fluxswipe.autoplay.v1";
+let autoplayPref=(()=>{try{return localStorage.getItem(LS_AUTOPLAY)==="on"?"on":"off";}catch(e){return "off";}})();
+let autoplayT=null,lastAutoCard=null;
+function renderAutoplayPref(){
+  const html=prefRow("autoplay",T("autoplay.label"),T("autoplay.desc."+autoplayPref),
+    [{v:"off",t:T("autoplay.opt.off")},{v:"on",t:T("autoplay.opt.on")}],autoplayPref);
+  document.querySelectorAll("[data-autoplaymount]").forEach(el=>{el.innerHTML=html;});
+}
+function setAutoplayPref(v){
+  const next=v==="on"?"on":"off";
+  if(next===autoplayPref)return;
+  autoplayPref=next;
+  try{localStorage.setItem(LS_AUTOPLAY,next);}catch(e){warn("save autoplay",e);}
+  if(next==="off")clearTimeout(autoplayT);
+  renderAutoplayPref();
+}
+function armerAutoplay(card){
+  clearTimeout(autoplayT);
+  if(autoplayPref!=="on"||contentFilter!=="video"||!card||!card.dataset.vid)return;
+  autoplayT=setTimeout(()=>{
+    // La carte doit être TOUJOURS celle sous les yeux, sans panneau ouvert ni
+    // app en arrière-plan : sinon le son partirait derrière un autre écran.
+    if(currentCardEl()!==card||!card.isConnected)return;
+    if(document.querySelector(".sheet.open")||document.visibilityState==="hidden")return;
+    startVideo(card);
+  },AUTOPLAY_MS);
+}
 function renderPausePref(){
   const html=prefRow("pause",T("pause.label"),T("pause.desc."+pausePref),
     PAUSE_VALS.map(v=>({v,t:v==="off"?T("pause.opt.off"):v})),pausePref);
@@ -3266,6 +3305,9 @@ function onCardChange(userScroll){
   // Arrêt n°1 : on a quitté la carte qui jouait. C'est le geste attendu — swiper
   // coupe la vidéo, comme sur n'importe quel fil vertical.
   if(playingCard&&feedEl.children[i]!==playingCard)stopVideo();
+  // Lecture auto : une seule armée par ARRIVÉE sur une carte (pas à chaque frame
+  // du défilement), et seulement après un vrai swipe — un recalage annule.
+  if(card!==lastAutoCard){lastAutoCard=card;if(userScroll)armerAutoplay(card);else clearTimeout(autoplayT);}
   const samePending=pendingSeenItem===it||(pendingSeenItem&&it&&pendingSeenItem.link&&pendingSeenItem.link===it.link);
   if(!samePending){
     if(pendingSeenItem&&userScroll){bumpCardScroll();verifierPause();}   // VRAI swipe seulement : une de plus au compteur
@@ -3307,7 +3349,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="297";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="298";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -3318,6 +3360,8 @@ const APP_VERSION="297";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:298,date:"2026-10-15",items:[
+    "changelog.v298.item1"]},
   {v:296,date:"2026-10-12",items:[
     "changelog.v296.item1"]},
   {v:290,date:"2026-10-10",items:[
@@ -7658,6 +7702,7 @@ function setPref(name,v){
   if(name==="appscheme"){setAppScheme(v);return;}   // idem : clair/sombre/auto
   if(name==="cardsPerSwipe"){setCardsPerSwipe(v);return;}   // idem : recompose le fil
   if(name==="pause"){setPausePref(v);return;}   // propre clé, voir pausePref
+  if(name==="autoplay"){setAutoplayPref(v);return;}   // idem, voir autoplayPref
   if(name==="age"){setAgeCategory(v);return;}   // idem : remplace `feeds`, voir setAgeCategory
   if(name==="contentFilter"){setContentFilter(v);return;}   // idem : recharge le fil
   if(name==="notif"){setNotifPref(v);return;}   // idem : aller-retour natif (permission), voir setNotifPref
@@ -7683,7 +7728,7 @@ function setLang(l){
   document.documentElement.lang=LANG;
   applyI18n();
   renderLangPref();renderReadPref();renderThemePref();renderSchemePref();renderAutoExport();renderIntGrid("intGrid");renderList();renderSuggest();renderMixUI();
-  renderPausePref();renderEcouteUI();renderMutes();renderSourceHelp();renderNatures();
+  renderPausePref();renderAutoplayPref();renderEcouteUI();renderMutes();renderSourceHelp();renderNatures();
   switchFeed();
 }
 /* Contrairement à setLang(), ne touche à AUCUN état du fil : c'est pour ça
@@ -7880,6 +7925,7 @@ renderReadPref();
 renderThemePref();renderSchemePref();
 renderCardsPref();
 renderPausePref();
+renderAutoplayPref();
 renderEcouteUI();
 renderAutoExport();refreshAutoExport();
 /* Rafraîchissement hebdomadaire, en silence : une liste de blocage vieille de
@@ -9770,6 +9816,7 @@ function settingsSnapshot(){
     filterSponsored,
     mutedWords,
     pause:pausePref,
+    autoplay:autoplayPref,
     contentFilter,
     hideSeen,
     ytApiKey,
@@ -9917,6 +9964,9 @@ function applySettingsImport(obj){
   }
   if(typeof obj.pause==="string"&&PAUSE_VALS.includes(obj.pause)){
     localStorage.setItem(LS_PAUSE,obj.pause);n++;
+  }
+  if(obj.autoplay==="on"||obj.autoplay==="off"){
+    localStorage.setItem(LS_AUTOPLAY,obj.autoplay);n++;
   }
   if(Array.isArray(obj.mutedWords)){
     localStorage.setItem(LS_MUTES,JSON.stringify(sanitizeMutedWords(obj.mutedWords)));n++;
