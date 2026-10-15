@@ -31,7 +31,8 @@ import java.util.concurrent.TimeUnit;
  * dans index.html) et ce worker se contente de l'écrire. Même principe que
  * {@link NewsCheckWorker} : le natif ne recalcule rien.
  *
- * <p>Chaque passage ÉCRASE les mêmes fichiers (SAF créerait sinon
+ * <p>Chaque passage ÉCRASE le même fichier et supprime ses doublons « xxx (1).json »
+ * et les restes des anciennes versions (SAF créerait sinon
  * « xxx (1).json » à chaque fois). Un échec est mémorisé, pas rejoué : un
  * dossier perdu demande l'utilisateur, un backoff n'y changerait rien.
  */
@@ -134,19 +135,37 @@ public class AutoExportWorker extends Worker {
         return Result.success();
     }
 
-    /** Écrit {@code name} dans le dossier, en réutilisant le fichier existant. */
+    /** Fichiers que NOUS avons écrits, sous toutes leurs variantes : le nom courant,
+     *  ceux des anciennes versions (OPML + réglages séparés) et les « xxx (1).json »
+     *  que le fournisseur de stockage (Drive en tête) fabrique quand il refuse de
+     *  réutiliser un nom. Rien d'autre du dossier n'est jamais touché. */
+    private static final java.util.regex.Pattern OURS = java.util.regex.Pattern.compile(
+        "^swipernews-(sauvegarde|reglages|sources)( \\(\\d+\\))?\\.(json|opml)$");
+
+    /** Écrit {@code name} dans le dossier : réutilise le fichier existant, puis supprime
+     *  les doublons et les restes d'anciennes versions — un seul fichier à l'arrivée. */
     private static void write(Context ctx, Uri tree, String name, String mime, String content) throws IOException {
         android.content.ContentResolver resolver = ctx.getContentResolver();
         String treeDocId = DocumentsContract.getTreeDocumentId(tree);
         Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, treeDocId);
         Uri target = null;
+        long targetModified = -1;
+        java.util.List<Uri> others = new java.util.ArrayList<>();
         try (android.database.Cursor c = resolver.query(children, new String[] {
                 DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null)) {
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_LAST_MODIFIED}, null, null, null)) {
             while (c != null && c.moveToNext()) {
-                if (name.equals(c.getString(1))) {
-                    target = DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0));
-                    break;
+                String display = c.getString(1);
+                if (display == null || !OURS.matcher(display).matches()) continue;
+                Uri doc = DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0));
+                // On garde, parmi les fichiers au nom exact, le plus récemment modifié.
+                if (name.equals(display) && c.getLong(2) >= targetModified) {
+                    if (target != null) others.add(target);
+                    target = doc;
+                    targetModified = c.getLong(2);
+                } else {
+                    others.add(doc);
                 }
             }
         }
@@ -159,6 +178,14 @@ public class AutoExportWorker extends Worker {
         try (OutputStream os = resolver.openOutputStream(target, "wt")) {
             if (os == null) throw new IOException("écriture impossible : " + name);
             os.write(content.getBytes(StandardCharsets.UTF_8));
+        }
+        // Après l'écriture réussie seulement : un échec ne doit jamais coûter l'ancienne copie.
+        for (Uri extra : others) {
+            try {
+                DocumentsContract.deleteDocument(resolver, extra);
+            } catch (Exception e) {
+                // Suppression refusée : le prochain passage réessaiera.
+            }
         }
     }
 }
