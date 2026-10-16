@@ -164,8 +164,27 @@ public class InAppBrowserPlugin extends Plugin {
             call.reject("activité indisponible");
             return;
         }
+        // Un export déjà enregistré sous ce nom est ÉCRASÉ sur place : le
+        // sélecteur crée toujours un nouveau fichier (« nom (1).opml »), donc
+        // les exports s'accumulaient. Si l'ancien emplacement n'est plus
+        // accessible (fichier supprimé, droit perdu), on retombe sur le sélecteur.
+        SharedPreferences sp = getContext().getSharedPreferences(EXPORT_PREFS, Context.MODE_PRIVATE);
+        String known = sp.getString(EXPORT_KEY + name, null);
+        if (known != null) {
+            try {
+                if (writeTo(Uri.parse(known), data)) {
+                    call.resolve();
+                    return;
+                }
+            } catch (Exception ignored) {
+                // repli sur le sélecteur
+            }
+        }
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+            | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         intent.setType(mime);
         intent.putExtra(Intent.EXTRA_TITLE, name);
         try {
@@ -185,17 +204,37 @@ public class InAppBrowserPlugin extends Plugin {
             return;
         }
         String data = call.getString("data");
-        try (OutputStream os = getContext().getContentResolver()
-                .openOutputStream(result.getData().getData())) {
-            if (os == null) {
+        Uri uri = result.getData().getData();
+        try {
+            if (!writeTo(uri, data)) {
                 call.reject("écriture impossible");
                 return;
             }
-            os.write(data.getBytes(StandardCharsets.UTF_8));
+            try {
+                getContext().getContentResolver().takePersistableUriPermission(uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                String name = new File(call.getString("name", "")).getName();
+                getContext().getSharedPreferences(EXPORT_PREFS, Context.MODE_PRIVATE)
+                    .edit().putString(EXPORT_KEY + name, uri.toString()).apply();
+            } catch (SecurityException ignored) {
+                // pas de droit durable : le prochain export repassera par le sélecteur
+            }
             call.resolve();
         } catch (IOException e) {
             String msg = e.getMessage();
             call.reject(msg == null ? "écriture impossible" : msg);
+        }
+    }
+
+    private static final String EXPORT_PREFS = "export_files";
+    private static final String EXPORT_KEY = "uri:";
+
+    /** Écrit en TRONQUANT ("wt") : sans cela, un fichier plus court garde la fin de l'ancien. */
+    private boolean writeTo(Uri uri, String data) throws IOException {
+        try (OutputStream os = getContext().getContentResolver().openOutputStream(uri, "wt")) {
+            if (os == null) return false;
+            os.write(data.getBytes(StandardCharsets.UTF_8));
+            return true;
         }
     }
 
