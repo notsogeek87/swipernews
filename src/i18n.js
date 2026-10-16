@@ -104,6 +104,10 @@
         "Dans les modes Vidéos (filtre ou onglet Vidéos), la vidéo démarre 0,5 s après le swipe.",
       "autoplay.opt.off": "Non",
       "autoplay.opt.on": "Oui",
+      "changelog.v300.item1":
+        "Le filtre Tout / Vidéos / Articles de la feuille Sources est retiré : il faisait doublon avec le sélecteur en haut du fil (balayage horizontal).",
+      "changelog.v300.item1":
+        "The All / Videos / Articles filter in the Sources sheet is gone: it duplicated the selector at the top of the feed (horizontal swipe).",
       "changelog.v299.item1":
         "Lecture auto : elle marche aussi avec l'onglet Vidéos (balayage horizontal), pas seulement avec le filtre.",
       "changelog.v298.item1":
@@ -351,17 +355,6 @@
       "sheet.sources.title": "📰 Sources d'actualité",
       "sheet.sources.sub": "Coche les flux à afficher, ajoute ceux que tu veux.",
       "sheet.sources.filterSponsored": "Filtrer les articles sponsorisés et bons plans",
-      "cf.label": "Contenu affiché",
-      "cf.desc.all": "Toutes tes sources, mélangées normalement.",
-      "cf.desc.video": "Seulement les Shorts YouTube de tes chaînes.",
-      "cf.desc.articles": "Actus et Wikipédia, sans les vidéos.",
-      "cf.opt.all": "Tout",
-      "cf.opt.video": "Vidéos",
-      "cf.opt.articles": "Articles",
-      "sheet.sources.noVideoFeed.title": "Pas de chaîne YouTube",
-      "sheet.sources.noVideoFeed.msg":
-        "Ce filtre ne montre que les Shorts de tes chaînes YouTube — tu n'en as ajouté aucune. Ajoutes-en une pour l'utiliser.",
-      "sheet.sources.noVideoFeed.cta": "Ajouter une chaîne YouTube",
       "sheet.sources.groupRss": "Flux RSS",
       "sheet.sources.groupVideo": "Chaînes YouTube",
       "sheet.sources.placeholder": "Adresse, r/sous-reddit, @compte…",
@@ -919,17 +912,6 @@
       "sheet.sources.title": "📰 News sources",
       "sheet.sources.sub": "Check the feeds to show, add whichever you like.",
       "sheet.sources.filterSponsored": "Filter out sponsored articles and deals",
-      "cf.label": "Content shown",
-      "cf.desc.all": "All your sources, mixed as usual.",
-      "cf.desc.video": "Only YouTube Shorts from your channels.",
-      "cf.desc.articles": "News and Wikipedia, without videos.",
-      "cf.opt.all": "All",
-      "cf.opt.video": "Videos",
-      "cf.opt.articles": "Articles",
-      "sheet.sources.noVideoFeed.title": "No YouTube channel",
-      "sheet.sources.noVideoFeed.msg":
-        "This filter only shows Shorts from your YouTube channels, and you haven't added any yet. Add one to use it.",
-      "sheet.sources.noVideoFeed.cta": "Add a YouTube channel",
       "sheet.sources.groupRss": "RSS feeds",
       "sheet.sources.groupVideo": "YouTube channels",
       "sheet.sources.placeholder": "Address, r/subreddit, @account…",

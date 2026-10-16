@@ -1884,13 +1884,6 @@
     <div class="sheet__grip"></div>
     <h2 id="pickTitle"></h2>
     <p class="sub" id="pickSub"></p>
-    <!-- Filtre de contenu (tout / vidéos seules / articles [actus+Wikipédia,
-         sans vidéo]) pour la feuille des sources — EN TÊTE, avant la grille
-         des sources : un réglage qui bascule tout le fil, pas un de plus
-         dans la liste. Rempli par renderContentFilterPref() (prefRow). -->
-    <div class="hidden" id="videoFilterRow">
-      <div data-cfmount></div>
-    </div>
     <div class="intgrid" id="pickGrid"></div>
     <!-- Seulement pour les sources, où le choix est MULTIPLE : il faut bien un
          moment où l'on a fini de cocher. Le filtre des thèmes, choix unique,
@@ -1905,19 +1898,10 @@
      principe que menuSheet → sheet : une seule couche, donc le bouton retour ou
      un tap sur le fond ferment tout plutôt que de revenir sur la feuille des
      sources (voir replaceDialog). -->
-<div class="sheet" id="noVideoSheet" role="dialog" aria-modal="true" aria-labelledby="noVideoTitle">
-  <div class="sheet__panel" tabindex="-1">
-    <div class="sheet__grip"></div>
-    <h2 id="noVideoTitle" data-i18n="sheet.sources.noVideoFeed.title">Pas de chaîne YouTube</h2>
-    <p class="sub" data-i18n="sheet.sources.noVideoFeed.msg">Ce filtre ne montre que les Shorts de tes chaînes YouTube — tu n'en as ajouté aucune. Ajoutes-en une pour l'utiliser.</p>
-    <button class="applybtn" id="noVideoAddBtn" data-i18n="sheet.sources.noVideoFeed.cta">Ajouter une chaîne YouTube</button>
-  </div>
-</div>
 
 <!-- Rappel « active les notifications », app packagée seulement, proposé au
      1er lancement (voir notifNudgeAnswered) — juste après l'accueil, par
-     replaceDialog depuis welcomeSheet (même principe que noVideoSheet
-     ci-dessus). Un utilisateur déjà en place voit le même panneau, ou sa
+     replaceDialog depuis welcomeSheet (même principe que menuSheet → sheet). Un utilisateur déjà en place voit le même panneau, ou sa
      variante accolée au journal des nouveautés s'il en ouvre un
      (renderNotifNudge, openChangelogIfNew) : les deux partagent le MÊME
      marqueur "déjà proposé", jamais les deux à la fois. TROIS issues, voir
@@ -1963,7 +1947,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=294"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=299"></script>
+<script src="src/i18n.js?v=300"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -3218,8 +3202,8 @@ let pausePref=(()=>{try{const v=localStorage.getItem(LS_PAUSE);return PAUSE_VALS
 let pauseVueA=0,pauseT=null;
 /* ---------- Lecture auto des vidéos ----------
    Réglage OPTIONNEL (désactivé par défaut) : en filtre « Vidéos » SEULEMENT
-   (contentFilter==="video") OU en nature « Vidéos » (le sélecteur Articles | Tout |
-   Vidéos, balayage horizontal : `nature==="videos"`), la vidéo de la carte d'arrivée se lance toute seule
+   nature « Vidéos » (le sélecteur Articles | Tout | Vidéos, balayage
+   horizontal : `nature==="videos"`), la vidéo de la carte d'arrivée se lance toute seule
    AUTOPLAY_MS après un vrai swipe. Ailleurs (Tout, Articles) rien ne change : le
    fil mélange alors des articles, et lancer un lecteur sans que personne ne l'ait
    demandé contredirait la façade de la carte vidéo (voir startVideo). Armé par
@@ -3244,7 +3228,7 @@ function setAutoplayPref(v){
 }
 function armerAutoplay(card){
   clearTimeout(autoplayT);
-  if(autoplayPref!=="on"||(contentFilter!=="video"&&nature!=="videos")||!card||!card.dataset.vid)return;
+  if(autoplayPref!=="on"||nature!=="videos"||!card||!card.dataset.vid)return;
   autoplayT=setTimeout(()=>{
     // La carte doit être TOUJOURS celle sous les yeux, sans panneau ouvert ni
     // app en arrière-plan : sinon le son partirait derrière un autre écran.
@@ -3350,7 +3334,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="299";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="300";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -3361,6 +3345,8 @@ const APP_VERSION="299";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:300,date:"2026-10-16",items:[
+    "changelog.v300.item1"]},
   {v:299,date:"2026-10-15",items:[
     "changelog.v299.item1"]},
   {v:298,date:"2026-10-15",items:[
@@ -3815,21 +3801,6 @@ const LS_SPONSOR="fluxswipe.sponsorfilter.v1";
 let filterSponsored=(()=>{
   try{const v=localStorage.getItem(LS_SPONSOR);return v===null?true:v==="1";}
   catch(e){return true;}
-})();
-
-/* Filtre de contenu de la feuille des sources : "all" (tout), "video"
-   (Shorts YouTube seulement) ou "articles" (actus + Wikipédia, sans les
-   vidéos). Remplace l'ancien interrupteur binaire (LS_VIDEO_ONLY) — la
-   nouvelle clé porte l'état à 3 voies directement, LS_VIDEO_ONLY ne sert
-   plus qu'à migrer un réglage déjà enregistré par une version antérieure. */
-const LS_CONTENT_FILTER="fluxswipe.contentfilter.v1";
-const LS_VIDEO_ONLY="fluxswipe.videoonlyfilter.v1";
-let contentFilter=(()=>{
-  try{
-    const v=localStorage.getItem(LS_CONTENT_FILTER);
-    if(v==="all"||v==="video"||v==="articles")return v;
-    return localStorage.getItem(LS_VIDEO_ONLY)==="1"?"video":"all";
-  }catch(e){return "all";}
 })();
 
 /* ---------- Clé API YouTube (secours, réglage avancé) ----------
@@ -4353,8 +4324,6 @@ async function fetchFeedRobust(feed){
     if(!a)throw new Error("budget");
   }
   let result=filterSponsored?a.filter(i=>!isPromotionalItem(i)):a;
-  if(contentFilter==="video")result=result.filter(i=>videoIdOf(i));
-  else if(contentFilter==="articles")result=result.filter(i=>!videoIdOf(i));
   /* Filtre d'âge, YouTube seul (voir CONFIG.YT_MAX_AGE_MS) : une date qui ne se
      parse pas ne fait pas sortir l'article, seule une date CONFIRMÉE trop
      vieille le fait. */
@@ -5580,9 +5549,7 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
       // cacheSave(key) se fait désormais dans paint()/whenFeedIdle ci-dessus,
       // une fois `items` réellement à jour (voir son commentaire).
       unreachable=new Set(failed.map(f=>f.url));   // pour marquer le panneau Sources
-      // Ne pas afficher d'erreur quand le filtre vidéo est activé : les sources
-      // RSS classiques n'ont pas de vidéos, donc elles sont vides en résultat
-      if(failed.length&&contentFilter!=="video"){
+      if(failed.length){
         // Nommer les flux : « 2 flux injoignables » n'indique pas lesquels
         // supprimer. Au-delà de 3, on abrège pour rester lisible.
         const noms=failed.map(f=>f.name);
@@ -7504,30 +7471,16 @@ document.addEventListener("keydown",e=>{
   else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
 });
 const menuSheet=document.getElementById("menuSheet"),statsSheet=document.getElementById("statsSheet"),
-  changelogSheet=document.getElementById("changelogSheet"),noVideoSheet=document.getElementById("noVideoSheet"),
+  changelogSheet=document.getElementById("changelogSheet"),
   notifNudgeSheet=document.getElementById("notifNudgeSheet");
 document.getElementById("menuBtn").onclick=()=>openDialog(menuSheet);
 menuSheet.onclick=e=>{if(e.target===menuSheet)closeDialog(menuSheet);};
 statsSheet.onclick=e=>{if(e.target===statsSheet)closeDialog(statsSheet);};
 changelogSheet.onclick=e=>{if(e.target===changelogSheet)closeDialog(changelogSheet);};
-noVideoSheet.onclick=e=>{if(e.target===noVideoSheet)closeDialog(noVideoSheet);};
 notifNudgeSheet.onclick=e=>{if(e.target===notifNudgeSheet)closeDialog(notifNudgeSheet);};
 document.getElementById("notifNudgeEnable").onclick=()=>{markNotifNudgeAnswered();setPref("notif","on");closeDialog(notifNudgeSheet);};
 document.getElementById("notifNudgeLater").onclick=()=>{snoozeNotifNudge();closeDialog(notifNudgeSheet);};
 document.getElementById("notifNudgeDecline").onclick=()=>{markNotifNudgeAnswered();closeDialog(notifNudgeSheet);};
-/* CTA de noVideoSheet : bascule directement sur les réglages (même mécanique
-   replaceDialog que la notice elle-même) et pose le focus dans le champ
-   d'ajout de source — « direct vers l'ajout », pas juste vers le panneau. Le
-   scroll+focus est différé d'une frame : openSettings vient de reconstruire
-   #feedList (renderList), et #newUrl n'a sa position définitive qu'une fois
-   ce rendu posé dans le document. */
-document.getElementById("noVideoAddBtn").onclick=()=>{
-  openSettings(noVideoSheet);
-  requestAnimationFrame(()=>{
-    const u=document.getElementById("newUrl");
-    try{u.scrollIntoView({block:"center"});u.focus();}catch(_){}
-  });
-};
 document.getElementById("openSheet").onclick=()=>openSettings(menuSheet);
 // reloadBtn vit maintenant dans la rangée 1, hors du menu : pas de dialog à
 // fermer, juste l'action.
@@ -7707,7 +7660,6 @@ function setPref(name,v){
   if(name==="pause"){setPausePref(v);return;}   // propre clé, voir pausePref
   if(name==="autoplay"){setAutoplayPref(v);return;}   // idem, voir autoplayPref
   if(name==="age"){setAgeCategory(v);return;}   // idem : remplace `feeds`, voir setAgeCategory
-  if(name==="contentFilter"){setContentFilter(v);return;}   // idem : recharge le fil
   if(name==="notif"){setNotifPref(v);return;}   // idem : aller-retour natif (permission), voir setNotifPref
   const p=PREFS[name];
   if(!p)return;
@@ -8000,7 +7952,7 @@ function feedKey(){
   // actif était repeint au lancement suivant après l'avoir décoché, et les
   // articles sponsorisés n'apparaissaient qu'à la seconde peinture.
   return "mix|"+LANG+"|"+newsSrcKey()+"|"+cat+(cat==="all"?":"+interests.join(","):"")+
-    (filterSponsored?"|s":"")+(contentFilter!=="all"?"|"+contentFilter[0]:"");
+    (filterSponsored?"|s":"");
 }
 /* Instantané du fil, pour revenir d'un filtre à l'autre sans réseau : on
    restaure l'état exact (cartes affichées + position de scroll) au lieu de tout
@@ -8644,8 +8596,6 @@ function openPicker(kind){
   document.getElementById("pickTitle").textContent=T(src?"filter.src.label":"filter.cat.label");
   document.getElementById("pickSub").textContent=T(src?"filter.src.sub":"filter.cat.sub");
   pickApply.classList.toggle("hidden",!src);   // le choix unique s'applique au tap, sans bouton
-  document.getElementById("videoFilterRow").classList.toggle("hidden",!src);
-  if(src)renderContentFilterPref();
   renderPickGrid();
   openDialog(pickSheet);
 }
@@ -9298,38 +9248,6 @@ document.getElementById("muteList").addEventListener("click",e=>{
   const k=+b.dataset.unmute;
   setMutedWords(mutedWords.filter((_,i)=>i!==k));
 });
-/* Filtre de contenu à 3 choix, en tête de la feuille des sources d'actus
-   (voir [data-cfmount] dans le HTML, prefRow) : remplace l'ancien
-   interrupteur binaire « Shorts YouTube uniquement ». Entièrement
-   INDÉPENDANT de la dose d'apprentissage (mixScore, curseur ailleurs dans
-   les réglages) : « Articles » ne force pas un ratio actus/Wikipédia
-   particulier, il retire seulement les vidéos des DEUX moitiés du fil —
-   or Wikipédia n'a jamais de vidéo, donc en pratique cela ne change que ce
-   que fetchFeedRobust retient des flux d'actus (voir son filtre). */
-function renderContentFilterPref(){
-  const v=contentFilter;
-  const html=prefRow("contentFilter",T("cf.label"),T("cf.desc."+v),
-    [{v:"all",t:T("cf.opt.all")},{v:"video",t:T("cf.opt.video")},{v:"articles",t:T("cf.opt.articles")}],v);
-  document.querySelectorAll("[data-cfmount]").forEach(el=>{el.innerHTML=html;});
-}
-function setContentFilter(v){
-  // Activer « Vidéos » sans aucune chaîne YouTube viderait le fil sans un
-  // mot d'explication : mieux vaut le dire, et pointer vers l'endroit où en
-  // ajouter une, que remettre à l'utilisateur un fil vide à deviner.
-  if(v==="video"&&!feeds.some(f=>isYoutubeFeedUrl(f.url))){
-    replaceDialog(pickSheet,noVideoSheet);
-    return;
-  }
-  if(v===contentFilter)return;   // déjà dans cet état
-  contentFilter=v;
-  try{localStorage.setItem(LS_CONTENT_FILTER,v);}catch(_){}
-  renderContentFilterPref();
-  // Toujours un rechargement COMPLET, jamais un simple remix : le filtre de
-  // contenu change ce qui est FETCHÉ par source (voir fetchFeedRobust), pas
-  // seulement l'entrelacement — remix() seul aurait laissé les articles
-  // déjà en cache, vidéo ou non, tels quels.
-  loadFeeds(true);
-}
 /* La clé n'est enregistrée qu'après VÉRIFICATION réussie — jamais au simple
    blur du champ. Une clé fautive (faute de frappe, restriction mal posée
    côté Google Cloud) enregistrée en silence se serait révélée seulement au
@@ -9396,7 +9314,7 @@ function renderList(){const lbl=feedLabels(feeds);
     const armed=delConfirm===f.url;
     return `
   <div class="feedrow"><input type="checkbox" ${f.on?"checked":""} data-toggle="${i}">
-    <div><div class="name">${esc(lbl[i])}${unreachable.has(f.url)&&contentFilter!=="video"?`<span class="badge-ko">${esc(T("sheet.sources.unreachable"))}</span>`:""}</div>
+    <div><div class="name">${esc(lbl[i])}${unreachable.has(f.url)?`<span class="badge-ko">${esc(T("sheet.sources.unreachable"))}</span>`:""}</div>
       <div class="url">${esc(f.url)}</div></div>
     <div class="actions">
       <button class="share" data-share="${i}" aria-label="${escAttr(T("sheet.sources.shareAria",{name:lbl[i]}))}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
@@ -9820,7 +9738,6 @@ function settingsSnapshot(){
     mutedWords,
     pause:pausePref,
     autoplay:autoplayPref,
-    contentFilter,
     hideSeen,
     ytApiKey,
     readPref,
@@ -9973,12 +9890,6 @@ function applySettingsImport(obj){
   }
   if(Array.isArray(obj.mutedWords)){
     localStorage.setItem(LS_MUTES,JSON.stringify(sanitizeMutedWords(obj.mutedWords)));n++;
-  }
-  if(typeof obj.contentFilter==="string"&&["all","video","articles"].includes(obj.contentFilter)){
-    localStorage.setItem(LS_CONTENT_FILTER,obj.contentFilter);n++;
-  }else if(typeof obj.filterVideoOnly==="boolean"){
-    // Repli : fichier exporté par une version antérieure au filtre à 3 voies.
-    localStorage.setItem(LS_CONTENT_FILTER,obj.filterVideoOnly?"video":"all");n++;
   }
   if(typeof obj.hideSeen==="boolean"){
     localStorage.setItem(LS_HIDE_SEEN,obj.hideSeen?"1":"0");n++;
