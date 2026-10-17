@@ -170,6 +170,23 @@ public final class Summarizer {
         });
     }
 
+    /**
+     * Charge le modèle d'avance, sans rien générer : le chargement (centaines de Mo)
+     * est la part la plus lente avant le premier mot, et se paie alors pendant que
+     * l'utilisateur lit plutôt qu'après son appui. Sans effet si ce modèle est déjà
+     * chargé. Passe par le même fil de travail : un résumé demandé entre-temps
+     * attend simplement la fin du chargement, qu'il aurait dû faire lui-même.
+     */
+    public void warmUp(File model) {
+        if (!LIB_OK || worker.isShutdown()) return;
+        final String path = model.getAbsolutePath();
+        try {
+            worker.execute(() -> ensureLoaded(path));
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            // libéré entre le test et l'appel : rien à préchauffer
+        }
+    }
+
     /** Interrompt la génération en cours (sans libérer le modèle). */
     public void cancel() {
         gen++;

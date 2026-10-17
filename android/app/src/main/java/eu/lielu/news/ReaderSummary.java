@@ -124,6 +124,7 @@ final class ReaderSummary {
     void setArticleReady(boolean ready) {
         if (articleReady == ready) return;
         articleReady = ready;
+        if (ready) warmUp();
         if (!ready) {
             // Autre page : le résumé affiché n'est plus celui de ce qu'on lit.
             if (state == State.WORKING) cancelSummary();
@@ -131,6 +132,19 @@ final class ReaderSummary {
             showPanel(false);
         }
         updateFab();
+    }
+
+    /**
+     * Charge le modèle dès que le résumé devient possible, pour que l'appui n'ait
+     * plus à le faire. Seulement si un modèle est déjà installé : qui n'en a pas
+     * (ou n'utilise pas le résumé) ne paie ni mémoire ni processeur.
+     */
+    private void warmUp() {
+        if (destroyed || !Summarizer.isAvailable()) return;
+        final File model = store.activeFile();
+        if (model == null) return;
+        if (summarizer == null) summarizer = new Summarizer();
+        summarizer.warmUp(model);
     }
 
     /** La feuille et son voile vont ensemble. */
@@ -253,6 +267,7 @@ final class ReaderSummary {
                     // Feuille refermée pendant le transfert : on prévient, sans rien lancer.
                     state = State.IDLE;
                     Toast.makeText(ctx, R.string.summary_ready, Toast.LENGTH_LONG).show();
+                    if (articleReady) warmUp();
                 }
             }
 
