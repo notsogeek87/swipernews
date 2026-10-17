@@ -176,17 +176,19 @@
             android:progressDrawable="@drawable/reader_progress" />
     </LinearLayout>
 
-    <!-- Résumé local (ReaderSummary). Le bouton est en BAS à droite, là où
-         tombe le pouce, petit et translucide pour ne pas gêner la lecture ; il n'existe que lorsque le mode lecture a abouti.
-         La feuille monte du bas et le remplace tant qu'elle est ouverte. Ces
-         deux vues sont posées après la barre : au-dessus de tout. -->
+    <!-- Résumé local (ReaderSummary), habillé comme le reste de l'app : le bouton
+         est celui du rail du fil (carré, liseré « redline »), la feuille celle
+         des panneaux (« .sheet__panel » : fond « surface », coins de 8 dp en
+         haut, poignée, voile noir à 78 %). Bouton en BAS à droite, là où tombe
+         le pouce, petit et translucide pour ne pas gêner la lecture. Ces vues
+         sont posées après la barre : au-dessus de tout. -->
     <ImageButton
         android:id="@+id/reader_summary_fab"
         android:layout_width="46dp"
         android:layout_height="46dp"
         android:layout_gravity="bottom|end"
-        android:layout_marginEnd="14dp"
-        android:layout_marginBottom="20dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="36dp"
         android:padding="13dp"
         android:alpha="0.85"
         android:scaleType="fitCenter"
@@ -195,115 +197,135 @@
         android:visibility="gone"
         android:contentDescription="@string/summary_fab" />
 
+    <View
+        android:id="@+id/reader_summary_scrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#C7000000"
+        android:clickable="true"
+        android:focusable="false"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/reader_summary_panel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:orientation="vertical"
-        android:paddingStart="18dp"
-        android:paddingEnd="18dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="14dp"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="14dp"
+        android:paddingBottom="28dp"
         android:background="@drawable/bg_summary_panel"
-        android:elevation="12dp"
         android:clickable="true"
         android:focusable="true"
         android:visibility="gone">
 
-        <LinearLayout
+        <View
+            android:layout_width="44dp"
+            android:layout_height="5dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="18dp"
+            android:background="@drawable/bg_summary_grip" />
+
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:text="@string/summary_title"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:letterSpacing="-0.02"
+            android:textColor="@color/sn_ink" />
 
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/summary_title"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:textColor="@color/reader_ink" />
-
-            <ImageButton
-                android:id="@+id/reader_summary_close"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:scaleType="center"
-                android:src="@drawable/ic_reader_close"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/summary_close" />
-        </LinearLayout>
-
+        <!-- Étiquette technique : la police à chasse fixe, capitales, cendre — le
+             « .feedgroup summary » du panneau des sources. -->
         <TextView
             android:id="@+id/reader_summary_note"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="12sp"
-            android:textColor="@color/reader_muted" />
+            android:layout_marginTop="6dp"
+            android:fontFamily="monospace"
+            android:textAllCaps="true"
+            android:letterSpacing="0.04"
+            android:textSize="11sp"
+            android:textColor="@color/sn_ash" />
 
         <eu.lielu.news.MaxHeightScrollView
             android:id="@+id/reader_summary_scroll"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp">
+            android:layout_marginTop="14dp">
 
             <TextView
                 android:id="@+id/reader_summary_text"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="15sp"
-                android:lineSpacingMultiplier="1.2"
+                android:lineSpacingMultiplier="1.25"
                 android:textIsSelectable="true"
-                android:textColor="@color/reader_ink" />
+                android:textColor="@color/sn_ink" />
         </eu.lielu.news.MaxHeightScrollView>
 
         <ProgressBar
             android:id="@+id/reader_summary_progress"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="4dp"
-            android:layout_marginTop="12dp"
+            android:layout_height="3dp"
+            android:layout_marginTop="16dp"
             android:max="1000"
-            android:progressDrawable="@drawable/reader_progress"
-            android:indeterminateTint="@color/reader_accent"
+            android:progressDrawable="@drawable/summary_progress"
+            android:indeterminateTint="@color/sn_flare"
             android:visibility="gone" />
 
         <!-- Les actions sont tout en bas de la feuille : c'est là que le pouce
-             tombe, et la principale (la première) est la plus grande. -->
+             tombe. La première est le bouton plein, les autres sont fantômes. -->
         <LinearLayout
             android:id="@+id/reader_summary_actions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="16dp"
             android:orientation="vertical">
 
             <Button
                 android:id="@+id/reader_summary_btn1"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:textSize="15sp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="-0.01"
                 android:textAllCaps="false"
-                android:textColor="@color/reader_ink"
+                android:stateListAnimator="@null"
+                android:textColor="@color/sn_ink"
                 android:background="@drawable/reader_button_primary" />
 
             <Button
                 android:id="@+id/reader_summary_btn2"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="10dp"
+                android:minHeight="46dp"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="-0.01"
                 android:textAllCaps="false"
-                android:textColor="@color/reader_ink"
-                android:background="@drawable/reader_button" />
+                android:stateListAnimator="@null"
+                android:textColor="@color/sn_ink"
+                android:background="@drawable/reader_button_secondary" />
 
             <Button
                 android:id="@+id/reader_summary_btn3"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="10dp"
+                android:minHeight="46dp"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="-0.01"
                 android:textAllCaps="false"
-                android:textColor="@color/reader_ink"
-                android:background="@drawable/reader_button" />
+                android:stateListAnimator="@null"
+                android:textColor="@color/sn_ink"
+                android:background="@drawable/reader_button_secondary" />
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>

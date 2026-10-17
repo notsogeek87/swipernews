@@ -51,6 +51,7 @@ final class ReaderSummary {
     private final Host host;
     private final View fab;
     private final View panel;
+    private final View scrim;
     private final MaxHeightScrollView scroll;
     private final TextView note;
     private final TextView text;
@@ -74,6 +75,7 @@ final class ReaderSummary {
         this.host = host;
         fab = root.findViewById(R.id.reader_summary_fab);
         panel = root.findViewById(R.id.reader_summary_panel);
+        scrim = root.findViewById(R.id.reader_summary_scrim);
         scroll = root.findViewById(R.id.reader_summary_scroll);
         note = root.findViewById(R.id.reader_summary_note);
         text = root.findViewById(R.id.reader_summary_text);
@@ -89,7 +91,7 @@ final class ReaderSummary {
             ctx.getResources().getDisplayMetrics().heightPixels * MAX_TEXT_SCREEN_SHARE));
 
         fab.setOnClickListener(v -> open());
-        root.findViewById(R.id.reader_summary_close).setOnClickListener(v -> close());
+        scrim.setOnClickListener(v -> close());   // comme les feuilles du fil : toucher à côté referme
         updateFab();
     }
 
@@ -103,9 +105,16 @@ final class ReaderSummary {
             // Autre page : le résumé affiché n'est plus celui de ce qu'on lit.
             if (state == State.WORKING) cancelSummary();
             if (state != State.TRANSFER) reset();
-            panel.setVisibility(View.GONE);
+            showPanel(false);
         }
         updateFab();
+    }
+
+    /** La feuille et son voile vont ensemble. */
+    private void showPanel(boolean show) {
+        final int v = show ? View.VISIBLE : View.GONE;
+        scrim.setVisibility(v);
+        panel.setVisibility(v);
     }
 
     boolean isOpen() {
@@ -115,7 +124,7 @@ final class ReaderSummary {
     void close() {
         if (state == State.WORKING) cancelSummary();   // pas de calcul pour personne
         if (state == State.DONE || state == State.ERROR) reset();
-        panel.setVisibility(View.GONE);
+        showPanel(false);
         updateFab();
     }
 
@@ -150,7 +159,7 @@ final class ReaderSummary {
 
     private void open() {
         if (destroyed) return;
-        panel.setVisibility(View.VISIBLE);
+        showPanel(true);
         updateFab();
         if (state == State.TRANSFER || state == State.WORKING || state == State.DONE) return;
         File model = store.activeFile();
@@ -300,7 +309,7 @@ final class ReaderSummary {
             if (text.length() > 0) done();
             else {
                 state = State.IDLE;
-                panel.setVisibility(View.GONE);
+                showPanel(false);
                 updateFab();
             }
         }

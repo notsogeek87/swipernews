@@ -13,4 +13,15 @@
          rendu, faute de quoi le fond sombre apparaît une fraction de seconde. -->
     <color name="reader_page_sepia">#F3EBDC</color>
     <color name="reader_page_light">#FCFBF9</color>
+    <!-- La charte de l'app web (thème « Flamme », variables :root d'index.html),
+         pour les feuilles posées PAR-DESSUS le lecteur (résumé, téléchargement
+         du modèle). Les couleurs « reader_* » ci-dessus sont celles, plus
+         anciennes, de la barre du lecteur ; elles ne suivent pas cette charte. -->
+    <color name="sn_bg">#190501</color>
+    <color name="sn_surface">#340A01</color>
+    <color name="sn_molten">#631303</color>
+    <color name="sn_redline">#951C04</color>
+    <color name="sn_flare">#FA5838</color>
+    <color name="sn_ink">#F7F6FF</color>
+    <color name="sn_ash">#BAADAB</color>
 </resources>
