@@ -27,6 +27,13 @@ public final class Summarizer {
 
     /** Rappels, toujours sur le fil principal. */
     public interface Listener {
+        /**
+         * Le résumé s'écrira en {@code count} parties, annoncé avant la première. Un article
+         * court n'en a qu'une. Le texte des parties arrive par {@link #onText}, séparées
+         * d'une ligne vide.
+         */
+        default void onPart(int index, int count) {}
+
         /** Un morceau de résumé de plus (à AJOUTER à ce qui est déjà affiché). */
         void onText(String piece);
 
@@ -54,8 +61,17 @@ public final class Summarizer {
     /** Pas de moteur natif sur cet appareil. */
     public static final int ERR_UNAVAILABLE = -11;
 
-    /** Texte d'article envoyé au modèle, au plus : au-delà, la fin est coupée. */
+    /** Texte d'article envoyé au modèle en UN morceau, au plus (voir {@link #splitParts}). */
     static final int MAX_INPUT_CHARS = 4000;
+    /**
+     * Au-delà de MAX_INPUT_CHARS, l'article est découpé en parties d'environ cette taille,
+     * résumées l'une après l'autre : la première s'affiche pendant que la suivante s'écrit.
+     */
+    static final int PART_CHARS = 3000;
+    /** Nombre de parties au plus : au-delà, la fin de l'article est ignorée. */
+    static final int MAX_PARTS = 4;
+    /** Plafond de sécurité d'UNE partie (une cinquantaine de mots visés). */
+    static final int MAX_NEW_TOKENS_PART = 180;
     /**
      * Fenêtre de contexte demandée (jetons) : prompt + résumé. 4000 caractères de
      * français font environ 1200 jetons, plus le prompt système et 320 jetons de
@@ -147,8 +163,10 @@ public final class Summarizer {
         }
         final int my = ++gen;
         nativeCancel();
-        final byte[] system = systemPrompt(lang).getBytes(StandardCharsets.UTF_8);
-        final byte[] user = userPrompt(title, text, lang).getBytes(StandardCharsets.UTF_8);
+        final java.util.List<String> parts = splitParts(text);
+        final boolean multi = parts.size() > 1;
+        final byte[] system = (multi ? partSystemPrompt(lang) : systemPrompt(lang))
+            .getBytes(StandardCharsets.UTF_8);
         final String path = model.getAbsolutePath();
         worker.execute(() -> {
             if (my != gen) return;  // supplantée avant d'avoir commencé
@@ -156,17 +174,46 @@ public final class Summarizer {
                 post(my, () -> l.onError(ERR_LOAD));
                 return;
             }
-            final int res = nativeGenerate(handle, system, user, MAX_NEW_TOKENS, bytes -> {
-                if (my != gen) return false;
-                final String piece = new String(bytes, StandardCharsets.UTF_8);
-                post(my, () -> l.onText(piece));
-                return true;
-            });
-            if (res == RES_OK || res == RES_CANCELLED) {
-                post(my, () -> l.onDone(res == RES_CANCELLED));
-            } else {
-                post(my, () -> l.onError(res));
+            final int count = parts.size();
+            post(my, () -> l.onPart(0, count));
+            // Vrai dès qu'une partie a écrit quelque chose : sert à séparer la suivante.
+            final boolean[] wrote = {false};
+            for (int i = 0; i < count; i++) {
+                if (my != gen) return;
+                final int index = i;
+                if (index > 0) post(my, () -> l.onPart(index, count));
+                final byte[] user = (multi
+                    ? userPromptPart(title, parts.get(index), lang, index, count)
+                    : userPrompt(title, parts.get(index), lang)).getBytes(StandardCharsets.UTF_8);
+                wrote[0] = false;
+                final int res = nativeGenerate(handle, system, user,
+                    multi ? MAX_NEW_TOKENS_PART : MAX_NEW_TOKENS, bytes -> {
+                        if (my != gen) return false;
+                        String piece = new String(bytes, StandardCharsets.UTF_8);
+                        if (!wrote[0]) {
+                            // Début de partie : pas d'espace en tête, et une ligne vide
+                            // entre deux parties.
+                            piece = piece.replaceFirst("^\\s+", "");
+                            if (piece.isEmpty()) return true;
+                            wrote[0] = true;
+                            if (index > 0) piece = "\n\n" + piece;
+                        }
+                        final String out = piece;
+                        post(my, () -> l.onText(out));
+                        return true;
+                    });
+                if (res == RES_CANCELLED) {
+                    post(my, () -> l.onDone(true));
+                    return;
+                }
+                if (res != RES_OK) {
+                    // Une partie en échec n'efface pas celles déjà lues : on s'arrête là.
+                    if (index == 0) post(my, () -> l.onError(res));
+                    else post(my, () -> l.onDone(false));
+                    return;
+                }
             }
+            post(my, () -> l.onDone(false));
         });
     }
 
@@ -239,6 +286,70 @@ public final class Summarizer {
             + "100 mots, en un ou deux courts paragraphes (de 10 à 15 lignes sur un écran de "
             + "téléphone). Pas de liste, pas de titre. Appuie-toi uniquement sur l'article : "
             + "aucun avis, aucun fait ajouté.";
+    }
+
+    /** Consigne d'une PARTIE d'un long article : plus courte, et sans conclure à la place de l'article. */
+    static String partSystemPrompt(String lang) {
+        if ("en".equals(lang)) {
+            return "You summarize one passage of a news article. Write a faithful summary in "
+                + "English of about 50 words, in one short paragraph. No list, no title. Use only "
+                + "what the passage says: no opinion, no added fact, and do not conclude the article.";
+        }
+        return "Tu résumes un passage d'un article de presse. Écris un résumé fidèle en français "
+            + "d'environ 50 mots, en un seul court paragraphe. Pas de liste, pas de titre. "
+            + "Appuie-toi uniquement sur le passage : aucun avis, aucun fait ajouté, et ne conclus "
+            + "pas l'article.";
+    }
+
+    static String userPromptPart(String title, String text, String lang, int index, int count) {
+        final boolean en = "en".equals(lang);
+        final StringBuilder sb = new StringBuilder();
+        if (title != null && !title.trim().isEmpty()) {
+            sb.append(en ? "Title: " : "Titre : ").append(title.trim()).append("\n\n");
+        }
+        sb.append(en ? "Passage " : "Passage ").append(index + 1).append(en ? " of " : " sur ")
+            .append(count).append(" :\n").append(text.trim());
+        sb.append(en ? "\n\nSummary of the passage:" : "\n\nRésumé du passage :");
+        return sb.toString();
+    }
+
+    /**
+     * Découpe l'article en parties à résumer une par une. Jusqu'à MAX_INPUT_CHARS : une seule,
+     * comme avant. Au-delà : des parties d'égale taille (PART_CHARS environ, MAX_PARTS au plus),
+     * coupées de préférence entre deux paragraphes, sinon entre deux phrases.
+     */
+    static java.util.List<String> splitParts(String text) {
+        final java.util.List<String> out = new java.util.ArrayList<>();
+        String body = text == null ? "" : text.trim();
+        if (body.length() <= MAX_INPUT_CHARS) {
+            out.add(body);
+            return out;
+        }
+        final int cap = PART_CHARS * MAX_PARTS;
+        if (body.length() > cap) {
+            int cut = cap;
+            if (Character.isHighSurrogate(body.charAt(cut - 1))) cut--;
+            body = body.substring(0, cut);
+        }
+        final int n = Math.min(MAX_PARTS, (body.length() + PART_CHARS - 1) / PART_CHARS);
+        final int target = (body.length() + n - 1) / n;
+        int start = 0;
+        for (int i = 0; i < n - 1; i++) {
+            final int want = Math.min(body.length(), start + target);
+            final int floor = start + target / 2;
+            int end = body.lastIndexOf('\n', want);
+            if (end < floor) end = body.lastIndexOf(". ", want) + 1;
+            if (end < floor) {
+                end = want;
+                if (end < body.length() && Character.isHighSurrogate(body.charAt(end - 1))) end--;
+            }
+            final String part = body.substring(start, end).trim();
+            if (!part.isEmpty()) out.add(part);
+            start = end;
+        }
+        final String last = body.substring(start).trim();
+        if (!last.isEmpty()) out.add(last);
+        return out;
     }
 
     static String userPrompt(String title, String text, String lang) {

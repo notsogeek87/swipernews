@@ -308,6 +308,18 @@ final class ReaderSummary {
             if (summarizer == null) summarizer = new Summarizer();
             summarizer.summarize(model, host.articleTitle(), article, "fr", new Summarizer.Listener() {
                 private boolean first = true;
+                /** Résumé en plusieurs parties : on laisse le lecteur où il est, voir onText. */
+                private boolean multi;
+
+                @Override
+                public void onPart(int index, int count) {
+                    if (my != session || destroyed) return;
+                    multi = count > 1;
+                    // Tant que le texte n'a pas commencé, la note dit déjà « préparation ».
+                    if (multi && index > 0) {
+                        setNote(ctx.getString(R.string.summary_note_part, index + 1, count));
+                    }
+                }
 
                 @Override
                 public void onText(String piece) {
@@ -317,7 +329,9 @@ final class ReaderSummary {
                         setNote(ctx.getString(R.string.summary_note_local));
                     }
                     text.append(piece);
-                    scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
+                    // En plusieurs parties, on lit la première pendant que la suivante s'écrit :
+                    // suivre le bas du texte ramènerait le lecteur loin de ce qu'il lit.
+                    if (!multi) scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
                 }
 
                 @Override
