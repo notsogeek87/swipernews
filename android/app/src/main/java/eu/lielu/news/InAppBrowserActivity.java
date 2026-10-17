@@ -18,6 +18,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.ValueCallback;
 import android.webkit.WebViewClient;
 import android.widget.ImageButton;
 import android.widget.ProgressBar;
@@ -25,6 +26,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -35,6 +38,7 @@ import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewFeature;
 
 import org.json.JSONObject;
+import org.json.JSONTokener;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -98,6 +102,10 @@ public class InAppBrowserActivity extends AppCompatActivity {
     /** Mode lecture : ne garder que le titre, le texte et les images. */
     private boolean readerOn;
     private ImageButton readerBtn;
+
+    /** Résumé local de l'article simplifié (bouton rond en bas + feuille), voir ReaderSummary. */
+    private ReaderSummary summary;
+    private ActivityResultLauncher<String[]> pickModel;
 
     /**
      * Habillage du mode lecture, choisi côté web et transmis à l'ouverture :
@@ -237,6 +245,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
             insetBottom = s.bottom;
             barWrap.setPadding(insetLeft, Math.max(s.top, cut.top), insetRight, 0);
             applyWebPadding();
+            if (summary != null) summary.setBottomInset(insetBottom);
             return insets;
         });
 
@@ -260,6 +269,42 @@ public class InAppBrowserActivity extends AppCompatActivity {
         readerBtn.setOnClickListener(v -> toggleReader());
         updateReaderIcon();
 
+        // Avant onStart, comme l'exige l'API : le sélecteur de fichiers sert à
+        // importer un modèle de résumé déjà présent sur l'appareil.
+        pickModel = registerForActivityResult(new ActivityResultContracts.OpenDocument(),
+            uri -> { if (summary != null) summary.onModelPicked(uri); });
+        summary = new ReaderSummary(this, findViewById(R.id.reader_root), new ReaderSummary.Host() {
+            @Override
+            public void readArticle(ValueCallback<String> callback) {
+                if (web == null) { callback.onReceiveValue(""); return; }
+                // Le texte de l'article simplifié seulement (titre, ligne de source, corps) :
+                // rien du reste de la page, que le mode lecture a jeté.
+                web.evaluateJavascript(
+                    "(function(){var m=document.querySelector('main.sn-read');return m?m.innerText:''})()",
+                    value -> {
+                        if (web == null) return;   // le rappel est posté : l'activité a pu être fermée
+                        String out = "";
+                        try {
+                            Object o = new JSONTokener(value == null ? "null" : value).nextValue();
+                            if (o instanceof String) out = (String) o;
+                        } catch (org.json.JSONException ignored) {
+                            // valeur illisible : on rend du vide, ReaderSummary le dit
+                        }
+                        callback.onReceiveValue(out);
+                    });
+            }
+
+            @Override
+            public void pickModelFile() {
+                pickModel.launch(new String[] { "*/*" });
+            }
+
+            @Override
+            public String articleTitle() {
+                return titleView != null ? String.valueOf(titleView.getText()) : cardTitle;
+            }
+        });
+
         findViewById(R.id.reader_close).setOnClickListener(v -> finish());
         findViewById(R.id.reader_share).setOnClickListener(v -> share());
         findViewById(R.id.reader_external).setOnClickListener(v -> openExternally(Uri.parse(currentUrl)));
@@ -277,7 +322,9 @@ public class InAppBrowserActivity extends AppCompatActivity {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                if (web.canGoBack()) {
+                if (summary != null && summary.isOpen()) {
+                    summary.close();   // la feuille d'abord, avant de remonter l'historique
+                } else if (web.canGoBack()) {
                     web.goBack();
                 } else {
                     setEnabled(false);   // laisse le comportement par défaut fermer l'activité
@@ -665,6 +712,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
                 // La page simplifiée porte sa propre marge haute : la WebView
                 // lâche la sienne, sinon les deux s'ajoutent.
                 readerApplied = "1".equals(s);
+                if (summary != null) summary.setArticleReady(readerApplied);
                 applyWebPadding();
                 if (readerApplied) {
                     // Sans attendre la prochaine annonce de progression : l'article
@@ -821,6 +869,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
                 // Nouvelle page : celle du site, pas encore simplifiée. La marge
                 // haute redevient celle de la WebView jusqu'à preuve du contraire.
                 readerApplied = false;
+                if (summary != null) summary.setArticleReady(false);
                 applyWebPadding();
                 showBar();          // nouvelle page : on se resitue avant de replonger
                 // En mode lecture, on masque dès le départ : la page du site ne
@@ -973,6 +1022,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         revealHandler.removeCallbacks(revealTask);   // rien ne doit survivre à l'activité
+        if (summary != null) summary.destroy();
         if (web != null) {
             web.stopLoading();
             // Détacher avant destroy() : une WebView détruite encore attachée à sa

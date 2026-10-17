@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Action principale de la feuille du résumé : la pilule pleine, couleur d'accent. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/reader_accent" />
+    <corners android:radius="100dp" />
+    <padding
+        android:left="18dp"
+        android:top="12dp"
+        android:right="18dp"
+        android:bottom="12dp" />
+</shape>

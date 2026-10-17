@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bouton rond du résumé : le fond de la barre, cerclé de l'accent, comme les
+     boutons du rail du fil. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/reader_bar" />
+            <stroke android:width="2dp" android:color="@color/reader_accent" />
+        </shape>
+    </item>
+</layer-list>

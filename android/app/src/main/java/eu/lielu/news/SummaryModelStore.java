@@ -216,6 +216,19 @@ final class SummaryModelStore {
         new File(dir, IMPORTED_NAME).delete();
     }
 
+    /** Supprime tous les modèles installés et les téléchargements entamés. */
+    void deleteAll() {
+        if (busy) return;
+        for (Model m : MODELS) delete(m);
+        deleteImported();
+    }
+
+    /** Libère le fil de travail ; l'opération en cours, annulée, finit seule. */
+    void close() {
+        cancel();
+        worker.shutdown();
+    }
+
     private boolean begin(Listener l) {
         synchronized (this) {
             if (busy) {

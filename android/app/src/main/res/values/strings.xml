@@ -68,4 +68,32 @@
         <item>%1$d nouveaux articles à swiper, dont « %2$s »</item>
         <item>%1$d nouveautés — la dernière : « %2$s »</item>
     </string-array>
+
+    <!-- Résumé local (ReaderSummary) : une petite IA qui tourne sur le téléphone. -->
+    <string name="summary_fab">Résumer l\'article</string>
+    <string name="summary_title">Résumé</string>
+    <string name="summary_close">Fermer le résumé</string>
+    <string name="summary_note_local">Écrit sur ton téléphone : l\'article ne part nulle part.</string>
+    <string name="summary_note_prepare">Préparation du résumé…</string>
+    <string name="summary_note_copy">Copie du fichier…</string>
+    <string name="summary_need_model">Le résumé est écrit par une petite IA qui tourne sur ton téléphone. Il faut d\'abord récupérer son fichier, une seule fois. Le téléchargement est la seule connexion : ensuite, tout reste sur l\'appareil. Mieux vaut le Wi‑Fi.</string>
+    <string name="summary_download">Télécharger %1$s · %2$s</string>
+    <string name="summary_download_resume">Reprendre %1$s · %2$s (%3$d %%)</string>
+    <string name="summary_import">Importer un fichier GGUF…</string>
+    <string name="summary_downloading">Téléchargement de %1$s…</string>
+    <string name="summary_progress">Téléchargement… %1$d %%</string>
+    <string name="summary_cancel_download">Annuler (reprise possible)</string>
+    <string name="summary_stop">Arrêter</string>
+    <string name="summary_close_btn">Fermer</string>
+    <string name="summary_retry">Réessayer</string>
+    <string name="summary_delete_model">Supprimer le modèle (libère la place)</string>
+    <string name="summary_ready">Modèle prêt : touche le bouton ✨ pour résumer</string>
+    <string name="summary_err_space">Pas assez de place sur le téléphone pour ce modèle.</string>
+    <string name="summary_err_net">Téléchargement interrompu. Réessaie : il reprendra là où il s\'est arrêté.</string>
+    <string name="summary_err_invalid">Fichier incomplet, altéré ou qui n\'est pas un modèle GGUF.</string>
+    <string name="summary_err_load">Le modèle n\'a pas pu être chargé (mémoire insuffisante ?). Essaie le modèle léger.</string>
+    <string name="summary_err_long">Cet article est trop long pour le modèle.</string>
+    <string name="summary_err_short">Pas assez de texte à résumer ici.</string>
+    <string name="summary_err_generic">Le résumé a échoué.</string>
+    <string name="summary_err_unavailable">Le résumé n\'est pas disponible sur cet appareil.</string>
 </resources>

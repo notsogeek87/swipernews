@@ -139,14 +139,19 @@ public final class Summarizer {
         nativeCancel();
     }
 
-    /** Libère le modèle (la mémoire qu'il occupe se compte en centaines de Mo). */
+    /**
+     * Libère le modèle (la mémoire qu'il occupe se compte en centaines de Mo) ET le
+     * fil de travail : l'objet n'est plus utilisable ensuite.
+     */
     public void release() {
+        if (worker.isShutdown()) return;
         cancel();
         worker.execute(() -> {
             if (handle != 0) nativeFree(handle);
             handle = 0;
             loadedPath = null;
         });
+        worker.shutdown();   // la libération ci-dessus s'exécute encore ; plus aucune demande ensuite
     }
 
     private boolean ensureLoaded(String path) {

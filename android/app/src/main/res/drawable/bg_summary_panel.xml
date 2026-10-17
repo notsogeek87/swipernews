@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Feuille du résumé : posée en bas de l'écran, à portée du pouce. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/reader_bar" />
+    <stroke android:width="1dp" android:color="#33FFFFFF" />
+    <corners
+        android:topLeftRadius="22dp"
+        android:topRightRadius="22dp" />
+</shape>
