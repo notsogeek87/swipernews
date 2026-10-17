@@ -58,8 +58,12 @@ public final class Summarizer {
     static final int MAX_INPUT_CHARS = 6000;
     /** Fenêtre de contexte demandée (jetons) : prompt + résumé. */
     static final int N_CTX = 4096;
-    /** Longueur maximale du résumé (jetons). */
-    static final int MAX_NEW_TOKENS = 400;
+    /**
+     * Plafond de sécurité du résumé (jetons). La longueur visée (une centaine de
+     * mots, soit 10 à 15 lignes à l'écran) se demande dans le prompt ; ce plafond
+     * n'est qu'un garde-fou contre un modèle qui ne s'arrête pas.
+     */
+    static final int MAX_NEW_TOKENS = 320;
 
     private static final boolean LIB_OK;
 
@@ -177,11 +181,14 @@ public final class Summarizer {
 
     static String systemPrompt(String lang) {
         if ("en".equals(lang)) {
-            return "You summarize news articles. Write a faithful summary in English, in 3 to 5 "
-                + "short sentences. Use only what the article says: no opinion, no added fact.";
+            return "You summarize news articles. Write a faithful summary in English of about "
+                + "100 words, in one or two short paragraphs (10 to 15 lines on a phone screen). "
+                + "No list, no title. Use only what the article says: no opinion, no added fact.";
         }
-        return "Tu résumes des articles de presse. Écris un résumé fidèle en français, en 3 à 5 "
-            + "phrases courtes. Appuie-toi uniquement sur l'article : aucun avis, aucun fait ajouté.";
+        return "Tu résumes des articles de presse. Écris un résumé fidèle en français d'environ "
+            + "100 mots, en un ou deux courts paragraphes (de 10 à 15 lignes sur un écran de "
+            + "téléphone). Pas de liste, pas de titre. Appuie-toi uniquement sur l'article : "
+            + "aucun avis, aucun fait ajouté.";
     }
 
     static String userPrompt(String title, String text, String lang) {

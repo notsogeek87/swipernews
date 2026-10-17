@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Bouton rond du résumé : le fond de la barre, cerclé de l'accent, comme les
-     boutons du rail du fil. -->
+<!-- Bouton rond du résumé, DISCRET : fond de la barre et cercle d'accent tous deux
+     translucides, pour qu'on voie le texte à travers sans que le bouton se perde. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="oval">
-            <solid android:color="@color/reader_bar" />
-            <stroke android:width="2dp" android:color="@color/reader_accent" />
+            <solid android:color="#8C0D0D13" />
+            <stroke android:width="1.5dp" android:color="#66FF3B6B" />
         </shape>
     </item>
 </layer-list>

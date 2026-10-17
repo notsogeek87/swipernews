@@ -177,21 +177,21 @@
     </LinearLayout>
 
     <!-- Résumé local (ReaderSummary). Le bouton est en BAS à droite, là où
-         tombe le pouce ; il n'existe que lorsque le mode lecture a abouti.
+         tombe le pouce, petit et translucide pour ne pas gêner la lecture ; il n'existe que lorsque le mode lecture a abouti.
          La feuille monte du bas et le remplace tant qu'elle est ouverte. Ces
          deux vues sont posées après la barre : au-dessus de tout. -->
     <ImageButton
         android:id="@+id/reader_summary_fab"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
+        android:layout_width="46dp"
+        android:layout_height="46dp"
         android:layout_gravity="bottom|end"
-        android:layout_marginEnd="16dp"
+        android:layout_marginEnd="14dp"
         android:layout_marginBottom="20dp"
-        android:padding="16dp"
+        android:padding="13dp"
+        android:alpha="0.85"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_reader_summary"
         android:background="@drawable/bg_summary_fab"
-        android:elevation="6dp"
         android:visibility="gone"
         android:contentDescription="@string/summary_fab" />
 
