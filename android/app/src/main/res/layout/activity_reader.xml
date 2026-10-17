@@ -181,7 +181,9 @@
          des panneaux (« .sheet__panel » : fond « surface », coins de 8 dp en
          haut, poignée, voile noir à 78 %). Bouton en BAS à droite, là où tombe
          le pouce, petit et translucide pour ne pas gêner la lecture. Ces vues
-         sont posées après la barre : au-dessus de tout. -->
+         sont posées après la barre : au-dessus de tout.
+         AUCUNE couleur ici : elles viennent de l'habillage actif de l'app
+         (SummaryTheme), posé par ReaderSummary au démarrage. -->
     <ImageButton
         android:id="@+id/reader_summary_fab"
         android:layout_width="46dp"
@@ -193,7 +195,6 @@
         android:alpha="0.85"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_reader_summary"
-        android:background="@drawable/bg_summary_fab"
         android:visibility="gone"
         android:contentDescription="@string/summary_fab" />
 
@@ -216,26 +217,25 @@
         android:paddingEnd="20dp"
         android:paddingTop="14dp"
         android:paddingBottom="28dp"
-        android:background="@drawable/bg_summary_panel"
         android:clickable="true"
         android:focusable="true"
         android:visibility="gone">
 
         <View
+            android:id="@+id/reader_summary_grip"
             android:layout_width="44dp"
             android:layout_height="5dp"
             android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="18dp"
-            android:background="@drawable/bg_summary_grip" />
+            android:layout_marginBottom="18dp" />
 
         <TextView
+            android:id="@+id/reader_summary_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/summary_title"
             android:textSize="20sp"
             android:textStyle="bold"
-            android:letterSpacing="-0.02"
-            android:textColor="@color/sn_ink" />
+            android:letterSpacing="-0.02" />
 
         <!-- Étiquette technique : la police à chasse fixe, capitales, cendre — le
              « .feedgroup summary » du panneau des sources. -->
@@ -247,8 +247,7 @@
             android:fontFamily="monospace"
             android:textAllCaps="true"
             android:letterSpacing="0.04"
-            android:textSize="11sp"
-            android:textColor="@color/sn_ash" />
+            android:textSize="11sp" />
 
         <eu.lielu.news.MaxHeightScrollView
             android:id="@+id/reader_summary_scroll"
@@ -262,8 +261,7 @@
                 android:layout_height="wrap_content"
                 android:textSize="15sp"
                 android:lineSpacingMultiplier="1.25"
-                android:textIsSelectable="true"
-                android:textColor="@color/sn_ink" />
+                android:textIsSelectable="true" />
         </eu.lielu.news.MaxHeightScrollView>
 
         <ProgressBar
@@ -273,8 +271,6 @@
             android:layout_height="3dp"
             android:layout_marginTop="16dp"
             android:max="1000"
-            android:progressDrawable="@drawable/summary_progress"
-            android:indeterminateTint="@color/sn_flare"
             android:visibility="gone" />
 
         <!-- Les actions sont tout en bas de la feuille : c'est là que le pouce
@@ -295,9 +291,7 @@
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="-0.01"
                 android:textAllCaps="false"
-                android:stateListAnimator="@null"
-                android:textColor="@color/sn_ink"
-                android:background="@drawable/reader_button_primary" />
+                android:stateListAnimator="@null" />
 
             <Button
                 android:id="@+id/reader_summary_btn2"
@@ -309,9 +303,7 @@
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="-0.01"
                 android:textAllCaps="false"
-                android:stateListAnimator="@null"
-                android:textColor="@color/sn_ink"
-                android:background="@drawable/reader_button_secondary" />
+                android:stateListAnimator="@null" />
 
             <Button
                 android:id="@+id/reader_summary_btn3"
@@ -323,9 +315,7 @@
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="-0.01"
                 android:textAllCaps="false"
-                android:stateListAnimator="@null"
-                android:textColor="@color/sn_ink"
-                android:background="@drawable/reader_button_secondary" />
+                android:stateListAnimator="@null" />
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>

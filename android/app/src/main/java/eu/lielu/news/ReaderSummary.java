@@ -70,7 +70,7 @@ final class ReaderSummary {
     private final int basePanelBottom;
     private final int baseFabBottom;
 
-    ReaderSummary(Context ctx, View root, Host host) {
+    ReaderSummary(Context ctx, View root, Host host, String themeSpec) {
         this.ctx = ctx;
         this.host = host;
         fab = root.findViewById(R.id.reader_summary_fab);
@@ -90,9 +90,32 @@ final class ReaderSummary {
         scroll.setMaxHeightPx(Math.round(
             ctx.getResources().getDisplayMetrics().heightPixels * MAX_TEXT_SCREEN_SHARE));
 
+        applyTheme(root, SummaryTheme.parse(themeSpec, ctx.getResources().getDisplayMetrics().density));
+
         fab.setOnClickListener(v -> open());
         scrim.setOnClickListener(v -> close());   // comme les feuilles du fil : toucher à côté referme
         updateFab();
+    }
+
+    /**
+     * Pose les couleurs de l'habillage actif de l'app sur toute la feuille et son
+     * bouton. Aucune n'est dans les ressources : voir SummaryTheme.
+     */
+    private void applyTheme(View root, SummaryTheme t) {
+        panel.setBackground(t.panel());
+        root.findViewById(R.id.reader_summary_grip).setBackground(t.grip());
+        ((TextView) root.findViewById(R.id.reader_summary_title)).setTextColor(t.ink);
+        note.setTextColor(t.ash);
+        text.setTextColor(t.ink);
+        // La teinte s'applique à l'icône entière : le vecteur est tracé en blanc.
+        ((android.widget.ImageButton) fab).setColorFilter(t.ink);
+        fab.setBackground(t.fab());
+        progress.setProgressDrawable(t.progress());
+        progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(t.flare));
+        btn1.setBackground(t.primaryButton());
+        btn2.setBackground(t.secondaryButton());
+        btn3.setBackground(t.secondaryButton());
+        for (Button b : new Button[] { btn1, btn2, btn3 }) b.setTextColor(t.ink);
     }
 
     /* ---------- Appels de l'activité ---------- */

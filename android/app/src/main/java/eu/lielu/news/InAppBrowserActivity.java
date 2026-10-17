@@ -75,6 +75,8 @@ public class InAppBrowserActivity extends AppCompatActivity {
     public static final String EXTRA_READER = "eu.lielu.news.reader.READER_MODE";
     public static final String EXTRA_READER_SIZE = "eu.lielu.news.reader.READER_SIZE";
     public static final String EXTRA_READER_THEME = "eu.lielu.news.reader.READER_THEME";
+    /** Couleurs de l'habillage actif de l'app, pour la feuille de résumé (voir SummaryTheme). */
+    public static final String EXTRA_APP_THEME = "eu.lielu.news.reader.APP_THEME";
 
     /** Réponse vide renvoyée aux requêtes bloquées (null = « charge normalement »). */
     private static final String BLOCKED_MIME = "text/plain";
@@ -303,7 +305,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
             public String articleTitle() {
                 return titleView != null ? String.valueOf(titleView.getText()) : cardTitle;
             }
-        });
+        }, getIntent().getStringExtra(EXTRA_APP_THEME));
 
         findViewById(R.id.reader_close).setOnClickListener(v -> finish());
         findViewById(R.id.reader_share).setOnClickListener(v -> share());

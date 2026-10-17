@@ -79,6 +79,14 @@ public class InAppBrowserPlugin extends Plugin {
         // validées côté activité : le natif ne fait que les relayer au script.
         intent.putExtra(InAppBrowserActivity.EXTRA_READER_SIZE, call.getString("readerSize", "m"));
         intent.putExtra(InAppBrowserActivity.EXTRA_READER_THEME, call.getString("readerTheme", "dark"));
+        // Couleurs de l'habillage actif (Flamme, Bleuté, Sobre ; sombre ou clair),
+        // lues par le web dans ses variables CSS : la feuille de résumé les reprend
+        // au lieu de recopier ici une palette qui divergerait au premier nouveau
+        // thème. Une valeur invalide est écartée (repli sur Flamme côté activité).
+        final String appTheme = call.getString("theme", "");
+        if (SummaryTheme.isValid(appTheme)) {
+            intent.putExtra(InAppBrowserActivity.EXTRA_APP_THEME, appTheme);
+        }
         activity.startActivity(intent);
         // API 34+ : l'animation est déclarée par l'activité entrante elle-même.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {

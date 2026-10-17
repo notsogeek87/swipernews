@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- La poignée des feuilles du fil (« .sheet__grip ») : 44 x 5, cendre à 40 %. -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <solid android:color="#66BAADAB" />
-    <corners android:radius="4dp" />
-</shape>

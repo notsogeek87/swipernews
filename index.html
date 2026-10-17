@@ -3334,7 +3334,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="300";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="301";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -3932,6 +3932,20 @@ async function dropBlocklist(){
    YouTube installée, sinon le navigateur système) — voir le piège `blob:`/
    `data:` documenté dans CLAUDE.md, qui décrit le même `Bridge.launchIntent`
    pour tout le reste, http(s) compris. */
+/* Palette de l'habillage ACTIF (Flamme, Bleuté, Sobre ; sombre ou clair), lue dans
+   les variables CSS calculées de :root et transmise au lecteur natif, dont la
+   feuille de résumé s'habille comme l'app. Jamais recopiée côté natif : la
+   couleur exacte de chaque thème ne vit que dans le <style> (même principe que
+   le <meta theme-color>, voir applyAppTheme). Sept #rrggbb séparés par des
+   virgules ; "" si l'une n'est pas un hexadécimal à 6 chiffres — le natif
+   retombe alors sur Flamme. */
+function themePalette(){
+  try{
+    const cs=getComputedStyle(document.documentElement);
+    const v=["--bg","--surface","--molten","--redline","--flare","--ink","--ash"].map(k=>cs.getPropertyValue(k).trim());
+    return v.every(c=>/^#[0-9a-f]{6}$/i.test(c))?v.join(","):"";
+  }catch(e){return "";}
+}
 function openArticle(url,title,opts){
   arreterEcoute();               // on part lire : la revue de presse s'arrête
   if(!isNativeApp||readPref==="browser")return false;
@@ -3941,7 +3955,7 @@ function openArticle(url,title,opts){
   // L'appel est asynchrone : en cas d'échec (URL refusée côté natif), on
   // rattrape en ouvrant le lien comme le ferait le web.
   iab.open({url,title:title||"",hideCmp:cmpPref==="hide",blockAds:adsPref==="block",
-            reader:readPref==="read"&&!(opts&&opts.noReader),readerSize:rSizePref,readerTheme:rThemePref})
+            reader:readPref==="read"&&!(opts&&opts.noReader),readerSize:rSizePref,readerTheme:rThemePref,theme:themePalette()})
     .catch(()=>window.open(url,"_blank","noopener"));
   return true;
 }
