@@ -712,6 +712,7 @@ hors du dépôt, jamais dans `package.json`.
 | `InAppBrowserActivity` | Le lecteur : barre escamotable, insets, injections. `applyWebPadding()` pose une **marge de vue** (`topMargin`), jamais un padding, sur `reader_web` — un padding ne pousse jamais un élément `position:fixed`/`sticky` (l'en-tête de la plupart des sites de presse), qui resterait donc caché sous la barre |
 | `ReaderWebView` | Sous-classe minimale, seulement pour exposer `onScrollChanged` |
 | `BlocklistStore` | Liste de blocage : parsing, téléchargement, cache, fusion |
+| `Summarizer` + `src/main/cpp/` | Résumé par un modèle LOCAL (GGUF) : pont JNI (`summarizer_jni.cpp`) vers **llama.cpp**, sous-module épinglé sur un tag (`b11706`). Le texte traverse le pont en `byte[]` UTF-8, jamais en `jstring` (un emoji fait abandonner CheckJNI). Un seul moteur à la fois, annulation par un drapeau global. Étape 1 seulement : pas encore de bouton ni de gestion du modèle. **Un clone sans `--recurse-submodules` ne compile pas** : la CI (`submodules: true`) et la recette F-Droid doivent le récupérer |
 
 Scripts injectés, dans `res/raw/` : `reader_cmp.js` (bandeaux de consentement),
 `reader_ads.js` (emplacements publicitaires), `reader_read.js` (mode lecture),

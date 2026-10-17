@@ -39,6 +39,20 @@ android {
         versionCode 105060000
         versionName "1.5.6"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        // Moteur de résumé local (llama.cpp, src/main/cpp). Les trois
+        // architectures : filtrer sur arm64 seul rendrait l'APK ininstallable
+        // sur un téléphone 32 bits (INSTALL_FAILED_NO_MATCHING_ABIS), alors que
+        // le reste de l'app n'a aucune raison de l'exclure.
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a", "x86_64"
+        }
+        // Toujours en Release, même pour l'APK debug : llama.cpp compilé sans
+        // optimisation est inutilisable (dizaines de fois plus lent).
+        externalNativeBuild {
+            cmake {
+                arguments "-DCMAKE_BUILD_TYPE=Release"
+            }
+        }
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
@@ -57,6 +71,15 @@ android {
     dependenciesInfo {
         includeInApk = false
         includeInBundle = false
+    }
+    // Versions du NDK et de CMake ÉPINGLÉES : un build reproductible (exigé par
+    // F-Droid) ne peut pas dépendre de ce que le runner a de plus récent.
+    ndkVersion "27.2.12479018"
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+            version "3.22.1"
+        }
     }
     signingConfigs {
         if (hasReleaseKeystore) {

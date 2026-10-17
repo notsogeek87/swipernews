@@ -30,6 +30,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # llama.cpp (moteur de résumé local) est un sous-module.
+          submodules: true
 
       - uses: actions/setup-node@v4
         with:
@@ -73,7 +76,7 @@ jobs:
         run: |
           sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$sdkmanager" --licenses > /dev/null
-          "$sdkmanager" "platforms;android-36" "build-tools;36.0.0" > /dev/null
+          "$sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1" > /dev/null
 
       # www/ est un miroir régénéré des fichiers racine (jamais versionné),
       # cap sync le recopie ensuite dans le projet natif.
