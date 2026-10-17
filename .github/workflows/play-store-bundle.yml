@@ -23,7 +23,7 @@ name: Play Store AAB
 # déroulant.
 #
 # Séparé d'android.yml/release.yml : ceux-là produisent des .apk signés de la
-# clé du PROJET (celle que F-Droid vérifie, AllowedAPKSigningKeys). Play
+# clé du PROJET. Play
 # Store, lui, utilise le modèle Play App Signing : on signe seulement d'une
 # clé d'UPLOAD (PLAY_STORE_*, distincte), que Google re-signe ensuite de sa
 # propre clé — les deux clés ne se mélangent jamais.
@@ -35,17 +35,16 @@ name: Play Store AAB
 #
 # versionCode/versionName pour CE canal sont calculés ICI, jamais écrits
 # dans android/app/build.gradle : ce fichier reste réservé à la version
-# « officielle », celle que le tag vX.Y.Z et la recette F-Droid attendent en
+# « officielle », celle que le tag vX.Y.Z et android.yml attendent en
 # LITTÉRAL (voir CLAUDE.md, « Publier une version »). Le toucher pour chaque
-# publication Play Store casserait ce contrat, et risquerait la recette
-# F-Droid actuellement en revue (fdroiddata!44729). android.yml calcule déjà
+# publication Play Store casserait ce contrat. android.yml calcule déjà
 # ses versionCode de préversion de la même façon, par -P, sans jamais
 # modifier le fichier — même principe ici.
 #
 # Aucun plugin Gradle (Gradle Play Publisher) : il faudrait l'appliquer dans
-# android/build.gradle ou android/app/build.gradle, partagés avec F-Droid et
+# android/build.gradle ou android/app/build.gradle, partagés avec
 # android.yml — un nouveau plugin y ajouterait une résolution réseau à CHAQUE
-# build, y compris ceux de F-Droid, pour un besoin qui ne concerne que ce
+# build, y compris ceux de la CI, pour un besoin qui ne concerne que ce
 # seul workflow.
 #
 # La publication passe par tools/publish_play_store.py, pas par l'Action

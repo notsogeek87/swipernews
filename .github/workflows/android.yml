@@ -52,15 +52,8 @@ jobs:
       # même commit a ainsi compilé sur staging et échoué sur main à une minute
       # d'écart. D'où ces tentatives espacées.
       #
-      # Le sortir des devDependencies réglerait la cause plutôt que le symptôme,
-      # mais c'est lui qui justifie les entrées `scanignore`/`scandelete` de la
-      # recette F-Droid — exactement celles qui ont passé leur scanner, et le
-      # champ est strict dans les deux sens. À ne pas toucher tant que la MR est
-      # en revue (voir fdroid/eu.lielu.news.yml).
-      #
-      # Sans effet sur l'équivalence avec la recette F-Droid : réessayer la même
-      # commande n'installe rien de différent, le `prebuild` de la recette reste
-      # un `npm ci` nu.
+      # Le sortir des devDependencies réglerait la cause plutôt que le symptôme.
+      # Réessayer la même commande n'installe rien de différent.
       - name: Install dependencies
         run: |
           for essai in 1 2 3; do
@@ -111,7 +104,7 @@ jobs:
           build="${{ github.run_number }}"
           release_code="$(sed -n 's/^ *versionCode \([0-9]*\)$/\1/p' android/app/build.gradle)"
           if [ -z "$release_code" ]; then
-            echo "::error::versionCode introuvable dans android/app/build.gradle : il doit y rester un littéral (F-Droid le lit de la même façon)."
+            echo "::error::versionCode introuvable dans android/app/build.gradle : il doit y rester un littéral."
             exit 1
           fi
           # À 10000 le build atteindrait le palier de la version préparée et

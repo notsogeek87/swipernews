@@ -1,4 +1,4 @@
-name: Release APK (F-Droid RB)
+name: Release APK
 
 # Le build de publication, et lui seul. À ne pas confondre avec android.yml, qui
 # produit un APK à chaque push : il en dérive le versionCode du littéral lu ici
@@ -6,15 +6,8 @@ name: Release APK (F-Droid RB)
 # préversions de CETTE version, et s'installent les uns par-dessus les autres
 # sans jamais dépasser le tag qu'ils préparent.
 #
-# Ici, on compile EXACTEMENT comme F-Droid : Gradle nu, sans -PversionCode ni
-# -PversionName, donc la version lue en clair dans android/app/build.gradle.
-# C'est ce qui rend le build reproductible : F-Droid recompile le même tag,
-# compare son APK au nôtre (signature exclue) et, s'ils coïncident, distribue
-# le nôtre — signé de notre clé. Un paquet installé depuis GitHub se met alors
-# à jour depuis F-Droid, et réciproquement.
-#
-# Toute divergence casse la vérification : ne rien injecter ici qui varie d'un
-# build à l'autre (numéro de run, date, nom de branche…).
+# Ici, Gradle nu, sans -PversionCode ni -PversionName : la version est celle lue
+# en clair dans android/app/build.gradle, donc celle du tag.
 on:
   push:
     tags:
@@ -55,8 +48,7 @@ jobs:
           cache: gradle
 
       # Réessayée pour la même raison qu'ailleurs (voir android.yml) — et ici
-      # plus qu'ailleurs : c'est le build de PUBLICATION, celui que F-Droid
-      # recompile et compare. L'échouer sur un téléchargement de binaire raté
+      # plus qu'ailleurs : c'est le build de PUBLICATION. L'échouer sur un téléchargement de binaire raté
       # laisse un tag sans APK, donc une version qui ne se publie nulle part.
       # Aucune divergence introduite dans le build lui-même : la commande et son
       # résultat sont les mêmes, seul le nombre d'essais change.
@@ -81,7 +73,7 @@ jobs:
 
       # Le tag et la version en clair doivent dire la même chose : un tag posé
       # avant le commit qui bumpe build.gradle produirait un APK à l'ancienne
-      # version, que F-Droid refuserait (et dont l'URL ne correspondrait pas).
+      # version (et dont l'URL ne correspondrait pas au tag).
       - name: Vérifie que le tag et build.gradle concordent
         id: version
         env:
@@ -113,7 +105,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error::Aucun secret ANDROID_KEYSTORE_BASE64 : une release doit être signée de la clé du projet (AllowedAPKSigningKeys côté F-Droid)."
+            echo "::error::Aucun secret ANDROID_KEYSTORE_BASE64 : une release doit être signée de la clé du projet."
             exit 1
           fi
           printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
@@ -134,9 +126,7 @@ jobs:
           mv app/build/outputs/apk/release/app-release.apk "../$apk"
           echo "apk=$apk" >> "$GITHUB_OUTPUT"
 
-      # Le nom du fichier et le tag forment le contrat avec la recette F-Droid :
-      #   Binaries: …/releases/download/v%v/swipernews-%v.apk
-      # Les renommer casserait la vérification du build reproductible.
+      # Le nom du fichier suit le tag : releases/download/vX.Y.Z/swipernews-X.Y.Z.apk
       - name: Publie la release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -144,7 +134,7 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
-          notes="APK signé de la clé du projet, produit par un Gradle nu depuis les sources du tag $TAG — donc bit pour bit celui que F-Droid recompile (build reproductible)."
+          notes="APK signé de la clé du projet, produit par un Gradle nu depuis les sources du tag $TAG."
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else

@@ -12,13 +12,12 @@ android {
         applicationId "eu.lielu.news"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // La version de l'app, écrite en clair et NON en variable Groovy : c'est
-        // la seule forme que sait lire l'analyseur de F-Droid (fdroidserver,
-        // common.py, vcsearch_g/vnsearch_g — un littéral, rien d'autre). Sans
-        // ça, « fdroid checkupdates » ne trouve aucune version et abandonne.
+        // La version de l'app, écrite en clair et NON en variable Groovy : la CI
+        // (android.yml, release.yml) la relit avec sed, un littéral et rien
+        // d'autre.
         //
         // Ces deux valeurs sont donc la version publiée, à aligner avec le tag
-        // git et la recette (fdroid/eu.lielu.news.yml) — voir fdroid/README.md.
+        // git.
         //
         // Le versionCode se déduit de la version :
         //     majeur × 10⁸ + mineur × 10⁶ + correctif × 10⁴ + build
@@ -60,11 +59,8 @@ android {
         }
     }
     // Sans ça, l'AGP glisse dans le bloc de signature de l'APK la liste chiffrée
-    // de nos dépendances, destinée à Google Play. F-Droid la refuse (« found
-    // extra signing block 'Dependency metadata' ») et son scanner rejette le
-    // paquet. Ce bloc n'apparaît que lorsque Gradle signe lui-même : d'où son
-    // absence dans l'APK non signé que compile F-Droid, et sa présence dans
-    // celui de notre CI, le seul des deux qui soit publié.
+    // de nos dépendances, destinée à Google Play. Inutile dans un APK distribué
+    // hors du Play Store, et c'est du bruit dans le bloc de signature.
     //
     // À déclarer ici, dans « android », et non dans « defaultConfig » : Gradle
     // ne connaît pas la méthode là-bas.
@@ -72,8 +68,8 @@ android {
         includeInApk = false
         includeInBundle = false
     }
-    // Versions du NDK et de CMake ÉPINGLÉES : un build reproductible (exigé par
-    // F-Droid) ne peut pas dépendre de ce que le runner a de plus récent.
+    // Versions du NDK et de CMake ÉPINGLÉES : un build ne doit pas dépendre de
+    // ce que le runner a de plus récent.
     ndkVersion "27.2.12479018"
     externalNativeBuild {
         cmake {
@@ -105,8 +101,8 @@ android {
 // La CI (.github/workflows/android.yml) écrase la version ci-dessus par le
 // numéro de run, pour qu'un APK GitHub s'installe par-dessus le précédent.
 // Écrit ici, après le bloc android, et non dans defaultConfig : là-haut, une
-// expression Groovy rendrait la version illisible pour F-Droid, qui compile
-// sans ces propriétés et exige un littéral.
+// expression Groovy rendrait la version illisible pour la CI, qui relit le
+// littéral avec sed.
 if (project.hasProperty('versionCode')) {
     android.defaultConfig.versionCode = project.property('versionCode') as Integer
 }

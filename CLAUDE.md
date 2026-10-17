@@ -150,19 +150,7 @@ roulante sur `staging`.
 > - ajout au lieu de soustraction → les builds CI passent au-dessus du tag de
 >   leur propre version, qui devient à son tour ininstallable.
 
-### F-Droid
-
-`fdroid/eu.lielu.news.yml` est la recette à recopier dans `fdroiddata` ; elle
-doit rester équivalente à `android.yml`, sans dépendre de GitHub Actions.
-Conséquence pratique : **tout ce qui est nécessaire au build doit venir des
-sources**, ce qui interdit d'embarquer quoi que ce soit sous une licence
-incompatible avec la GPL-3.0 (voir « décisions à ne pas défaire »).
-
-La demande d'inclusion (`fdroiddata!44729`) est **ouverte, en cours de revue** —
-rien n'est encore publié chez eux. La recette vise `AutoUpdateMode: Version` :
-F-Droid suit les tags `vX.Y.Z` du dépôt, lit la version **dans les sources** et
-ajoute lui-même l'entrée de build. Plus aucune démarche chez eux à chaque
-version — mais cela ne tient qu'à une chose :
+### Publier une version
 
 > **Publier une version = bumper `versionCode` et `versionName` dans
 > `android/app/build.gradle`, dans le commit qui précède le tag `vX.Y.Z`.**
@@ -173,25 +161,18 @@ version — mais cela ne tient qu'à une chose :
 > L'ancien barème (majeur × 10000 + mineur × 100 + correctif, 1.3.0 → 10300)
 > a été élargi en 1.3.2 ; l'inflation est irréversible, un `versionCode` ne
 > redescend jamais.
-> Les deux valeurs sont écrites **en clair** dans `defaultConfig` : c'est la
-> seule forme que sait lire l'analyseur de F-Droid. Ne jamais les remplacer par
-> une variable Groovy ni par un `project.findProperty(…) ?: …` — l'écrasement
-> par la CI vit exprès *après* le bloc `android`, ne pas le remonter dedans.
+> Les deux valeurs sont écrites **en clair** dans `defaultConfig` : `android.yml`
+> relit le littéral avec `sed` pour en dériver le versionCode des préversions.
+> Ne jamais les remplacer par une variable Groovy ni par un
+> `project.findProperty(…) ?: …` — l'écrasement par la CI vit exprès *après* le
+> bloc `android`, ne pas le remonter dedans.
 
-Taguer sans avoir bumpé ne casse rien, mais ne publie rien non plus : F-Droid
-relit la même version, conclut « up to date » et ignore le tag — un silence
-qu'on met des semaines à remarquer.
-
-Second point non négociable depuis leur revue : la recette déclare `Binaries:`
-et `AllowedAPKSigningKeys:` (**build reproductible**). F-Droid recompile le tag,
-télécharge notre APK et refuse de publier si les deux diffèrent. Le tag doit
-donc avoir fait tourner `.github/workflows/release.yml` — le seul qui compile
-avec un **Gradle nu** (`android.yml`, lui, injecte le numéro de run dans la
-version) et qui publie sous le nom exact attendu :
+Le tag déclenche `.github/workflows/release.yml`, qui compile avec un **Gradle
+nu** (sans `-PversionCode`, donc la version lue dans les sources) et publie
 `releases/download/vX.Y.Z/swipernews-X.Y.Z.apk`.
 
-Le détail est dans `fdroid/README.md`, avec ce que les passages de leur CI et la
-revue de la MR ont appris.
+> L'app n'est plus proposée sur F-Droid (demande abandonnée). Le dossier
+> `fdroid/` a été retiré ; ne pas y voir une contrainte restante.
 
 ---
 
@@ -222,7 +203,7 @@ Les procédures répétitives vivent dans des skills ; ce fichier garde le *pour
 | `swipernews-bump` | toute modif de `index.html` / `src/*.js` : bump de version + `check.sh` |
 | `swipernews-verifier` | avant de pousser du web : tests, lint, syntaxe du JS en ligne, banc de QA |
 | `swipernews-natif-sans-sdk` | toute modif de `android/` sans SDK |
-| `swipernews-release` | publier `vX.Y.Z` (versionCode, tag, F-Droid) |
+| `swipernews-release` | publier `vX.Y.Z` (versionCode, tag) |
 | `swipernews-i18n-changelog` | nouveau texte d'interface ou « Nouveautés » |
 
 ---
@@ -248,8 +229,7 @@ reformater. Le style y est compact (peu d'espaces, accolades sur la même ligne)
 `.github/workflows/ci.yml` (lint + format + tests) et `android.yml` (APK signé
 + release) ne tournent **que** sur un push vers `main` ou `staging`, ou sur une
 *pull request*. `release.yml`, lui, ne se déclenche que sur un **tag** `vX.Y.Z`
-(ou à la main, en donnant le tag) : c'est le build de publication, celui que
-F-Droid vérifie.
+(ou à la main, en donnant le tag) : c'est le build de publication.
 
 > **Pousser une branche de travail seule ne déclenche RIEN.** Aucune
 > compilation du code natif, aucun APK. Pour faire compiler du Java, il faut
@@ -712,7 +692,7 @@ hors du dépôt, jamais dans `package.json`.
 | `InAppBrowserActivity` | Le lecteur : barre escamotable, insets, injections. `applyWebPadding()` pose une **marge de vue** (`topMargin`), jamais un padding, sur `reader_web` — un padding ne pousse jamais un élément `position:fixed`/`sticky` (l'en-tête de la plupart des sites de presse), qui resterait donc caché sous la barre |
 | `ReaderWebView` | Sous-classe minimale, seulement pour exposer `onScrollChanged` |
 | `BlocklistStore` | Liste de blocage : parsing, téléchargement, cache, fusion |
-| `Summarizer` + `src/main/cpp/` | Résumé par un modèle LOCAL (GGUF) : pont JNI (`summarizer_jni.cpp`) vers **llama.cpp**, sous-module épinglé sur un tag (`b11706`). Le texte traverse le pont en `byte[]` UTF-8, jamais en `jstring` (un emoji fait abandonner CheckJNI). Un seul moteur à la fois, annulation par un drapeau global. Étape 1 seulement : pas encore de bouton ni de gestion du modèle. **Un clone sans `--recurse-submodules` ne compile pas** : la CI (`submodules: true`) et la recette F-Droid doivent le récupérer |
+| `Summarizer` + `src/main/cpp/` | Résumé par un modèle LOCAL (GGUF) : pont JNI (`summarizer_jni.cpp`) vers **llama.cpp**, sous-module épinglé sur un tag (`b11706`). Le texte traverse le pont en `byte[]` UTF-8, jamais en `jstring` (un emoji fait abandonner CheckJNI). Un seul moteur à la fois, annulation par un drapeau global. Étape 1 seulement : pas encore de bouton ni de gestion du modèle. **Un clone sans `--recurse-submodules` ne compile pas** : la CI le récupère (`submodules: true`) |
 
 Scripts injectés, dans `res/raw/` : `reader_cmp.js` (bandeaux de consentement),
 `reader_ads.js` (emplacements publicitaires), `reader_read.js` (mode lecture),

@@ -1267,7 +1267,7 @@ cette section :
 
 | Forme | Où | Pourquoi |
 | --- | --- | --- |
-| **Coins arrondis** (coins transparents) | `logo-192/512.png`, écrans de démarrage, vignettes F-Droid | Personne ne masque ces images : elles doivent porter leur propre arrondi |
+| **Coins arrondis** (coins transparents) | `logo-192/512.png`, écrans de démarrage | Personne ne masque ces images : elles doivent porter leur propre arrondi |
 | **Plein bord** (dégradé prolongé jusqu'aux bords du carré) | `logo-maskable-512.png`, `resources/icon.png`, `resources/icon-background.png` | Tout ce qui **subit un masque**. Un masque circulaire mord au-delà des coins arrondis : sans plein bord, il découperait dans le vide et laisserait des encoches transparentes |
 | **Contenu seul** (carte + ampoule sur fond transparent) | `resources/icon-foreground.png` | Calque avant de l'icône adaptative, posé sur le dégradé du calque arrière — c'est ce qui permet au lanceur de les animer séparément |
 
@@ -1391,15 +1391,6 @@ dépôt** : perdue, plus aucune mise à jour de l'app installée n'est possible.
 - `well-known/assetlinks.json` est en place, avec une empreinte à remplacer, et
   `vercel.json` le réécrit vers `/.well-known/assetlinks.json` — le chemin exact
   qu'Android va interroger.
-
-### F-Droid
-
-F-Droid compile lui-même chaque application depuis ses sources : il n'y a pas
-de simple envoi d'APK, contrairement à GitHub Releases. Le dossier
-[`fdroid/`](fdroid/README.md) prépare ce qui dépend de ce dépôt (fiche
-`fastlane`, brouillon de recette de build) et détaille ce qu'il reste à faire
-à la main — poser un tag par version, ajouter des captures d'écran, puis
-ouvrir la demande d'inclusion sur `gitlab.com/fdroid/fdroiddata`.
 
 ## Sécurité
 
