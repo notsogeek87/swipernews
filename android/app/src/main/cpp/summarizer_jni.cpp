@@ -200,16 +200,23 @@ JNIEXPORT jint JNICALL Java_eu_lielu_news_Summarizer_nativeGenerate(
     std::string prompt;
     const bool templated = build_prompt(*e, to_string(env, jsystem), to_string(env, juser), prompt);
 
-    // Un gabarit de chat écrit déjà le jeton de début de séquence quand le modèle
-    // en veut un : l'ajouter une seconde fois dégrade la sortie.
-    const bool add_special = !templated;
+    // Le jeton de début de séquence est ajouté si le modèle en veut un (LFM2,
+    // Llama, Gemma l'exigent ; Qwen n'en a pas). Certains gabarits l'écrivent
+    // déjà dans le texte : on ne garde alors qu'un seul exemplaire, sinon la
+    // sortie se dégrade — même règle que llama-server.
+    (void) templated;
     int32_t n_tok = -llama_tokenize(e->vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()),
-                                    nullptr, 0, add_special, true);
+                                    nullptr, 0, true, true);
     if (n_tok <= 0) return ERR_PROMPT;
     std::vector<llama_token> tokens(static_cast<size_t>(n_tok));
     if (llama_tokenize(e->vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()),
-                       tokens.data(), n_tok, add_special, true) < 0) {
+                       tokens.data(), n_tok, true, true) < 0) {
         return ERR_PROMPT;
+    }
+    const llama_token bos = llama_vocab_bos(e->vocab);
+    if (n_tok >= 2 && bos >= 0 && tokens[0] == bos && tokens[1] == bos) {
+        tokens.erase(tokens.begin());
+        --n_tok;
     }
     if (n_tok + maxNew > e->n_ctx) return ERR_TOO_LONG;
 

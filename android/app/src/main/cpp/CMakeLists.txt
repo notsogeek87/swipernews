@@ -16,13 +16,22 @@ set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_APP OFF CACHE BOOL "" FORCE)
 set(LLAMA_OPENSSL OFF CACHE BOOL "" FORCE)
-# Un build qui doit tourner sur TOUS les téléphones, pas seulement celui de la
-# CI : pas d'optimisation « native » (instructions de la machine hôte), et pas
-# d'OpenMP (absent ou instable selon le NDK). Contrepartie assumée : on ne
-# profite pas de dotprod/i8mm — plus lent, mais jamais d'instruction illégale.
+# Pas d'optimisation « native » (instructions de la machine hôte, ici celle de la
+# CI), et pas d'OpenMP (absent ou instable selon le NDK). Les architectures
+# autres qu'arm64 restent donc sur le jeu d'instructions de base ; arm64 reçoit
+# son réglage explicite juste en dessous.
 set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
 set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
 set(GGML_LLAMAFILE OFF CACHE BOOL "" FORCE)
+# arm64 : produits dot (dotprod) et demi-précision (fp16), présents sur tous les
+# processeurs ARM depuis 2018 (Cortex-A75/A55 et suivants). C'est le plus gros
+# levier de vitesse : la lecture de l'article (le prompt) passe par des produits
+# scalaires d'entiers que dotprod fait 4 par 4. Contrepartie : un processeur plus
+# ancien lèverait « instruction illégale » — d'où le contrôle de /proc/cpuinfo
+# dans Summarizer.java, AVANT de charger la bibliothèque. À garder synchronisés.
+if(ANDROID_ABI STREQUAL "arm64-v8a")
+    set(GGML_CPU_ARM_ARCH "armv8.2-a+dotprod+fp16" CACHE STRING "" FORCE)
+endif()
 
 add_subdirectory(llama.cpp llama.cpp-build EXCLUDE_FROM_ALL)
 

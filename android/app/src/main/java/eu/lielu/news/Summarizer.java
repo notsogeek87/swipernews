@@ -55,9 +55,13 @@ public final class Summarizer {
     public static final int ERR_UNAVAILABLE = -11;
 
     /** Texte d'article envoyé au modèle, au plus : au-delà, la fin est coupée. */
-    static final int MAX_INPUT_CHARS = 6000;
-    /** Fenêtre de contexte demandée (jetons) : prompt + résumé. */
-    static final int N_CTX = 4096;
+    static final int MAX_INPUT_CHARS = 4000;
+    /**
+     * Fenêtre de contexte demandée (jetons) : prompt + résumé. 4000 caractères de
+     * français font environ 1200 jetons, plus le prompt système et 320 jetons de
+     * résumé : 3072 laisse de la marge, sans payer la mémoire d'un contexte plus gros.
+     */
+    static final int N_CTX = 3072;
     /**
      * Plafond de sécurité du résumé (jetons). La longueur visée (une centaine de
      * mots, soit 10 à 15 lignes à l'écran) se demande dans le prompt ; ce plafond
@@ -70,12 +74,41 @@ public final class Summarizer {
     static {
         boolean ok;
         try {
-            System.loadLibrary("swiperllm");
-            ok = true;
+            // Contrôle AVANT le chargement : la bibliothèque arm64 est compilée avec
+            // dotprod et fp16 (voir CMakeLists.txt), un processeur plus ancien la
+            // chargerait sans broncher puis planterait à la première génération.
+            ok = cpuCanRunBuild();
+            if (ok) System.loadLibrary("swiperllm");
         } catch (Throwable t) {
             ok = false;
         }
         LIB_OK = ok;
+    }
+
+    /**
+     * Vrai si ce processeur sait exécuter la bibliothèque native livrée. Seul le
+     * cas arm64 64 bits est contraint (dotprod = « asimddp », fp16 = « asimdhp »
+     * dans /proc/cpuinfo) ; les autres architectures sont compilées sans
+     * extension particulière.
+     */
+    static boolean cpuCanRunBuild() {
+        final boolean arm64 = android.os.Process.is64Bit()
+            && android.os.Build.SUPPORTED_ABIS.length > 0
+            && android.os.Build.SUPPORTED_ABIS[0].startsWith("arm64");
+        if (!arm64) return true;
+        try (java.io.BufferedReader r = new java.io.BufferedReader(
+                new java.io.FileReader("/proc/cpuinfo"))) {
+            String line;
+            while ((line = r.readLine()) != null) {
+                if (line.startsWith("Features")) {
+                    final java.util.List<String> f = java.util.Arrays.asList(line.split("\\s+"));
+                    return f.contains("asimddp") && f.contains("asimdhp");
+                }
+            }
+        } catch (java.io.IOException e) {
+            // illisible : mieux vaut masquer la fonction que risquer un plantage
+        }
+        return false;
     }
 
     private static native long nativeLoad(String path, int nCtx, int nThreads);

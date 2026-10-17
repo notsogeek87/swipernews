@@ -54,23 +54,33 @@ final class SummaryModelStore {
     }
 
     /**
-     * Qwen2.5 Instruct, licence Apache-2.0 (utilisable et redistribuable, compatible
-     * avec la GPL-3.0 du dépôt). Quantifié en Q4_K_M : le meilleur compromis
-     * taille/qualité pour un téléphone. Tailles et sommes lues sur Hugging Face.
+     * LFM2 de Liquid AI, quantifié en Q4_K_M. Choisis après comparaison sur un
+     * même article français (tests faits avec llama.cpp, 4 cœurs x86, 800 jetons
+     * de prompt) : LFM2-700M lit le prompt à 560 jetons/s et écrit à 38 jetons/s,
+     * soit plus vite que Qwen2.5-0.5B (350 / 36) et près de deux fois plus vite que
+     * Qwen2.5-1.5B (250 / 20), pour un résumé plus complet et fidèle que les deux.
+     * LFM2-350M est le plus rapide (950 / 71) mais invente un détail : c'est
+     * l'option « ultra léger », pas la recommandée. Qwen3 raisonne à voix haute
+     * (balises think) et Granite 4.0 350M boucle : écartés.
+     *
+     * Licence « LFM Open License v1.0 » : libre, y compris en redistribution, tant
+     * qu'on n'en fait pas un usage COMMERCIAL au-delà de 10 M$ de chiffre
+     * d'affaires annuel. Rien n'est embarqué dans l'APK : le fichier est téléchargé
+     * à la demande de l'utilisateur. Tailles et sommes lues sur Hugging Face.
      */
     static final Model[] MODELS = {
-        new Model("qwen25-1.5b", "Qwen2.5 1.5B (recommandé)",
-            "qwen2.5-1.5b-instruct-q4_k_m.gguf",
-            "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/"
-                + "91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_k_m.gguf",
-            1_117_320_736L,
-            "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e"),
-        new Model("qwen25-0.5b", "Qwen2.5 0.5B (léger, moins précis)",
-            "qwen2.5-0.5b-instruct-q4_k_m.gguf",
-            "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/"
-                + "9217f5db79a29953eb74d5343926648285ec7e67/qwen2.5-0.5b-instruct-q4_k_m.gguf",
-            491_400_032L,
-            "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db"),
+        new Model("lfm2-700m", "LFM2 700M (recommandé)",
+            "LFM2-700M-Q4_K_M.gguf",
+            "https://huggingface.co/LiquidAI/LFM2-700M-GGUF/resolve/"
+                + "fd39e80d7a5ac61494ffff577e61bbbfddbd0d02/LFM2-700M-Q4_K_M.gguf",
+            468_624_320L,
+            "684e8406dc13321452b3f6aeca432776e2a6a7e1ad6c23f7887b8fe3efbe2efa"),
+        new Model("lfm2-350m", "LFM2 350M (ultra léger)",
+            "LFM2-350M-Q4_K_M.gguf",
+            "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/"
+                + "8fdc9d526b7ed346b19257551b05816c7912ecc2/LFM2-350M-Q4_K_M.gguf",
+            229_309_376L,
+            "a4d000c7064bd3b2e42c6845836286a899a4e79cf1791da1a6797b58d575957d"),
     };
 
     static final int ERR_SPACE = 1;    // pas assez de place sur l'appareil

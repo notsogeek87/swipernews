@@ -76,7 +76,7 @@
     <string name="summary_note_local">Écrit sur ton téléphone : l\'article ne part nulle part.</string>
     <string name="summary_note_prepare">Préparation du résumé…</string>
     <string name="summary_note_copy">Copie du fichier…</string>
-    <string name="summary_need_model">Le résumé est écrit par une petite IA qui tourne sur ton téléphone. Il faut d\'abord récupérer son fichier, une seule fois. Le téléchargement est la seule connexion : ensuite, tout reste sur l\'appareil. Mieux vaut le Wi‑Fi.</string>
+    <string name="summary_need_model">Le résumé est écrit par une petite IA qui tourne sur ton téléphone. Il faut d\'abord récupérer son fichier, une seule fois. Le téléchargement est la seule connexion : ensuite, tout reste sur l\'appareil. Mieux vaut le Wi‑Fi. Modèles LFM2 de Liquid AI (licence LFM 1.0 : libre, sauf usage commercial au-delà de 10 M$ de chiffre d\'affaires).</string>
     <string name="summary_download">Télécharger %1$s · %2$s</string>
     <string name="summary_download_resume">Reprendre %1$s · %2$s (%3$d %%)</string>
     <string name="summary_import">Importer un fichier GGUF…</string>
