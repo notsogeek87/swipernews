@@ -65,7 +65,7 @@ final class ReaderSummary {
     private boolean deleteArmed;
     private final Runnable disarmDelete = () -> {
         deleteArmed = false;
-        if (state == State.DONE || state == State.ERROR) refreshDeleteLabel();
+        if (this.state == State.DONE || this.state == State.ERROR) refreshDeleteLabel();
     };
     private Summarizer summarizer;   // créé à la première demande : qui ne résume pas ne paie rien
 
