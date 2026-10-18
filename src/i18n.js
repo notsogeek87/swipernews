@@ -104,6 +104,8 @@
         "Dans les modes Vidéos (filtre ou onglet Vidéos), la vidéo démarre 0,5 s après le swipe.",
       "autoplay.opt.off": "Non",
       "autoplay.opt.on": "Oui",
+      "changelog.v303.item1":
+        "Le bouton ✨ résume aussi les vidéos YouTube, à partir de leurs sous-titres (s'il y en a).",
       "changelog.v301.item1":
         "Application Android : un bouton ✨ sur la carte résume l'article sur l'appareil, sans ouvrir la page (le modèle de résumé doit être installé).",
       "changelog.v300.item1":
@@ -624,6 +626,8 @@
 
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
+      "changelog.v303.item1":
+        "The ✨ button also summarizes YouTube videos from their subtitles (when there are any).",
       "changelog.v301.item1":
         "Android app: a ✨ button on the card summarizes the article on your device without opening the page (the summary model must be installed).",
       "changelog.v300.item1":

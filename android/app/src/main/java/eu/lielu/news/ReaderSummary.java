@@ -81,6 +81,8 @@ final class ReaderSummary {
     /** Résumé lancé depuis la carte : la feuille s'ouvre seule, et sa fermeture ferme le lecteur. */
     private boolean fromCard;
     private boolean waitingArticle;
+    /** Faux pour une vidéo : la transcription est le seul texte, il n'y a pas de page à révéler. */
+    private boolean hasPage = true;
     /** Incrémenté à chaque nouvelle demande : le rappel d'une demande dépassée est ignoré. */
     private int session;
     private final int basePanelBottom;
@@ -192,8 +194,9 @@ final class ReaderSummary {
      * déjà là pendant que la page se charge en coulisses, et le résumé démarre
      * dès que le mode lecture a isolé le texte (voir setArticleReady).
      */
-    void startFromCard() {
+    void startFromCard(boolean hasPage) {
         fromCard = true;
+        this.hasPage = hasPage;
         waitingArticle = true;
         text.setText(R.string.summary_loading_article);
         setNote(ctx.getString(R.string.summary_note_local));
@@ -417,8 +420,8 @@ final class ReaderSummary {
         setNote(ctx.getString(R.string.summary_note_local));
         showProgress(false, 0);
         setButtons(ctx.getString(R.string.summary_close_btn), v -> close(),
-            fromCard ? ctx.getString(R.string.summary_read_article) : null,
-            fromCard ? v -> readFullArticle() : null,
+            fromCard && hasPage ? ctx.getString(R.string.summary_read_article) : null,
+            fromCard && hasPage ? v -> readFullArticle() : null,
             ctx.getString(R.string.summary_delete_model), v -> askDeleteModel());
         styleDeleteButton(btn3);
     }

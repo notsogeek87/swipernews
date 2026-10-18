@@ -78,6 +78,8 @@ public class InAppBrowserActivity extends AppCompatActivity {
     /** Couleurs de l'habillage actif de l'app, pour la feuille de résumé (voir SummaryTheme). */
     public static final String EXTRA_APP_THEME = "eu.lielu.news.reader.APP_THEME";
     /** Résumé lancé depuis la carte : la page reste voilée, seule la feuille de résumé se montre. */
+    /** Identifiant d'une vidéo YouTube à résumer : sa transcription remplace le texte de la page. */
+    public static final String EXTRA_VIDEO_ID = "eu.lielu.news.reader.VIDEO_ID";
     public static final String EXTRA_SUMMARY_ONLY = "eu.lielu.news.reader.SUMMARY_ONLY";
 
     /** Réponse vide renvoyée aux requêtes bloquées (null = « charge normalement »). */
@@ -133,6 +135,9 @@ public class InAppBrowserActivity extends AppCompatActivity {
     private boolean readerApplied;
     /** Résumé depuis la carte : tant que c'est vrai, la page n'est jamais révélée (voir revealContent). */
     private boolean summaryVeil;
+    /** Résumé d'une vidéo : aucune page n'est chargée, le texte est sa transcription. */
+    private String videoId;
+    private String transcript;
 
     /**
      * Voile posé sur la WebView le temps que le mode lecture s'applique.
@@ -207,7 +212,9 @@ public class InAppBrowserActivity extends AppCompatActivity {
         blockAds = intent.getBooleanExtra(EXTRA_BLOCK_ADS, false);
         summaryVeil = intent.getBooleanExtra(EXTRA_SUMMARY_ONLY, false);
         // Le texte à résumer est celui du mode lecture : il est donc forcé.
-        readerOn = summaryVeil || intent.getBooleanExtra(EXTRA_READER, false);
+        final String vid = intent.getStringExtra(EXTRA_VIDEO_ID);
+        videoId = summaryVeil && YoutubeTranscript.isVideoId(vid) ? vid : null;
+        readerOn = (summaryVeil && videoId == null) || intent.getBooleanExtra(EXTRA_READER, false);
         readerSize = oneOf(intent.getStringExtra(EXTRA_READER_SIZE), "m", "s", "m", "l", "xl");
         readerTheme = oneOf(intent.getStringExtra(EXTRA_READER_THEME), "dark", "dark", "sepia", "light");
         // Liste intégrée + liste téléchargée si l'utilisateur en a choisi une.
@@ -284,6 +291,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
         summary = new ReaderSummary(this, findViewById(R.id.reader_root), new ReaderSummary.Host() {
             @Override
             public void readArticle(ValueCallback<String> callback) {
+                if (transcript != null) { callback.onReceiveValue(transcript); return; }
                 if (web == null) { callback.onReceiveValue(""); return; }
                 // Le texte de l'article simplifié seulement (titre, ligne de source, corps) :
                 // rien du reste de la page, que le mode lecture a jeté.
@@ -324,7 +332,10 @@ public class InAppBrowserActivity extends AppCompatActivity {
             }
         }, getIntent().getStringExtra(EXTRA_APP_THEME));
 
-        if (summaryVeil) summary.startFromCard();
+        if (summaryVeil) {
+            summary.startFromCard(videoId == null);
+            if (videoId != null) fetchTranscript();
+        }
         findViewById(R.id.reader_close).setOnClickListener(v -> finish());
         findViewById(R.id.reader_share).setOnClickListener(v -> share());
         findViewById(R.id.reader_external).setOnClickListener(v -> openExternally(Uri.parse(currentUrl)));
@@ -355,10 +366,10 @@ public class InAppBrowserActivity extends AppCompatActivity {
 
         // Avant même le premier octet : ouvrir en mode lecture ne doit jamais
         // laisser entrevoir la page du site.
-        if (readerOn) coverContent();
+        if (readerOn || summaryVeil) coverContent();
         if (savedInstanceState != null) {
             web.restoreState(savedInstanceState);
-        } else {
+        } else if (videoId == null) {   // une vidéo n'a pas de page à charger : seule sa transcription compte
             web.loadUrl(url);
         }
     }
@@ -517,6 +528,25 @@ public class InAppBrowserActivity extends AppCompatActivity {
     }
 
     /** Masque la WebView (sans la démonter : elle continue de charger et de rendre). */
+    /** Va chercher les sous-titres hors du fil principal, puis lance le résumé comme pour un article. */
+    private void fetchTranscript() {
+        final String id = videoId;
+        final String lang = java.util.Locale.getDefault().getLanguage();
+        new Thread(() -> {
+            final String t = YoutubeTranscript.fetch(id, lang);
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed() || summary == null) return;
+                if (t == null) {
+                    Toast.makeText(this, R.string.summary_err_no_transcript, Toast.LENGTH_LONG).show();
+                    finish();
+                    return;
+                }
+                transcript = t;
+                summary.setArticleReady(true);
+            });
+        }, "yt-transcript").start();
+    }
+
     private void coverContent() {
         if (web == null) return;
         web.setAlpha(0f);

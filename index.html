@@ -1950,7 +1950,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=294"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=302"></script>
+<script src="src/i18n.js?v=303"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -3337,7 +3337,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="302";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="303";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -3348,6 +3348,8 @@ const APP_VERSION="302";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:303,date:"2026-10-18",items:[
+    "changelog.v303.item1"]},
   {v:301,date:"2026-10-18",items:[
     "changelog.v301.item1"]},
   {v:300,date:"2026-10-16",items:[
@@ -6847,10 +6849,11 @@ const saveBtn=document.getElementById("saveBtn");
 const sumBtn=document.getElementById("sumBtn");
 /* Résumer depuis la carte : le texte à résumer est celui de la PAGE de l'article
    (le mode lecture l'isole côté natif), pas l'extrait du flux, souvent trop court.
-   APK seulement, et jamais pour une vidéo : sa page n'a pas d'article. */
+   APK seulement. Pour une vidéo, il n'y a pas de page à lire : le natif résume sa
+   TRANSCRIPTION (sous-titres), demandée à YouTube au tap seulement. */
 function peutResumer(it){
   const iab=iabPlugin();
-  return !!(isNativeApp&&iab&&iab.open&&/^https?:/i.test(it.link||"")&&!videoIdOf(it));
+  return !!(isNativeApp&&iab&&iab.open&&/^https?:/i.test(it.link||""));
 }
 sumBtn.onclick=e=>{
   e.stopPropagation();
@@ -6858,7 +6861,7 @@ sumBtn.onclick=e=>{
   if(!it||!peutResumer(it))return;
   arreterEcoute();
   iabPlugin().open({url:it.link,title:it.title||"",hideCmp:cmpPref==="hide",blockAds:adsPref==="block",
-    reader:true,summaryOnly:true,readerSize:rSizePref,readerTheme:rThemePref,theme:themePalette()})
+    reader:true,summaryOnly:true,videoId:videoIdOf(it)||"",readerSize:rSizePref,readerTheme:rThemePref,theme:themePalette()})
     .catch(()=>toast(T("toast.summaryFail")));
 };
 function updateRail(it=currentItem()){

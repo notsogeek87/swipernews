@@ -73,6 +73,7 @@ public class InAppBrowserPlugin extends Plugin {
         // s'active sciemment (voir adsPref dans index.html).
         intent.putExtra(InAppBrowserActivity.EXTRA_BLOCK_ADS,
             Boolean.TRUE.equals(call.getBoolean("blockAds", Boolean.FALSE)));
+        intent.putExtra(InAppBrowserActivity.EXTRA_VIDEO_ID, call.getString("videoId", ""));
         intent.putExtra(InAppBrowserActivity.EXTRA_SUMMARY_ONLY,
             Boolean.TRUE.equals(call.getBoolean("summaryOnly", Boolean.FALSE)));
         intent.putExtra(InAppBrowserActivity.EXTRA_READER,

@@ -88,6 +88,7 @@
     <string name="summary_loading_article">Chargement de l\'article…</string>
     <string name="summary_read_article">Lire l\'article</string>
     <string name="summary_err_page">Cette page ne contient pas d\'article à résumer.</string>
+    <string name="summary_err_no_transcript">Cette vidéo n\'a pas de sous-titres à résumer.</string>
     <string name="summary_close_btn">Fermer</string>
     <string name="summary_retry">Réessayer</string>
     <string name="summary_delete_model">Supprimer le modèle (libère la place)</string>
