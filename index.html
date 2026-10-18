@@ -1566,6 +1566,9 @@
   <!-- État (creux/plein) et libellé posés par updateRail() : ils dépendent de
        la carte visible, donc ne peuvent pas être statiques comme shareBtn. -->
   <button id="saveBtn"></button>
+  <!-- Résumé local sans ouvrir la page : APK seulement (le modèle est sur l'appareil),
+       montré/masqué par updateRail(). -->
+  <button id="sumBtn" hidden data-i18n-attr="aria-label:rail.sum.aria,title:rail.sum.title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"></path><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg></button>
   <button id="shareBtn" data-i18n-attr="aria-label:rail.share.aria,title:rail.share.title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
 </div>
 
@@ -1947,7 +1950,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=294"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=300"></script>
+<script src="src/i18n.js?v=302"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -3334,7 +3337,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="301";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="302";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -3345,6 +3348,8 @@ const APP_VERSION="301";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:301,date:"2026-10-18",items:[
+    "changelog.v301.item1"]},
   {v:300,date:"2026-10-16",items:[
     "changelog.v300.item1"]},
   {v:299,date:"2026-10-15",items:[
@@ -6839,6 +6844,23 @@ feedEl.addEventListener("click",e=>{
    l'app au lieu d'une par carte). Masqué sur la carte de fin. */
 const railEl=document.getElementById("rail");
 const saveBtn=document.getElementById("saveBtn");
+const sumBtn=document.getElementById("sumBtn");
+/* Résumer depuis la carte : le texte à résumer est celui de la PAGE de l'article
+   (le mode lecture l'isole côté natif), pas l'extrait du flux, souvent trop court.
+   APK seulement, et jamais pour une vidéo : sa page n'a pas d'article. */
+function peutResumer(it){
+  const iab=iabPlugin();
+  return !!(isNativeApp&&iab&&iab.open&&/^https?:/i.test(it.link||"")&&!videoIdOf(it));
+}
+sumBtn.onclick=e=>{
+  e.stopPropagation();
+  const it=currentItem();
+  if(!it||!peutResumer(it))return;
+  arreterEcoute();
+  iabPlugin().open({url:it.link,title:it.title||"",hideCmp:cmpPref==="hide",blockAds:adsPref==="block",
+    reader:true,summaryOnly:true,readerSize:rSizePref,readerTheme:rThemePref,theme:themePalette()})
+    .catch(()=>toast(T("toast.summaryFail")));
+};
 function updateRail(it=currentItem()){
   // Carte à parts égales (cardsPerSwipe>1, voir cardGroups) : aucun des N
   // articles n'est PLUS « celui-ci » que les autres, donc rien de cohérent
@@ -6847,6 +6869,7 @@ function updateRail(it=currentItem()){
   const card=currentCardEl();
   if(card&&cardGroups.has(+card.dataset.id))it=null;
   railEl.classList.toggle("hidden",!it);
+  sumBtn.hidden=!(it&&peutResumer(it));
   // Icône ET libellé dépendent de l'état : contrairement à shareBtn (aria/title
   // statiques posés par data-i18n-attr), ceux-ci changent à chaque bascule.
   const on=!!(it&&isSaved(it));

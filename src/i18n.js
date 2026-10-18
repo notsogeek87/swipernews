@@ -104,10 +104,10 @@
         "Dans les modes Vidéos (filtre ou onglet Vidéos), la vidéo démarre 0,5 s après le swipe.",
       "autoplay.opt.off": "Non",
       "autoplay.opt.on": "Oui",
+      "changelog.v301.item1":
+        "Application Android : un bouton ✨ sur la carte résume l'article sur l'appareil, sans ouvrir la page (le modèle de résumé doit être installé).",
       "changelog.v300.item1":
         "Le filtre Tout / Vidéos / Articles de la feuille Sources est retiré : il faisait doublon avec le sélecteur en haut du fil (balayage horizontal).",
-      "changelog.v300.item1":
-        "The All / Videos / Articles filter in the Sources sheet is gone: it duplicated the selector at the top of the feed (horizontal swipe).",
       "changelog.v299.item1":
         "Lecture auto : elle marche aussi avec l'onglet Vidéos (balayage horizontal), pas seulement avec le filtre.",
       "changelog.v298.item1":
@@ -262,6 +262,9 @@
 
       "rail.share.aria": "Partager cet article",
       "rail.share.title": "Partager",
+      "rail.sum.aria": "Résumer cet article sur l'appareil",
+      "rail.sum.title": "Résumer",
+      "toast.summaryFail": "Impossible de lancer le résumé.",
       "rail.save.titleOn": "Retirer des enregistrés",
       "rail.save.titleOff": "Enregistrer cet article",
 
@@ -621,6 +624,10 @@
 
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
+      "changelog.v301.item1":
+        "Android app: a ✨ button on the card summarizes the article on your device without opening the page (the summary model must be installed).",
+      "changelog.v300.item1":
+        "The All / Videos / Articles filter in the Sources sheet is gone: it duplicated the selector at the top of the feed (horizontal swipe).",
       "changelog.version": "Version {v}",
       "changelog.v290.item1":
         "↔️ Three positions at the top: Articles | All | Videos. Swipe the feed right for articles only, left for videos only (from “All”).",
@@ -822,6 +829,9 @@
 
       "rail.share.aria": "Share this article",
       "rail.share.title": "Share",
+      "rail.sum.aria": "Summarize this article on your device",
+      "rail.sum.title": "Summarize",
+      "toast.summaryFail": "Couldn't start the summary.",
       "rail.save.titleOn": "Remove from saved",
       "rail.save.titleOff": "Save this article",
 

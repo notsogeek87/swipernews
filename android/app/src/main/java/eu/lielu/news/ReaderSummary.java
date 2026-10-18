@@ -38,6 +38,12 @@ final class ReaderSummary {
         void pickModelFile();
 
         String articleTitle();
+
+        /** « Lire l'article » : la page, jusque-là voilée, devient visible. */
+        void revealArticle();
+
+        /** La feuille d'un résumé lancé depuis la carte vient d'être fermée. */
+        void onSheetClosed();
     }
 
     private enum State { IDLE, NEED_MODEL, TRANSFER, WORKING, DONE, ERROR }
@@ -72,6 +78,9 @@ final class ReaderSummary {
     private State state = State.IDLE;
     private boolean articleReady;
     private boolean destroyed;
+    /** Résumé lancé depuis la carte : la feuille s'ouvre seule, et sa fermeture ferme le lecteur. */
+    private boolean fromCard;
+    private boolean waitingArticle;
     /** Incrémenté à chaque nouvelle demande : le rappel d'une demande dépassée est ignoré. */
     private int session;
     private final int basePanelBottom;
@@ -133,6 +142,10 @@ final class ReaderSummary {
         if (articleReady == ready) return;
         articleReady = ready;
         if (ready) warmUp();
+        if (ready && fromCard && waitingArticle) {
+            waitingArticle = false;
+            open();
+        }
         if (!ready) {
             // Autre page : le résumé affiché n'est plus celui de ce qu'on lit.
             if (state == State.WORKING) cancelSummary();
@@ -171,6 +184,30 @@ final class ReaderSummary {
         if (state == State.DONE || state == State.ERROR) reset();
         showPanel(false);
         updateFab();
+        if (fromCard) host.onSheetClosed();
+    }
+
+    /**
+     * Résumé demandé depuis la carte, sans avoir ouvert l'article : la feuille est
+     * déjà là pendant que la page se charge en coulisses, et le résumé démarre
+     * dès que le mode lecture a isolé le texte (voir setArticleReady).
+     */
+    void startFromCard() {
+        fromCard = true;
+        waitingArticle = true;
+        text.setText(R.string.summary_loading_article);
+        setNote(ctx.getString(R.string.summary_note_local));
+        showProgress(true, 0);
+        setButtons(ctx.getString(R.string.summary_close_btn), v -> close(), null, null, null, null);
+        showPanel(true);
+        updateFab();
+    }
+
+    /** « Lire l'article » : on quitte le mode résumé seul, le lecteur ordinaire reprend. */
+    private void readFullArticle() {
+        fromCard = false;
+        close();
+        host.revealArticle();
     }
 
     /** Marge du bas = barre de navigation : ni le bouton ni la feuille ne passent dessous. */
@@ -213,7 +250,7 @@ final class ReaderSummary {
     }
 
     private void updateFab() {
-        fab.setVisibility(articleReady && Summarizer.isAvailable() && !isOpen() && !destroyed
+        fab.setVisibility(articleReady && Summarizer.isAvailable() && !isOpen() && !destroyed && !fromCard
             ? View.VISIBLE : View.GONE);
     }
 
@@ -380,7 +417,9 @@ final class ReaderSummary {
         setNote(ctx.getString(R.string.summary_note_local));
         showProgress(false, 0);
         setButtons(ctx.getString(R.string.summary_close_btn), v -> close(),
-            null, null, ctx.getString(R.string.summary_delete_model), v -> askDeleteModel());
+            fromCard ? ctx.getString(R.string.summary_read_article) : null,
+            fromCard ? v -> readFullArticle() : null,
+            ctx.getString(R.string.summary_delete_model), v -> askDeleteModel());
         styleDeleteButton(btn3);
     }
 

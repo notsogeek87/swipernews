@@ -77,6 +77,8 @@ public class InAppBrowserActivity extends AppCompatActivity {
     public static final String EXTRA_READER_THEME = "eu.lielu.news.reader.READER_THEME";
     /** Couleurs de l'habillage actif de l'app, pour la feuille de résumé (voir SummaryTheme). */
     public static final String EXTRA_APP_THEME = "eu.lielu.news.reader.APP_THEME";
+    /** Résumé lancé depuis la carte : la page reste voilée, seule la feuille de résumé se montre. */
+    public static final String EXTRA_SUMMARY_ONLY = "eu.lielu.news.reader.SUMMARY_ONLY";
 
     /** Réponse vide renvoyée aux requêtes bloquées (null = « charge normalement »). */
     private static final String BLOCKED_MIME = "text/plain";
@@ -129,6 +131,8 @@ public class InAppBrowserActivity extends AppCompatActivity {
      * l'article simplifié est affiché, et revient dès la page suivante.
      */
     private boolean readerApplied;
+    /** Résumé depuis la carte : tant que c'est vrai, la page n'est jamais révélée (voir revealContent). */
+    private boolean summaryVeil;
 
     /**
      * Voile posé sur la WebView le temps que le mode lecture s'applique.
@@ -201,7 +205,9 @@ public class InAppBrowserActivity extends AppCompatActivity {
         // false par défaut : le blocage s'active sciemment côté réglages, il ne
         // doit pas s'appliquer parce qu'un appelant a oublié de le préciser.
         blockAds = intent.getBooleanExtra(EXTRA_BLOCK_ADS, false);
-        readerOn = intent.getBooleanExtra(EXTRA_READER, false);
+        summaryVeil = intent.getBooleanExtra(EXTRA_SUMMARY_ONLY, false);
+        // Le texte à résumer est celui du mode lecture : il est donc forcé.
+        readerOn = summaryVeil || intent.getBooleanExtra(EXTRA_READER, false);
         readerSize = oneOf(intent.getStringExtra(EXTRA_READER_SIZE), "m", "s", "m", "l", "xl");
         readerTheme = oneOf(intent.getStringExtra(EXTRA_READER_THEME), "dark", "dark", "sepia", "light");
         // Liste intégrée + liste téléchargée si l'utilisateur en a choisi une.
@@ -305,8 +311,20 @@ public class InAppBrowserActivity extends AppCompatActivity {
             public String articleTitle() {
                 return titleView != null ? String.valueOf(titleView.getText()) : cardTitle;
             }
+
+            @Override
+            public void revealArticle() {
+                summaryVeil = false;
+                revealContent();
+            }
+
+            @Override
+            public void onSheetClosed() {
+                finish();   // résumé lancé depuis la carte : on retourne au fil
+            }
         }, getIntent().getStringExtra(EXTRA_APP_THEME));
 
+        if (summaryVeil) summary.startFromCard();
         findViewById(R.id.reader_close).setOnClickListener(v -> finish());
         findViewById(R.id.reader_share).setOnClickListener(v -> share());
         findViewById(R.id.reader_external).setOnClickListener(v -> openExternally(Uri.parse(currentUrl)));
@@ -508,6 +526,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
 
     private void revealContent() {
         revealHandler.removeCallbacks(revealTask);
+        if (summaryVeil) return;
         if (web == null || web.getAlpha() >= 1f) return;
         // Court délai : le remplacement du DOM par le script est fait, mais son
         // rendu tient sur la ou les frames suivantes. Révéler dans la même
@@ -714,6 +733,12 @@ public class InAppBrowserActivity extends AppCompatActivity {
                 // La page simplifiée porte sa propre marge haute : la WebView
                 // lâche la sienne, sinon les deux s'ajoutent.
                 readerApplied = "1".equals(s);
+                if (summaryVeil && !readerApplied) {
+                    // Rien d'exploitable à résumer (connexion, galerie, application web).
+                    Toast.makeText(this, R.string.summary_err_page, Toast.LENGTH_LONG).show();
+                    finish();
+                    return;
+                }
                 if (summary != null) summary.setArticleReady(readerApplied);
                 applyWebPadding();
                 if (readerApplied) {
