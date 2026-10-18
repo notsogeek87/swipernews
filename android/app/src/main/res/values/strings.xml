@@ -88,6 +88,7 @@
     <string name="summary_close_btn">Fermer</string>
     <string name="summary_retry">Réessayer</string>
     <string name="summary_delete_model">Supprimer le modèle (libère la place)</string>
+    <string name="summary_delete_confirm">Appuyer encore pour supprimer</string>
     <string name="summary_ready">Modèle prêt : touche le bouton ✨ pour résumer</string>
     <string name="summary_err_space">Pas assez de place sur le téléphone pour ce modèle.</string>
     <string name="summary_err_net">Téléchargement interrompu. Réessaie : il reprendra là où il s\'est arrêté.</string>

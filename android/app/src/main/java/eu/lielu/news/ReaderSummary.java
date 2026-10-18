@@ -60,6 +60,13 @@ final class ReaderSummary {
     private final Button btn2;
     private final Button btn3;
     private final SummaryModelStore store;
+    private SummaryTheme theme;
+    /** Suppression du modèle « armée » par un premier appui : le second, dans les 3 s, confirme. */
+    private boolean deleteArmed;
+    private final Runnable disarmDelete = () -> {
+        deleteArmed = false;
+        if (state == State.DONE || state == State.ERROR) refreshDeleteLabel();
+    };
     private Summarizer summarizer;   // créé à la première demande : qui ne résume pas ne paie rien
 
     private State state = State.IDLE;
@@ -90,7 +97,8 @@ final class ReaderSummary {
         scroll.setMaxHeightPx(Math.round(
             ctx.getResources().getDisplayMetrics().heightPixels * MAX_TEXT_SCREEN_SHARE));
 
-        applyTheme(root, SummaryTheme.parse(themeSpec, ctx.getResources().getDisplayMetrics().density));
+        theme = SummaryTheme.parse(themeSpec, ctx.getResources().getDisplayMetrics().density);
+        applyTheme(root, theme);
 
         fab.setOnClickListener(v -> open());
         scrim.setOnClickListener(v -> close());   // comme les feuilles du fil : toucher à côté referme
@@ -372,7 +380,8 @@ final class ReaderSummary {
         setNote(ctx.getString(R.string.summary_note_local));
         showProgress(false, 0);
         setButtons(ctx.getString(R.string.summary_close_btn), v -> close(),
-            ctx.getString(R.string.summary_delete_model), v -> deleteModel(), null, null);
+            null, null, ctx.getString(R.string.summary_delete_model), v -> askDeleteModel());
+        styleDeleteButton(btn3);
     }
 
     private void fail(String message) {
@@ -388,9 +397,42 @@ final class ReaderSummary {
                 if (store.activeFile() != null) start(store.activeFile());
                 else showNeedModel();
             },
+            ctx.getString(R.string.summary_close_btn), v -> close(),
             offerDelete ? ctx.getString(R.string.summary_delete_model) : null,
-            offerDelete ? v -> deleteModel() : null,
-            ctx.getString(R.string.summary_close_btn), v -> close());
+            offerDelete ? v -> askDeleteModel() : null);
+        if (offerDelete) styleDeleteButton(btn3);
+    }
+
+    /**
+     * « Supprimer le modèle » est destructif (plusieurs centaines de Mo à retélécharger) :
+     * il ne ressemble donc pas aux autres actions et demande un second appui.
+     */
+    private void askDeleteModel() {
+        if (deleteArmed) {
+            btn3.removeCallbacks(disarmDelete);
+            deleteArmed = false;
+            deleteModel();
+            return;
+        }
+        deleteArmed = true;
+        refreshDeleteLabel();
+        btn3.postDelayed(disarmDelete, 3000);
+    }
+
+    private void refreshDeleteLabel() {
+        btn3.setText(ctx.getString(deleteArmed ? R.string.summary_delete_confirm
+            : R.string.summary_delete_model));
+    }
+
+    /** Lien de texte discret, petit, loin du pouce : ni fond, ni même taille que « Fermer ». */
+    private void styleDeleteButton(Button b) {
+        b.setBackground(null);
+        b.setTextSize(12);
+        b.setTextColor(theme.ash);
+        b.setMinHeight(0);
+        b.setMinimumHeight(0);
+        final float d = ctx.getResources().getDisplayMetrics().density;
+        ((android.widget.LinearLayout.LayoutParams) b.getLayoutParams()).topMargin = Math.round(28 * d);
     }
 
     private void deleteModel() {
@@ -423,6 +465,16 @@ final class ReaderSummary {
 
     private void setButtons(String l1, View.OnClickListener c1, String l2, View.OnClickListener c2,
                             String l3, View.OnClickListener c3) {
+        deleteArmed = false;
+        btn3.removeCallbacks(disarmDelete);
+        // Le 3e bouton a pu servir de lien discret : retour au style d'origine.
+        btn3.setBackground(theme.secondaryButton());
+        btn3.setTextColor(theme.ink);
+        btn3.setTextSize(13);
+        final float d = ctx.getResources().getDisplayMetrics().density;
+        btn3.setMinHeight(Math.round(46 * d));
+        btn3.setMinimumHeight(Math.round(46 * d));
+        ((android.widget.LinearLayout.LayoutParams) btn3.getLayoutParams()).topMargin = Math.round(10 * d);
         bind(btn1, l1, c1);
         bind(btn2, l2, c2);
         bind(btn3, l3, c3);
