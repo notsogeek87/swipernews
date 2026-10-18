@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Écouter le résumé : un haut-parleur et deux ondes. Même trait que les autres
+     icônes (2 px, bouts ronds, teinte posée par ReaderSummary d'après le thème actif). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M4,9 L8,9 L13,5 L13,19 L8,15 L4,15 Z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M16.5,9 C17.8,10.3 17.8,13.7 16.5,15 M19,6.5 C21.7,9.2 21.7,14.8 19,17.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+</vector>

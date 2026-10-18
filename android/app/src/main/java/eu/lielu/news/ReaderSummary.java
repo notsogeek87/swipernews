@@ -65,7 +65,7 @@ final class ReaderSummary {
     private final Button btn1;
     private final Button btn2;
     private final Button btn3;
-    private final Button listenBtn;
+    private final android.widget.ImageButton listenBtn;
     private final SummarySpeaker speaker;
     private final SummaryModelStore store;
     private SummaryTheme theme;
@@ -151,8 +151,9 @@ final class ReaderSummary {
         btn1.setBackground(t.primaryButton());
         btn2.setBackground(t.secondaryButton());
         btn3.setBackground(t.secondaryButton());
-        listenBtn.setBackground(t.secondaryButton());
-        for (Button b : new Button[] { btn1, btn2, btn3, listenBtn }) b.setTextColor(t.ink);
+        listenBtn.setColorFilter(t.ink);
+        listenBtn.setBackground(t.fab());
+        for (Button b : new Button[] { btn1, btn2, btn3 }) b.setTextColor(t.ink);
     }
 
     /* ---------- Appels de l'activité ---------- */
@@ -465,7 +466,9 @@ final class ReaderSummary {
     }
 
     private void refreshListen() {
-        listenBtn.setText(speaker.isSpeaking() ? R.string.summary_listen_stop : R.string.summary_listen);
+        final boolean on = speaker.isSpeaking();
+        listenBtn.setImageResource(on ? R.drawable.ic_summary_stop : R.drawable.ic_summary_speaker);
+        listenBtn.setContentDescription(ctx.getString(on ? R.string.summary_listen_stop : R.string.summary_listen));
     }
 
     private void fail(String message) {
