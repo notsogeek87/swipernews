@@ -282,6 +282,21 @@
             android:layout_marginTop="16dp"
             android:orientation="vertical">
 
+            <!-- Lecture à voix haute, facultative : visible seulement quand le
+                 résumé est fini (SummarySpeaker). -->
+            <Button
+                android:id="@+id/reader_summary_listen"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:minHeight="46dp"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="-0.01"
+                android:textAllCaps="false"
+                android:stateListAnimator="@null"
+                android:visibility="gone" />
+
             <Button
                 android:id="@+id/reader_summary_btn1"
                 android:layout_width="match_parent"

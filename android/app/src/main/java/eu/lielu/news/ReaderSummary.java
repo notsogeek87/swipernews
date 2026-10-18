@@ -65,6 +65,8 @@ final class ReaderSummary {
     private final Button btn1;
     private final Button btn2;
     private final Button btn3;
+    private final Button listenBtn;
+    private final SummarySpeaker speaker;
     private final SummaryModelStore store;
     private SummaryTheme theme;
     /** Suppression du modèle « armée » par un premier appui : le second, dans les 3 s, confirme. */
@@ -101,6 +103,21 @@ final class ReaderSummary {
         btn1 = root.findViewById(R.id.reader_summary_btn1);
         btn2 = root.findViewById(R.id.reader_summary_btn2);
         btn3 = root.findViewById(R.id.reader_summary_btn3);
+        listenBtn = root.findViewById(R.id.reader_summary_listen);
+        speaker = new SummarySpeaker(ctx, new SummarySpeaker.Listener() {
+            @Override
+            public void onFinished() {
+                if (!destroyed) refreshListen();
+            }
+
+            @Override
+            public void onError() {
+                if (destroyed) return;
+                refreshListen();
+                Toast.makeText(ctx, R.string.summary_listen_err, Toast.LENGTH_SHORT).show();
+            }
+        });
+        listenBtn.setOnClickListener(v -> toggleListen());
         store = new SummaryModelStore(ctx);
 
         basePanelBottom = panel.getPaddingBottom();
@@ -134,7 +151,8 @@ final class ReaderSummary {
         btn1.setBackground(t.primaryButton());
         btn2.setBackground(t.secondaryButton());
         btn3.setBackground(t.secondaryButton());
-        for (Button b : new Button[] { btn1, btn2, btn3 }) b.setTextColor(t.ink);
+        listenBtn.setBackground(t.secondaryButton());
+        for (Button b : new Button[] { btn1, btn2, btn3, listenBtn }) b.setTextColor(t.ink);
     }
 
     /* ---------- Appels de l'activité ---------- */
@@ -173,6 +191,7 @@ final class ReaderSummary {
     /** La feuille et son voile vont ensemble. */
     private void showPanel(boolean show) {
         final int v = show ? View.VISIBLE : View.GONE;
+        if (!show) stopListening();
         scrim.setVisibility(v);
         panel.setVisibility(v);
     }
@@ -238,6 +257,7 @@ final class ReaderSummary {
         session++;
         store.close();
         if (summarizer != null) summarizer.release();
+        speaker.release();
     }
 
     /* ---------- Ouverture ---------- */
@@ -424,6 +444,28 @@ final class ReaderSummary {
             fromCard && hasPage ? v -> readFullArticle() : null,
             ctx.getString(R.string.summary_delete_model), v -> askDeleteModel());
         styleDeleteButton(btn3);
+        refreshListen();
+        listenBtn.setVisibility(View.VISIBLE);
+    }
+
+    /* ---------- Lecture à voix haute (facultative) ---------- */
+
+    private void toggleListen() {
+        if (speaker.isSpeaking()) {
+            speaker.stop();
+        } else {
+            speaker.speak(text.getText().toString());
+        }
+        refreshListen();
+    }
+
+    private void stopListening() {
+        speaker.stop();
+        refreshListen();
+    }
+
+    private void refreshListen() {
+        listenBtn.setText(speaker.isSpeaking() ? R.string.summary_listen_stop : R.string.summary_listen);
     }
 
     private void fail(String message) {
@@ -488,6 +530,7 @@ final class ReaderSummary {
     private void reset() {
         state = State.IDLE;
         session++;
+        stopListening();
         text.setText("");
         showProgress(false, 0);
     }
@@ -509,6 +552,8 @@ final class ReaderSummary {
                             String l3, View.OnClickListener c3) {
         deleteArmed = false;
         btn3.removeCallbacks(disarmDelete);
+        stopListening();
+        listenBtn.setVisibility(View.GONE);
         // Le 3e bouton a pu servir de lien discret : retour au style d'origine.
         btn3.setBackground(theme.secondaryButton());
         btn3.setTextColor(theme.ink);
