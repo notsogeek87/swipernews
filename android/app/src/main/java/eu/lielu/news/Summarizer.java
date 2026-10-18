@@ -72,6 +72,8 @@ public final class Summarizer {
     static final int MAX_PARTS = 4;
     /** Plafond de sécurité d'UNE partie (une cinquantaine de mots visés). */
     static final int MAX_NEW_TOKENS_PART = 180;
+    /** Plafond du résumé court d'une vidéo (jetons) : une quarantaine de mots visés dans le prompt. */
+    static final int MAX_NEW_TOKENS_BRIEF = 140;
     /**
      * Fenêtre de contexte demandée (jetons) : prompt + résumé. 4000 caractères de
      * français font environ 1200 jetons, plus le prompt système et 320 jetons de
@@ -157,6 +159,15 @@ public final class Summarizer {
      * @param lang "fr" ou "en" : langue du résumé demandé
      */
     public void summarize(File model, String title, String text, String lang, Listener l) {
+        summarize(model, title, text, lang, false, l);
+    }
+
+    /**
+     * @param brief résumé COURT d'une transcription de vidéo (une quarantaine de mots, une seule
+     *              passe) : un oral se lit mal en 4 parties, et le texte est déjà condensé
+     *              par {@link YoutubeTranscript#condense}
+     */
+    public void summarize(File model, String title, String text, String lang, boolean brief, Listener l) {
         if (!LIB_OK) {
             main.post(() -> l.onError(ERR_UNAVAILABLE));
             return;
@@ -164,8 +175,8 @@ public final class Summarizer {
         final int my = ++gen;
         nativeCancel();
         final java.util.List<String> parts = splitParts(text);
-        final boolean multi = parts.size() > 1;
-        final byte[] system = (multi ? partSystemPrompt(lang) : systemPrompt(lang))
+        final boolean multi = parts.size() > 1 && !brief;
+        final byte[] system = (brief ? videoSystemPrompt(lang) : multi ? partSystemPrompt(lang) : systemPrompt(lang))
             .getBytes(StandardCharsets.UTF_8);
         final String path = model.getAbsolutePath();
         worker.execute(() -> {
@@ -187,7 +198,7 @@ public final class Summarizer {
                     : userPrompt(title, parts.get(index), lang)).getBytes(StandardCharsets.UTF_8);
                 wrote[0] = false;
                 final int res = nativeGenerate(handle, system, user,
-                    multi ? MAX_NEW_TOKENS_PART : MAX_NEW_TOKENS, bytes -> {
+                    brief ? MAX_NEW_TOKENS_BRIEF : multi ? MAX_NEW_TOKENS_PART : MAX_NEW_TOKENS, bytes -> {
                         if (my != gen) return false;
                         String piece = new String(bytes, StandardCharsets.UTF_8);
                         if (!wrote[0]) {
@@ -286,6 +297,18 @@ public final class Summarizer {
             + "100 mots, en un ou deux courts paragraphes (de 10 à 15 lignes sur un écran de "
             + "téléphone). Pas de liste, pas de titre. Appuie-toi uniquement sur l'article : "
             + "aucun avis, aucun fait ajouté.";
+    }
+
+    /** Consigne d'un résumé COURT de vidéo : ce qui est dit, en quelques phrases. */
+    static String videoSystemPrompt(String lang) {
+        if ("en".equals(lang)) {
+            return "You summarize the transcript of a video. Write a faithful summary in English of "
+                + "about 40 words, in one short paragraph of 2 or 3 sentences. No list, no title. "
+                + "Use only what is said: no opinion, no added fact.";
+        }
+        return "Tu résumes la transcription d'une vidéo. Écris un résumé fidèle en français "
+            + "d'environ 40 mots, en un seul court paragraphe de 2 ou 3 phrases. Pas de liste, "
+            + "pas de titre. Appuie-toi uniquement sur ce qui est dit : aucun avis, aucun fait ajouté.";
     }
 
     /** Consigne d'une PARTIE d'un long article : plus courte, et sans conclure à la place de l'article. */

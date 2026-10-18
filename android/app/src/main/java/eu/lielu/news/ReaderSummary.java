@@ -354,7 +354,7 @@ final class ReaderSummary {
                 return;
             }
             if (summarizer == null) summarizer = new Summarizer();
-            summarizer.summarize(model, host.articleTitle(), article, "fr", new Summarizer.Listener() {
+            summarizer.summarize(model, host.articleTitle(), article, "fr", !hasPage, new Summarizer.Listener() {
                 private boolean first = true;
                 /** Résumé en plusieurs parties : on laisse le lecteur où il est, voir onText. */
                 private boolean multi;

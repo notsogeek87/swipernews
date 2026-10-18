@@ -59,7 +59,7 @@ final class YoutubeTranscript {
             final String url = pickTrack(tracks, lang);
             if (url == null || !url.startsWith("https://")) return null;
             final String text = parse(request(url, null));
-            return text.isEmpty() ? null : text;
+            return text.isEmpty() ? null : condense(text, 3600);
         } catch (Exception e) {
             return null;
         }
@@ -85,6 +85,34 @@ final class YoutubeTranscript {
             }
         }
         return best;
+    }
+
+    /**
+     * Réduit une longue transcription à {@code max} caractères en gardant {@code SLICES} extraits
+     * répartis sur toute la durée (début, milieu, fin) : le résumé couvre la vidéo entière en une
+     * seule passe, au lieu de se limiter à ses premières minutes.
+     */
+    static String condense(String text, int max) {
+        if (text.length() <= max) return text;
+        final int slices = 4;
+        final int size = max / slices;
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < slices; i++) {
+            int from = (int) ((long) (text.length() - size) * i / (slices - 1));
+            int to = from + size;
+            // Coupes sur des espaces, pour ne pas finir ni commencer au milieu d'un mot.
+            if (i > 0) {
+                final int sp = text.indexOf(' ', from);
+                if (sp > 0 && sp < to) from = sp + 1;
+            }
+            if (i < slices - 1 && to < text.length()) {
+                final int sp = text.lastIndexOf(' ', to);
+                if (sp > from) to = sp;
+            }
+            if (sb.length() > 0) sb.append(" [...] ");
+            sb.append(text, from, to);
+        }
+        return sb.toString();
     }
 
     /** Fusionne les répliques en un texte continu : XML « text » ou « p » selon le format rendu. */
