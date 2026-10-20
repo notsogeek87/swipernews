@@ -89,7 +89,7 @@ public class MainActivity extends BridgeActivity {
     /**
      * Fenêtre pendant laquelle un 2e retour confirme la sortie — même ordre de
      * grandeur que le double-appui de resetStats()/delFeed() côté web (voir
-     * CLAUDE.md), pour rester cohérent avec les autres confirmations à 2 appuis
+     * AGENTS.md), pour rester cohérent avec les autres confirmations à 2 appuis
      * de l'app.
      */
     private static final long EXIT_CONFIRM_WINDOW_MS = 2000;

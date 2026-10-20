@@ -628,7 +628,7 @@
    *  traités comme une frontière de groupe : un premier essai fermait le
    *  groupe en cours dès qu'un solo apparaissait, même à peine commencé — sur
    *  un fil où actus et vidéos alternent strictement (le tour de rôle « une
-   *  actu, une vidéo », voir CLAUDE.md), quasi CHAQUE actu se retrouvait
+   *  actu, une vidéo », voir AGENTS.md), quasi CHAQUE actu se retrouvait
    *  interrompue avant même d'avoir un deuxième voisin, donc quasi TOUJOURS
    *  seule malgré cardsPerSwipe>1 — l'inverse de ce que règle ce prédicat.
    *  Ici, les articles « groupables » (non-solo) sont d'abord chaînés dans
@@ -1061,7 +1061,7 @@
      d'où ce dernier recours, qui n'existe que si l'utilisateur a lui-même
      renseigné SA PROPRE clé dans les réglages avancés : jamais de clé
      embarquée dans l'app (quota partagé par tous les utilisateurs, épuisable
-     quel que soit le soin apporté à la restreindre — voir CLAUDE.md). Trois
+     quel que soit le soin apporté à la restreindre — voir AGENTS.md). Trois
      formes, du moins coûteux en quota au plus (channels.list : 1 unité ;
      search.list : 100) — resolveYoutubeChannelFeed (index.html) les enchaîne
      et vérifie chaque résultat par une vraie requête, ce qui ne peut donc pas
