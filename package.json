@@ -12,7 +12,9 @@
     "cap:prepare": "rm -rf www && mkdir -p www && cp index.html manifest.webmanifest sw.js logo-192.png logo-512.png logo-maskable-512.png www/ && cp -r src www/src && cp -r fonts www/fonts",
     "cap:sync": "npm run cap:prepare && cap sync android",
     "android:open": "cap open android",
-    "android:assets": "capacitor-assets generate --android"
+    "android:assets": "capacitor-assets generate --android",
+    "vibe:analyze": "node scripts/vibe-analyze.mjs",
+    "vibe:check": "node scripts/vibe-check.mjs"
   },
   "license": "GPL-3.0-or-later",
   "devDependencies": {

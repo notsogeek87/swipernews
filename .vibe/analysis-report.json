@@ -1,0 +1,499 @@
+{
+  "metadata": {
+    "analyzedAt": "2026-10-20T20:09:17.325Z",
+    "analyzerVersion": "1.0.0"
+  },
+  "structure": {
+    "totalFiles": 73,
+    "totalDirectories": 26,
+    "byExtension": {
+      ".md": 14,
+      ".sh": 3,
+      ".yml": 4,
+      "": 4,
+      ".json": 7,
+      ".html": 5,
+      ".js": 15,
+      ".opml": 1,
+      ".woff2": 4,
+      ".txt": 2,
+      ".png": 9,
+      ".webmanifest": 1,
+      ".mjs": 2,
+      ".py": 2
+    },
+    "keyFiles": {
+      "entryPoints": [
+        "index.html",
+        "manifest.webmanifest",
+        "sw.js"
+      ],
+      "sourceFiles": [
+        "api/feed.js",
+        "api/learn.js",
+        "api/og.js",
+        "src/i18n.js",
+        "src/learn-core.js",
+        "src/lib.js"
+      ],
+      "testFiles": [
+        "test/feed.test.js",
+        "test/i18n.test.js",
+        "test/learn-core.test.js",
+        "test/learn.test.js",
+        "test/lib.test.js",
+        "test/og.test.js"
+      ],
+      "configFiles": [
+        ".github/PULL_REQUEST_TEMPLATE.md",
+        ".github/workflows/android.yml",
+        ".github/workflows/ci.yml",
+        ".github/workflows/play-store-bundle.yml",
+        ".github/workflows/release.yml",
+        "scripts/vibe-analyze.mjs",
+        "scripts/vibe-check.mjs"
+      ],
+      "documentationFiles": [
+        ".claude/skills/swipernews-bump/SKILL.md",
+        ".claude/skills/swipernews-i18n-changelog/SKILL.md",
+        ".claude/skills/swipernews-natif-sans-sdk/SKILL.md",
+        ".claude/skills/swipernews-release/SKILL.md",
+        ".claude/skills/swipernews-verifier/SKILL.md",
+        ".claude/skills/swipernews-verifier/references/pont-capacitor.md",
+        ".github/PULL_REQUEST_TEMPLATE.md",
+        ".vibe/instructions.md",
+        "AGENTS.md",
+        "AUDIT-2026-08.md",
+        "AUDIT-ROBUSTESSE-2026-08.md",
+        "AUDIT.md",
+        "README.md",
+        "docs/architecture/2026-09-01-paysage-large-volet.md",
+        "fonts/LICENSE-Inter.txt",
+        "fonts/LICENSE-SourceSerif4.txt"
+      ]
+    },
+    "directoryTree": {
+      ".claude": {},
+      ".claude/skills": {},
+      ".claude/skills/swipernews-bump": {},
+      ".claude/skills/swipernews-bump/scripts": {},
+      ".claude/skills/swipernews-i18n-changelog": {},
+      ".claude/skills/swipernews-natif-sans-sdk": {},
+      ".claude/skills/swipernews-release": {},
+      ".claude/skills/swipernews-release/scripts": {},
+      ".claude/skills/swipernews-verifier": {},
+      ".claude/skills/swipernews-verifier/references": {},
+      ".claude/skills/swipernews-verifier/scripts": {},
+      ".github": {},
+      ".github/workflows": {},
+      ".vibe": {},
+      "api": {},
+      "docs": {},
+      "docs/architecture": {},
+      "fastlane": {},
+      "fastlane/metadata": {},
+      "fonts": {},
+      "resources": {},
+      "scripts": {},
+      "src": {},
+      "test": {},
+      "tools": {},
+      "well-known": {}
+    }
+  },
+  "stack": {
+    "frontend": {
+      "languages": [
+        "HTML",
+        "CSS",
+        "JavaScript"
+      ],
+      "frameworks": [],
+      "buildTools": [
+        "lint",
+        "format",
+        "format:check",
+        "test",
+        "cap:prepare",
+        "cap:sync",
+        "android:open",
+        "android:assets",
+        "vibe:analyze",
+        "vibe:check"
+      ],
+      "features": [
+        "PWA",
+        "Service Worker",
+        "Zero Build"
+      ]
+    },
+    "backend": {
+      "provider": "Vercel",
+      "functions": [
+        "feed.js",
+        "learn.js",
+        "og.js"
+      ],
+      "runtime": "Node.js"
+    },
+    "mobile": {
+      "framework": "Capacitor",
+      "platform": "Android",
+      "sdk": {
+        "min": "",
+        "target": "",
+        "compile": ""
+      }
+    },
+    "devTools": {
+      "linters": [
+        "ESLint"
+      ],
+      "formatters": [
+        "Prettier"
+      ],
+      "testRunners": [
+        "Node.js Test Runner"
+      ]
+    },
+    "dependencies": {
+      "production": [],
+      "development": [
+        "@capacitor/android@^8.5.0",
+        "@capacitor/app@^8.1.1",
+        "@capacitor/assets@^3.0.5",
+        "@capacitor/cli@^8.5.0",
+        "@capacitor/core@^8.5.0",
+        "eslint@^9.13.0",
+        "prettier@^3.3.3"
+      ]
+    }
+  },
+  "workflows": {
+    "available": [
+      {
+        "name": "android",
+        "file": "android.yml",
+        "triggers": [
+          "push",
+          "pull_request",
+          "manual"
+        ],
+        "jobs": [
+          "build",
+          "steps",
+          "with",
+          "submodules",
+          "with",
+          "with",
+          "distribution",
+          "cache",
+          "run",
+          "run",
+          "run",
+          "id",
+          "run",
+          "id",
+          "env",
+          "KEYSTORE_BASE64",
+          "run",
+          "id",
+          "env",
+          "ANDROID_KEYSTORE_FILE",
+          "ANDROID_KEYSTORE_PASSWORD",
+          "ANDROID_KEY_ALIAS",
+          "ANDROID_KEY_PASSWORD",
+          "run",
+          "with",
+          "name",
+          "path",
+          "if",
+          "env",
+          "GH_TOKEN",
+          "APK",
+          "BRANCH",
+          "run"
+        ]
+      },
+      {
+        "name": "ci",
+        "file": "ci.yml",
+        "triggers": [
+          "push",
+          "pull_request"
+        ],
+        "jobs": [
+          "quality",
+          "steps",
+          "with",
+          "run",
+          "run",
+          "run",
+          "run"
+        ]
+      },
+      {
+        "name": "play-store-bundle",
+        "file": "play-store-bundle.yml",
+        "triggers": [
+          "manual"
+        ],
+        "jobs": [
+          "bundle",
+          "steps",
+          "with",
+          "submodules",
+          "with",
+          "with",
+          "distribution",
+          "cache",
+          "run",
+          "run",
+          "run",
+          "id",
+          "run",
+          "env",
+          "KEYSTORE_BASE64",
+          "run",
+          "id",
+          "env",
+          "ANDROID_KEYSTORE_FILE",
+          "ANDROID_KEYSTORE_PASSWORD",
+          "ANDROID_KEY_ALIAS",
+          "ANDROID_KEY_PASSWORD",
+          "run",
+          "with",
+          "name",
+          "path",
+          "run",
+          "env",
+          "PLAY_STORE_SERVICE_ACCOUNT_JSON",
+          "run"
+        ]
+      },
+      {
+        "name": "release",
+        "file": "release.yml",
+        "triggers": [
+          "push",
+          "manual",
+          "tags"
+        ],
+        "jobs": [
+          "release",
+          "steps",
+          "with",
+          "ref",
+          "submodules",
+          "with",
+          "with",
+          "distribution",
+          "cache",
+          "run",
+          "run",
+          "run",
+          "id",
+          "env",
+          "INPUT_TAG",
+          "run",
+          "env",
+          "KEYSTORE_BASE64",
+          "run",
+          "id",
+          "env",
+          "ANDROID_KEYSTORE_FILE",
+          "ANDROID_KEYSTORE_PASSWORD",
+          "ANDROID_KEY_ALIAS",
+          "ANDROID_KEY_PASSWORD",
+          "run",
+          "env",
+          "GH_TOKEN",
+          "APK",
+          "TAG",
+          "run"
+        ]
+      }
+    ],
+    "triggers": {},
+    "jobs": {
+      "android": [
+        "build",
+        "steps",
+        "with",
+        "submodules",
+        "with",
+        "with",
+        "distribution",
+        "cache",
+        "run",
+        "run",
+        "run",
+        "id",
+        "run",
+        "id",
+        "env",
+        "KEYSTORE_BASE64",
+        "run",
+        "id",
+        "env",
+        "ANDROID_KEYSTORE_FILE",
+        "ANDROID_KEYSTORE_PASSWORD",
+        "ANDROID_KEY_ALIAS",
+        "ANDROID_KEY_PASSWORD",
+        "run",
+        "with",
+        "name",
+        "path",
+        "if",
+        "env",
+        "GH_TOKEN",
+        "APK",
+        "BRANCH",
+        "run"
+      ],
+      "ci": [
+        "quality",
+        "steps",
+        "with",
+        "run",
+        "run",
+        "run",
+        "run"
+      ],
+      "play-store-bundle": [
+        "bundle",
+        "steps",
+        "with",
+        "submodules",
+        "with",
+        "with",
+        "distribution",
+        "cache",
+        "run",
+        "run",
+        "run",
+        "id",
+        "run",
+        "env",
+        "KEYSTORE_BASE64",
+        "run",
+        "id",
+        "env",
+        "ANDROID_KEYSTORE_FILE",
+        "ANDROID_KEYSTORE_PASSWORD",
+        "ANDROID_KEY_ALIAS",
+        "ANDROID_KEY_PASSWORD",
+        "run",
+        "with",
+        "name",
+        "path",
+        "run",
+        "env",
+        "PLAY_STORE_SERVICE_ACCOUNT_JSON",
+        "run"
+      ],
+      "release": [
+        "release",
+        "steps",
+        "with",
+        "ref",
+        "submodules",
+        "with",
+        "with",
+        "distribution",
+        "cache",
+        "run",
+        "run",
+        "run",
+        "id",
+        "env",
+        "INPUT_TAG",
+        "run",
+        "env",
+        "KEYSTORE_BASE64",
+        "run",
+        "id",
+        "env",
+        "ANDROID_KEYSTORE_FILE",
+        "ANDROID_KEYSTORE_PASSWORD",
+        "ANDROID_KEY_ALIAS",
+        "ANDROID_KEY_PASSWORD",
+        "run",
+        "env",
+        "GH_TOKEN",
+        "APK",
+        "TAG",
+        "run"
+      ]
+    }
+  },
+  "documentation": {
+    "primary": [
+      {
+        "file": "README.md",
+        "size": 90815,
+        "lines": 1482
+      },
+      {
+        "file": "AGENTS.md",
+        "size": 108950,
+        "lines": 1562
+      },
+      {
+        "file": ".vibe/instructions.md",
+        "size": 7558,
+        "lines": 193
+      },
+      {
+        "file": ".github/PULL_REQUEST_TEMPLATE.md",
+        "size": 2981,
+        "lines": 74
+      }
+    ],
+    "secondary": [
+      {
+        "file": "docs/architecture/2026-09-01-paysage-large-volet.md",
+        "lines": 233
+      }
+    ],
+    "skills": [
+      {
+        "name": "swipernews-bump",
+        "files": [
+          "SKILL.md",
+          "scripts"
+        ]
+      },
+      {
+        "name": "swipernews-i18n-changelog",
+        "files": [
+          "SKILL.md"
+        ]
+      },
+      {
+        "name": "swipernews-natif-sans-sdk",
+        "files": [
+          "SKILL.md"
+        ]
+      },
+      {
+        "name": "swipernews-release",
+        "files": [
+          "SKILL.md",
+          "scripts"
+        ]
+      },
+      {
+        "name": "swipernews-verifier",
+        "files": [
+          "SKILL.md",
+          "references",
+          "scripts"
+        ]
+      }
+    ],
+    "totalLines": 3544
+  },
+  "issues": [],
+  "recommendations": []
+}

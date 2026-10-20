@@ -1,4 +1,4 @@
-# Notes pour les agents de code
+# Guide pour tous les agents IA - SwiperNews
 
 Ce fichier complète le README (qui, lui, explique le *pourquoi* de chaque choix
 en détail). Ici : ce qu'il faut savoir avant de toucher au dépôt, et ce qui ne
@@ -6,6 +6,23 @@ se devine pas en lisant le code.
 
 **Tout est en français** — commentaires, messages de commit, textes d'interface,
 documentation. S'y tenir.
+
+---
+
+## Sommaire
+
+1. [À quoi sert ce projet](#à-quoi-sert-ce-projet)
+2. [Ce qu'est ce dépôt](#ce-quest-ce-dépôt)
+3. [Sur quoi ça tourne](#sur-quoi-ça-tourne)
+4. [Compiler et publier](#compiler-et-publier)
+5. [Règle non négociable : la version](#règle-non-négociable--la-version)
+6. [Skills du dépôt](#skills-du-dépôt)
+7. [Commandes](#commandes)
+8. [CI : ce qui se déclenche](#ci--ce-qui-se-déclenche)
+9. [Environnement de développement](#environnement-de-développement)
+10. [Carte du code](#carte-du-code)
+11. [Décisions à ne pas défaire](#décisions-à-ne-pas-défaire)
+12. [Ressources pour les agents](#ressources-pour-les-agents)
 
 ---
 
@@ -1502,3 +1519,43 @@ C'est ce banc qui a trouvé les deux pannes critiques de
 `AUDIT-ROBUSTESSE-2026-08.md` — invisibles en lecture de code, parce qu'elles
 supposent une donnée locale abîmée. À rejouer après toute modification du
 chargement du fil, du cache ou de l'état.
+
+---
+
+## Ressources pour les agents
+
+### Pour Vibe Code
+- **Fichier dédié** : `.vibe/instructions.md` contient le contexte et les instructions spécifiques à Vibe Code
+- **Configuration** : `.vibe/config.json` définit les restrictions et conventions pour Vibe Code
+
+### Outils d'analyse
+- **Script d'analyse** : `scripts/vibe-analyze.js` - Analyse du repository (ES modules)
+- **Script de vérification** : `scripts/vibe-check.js` - Vérification pré-commit (ES modules)
+
+### Commandes utiles
+```bash
+# Analyse du repository
+npm run vibe:analyze
+
+# Vérification pré-commit
+npm run vibe:check
+
+# Lint + Format + Tests (CI)
+npm run lint
+npm run format:check
+npm test
+
+# Build Android
+npm run cap:sync
+cd android && ./gradlew assembleDebug
+```
+
+### Documentation complémentaire
+- **README.md** : Philosophie et architecture du projet
+- **docs/architecture/** : Décisions architecturales détaillées
+- **AUDIT-*.md** : Audits de robustesse et corrections
+- **.claude/skills/** : Procédures répétitives automatisées
+
+---
+
+*Ce fichier est le guide principal pour tous les agents IA. Pour les instructions spécifiques à Vibe Code, voir `.vibe/instructions.md`.*

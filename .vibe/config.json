@@ -1,0 +1,229 @@
+{
+  "name": "SwiperNews Vibe Code Configuration",
+  "version": "1.0.0",
+  "description": "Configuration spécifique pour Vibe Code sur le projet SwiperNews",
+  
+  "project": {
+    "name": "swipernews",
+    "repository": "notsogeek87/swipernews",
+    "website": "https://news.lielu.eu",
+    "license": "GPL-3.0-or-later",
+    "language": "fr"
+  },
+  
+  "restrictions": {
+    "forbidden_actions": [
+      "NE JAMAIS modifier index.html ou src/*.js SANS bump de version",
+      "NE JAMAIS activer CapacitorHttp globalement (utiliser nativeGet() pour RSS seulement)",
+      "NE JAMAIS accepter les bandeaux de consentement (masquage uniquement)",
+      "NE JAMAIS bloquer le fil de se charger avec des données locales non validées",
+      "NE JAMAIS changer la licence du projet (GPL-3.0-or-later)"
+    ],
+    "read_only_files": [
+      "www/"
+    ],
+    "version_bump_required": [
+      "index.html",
+      "src/lib.js",
+      "src/i18n.js",
+      "src/learn-core.js"
+    ],
+    "version_bump_locations": [
+      {
+        "file": "index.html",
+        "pattern": "APP_VERSION",
+        "description": "Version de l'application"
+      },
+      {
+        "file": "index.html",
+        "pattern": "src/.*\\.js\\?v=",
+        "description": "Paramètre v= dans les scripts"
+      },
+      {
+        "file": "sw.js",
+        "pattern": "const CACHE = \"flux-v",
+        "description": "Version du cache dans le Service Worker"
+      }
+    ]
+  },
+  
+  "conventions": {
+    "code_style": {
+      "index.html": {
+        "style": "compact",
+        "description": "JS/CSS en ligne - dense à dessein, NE PAS reformater",
+        "formatter": "none"
+      },
+      "src/": {
+        "style": "standard",
+        "description": "Fonctions pures partagées",
+        "formatter": "prettier"
+      },
+      "api/": {
+        "style": "standard",
+        "description": "Endpoints serverless Vercel",
+        "formatter": "prettier"
+      },
+      "android/": {
+        "style": "java",
+        "description": "Projet Capacitor natif",
+        "formatter": "none"
+      }
+    },
+    "naming": {
+      "language": "fr",
+      "prefixes": {
+        "css": "sn-",
+        "data_attributes": "data-*"
+      },
+      "variables": {
+        "theme": "--redline-rgb",
+        "theme_description": "Triplets R,G,B pour les fonctions CSS avec opacité"
+      }
+    },
+    "testing": {
+      "framework": "node --test",
+      "test_files": "test/*.test.js",
+      "qa_bank": "tools/qa-scenarios.js",
+      "scenarios": [
+        "forcetop",
+        "teteouverture", 
+        "lentnews",
+        "video",
+        "motsmasques",
+        "pausedouce",
+        "ecoute",
+        "redites",
+        "quitte"
+      ]
+    }
+  },
+  
+  "workflows": {
+    "development": {
+      "local_test": {
+        "web": "python3 -m http.server 8000",
+        "android": "npm run cap:sync && cd android && ./gradlew assembleDebug"
+      },
+      "scripts": {
+        "lint": "npm run lint",
+        "format": "npm run format",
+        "format:check": "npm run format:check",
+        "test": "npm test",
+        "cap:prepare": "npm run cap:prepare",
+        "cap:sync": "npm run cap:sync",
+        "android:open": "npm run android:open"
+      }
+    },
+    "ci_cd": {
+      "workflows": [
+        {
+          "name": "CI",
+          "file": ".github/workflows/ci.yml",
+          "description": "Lint + Format check + Tests",
+          "triggers": ["push to main/staging", "pull request"]
+        },
+        {
+          "name": "Android APK",
+          "file": ".github/workflows/android.yml",
+          "description": "Build APK (préversion)",
+          "triggers": ["push to main/staging", "pull request"]
+        },
+        {
+          "name": "Release APK",
+          "file": ".github/workflows/release.yml",
+          "description": "Build APK de publication",
+          "triggers": ["tag vX.Y.Z"]
+        },
+        {
+          "name": "Play Store AAB",
+          "file": ".github/workflows/play-store-bundle.yml",
+          "description": "Build AAB + Publication Google Play",
+          "triggers": ["manual (workflow_dispatch)"]
+        }
+      ],
+      "version_calculation": {
+        "android_versionCode": "majeur × 10^8 + mineur × 10^6 + correctif × 10^4",
+        "ci_versionCode": "versionCode(build.gradle) - 10000 + run_number"
+      }
+    }
+  },
+  
+  "architecture": {
+    "type": "PWA + APK Android",
+    "frontend": {
+      "main_file": "index.html",
+      "description": "Application complète en un seul fichier (CSS + JS en ligne)",
+      "shared_functions": "src/*.js",
+      "service_worker": "sw.js"
+    },
+    "backend": {
+      "provider": "Vercel",
+      "functions": "api/*.js",
+      "endpoints": [
+        "api/feed.js",
+        "api/learn.js", 
+        "api/og.js"
+      ]
+    },
+    "mobile": {
+      "framework": "Capacitor 8",
+      "platform": "Android",
+      "targetSdk": 36,
+      "minSdk": 24,
+      "webDir": "www/"
+    }
+  },
+  
+  "quality_gates": {
+    "required_checks": [
+      "npm run lint",
+      "npm run format:check",
+      "npm test"
+    ],
+    "optional_checks": [
+      "node tools/qa-scenarios.js"
+    ],
+    "critical_rules": [
+      "Toute modification de index.html/src/*.js DOIT être accompagnée d'un bump de version",
+      "Les données locales (localStorage) ne doivent JAMAIS bloquer le chargement",
+      "Les bandeaux de consentement doivent être MASQUÉS, jamais acceptés",
+      "Le fil doit toujours pouvoir se charger, même avec des données corrompues"
+    ]
+  },
+  
+  "documentation": {
+    "primary": [
+      {
+        "file": "README.md",
+        "description": "Philosophie et architecture du projet"
+      },
+      {
+        "file": "AGENTS.md",
+        "description": "Guide pour tous les agents IA"
+      },
+      {
+        "file": ".vibe/instructions.md",
+        "description": "Instructions spécifiques pour Vibe Code"
+      }
+    ],
+    "secondary": [
+      "AUDIT.md",
+      "AUDIT-2026-08.md",
+      "AUDIT-ROBUSTESSE-2026-08.md",
+      "docs/architecture/"
+    ],
+    "skills": ".claude/skills/"
+  },
+  
+  "contacts": {
+    "repository": "https://github.com/notsogeek87/swipernews",
+    "website": "https://news.lielu.eu"
+  },
+  
+  "metadata": {
+    "created": "2024-10-20",
+    "maintainer": "Vibe Code",
+    "notes": "Cette configuration est spécifique à Vibe Code. Pour les autres agents, voir AGENTS.md."
+  }
+}
