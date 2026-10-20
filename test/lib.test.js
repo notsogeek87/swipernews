@@ -1164,7 +1164,7 @@ test("groupItems(list,n,isSolo) isole les articles solo, sans jamais fragmenter 
 
 test("groupItems(list,n,isSolo) : une alternance stricte solo/groupable groupe quand même normalement", () => {
   // Cas réel qui a motivé la réécriture : le tour de rôle « une actu, une
-  // vidéo » (voir CLAUDE.md) alterne STRICTEMENT les deux natures. Fermer le
+  // vidéo » (voir AGENTS.md) alterne STRICTEMENT les deux natures. Fermer le
   // groupe en cours à chaque solo rencontré (premier essai) donnait alors
   // une carte de 1 article sur deux, quel que soit cardsPerSwipe — plus
   // aucun regroupement effectif. Ici, les 6 articles groupables doivent

@@ -2,7 +2,7 @@
 // tests Node (même mécanique que src/learn-core.js : chargé en <script src>
 // classique dans index.html, et en require() côté test).
 //
-// Le français est la langue SOURCE, complète par construction (voir CLAUDE.md :
+// Le français est la langue SOURCE, complète par construction (voir AGENTS.md :
 // "Tout est en français"). Les autres langues sont des COUCHES PAR-DESSUS,
 // partielles par nature : une clé absente d'une langue retombe sur le
 // français plutôt que d'afficher un vide — ajouter une langue est donc
@@ -11,7 +11,7 @@
 // Ce que ce fichier NE traduit PAS, par choix documenté :
 //   - le contenu des articles (RSS, Wikipédia) : ce n'est pas un texte
 //     d'interface, et aucune traduction automatique n'est appelée (voir
-//     CLAUDE.md, "aucun appel à un tiers non choisi") ;
+//     AGENTS.md, "aucun appel à un tiers non choisi") ;
 //   - relTime() (src/lib.js) : les dates relatives restent en français quelle
 //     que soit LANG, pour ne pas faire diverger une fonction pure déjà testée
 //     et utilisée partout (cartes, liste de blocage). À reprendre séparément

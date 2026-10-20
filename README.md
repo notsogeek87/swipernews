@@ -747,7 +747,7 @@ Quatre choses à savoir avant une première contribution :
 4. **Le dépôt est en français** — commentaires, messages de commit, textes
    d'interface. Les commentaires y expliquent le *pourquoi*, pas le *quoi*.
 
-[`CLAUDE.md`](CLAUDE.md) rassemble en un seul endroit la carte du code, les
+[`AGENTS.md`](AGENTS.md) rassemble en un seul endroit la carte du code, les
 décisions à ne pas défaire et les pièges déjà payés. Écrit pour un assistant de
 code, il se lit très bien pour prendre le dépôt en main.
 
