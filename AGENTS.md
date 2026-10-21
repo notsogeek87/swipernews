@@ -1,5 +1,15 @@
 # Guide pour tous les agents IA - SwiperNews
 
+## ⚠️ RÈGLE FONDAMENTALE POUR TOUS LES AGENTS IA
+**L'agent code SEUL, de A à Z.**
+- Il **ne demande JAMAIS** à l'utilisateur de coder.
+- Il **vérifie systématiquement** que :
+  - Le code compile (`npm run build`, `npm run cap:sync`, etc.).
+  - **TOUS les tests passent** (`npm test`) avant tout push.
+- Si un choix d'architecture bloque, il pose **une seule question courte** pour trancher.
+
+---
+
 Ce fichier complète le README (qui, lui, explique le *pourquoi* de chaque choix
 en détail). Ici : ce qu'il faut savoir avant de toucher au dépôt, et ce qui ne
 se devine pas en lisant le code.
