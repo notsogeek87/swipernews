@@ -62,6 +62,7 @@
 ## 📝 Notes supplémentaires
 
 Ajoutez ici toute information complémentaire :
+
 - Captures d'écran (si UI/UX)
 - Benchmarks (si performance)
 - Comportements attendus vs observés
@@ -69,5 +70,5 @@ Ajoutez ici toute information complémentaire :
 
 ---
 
-*Merci pour votre contribution ! 🙏*
-*Rappel : Tout est en français - commentaires, messages de commit, interface.*
+_Merci pour votre contribution ! 🙏_
+_Rappel : Tout est en français - commentaires, messages de commit, interface._

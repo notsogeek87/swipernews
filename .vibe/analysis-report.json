@@ -23,11 +23,7 @@
       ".py": 2
     },
     "keyFiles": {
-      "entryPoints": [
-        "index.html",
-        "manifest.webmanifest",
-        "sw.js"
-      ],
+      "entryPoints": ["index.html", "manifest.webmanifest", "sw.js"],
       "sourceFiles": [
         "api/feed.js",
         "api/learn.js",
@@ -103,11 +99,7 @@
   },
   "stack": {
     "frontend": {
-      "languages": [
-        "HTML",
-        "CSS",
-        "JavaScript"
-      ],
+      "languages": ["HTML", "CSS", "JavaScript"],
       "frameworks": [],
       "buildTools": [
         "lint",
@@ -121,19 +113,11 @@
         "vibe:analyze",
         "vibe:check"
       ],
-      "features": [
-        "PWA",
-        "Service Worker",
-        "Zero Build"
-      ]
+      "features": ["PWA", "Service Worker", "Zero Build"]
     },
     "backend": {
       "provider": "Vercel",
-      "functions": [
-        "feed.js",
-        "learn.js",
-        "og.js"
-      ],
+      "functions": ["feed.js", "learn.js", "og.js"],
       "runtime": "Node.js"
     },
     "mobile": {
@@ -146,15 +130,9 @@
       }
     },
     "devTools": {
-      "linters": [
-        "ESLint"
-      ],
-      "formatters": [
-        "Prettier"
-      ],
-      "testRunners": [
-        "Node.js Test Runner"
-      ]
+      "linters": ["ESLint"],
+      "formatters": ["Prettier"],
+      "testRunners": ["Node.js Test Runner"]
     },
     "dependencies": {
       "production": [],
@@ -174,11 +152,7 @@
       {
         "name": "android",
         "file": "android.yml",
-        "triggers": [
-          "push",
-          "pull_request",
-          "manual"
-        ],
+        "triggers": ["push", "pull_request", "manual"],
         "jobs": [
           "build",
           "steps",
@@ -218,26 +192,13 @@
       {
         "name": "ci",
         "file": "ci.yml",
-        "triggers": [
-          "push",
-          "pull_request"
-        ],
-        "jobs": [
-          "quality",
-          "steps",
-          "with",
-          "run",
-          "run",
-          "run",
-          "run"
-        ]
+        "triggers": ["push", "pull_request"],
+        "jobs": ["quality", "steps", "with", "run", "run", "run", "run"]
       },
       {
         "name": "play-store-bundle",
         "file": "play-store-bundle.yml",
-        "triggers": [
-          "manual"
-        ],
+        "triggers": ["manual"],
         "jobs": [
           "bundle",
           "steps",
@@ -274,11 +235,7 @@
       {
         "name": "release",
         "file": "release.yml",
-        "triggers": [
-          "push",
-          "manual",
-          "tags"
-        ],
+        "triggers": ["push", "manual", "tags"],
         "jobs": [
           "release",
           "steps",
@@ -351,15 +308,7 @@
         "BRANCH",
         "run"
       ],
-      "ci": [
-        "quality",
-        "steps",
-        "with",
-        "run",
-        "run",
-        "run",
-        "run"
-      ],
+      "ci": ["quality", "steps", "with", "run", "run", "run", "run"],
       "play-store-bundle": [
         "bundle",
         "steps",
@@ -459,37 +408,23 @@
     "skills": [
       {
         "name": "swipernews-bump",
-        "files": [
-          "SKILL.md",
-          "scripts"
-        ]
+        "files": ["SKILL.md", "scripts"]
       },
       {
         "name": "swipernews-i18n-changelog",
-        "files": [
-          "SKILL.md"
-        ]
+        "files": ["SKILL.md"]
       },
       {
         "name": "swipernews-natif-sans-sdk",
-        "files": [
-          "SKILL.md"
-        ]
+        "files": ["SKILL.md"]
       },
       {
         "name": "swipernews-release",
-        "files": [
-          "SKILL.md",
-          "scripts"
-        ]
+        "files": ["SKILL.md", "scripts"]
       },
       {
         "name": "swipernews-verifier",
-        "files": [
-          "SKILL.md",
-          "references",
-          "scripts"
-        ]
+        "files": ["SKILL.md", "references", "scripts"]
       }
     ],
     "totalLines": 3544

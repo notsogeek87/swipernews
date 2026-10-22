@@ -2,7 +2,7 @@
   "name": "SwiperNews Vibe Code Configuration",
   "version": "1.0.0",
   "description": "Configuration spécifique pour Vibe Code sur le projet SwiperNews",
-  
+
   "project": {
     "name": "swipernews",
     "repository": "notsogeek87/swipernews",
@@ -10,7 +10,7 @@
     "license": "GPL-3.0-or-later",
     "language": "fr"
   },
-  
+
   "restrictions": {
     "forbidden_actions": [
       "NE JAMAIS modifier index.html ou src/*.js SANS bump de version",
@@ -19,9 +19,7 @@
       "NE JAMAIS bloquer le fil de se charger avec des données locales non validées",
       "NE JAMAIS changer la licence du projet (GPL-3.0-or-later)"
     ],
-    "read_only_files": [
-      "www/"
-    ],
+    "read_only_files": ["www/"],
     "version_bump_required": [
       "index.html",
       "src/lib.js",
@@ -46,7 +44,7 @@
       }
     ]
   },
-  
+
   "conventions": {
     "code_style": {
       "index.html": {
@@ -87,7 +85,7 @@
       "qa_bank": "tools/qa-scenarios.js",
       "scenarios": [
         "forcetop",
-        "teteouverture", 
+        "teteouverture",
         "lentnews",
         "video",
         "motsmasques",
@@ -98,7 +96,7 @@
       ]
     }
   },
-  
+
   "workflows": {
     "development": {
       "local_test": {
@@ -148,7 +146,7 @@
       }
     }
   },
-  
+
   "architecture": {
     "type": "PWA + APK Android",
     "frontend": {
@@ -160,11 +158,7 @@
     "backend": {
       "provider": "Vercel",
       "functions": "api/*.js",
-      "endpoints": [
-        "api/feed.js",
-        "api/learn.js", 
-        "api/og.js"
-      ]
+      "endpoints": ["api/feed.js", "api/learn.js", "api/og.js"]
     },
     "mobile": {
       "framework": "Capacitor 8",
@@ -174,16 +168,10 @@
       "webDir": "www/"
     }
   },
-  
+
   "quality_gates": {
-    "required_checks": [
-      "npm run lint",
-      "npm run format:check",
-      "npm test"
-    ],
-    "optional_checks": [
-      "node tools/qa-scenarios.js"
-    ],
+    "required_checks": ["npm run lint", "npm run format:check", "npm test"],
+    "optional_checks": ["node tools/qa-scenarios.js"],
     "critical_rules": [
       "Toute modification de index.html/src/*.js DOIT être accompagnée d'un bump de version",
       "Les données locales (localStorage) ne doivent JAMAIS bloquer le chargement",
@@ -191,7 +179,7 @@
       "Le fil doit toujours pouvoir se charger, même avec des données corrompues"
     ]
   },
-  
+
   "documentation": {
     "primary": [
       {
@@ -215,12 +203,12 @@
     ],
     "skills": ".claude/skills/"
   },
-  
+
   "contacts": {
     "repository": "https://github.com/notsogeek87/swipernews",
     "website": "https://news.lielu.eu"
   },
-  
+
   "metadata": {
     "created": "2024-10-20",
     "maintainer": "Vibe Code",
