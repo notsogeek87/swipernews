@@ -12,6 +12,7 @@ import android.widget.ScrollView;
  */
 public class MaxHeightScrollView extends ScrollView {
     private int maxHeightPx = Integer.MAX_VALUE;
+    private boolean fixedHeight;
 
     public MaxHeightScrollView(Context context) {
         super(context);
@@ -27,10 +28,22 @@ public class MaxHeightScrollView extends ScrollView {
         requestLayout();
     }
 
+    /**
+     * Hauteur figée au maximum : la feuille garde sa taille pendant que le texte
+     * s'écrit, au lieu de monter à mesure qu'il grandit (ce qui fait bouger ce
+     * qu'on est en train de lire).
+     */
+    public void setFixedHeight(boolean fixed) {
+        if (fixed == fixedHeight) return;
+        fixedHeight = fixed;
+        requestLayout();
+    }
+
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         if (maxHeightPx != Integer.MAX_VALUE) {
-            heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(maxHeightPx, View.MeasureSpec.AT_MOST);
+            heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(maxHeightPx,
+                fixedHeight ? View.MeasureSpec.EXACTLY : View.MeasureSpec.AT_MOST);
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
     }

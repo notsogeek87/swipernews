@@ -362,6 +362,7 @@ final class ReaderSummary {
 
     private void start(File model) {
         state = State.WORKING;
+        scroll.setFixedHeight(true);   // la feuille ne bouge plus pendant l'écriture
         final int my = ++session;
         text.setText("");
         setNote(ctx.getString(R.string.summary_note_prepare));
@@ -377,7 +378,7 @@ final class ReaderSummary {
             if (summarizer == null) summarizer = new Summarizer();
             summarizer.summarize(model, host.articleTitle(), article, "fr", !hasPage, new Summarizer.Listener() {
                 private boolean first = true;
-                /** Résumé en plusieurs parties : on laisse le lecteur où il est, voir onText. */
+                /** Résumé en plusieurs parties. */
                 private boolean multi;
 
                 @Override
@@ -398,9 +399,8 @@ final class ReaderSummary {
                         setNote(ctx.getString(R.string.summary_note_local));
                     }
                     text.append(piece);
-                    // En plusieurs parties, on lit la première pendant que la suivante s'écrit :
-                    // suivre le bas du texte ramènerait le lecteur loin de ce qu'il lit.
-                    if (!multi) scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
+                    // Jamais de défilement automatique : le texte qui arrive s'écrit sous
+                    // la fenêtre, et c'est l'utilisateur qui défile s'il le souhaite.
                 }
 
                 @Override
@@ -430,6 +430,7 @@ final class ReaderSummary {
             if (text.length() > 0) done();
             else {
                 state = State.IDLE;
+                scroll.setFixedHeight(false);
                 showPanel(false);
                 updateFab();
             }
@@ -477,6 +478,7 @@ final class ReaderSummary {
 
     private void failWithModelOption(String message, boolean offerDelete) {
         state = State.ERROR;
+        scroll.setFixedHeight(false);
         text.setText(message);
         setNote(ctx.getString(R.string.summary_note_local));
         showProgress(false, 0);
@@ -532,6 +534,7 @@ final class ReaderSummary {
 
     private void reset() {
         state = State.IDLE;
+        scroll.setFixedHeight(false);
         session++;
         stopListening();
         text.setText("");
