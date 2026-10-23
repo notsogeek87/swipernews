@@ -368,6 +368,7 @@ final class ReaderSummary {
         setNote(ctx.getString(R.string.summary_note_prepare));
         showProgress(true, 0);
         setButtons(ctx.getString(R.string.summary_stop), v -> cancelSummary(), null, null, null, null);
+        reserveDoneLayout();
         host.readArticle(raw -> {
             if (my != session || destroyed) return;
             final String article = raw == null ? "" : raw.trim();
@@ -448,6 +449,27 @@ final class ReaderSummary {
         styleDeleteButton(btn3);
         refreshListen();
         listenBtn.setVisibility(View.VISIBLE);
+        // Même emprise que pendant l'écriture : la feuille ne change pas de hauteur à la fin.
+        if (btn2.getVisibility() == View.GONE) {
+            btn2.setText(" ");
+            btn2.setVisibility(View.INVISIBLE);
+        }
+        progress.setVisibility(View.INVISIBLE);
+    }
+
+    /**
+     * Pendant l'écriture, on réserve la place de ce qui apparaît à la fin (icône
+     * d'écoute, « Lire l'article », « Supprimer le modèle », trait de progression)
+     * sans l'afficher : la feuille garde la même hauteur du début à la fin, au lieu
+     * de monter d'un coup quand le résumé s'achève.
+     */
+    private void reserveDoneLayout() {
+        listenBtn.setVisibility(View.INVISIBLE);
+        btn2.setText(" ");
+        btn2.setVisibility(View.INVISIBLE);
+        refreshDeleteLabel();
+        styleDeleteButton(btn3);
+        btn3.setVisibility(View.INVISIBLE);
     }
 
     /* ---------- Lecture à voix haute (facultative) ---------- */
