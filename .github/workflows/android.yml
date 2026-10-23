@@ -121,7 +121,8 @@ jobs:
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             name="$base.$build"
           else
-            name="$base.$build-$REF_NAME"
+            # « 65/merge » (PR) ou « security/x » : une « / » ferait de la version un chemin
+            name="$base.$build-$(printf %s "$REF_NAME" | tr -c "A-Za-z0-9._\n-" "-")"
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "name=$name" >> "$GITHUB_OUTPUT"
