@@ -462,6 +462,25 @@ final class ReaderSummary {
             btn2.setVisibility(View.INVISIBLE);
         }
         progress.setVisibility(View.INVISIBLE);
+        arrangeActions(true);
+    }
+
+    /**
+     * À la fin, « Fermer » passe en BAS de la pile, exactement là où se tenait
+     * « Arrêter » : le bouton principal ne change pas de place, seuls les liens
+     * secondaires apparaissent au-dessus. Hors de cet état, ordre d'origine.
+     */
+    private void arrangeActions(boolean done) {
+        final android.widget.LinearLayout box = (android.widget.LinearLayout) btn1.getParent();
+        final boolean atEnd = box.indexOfChild(btn1) == box.getChildCount() - 1;
+        if (done != atEnd) {
+            box.removeView(btn1);
+            if (done) box.addView(btn1); else box.addView(btn1, 0);
+        }
+        final float d = ctx.getResources().getDisplayMetrics().density;
+        ((android.widget.LinearLayout.LayoutParams) btn1.getLayoutParams()).topMargin =
+            done ? Math.round(10 * d) : 0;
+        btn1.requestLayout();
     }
 
     /**
@@ -472,6 +491,7 @@ final class ReaderSummary {
      * pouce, au lieu de flotter au milieu avec du vide dessous.
      */
     private void enterWritingLayout() {
+        listenBtn.setVisibility(View.INVISIBLE);
         if (writingLayout) return;
         writingLayout = true;
         scroll.setMaxHeightPx(baseMaxPx);
@@ -494,9 +514,10 @@ final class ReaderSummary {
         final int l = listenBtn.getVisibility(), b2 = btn2.getVisibility(), b3 = btn3.getVisibility();
         final int pg = progress.getVisibility();
         final CharSequence t2 = btn2.getText(), t3 = btn3.getText();
+        listenBtn.setVisibility(View.INVISIBLE);
         panel.measure(wSpec, hSpec);
         final int working = panel.getMeasuredHeight();
-        listenBtn.setVisibility(View.VISIBLE);
+        arrangeActions(true);
         btn2.setText(" ");
         btn2.setVisibility(View.VISIBLE);
         refreshDeleteLabel();
@@ -505,6 +526,7 @@ final class ReaderSummary {
         progress.setVisibility(View.INVISIBLE);
         panel.measure(wSpec, hSpec);
         final int done = panel.getMeasuredHeight();
+        arrangeActions(false);
         listenBtn.setVisibility(l);
         btn2.setVisibility(b2);
         btn3.setVisibility(b3);
@@ -623,7 +645,9 @@ final class ReaderSummary {
         deleteArmed = false;
         btn3.removeCallbacks(disarmDelete);
         stopListening();
-        listenBtn.setVisibility(View.GONE);
+        arrangeActions(false);
+        // Pendant l'écriture l'icône garde sa place : l'en-tête ne change pas de hauteur à la fin.
+        listenBtn.setVisibility(writingLayout ? View.INVISIBLE : View.GONE);
         // Le 3e bouton a pu servir de lien discret : retour au style d'origine.
         btn3.setBackground(theme.secondaryButton());
         btn3.setTextColor(theme.ink);
