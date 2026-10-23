@@ -88,6 +88,9 @@ final class ReaderSummary {
     /** Incrémenté à chaque nouvelle demande : le rappel d'une demande dépassée est ignoré. */
     private int session;
     private final int basePanelBottom;
+    /** Hauteur de la zone de texte hors écriture, et vrai tant que la feuille garde sa taille d'écriture. */
+    private final int baseMaxPx;
+    private boolean writingLayout;
     private final int baseFabBottom;
 
     ReaderSummary(Context ctx, View root, Host host, String themeSpec) {
@@ -122,8 +125,9 @@ final class ReaderSummary {
 
         basePanelBottom = panel.getPaddingBottom();
         baseFabBottom = ((FrameLayout.LayoutParams) fab.getLayoutParams()).bottomMargin;
-        scroll.setMaxHeightPx(Math.round(
-            ctx.getResources().getDisplayMetrics().heightPixels * MAX_TEXT_SCREEN_SHARE));
+        baseMaxPx = Math.round(
+            ctx.getResources().getDisplayMetrics().heightPixels * MAX_TEXT_SCREEN_SHARE);
+        scroll.setMaxHeightPx(baseMaxPx);
 
         theme = SummaryTheme.parse(themeSpec, ctx.getResources().getDisplayMetrics().density);
         applyTheme(root, theme);
@@ -222,6 +226,7 @@ final class ReaderSummary {
         setNote(ctx.getString(R.string.summary_note_local));
         showProgress(true, 0);
         setButtons(ctx.getString(R.string.summary_close_btn), v -> close(), null, null, null, null);
+        enterWritingLayout();   // dès l'ouverture : la feuille ne passe pas de petite à grande
         showPanel(true);
         updateFab();
     }
@@ -281,6 +286,7 @@ final class ReaderSummary {
     /* ---------- Le modèle manque ---------- */
 
     private void showNeedModel() {
+        leaveWritingLayout();
         state = State.NEED_MODEL;
         text.setText(R.string.summary_need_model);
         setNote(ctx.getString(R.string.summary_note_local));
@@ -362,13 +368,12 @@ final class ReaderSummary {
 
     private void start(File model) {
         state = State.WORKING;
-        scroll.setFixedHeight(true);   // la feuille ne bouge plus pendant l'écriture
         final int my = ++session;
         text.setText("");
         setNote(ctx.getString(R.string.summary_note_prepare));
         showProgress(true, 0);
         setButtons(ctx.getString(R.string.summary_stop), v -> cancelSummary(), null, null, null, null);
-        reserveDoneLayout();
+        enterWritingLayout();
         host.readArticle(raw -> {
             if (my != session || destroyed) return;
             final String article = raw == null ? "" : raw.trim();
@@ -431,7 +436,7 @@ final class ReaderSummary {
             if (text.length() > 0) done();
             else {
                 state = State.IDLE;
-                scroll.setFixedHeight(false);
+                leaveWritingLayout();
                 showPanel(false);
                 updateFab();
             }
@@ -449,7 +454,9 @@ final class ReaderSummary {
         styleDeleteButton(btn3);
         refreshListen();
         listenBtn.setVisibility(View.VISIBLE);
-        // Même emprise que pendant l'écriture : la feuille ne change pas de hauteur à la fin.
+        // Même emprise que pendant l'écriture : la zone de texte rend à la feuille la place
+        // que les boutons de fin viennent d'occuper, elle ne change pas de hauteur.
+        scroll.setMaxHeightPx(baseMaxPx);
         if (btn2.getVisibility() == View.GONE) {
             btn2.setText(" ");
             btn2.setVisibility(View.INVISIBLE);
@@ -458,18 +465,53 @@ final class ReaderSummary {
     }
 
     /**
-     * Pendant l'écriture, on réserve la place de ce qui apparaît à la fin (icône
-     * d'écoute, « Lire l'article », « Supprimer le modèle », trait de progression)
-     * sans l'afficher : la feuille garde la même hauteur du début à la fin, au lieu
-     * de monter d'un coup quand le résumé s'achève.
+     * Fige la feuille à sa taille FINALE dès l'ouverture : pendant l'attente et
+     * l'écriture, la zone de texte occupe aussi la place que prendront les boutons
+     * de fin (écoute, « Lire l'article », « Supprimer le modèle »). Ainsi la feuille
+     * ne change jamais de hauteur, et le bouton d'action reste en bas, sous le
+     * pouce, au lieu de flotter au milieu avec du vide dessous.
      */
-    private void reserveDoneLayout() {
-        listenBtn.setVisibility(View.INVISIBLE);
+    private void enterWritingLayout() {
+        if (writingLayout) return;
+        writingLayout = true;
+        scroll.setMaxHeightPx(baseMaxPx);
+        scroll.setFixedHeight(true);
+        final int extra = doneExtraPx();
+        scroll.setMaxHeightPx(baseMaxPx + extra);
+    }
+
+    private void leaveWritingLayout() {
+        writingLayout = false;
+        scroll.setFixedHeight(false);
+        scroll.setMaxHeightPx(baseMaxPx);
+    }
+
+    /** Hauteur que la feuille gagne quand les boutons de fin apparaissent (mesurée, jamais devinée). */
+    private int doneExtraPx() {
+        final int w = ctx.getResources().getDisplayMetrics().widthPixels;
+        final int wSpec = View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY);
+        final int hSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+        final int l = listenBtn.getVisibility(), b2 = btn2.getVisibility(), b3 = btn3.getVisibility();
+        final int pg = progress.getVisibility();
+        final CharSequence t2 = btn2.getText(), t3 = btn3.getText();
+        panel.measure(wSpec, hSpec);
+        final int working = panel.getMeasuredHeight();
+        listenBtn.setVisibility(View.VISIBLE);
         btn2.setText(" ");
-        btn2.setVisibility(View.INVISIBLE);
+        btn2.setVisibility(View.VISIBLE);
         refreshDeleteLabel();
         styleDeleteButton(btn3);
-        btn3.setVisibility(View.INVISIBLE);
+        btn3.setVisibility(View.VISIBLE);
+        progress.setVisibility(View.INVISIBLE);
+        panel.measure(wSpec, hSpec);
+        final int done = panel.getMeasuredHeight();
+        listenBtn.setVisibility(l);
+        btn2.setVisibility(b2);
+        btn3.setVisibility(b3);
+        progress.setVisibility(pg);
+        btn2.setText(t2);
+        btn3.setText(t3);
+        return Math.max(0, done - working);
     }
 
     /* ---------- Lecture à voix haute (facultative) ---------- */
@@ -500,7 +542,7 @@ final class ReaderSummary {
 
     private void failWithModelOption(String message, boolean offerDelete) {
         state = State.ERROR;
-        scroll.setFixedHeight(false);
+        leaveWritingLayout();
         text.setText(message);
         setNote(ctx.getString(R.string.summary_note_local));
         showProgress(false, 0);
@@ -556,7 +598,7 @@ final class ReaderSummary {
 
     private void reset() {
         state = State.IDLE;
-        scroll.setFixedHeight(false);
+        leaveWritingLayout();
         session++;
         stopListening();
         text.setText("");
