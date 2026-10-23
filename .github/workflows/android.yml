@@ -98,6 +98,8 @@ jobs:
       # dessus eux — l'inverse exact du problème qu'on corrige.
       - name: Calcule la version
         id: version
+        env:
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           base="$(node -p "require('./package.json').version")"
@@ -119,7 +121,7 @@ jobs:
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             name="$base.$build"
           else
-            name="$base.$build-${{ github.ref_name }}"
+            name="$base.$build-$REF_NAME"
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "name=$name" >> "$GITHUB_OUTPUT"
