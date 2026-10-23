@@ -49,7 +49,7 @@ final class ReaderSummary {
     private enum State { IDLE, NEED_MODEL, TRANSFER, WORKING, DONE, ERROR }
 
     /** Au-delà de cette part de l'écran, le résumé défile plutôt que d'agrandir la feuille. */
-    private static final float MAX_TEXT_SCREEN_SHARE = 0.5f;
+    private static final float MAX_TEXT_SCREEN_SHARE = 0.4f;
     /** Un article plus court n'a rien à résumer. */
     private static final int MIN_ARTICLE_CHARS = 200;
 
