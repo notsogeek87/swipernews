@@ -101,9 +101,17 @@
       "autoplay.label": "Lecture auto des vidéos",
       "autoplay.desc.off": "Tu lances chaque vidéo toi-même avec ▶.",
       "autoplay.desc.on":
-        "Dans les modes Vidéos (filtre ou onglet Vidéos), la vidéo démarre 0,5 s après le swipe.",
+        "Dans les modes Vidéos (filtre ou onglet Vidéos), la vidéo démarre après le swipe.",
       "autoplay.opt.off": "Non",
       "autoplay.opt.on": "Oui",
+      "autoplay.delay.label": "Délai avant lecture",
+      "autoplay.delay.desc":
+        "Temps d'attente après le swipe avant le lancement de la vidéo.",
+      "autoplay.delay.opt.500": "0,5 s",
+      "autoplay.delay.opt.1000": "1 s",
+      "autoplay.delay.opt.2000": "2 s",
+      "autoplay.delay.opt.3000": "3 s",
+      "autoplay.delay.opt.5000": "5 s",
       "changelog.v303.item1":
         "Le bouton ✨ résume aussi les vidéos YouTube, à partir de leurs sous-titres (s'il y en a).",
       "changelog.v301.item1":
@@ -680,9 +688,16 @@
       "autoplay.label": "Autoplay videos",
       "autoplay.desc.off": "You start each video yourself with ▶.",
       "autoplay.desc.on":
-        "In Videos modes (filter or Videos tab), the video starts 0.5 s after the swipe.",
+        "In Videos modes (filter or Videos tab), the video starts after the swipe.",
       "autoplay.opt.off": "Off",
       "autoplay.opt.on": "On",
+      "autoplay.delay.label": "Delay before playing",
+      "autoplay.delay.desc": "How long to wait after the swipe before the video starts.",
+      "autoplay.delay.opt.500": "0.5 s",
+      "autoplay.delay.opt.1000": "1 s",
+      "autoplay.delay.opt.2000": "2 s",
+      "autoplay.delay.opt.3000": "3 s",
+      "autoplay.delay.opt.5000": "5 s",
       "changelog.v299.item1":
         "Autoplay: now also works with the Videos tab (horizontal swipe), not only the filter.",
       "changelog.v298.item1":
