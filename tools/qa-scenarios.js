@@ -3434,6 +3434,40 @@ ${Array.from({ length: 12 }, (_, k) => {
     console.log(
       `démarrage : ${a.appels} appel, ${a.n} cartes (1..40 attendu), 1re = carte courante : ${a.premiere}, phrases ≤ 200 : ${a.phrases}, langue ${a.lang}, pilule ${a.pilule}, lecture par la page : ${a.lecturePage} (attendu 0)`
     );
+    // Réglages du palier 2 : vitesse + minuteur transmis, annonce au lancement
+    // explicite (menu) et PAS à la relance d'un swipe, qui garde le minuteur.
+    await page.evaluate(() => {
+      setEcouteRate("1.5");
+      setEcouteSleep("30");
+      arreterEcoute();
+    });
+    await page.evaluate(() => demarrerEcoute({ intro: true }));
+    await page.evaluate(() => demarrerEcoute());
+    const [d1, d2] = await page.evaluate(() => window.__starts.slice(-2));
+    console.log(
+      `réglages : vitesse ${d1.rate} (1.5), minuteur ${d1.sleepMin} (30), annonce « ${d1.intro} », relance sans annonce : ${d2.intro === ""}, relance garde le minuteur : ${d2.keepTimer}`
+    );
+    await page.evaluate(() => {
+      window.__stopsSvc = 0;
+      window.__starts.length = 1;
+    });
+    console.log(
+      `rangées de réglage affichées : ${await page.evaluate(() => document.querySelectorAll("[data-listenmount] .prefrow").length)} (attendu 2 par point de montage)`
+    );
+    // Une carte vidéo (simulée sur la carte 1) n'entre PAS dans la file
+    const vid = await page.evaluate(() => {
+      const orig = window.videoIdOf;
+      const cle = cleDeCarte(feedEl.children[1]);
+      const lien = cardItems(feedEl.children[1])[0].link;
+      window.videoIdOf = (it) => (it && it.link === lien ? "abcdefghijk" : orig(it));
+      const sans = fileEcoute().every((x) => x.key !== cle);
+      window.videoIdOf = orig;
+      const avec = fileEcoute().some((x) => x.key === cle);
+      return { sans, avec };
+    });
+    console.log(
+      `carte vidéo écartée de la file : ${vid.sans} (attendu true), présente sinon : ${vid.avec} (attendu true)`
+    );
     // Arrière-plan : l'écoute doit SURVIVRE (le service continue écran éteint)
     await page.evaluate(() => {
       Object.defineProperty(document, "visibilityState", {

@@ -94,10 +94,23 @@ public class ListenService extends Service {
 
     static String currentKey() { return currentKey; }
 
-    static void prepare(List<Entry> queue, int start, String lang) {
+    private static float pendingRate = 1f;
+    private static int pendingSleepMin = 0;
+    private static boolean pendingKeepTimer = false;
+
+    /**
+     * @param rate      vitesse de la voix (1 = normale), bornée à 0,5-2
+     * @param sleepMin  minuteur d'arrêt en minutes, 0 = aucun
+     * @param keepTimer vrai pour une RELANCE (swipe au premier plan) : le minuteur
+     *                  en cours garde son échéance au lieu de repartir de zéro
+     */
+    static void prepare(List<Entry> queue, int start, String lang, float rate, int sleepMin, boolean keepTimer) {
         pendingQueue = queue;
         pendingStart = start;
         pendingLang = lang == null || lang.isEmpty() ? "fr-FR" : lang;
+        pendingRate = Math.max(0.5f, Math.min(2f, rate));
+        pendingSleepMin = Math.max(0, sleepMin);
+        pendingKeepTimer = keepTimer;
     }
 
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -108,6 +121,8 @@ public class ListenService extends Service {
     private boolean paused = false;
     private boolean pausedByFocus = false;
     private String lang = "fr-FR";
+    private float rate = 1f;
+    private final Runnable sleepRunnable = () -> stopAll("sleep");
 
     private TextToSpeech tts;
     private boolean ttsReady = false;
@@ -170,6 +185,14 @@ public class ListenService extends Service {
         queue = new ArrayList<>(pendingQueue);
         index = Math.max(0, Math.min(pendingStart, queue.size() - 1));
         lang = pendingLang;
+        rate = pendingRate;
+        if (tts != null && ttsReady) tts.setSpeechRate(rate);
+        // Minuteur : une relance (keepTimer) garde l'échéance en cours ; sinon il
+        // repart, ou s'éteint si aucun n'est demandé.
+        if (!(pendingKeepTimer && active)) {
+            main.removeCallbacks(sleepRunnable);
+            if (pendingSleepMin > 0) main.postDelayed(sleepRunnable, pendingSleepMin * 60_000L);
+        }
         chunk = 0;
         paused = false;
         pausedByFocus = false;
@@ -205,6 +228,7 @@ public class ListenService extends Service {
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                 .build();
             tts.setAudioAttributes(attrs);
+            tts.setSpeechRate(rate);
             tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                 @Override
                 public void onStart(String id) { }

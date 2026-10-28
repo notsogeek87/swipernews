@@ -112,6 +112,16 @@
       "autoplay.delay.opt.2000": "2 s",
       "autoplay.delay.opt.3000": "3 s",
       "autoplay.delay.opt.5000": "5 s",
+      "listen.rate.label": "Vitesse de la voix",
+      "listen.rate.desc": "Pour « Écouter le fil » (application Android).",
+      "listen.sleep.label": "Minuteur d'arrêt",
+      "listen.sleep.desc.off": "Jamais : l'écoute va jusqu'à la fin de la file.",
+      "listen.sleep.desc": "L'écoute s'arrête toute seule au bout de {m} minutes.",
+      "listen.sleep.opt.off": "Non",
+      "listen.slept": "Minuteur écoulé — écoute arrêtée",
+      "listen.intro": "{n} infos, environ {m} min.",
+      "changelog.v306.item1":
+        "Écouter le fil (Android) : vitesse de la voix réglable, minuteur d'arrêt (15, 30 ou 60 min) et une courte annonce au début (nombre d'infos, durée).",
       "changelog.v305.item1":
         "Application Android : « Écouter le fil » continue téléphone posé, écran éteint. Une notification permet de mettre en pause, passer à l'article suivant ou précédent, ou arrêter — les boutons du casque aussi.",
       "changelog.v303.item1":
@@ -636,6 +646,16 @@
 
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
+      "listen.rate.label": "Voice speed",
+      "listen.rate.desc": "For “Listen to the feed” (Android app).",
+      "listen.sleep.label": "Sleep timer",
+      "listen.sleep.desc.off": "Never: listening runs to the end of the queue.",
+      "listen.sleep.desc": "Listening stops by itself after {m} minutes.",
+      "listen.sleep.opt.off": "Off",
+      "listen.slept": "Timer finished — listening stopped",
+      "listen.intro": "{n} stories, about {m} min.",
+      "changelog.v306.item1":
+        "Listen to the feed (Android): adjustable voice speed, a sleep timer (15, 30 or 60 min) and a short announcement at the start (number of stories, duration).",
       "changelog.v305.item1":
         "Android app: “Listen to the feed” keeps going with your phone down and the screen off. A notification lets you pause, skip to the next or previous article, or stop — headset buttons work too.",
       "changelog.v303.item1":

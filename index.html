@@ -1693,6 +1693,9 @@
     <!-- Pause douce (voir renderPausePref/verifierPause) : même forme prefRow. -->
     <div data-pausemount></div>
 
+    <!-- Écoute du fil, APK seulement (voir renderListenPref/ListenService) : vitesse de voix et minuteur d'arrêt. -->
+    <div data-listenmount></div>
+
     <!-- Lecture auto des vidéos (voir renderAutoplayPref/armerAutoplay) : même forme prefRow. -->
     <div data-autoplaymount></div>
 
@@ -1950,7 +1953,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=294"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=305"></script>
+<script src="src/i18n.js?v=306"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -3157,13 +3160,50 @@ async function lireEnBoucle(gen){
    notification (pause, précédent, suivant, arrêt) et les boutons du casque.
    On ne lui remet donc pas un ordre « lis la carte courante » mais un INSTANTANÉ
    du fil — les ECOUTE_FILE_MAX prochaines cartes, déjà découpées en phrases —
-   qu'il lit sans nous. File BORNÉE exprès : le fil est infini (Wikipédia), une
+   qu'il lit sans nous, SANS les cartes vidéo. File BORNÉE exprès : le fil est infini (Wikipédia), une
    lecture qui ne s'arrête jamais n'est pas ce qu'on demande à une radio posée sur
    la table. Au premier plan, le service nous renvoie la carte en cours
    (événement « listen », surEtatEcoute) et la page la suit ; au retour d'un long
    arrière-plan c'est listenStatus (syncEcouteService) qui la remet à sa place.
    Sans le service (web, ancien APK), c'est la boucle d'origine. */
 const ECOUTE_FILE_MAX=40;
+/* Réglages du mode radio (service natif seulement, donc montrés seulement dans
+   l'APK). Lus À CHAQUE démarrage et transmis au service : il n'en garde rien. */
+const ECOUTE_RATES=["0.8","1","1.25","1.5"];
+const ECOUTE_SLEEPS=["off","15","30","60"];
+const LS_ECOUTE_RATE="fluxswipe.listenrate.v1",LS_ECOUTE_SLEEP="fluxswipe.listensleep.v1";
+let ecouteRate=(()=>{try{const v=localStorage.getItem(LS_ECOUTE_RATE);return ECOUTE_RATES.includes(v)?v:"1";}catch(e){return "1";}})();
+let ecouteSleep=(()=>{try{const v=localStorage.getItem(LS_ECOUTE_SLEEP);return ECOUTE_SLEEPS.includes(v)?v:"off";}catch(e){return "off";}})();
+function renderListenPref(){
+  const ok=!!ecouteService();
+  const dec=v=>(LANG==="fr"?v.replace(".",","):v)+"×";
+  const html=ok?prefRow("listenrate",T("listen.rate.label"),T("listen.rate.desc"),
+      ECOUTE_RATES.map(v=>({v,t:dec(v)})),ecouteRate)
+    +prefRow("listensleep",T("listen.sleep.label"),ecouteSleep==="off"?T("listen.sleep.desc.off"):T("listen.sleep.desc",{m:ecouteSleep}),
+      ECOUTE_SLEEPS.map(v=>({v,t:v==="off"?T("listen.sleep.opt.off"):v+" min"})),ecouteSleep):"";
+  document.querySelectorAll("[data-listenmount]").forEach(el=>{el.innerHTML=html;});
+}
+function setEcouteRate(v){
+  if(!ECOUTE_RATES.includes(v)||v===ecouteRate)return;
+  ecouteRate=v;
+  try{localStorage.setItem(LS_ECOUTE_RATE,v);}catch(e){warn("save listenrate",e);}
+  renderListenPref();
+}
+function setEcouteSleep(v){
+  if(!ECOUTE_SLEEPS.includes(v)||v===ecouteSleep)return;
+  ecouteSleep=v;
+  try{localStorage.setItem(LS_ECOUTE_SLEEP,v);}catch(e){warn("save listensleep",e);}
+  renderListenPref();
+}
+/* Annonce de début, lue par le service avant la première carte : de quoi se
+   préparer (combien d'infos, combien de temps) sans regarder l'écran. ~14
+   caractères par seconde à vitesse 1, c'est la cadence mesurée des voix système. */
+function introEcoute(file){
+  if(file.length<2)return "";
+  const car=file.reduce((n,x)=>n+x.chunks.reduce((m,c)=>m+c.length,0),0);
+  const min=Math.max(1,Math.round(car/(14*60)/(+ecouteRate||1)));
+  return T("listen.intro",{n:file.length,m:min});
+}
 function ecouteService(){
   const p=ttsNatif();
   return p&&typeof p.listenStart==="function"?p:null;
@@ -3172,7 +3212,10 @@ function fileEcoute(){
   const kids=feedEl.children,out=[];
   for(let k=Math.max(currentIndex(),0);k<kids.length&&out.length<ECOUTE_FILE_MAX;k++){
     const its=cardItems(kids[k]);
-    if(!its.length)continue;
+    // Une vidéo ne se lit pas : son titre seul, sans rien à écouter derrière,
+    // n'a pas sa place dans une radio. isSolo (groupItems) garantit qu'une carte
+    // vidéo ne porte jamais d'article à côté.
+    if(!its.length||its.every(it=>videoIdOf(it)))continue;
     const chunks=ttsChunks(texteDeCarte(kids[k]));
     if(!chunks.length)continue;
     out.push({key:cleDeCarte(kids[k]),source:sansEmoji(its[0].source||""),title:sansEmoji(its[0].title||""),chunks});
@@ -3191,6 +3234,7 @@ function surEtatEcoute(e){
     renderEcouteUI();
     if(e.reason==="end")toast(T("listen.end"));
     else if(e.reason==="error")toast(T("listen.failed"));
+    else if(e.reason==="sleep")toast(T("listen.slept"));
     return;
   }
   if(!ecouteActive){ecouteActive=true;renderEcouteUI();}
@@ -3219,19 +3263,25 @@ function brancherEcoute(svc){
   ecouteBranchee=true;
   try{svc.addListener("listen",surEtatEcoute);}catch(e){warn("écoute",e);}
 }
-function demarrerEcoute(){
+/* opts.intro : annonce de début, seulement au lancement EXPLICITE (menu) — un
+   swipe qui relance la lecture ne doit pas la répéter. Une relance (écoute déjà
+   active) garde aussi l'échéance du minuteur en cours au lieu de la remettre à zéro. */
+function demarrerEcoute(opts){
   if(!ttsDispo())return;
   clearTimeout(ecouteRepriseT);
   stopVideo();
   const svc=ecouteService();
   if(svc){
+    const relance=ecouteActive;
     const file=fileEcoute();
     if(!file.length)return;
     brancherEcoute(svc);
     const gen=++ecouteGen;
     ecouteActive=true;ecouteCle=file[0].key;
     renderEcouteUI();
-    svc.listenStart({items:file,lang:TTS_LANG[LANG]||LANG}).catch(e=>{
+    svc.listenStart({items:file,lang:TTS_LANG[LANG]||LANG,rate:+ecouteRate||1,
+      sleepMin:ecouteSleep==="off"?0:+ecouteSleep,keepTimer:relance,
+      intro:opts&&opts.intro?introEcoute(file):""}).catch(e=>{
       if(gen!==ecouteGen)return;
       warn("écoute",e);
       ecouteActive=false;ecouteCle="";ecouteGen++;
@@ -3274,7 +3324,7 @@ function placerPilule(){
 }
 document.getElementById("listenBtn").onclick=()=>{
   closeDialog(menuSheet);
-  if(ecouteActive)arreterEcoute();else demarrerEcoute();
+  if(ecouteActive)arreterEcoute();else demarrerEcoute({intro:true});
 };
 document.getElementById("listenPill").onclick=arreterEcoute;
 /* ---------- Pause douce ----------
@@ -3434,7 +3484,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="305";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="306";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -3445,6 +3495,8 @@ const APP_VERSION="305";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:306,date:"2026-10-28",items:[
+    "changelog.v306.item1"]},
   {v:305,date:"2026-10-28",items:[
     "changelog.v305.item1"]},
   {v:303,date:"2026-10-18",items:[
@@ -7799,6 +7851,8 @@ function setPref(name,v){
   if(name==="apptheme"){setAppTheme(v);return;}   // idem : attribut sur <html>
   if(name==="appscheme"){setAppScheme(v);return;}   // idem : clair/sombre/auto
   if(name==="cardsPerSwipe"){setCardsPerSwipe(v);return;}   // idem : recompose le fil
+  if(name==="listenrate"){setEcouteRate(v);return;}   // idem, voir ecouteRate
+  if(name==="listensleep"){setEcouteSleep(v);return;}   // idem, voir ecouteSleep
   if(name==="pause"){setPausePref(v);return;}   // propre clé, voir pausePref
   if(name==="autoplay"){setAutoplayPref(v);return;}   // idem, voir autoplayPref
   if(name==="autoplaydelay"){setAutoplayDelay(v);return;}   // idem, voir autoplayDelay
@@ -7826,7 +7880,7 @@ function setLang(l){
   document.documentElement.lang=LANG;
   applyI18n();
   renderLangPref();renderReadPref();renderThemePref();renderSchemePref();renderAutoExport();renderIntGrid("intGrid");renderList();renderSuggest();renderMixUI();
-  renderPausePref();renderAutoplayPref();renderEcouteUI();renderMutes();renderSourceHelp();renderNatures();
+  renderPausePref();renderListenPref();renderAutoplayPref();renderEcouteUI();renderMutes();renderSourceHelp();renderNatures();
   switchFeed();
 }
 /* Contrairement à setLang(), ne touche à AUCUN état du fil : c'est pour ça
@@ -8023,6 +8077,7 @@ renderReadPref();
 renderThemePref();renderSchemePref();
 renderCardsPref();
 renderPausePref();
+renderListenPref();
 renderAutoplayPref();
 renderEcouteUI();
 renderAutoExport();refreshAutoExport();

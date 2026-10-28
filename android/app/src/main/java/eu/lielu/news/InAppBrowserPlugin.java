@@ -805,7 +805,19 @@ public class InAppBrowserPlugin extends Plugin {
             call.reject("rien à lire");
             return;
         }
-        ListenService.prepare(queue, 0, call.getString("lang", "fr-FR"));
+        String intro = call.getString("intro", "");
+        if (intro != null && !intro.trim().isEmpty()) {
+            // L'annonce prend la clé du 1er article : l'événement « listen » ne fera
+            // pas défiler la page, elle est déjà sur cette carte.
+            List<String> ic = new ArrayList<>();
+            ic.add(intro.trim());
+            queue.add(0, new ListenService.Entry(queue.get(0).key, "", "", ic));
+        }
+        Double rate = call.getDouble("rate", 1.0);
+        Integer sleep = call.getInt("sleepMin", 0);
+        ListenService.prepare(queue, 0, call.getString("lang", "fr-FR"),
+            rate == null ? 1f : rate.floatValue(), sleep == null ? 0 : sleep,
+            Boolean.TRUE.equals(call.getBoolean("keepTimer", false)));
         ListenService.setListener((active, key, reason) -> {
             JSObject ev = new JSObject();
             ev.put("active", active);
