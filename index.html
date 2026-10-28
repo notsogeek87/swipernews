@@ -1544,7 +1544,6 @@
       <button type="button" class="menurow" id="histBtn"><span class="menurow__i"></span><span data-i18n="top.history.aria">Liste des articles</span></button>
       <button type="button" class="menurow" id="savedBtn"><span class="menurow__i"></span><span data-i18n="top.saved.aria">Enregistrés</span></button>
       <button type="button" class="menurow hidden" id="listenBtn"><span class="menurow__i"></span><span id="listenBtnTxt" data-i18n="listen.start">Écouter le fil</span></button>
-      <button type="button" class="menurow hidden" id="flashBtn"><span class="menurow__i"></span><span data-i18n="listen.flash.btn">Flash info</span></button>
       <button type="button" class="menurow" id="menuStatsBtn"><span class="menurow__i"></span><span data-i18n="menu.stats">Mon activité</span></button>
       <button type="button" class="menurow" id="changelogBtn"><span class="menurow__i"></span><span data-i18n="menu.changelog">Nouveautés</span></button>
       <button type="button" class="menurow" id="openSheet"><span class="menurow__i"></span><span data-i18n="top.settings.aria">Réglages</span></button>
@@ -1847,6 +1846,18 @@
 <!-- Pause douce (voir verifierPause) : proposée tous les N cartes du jour si
      l'utilisateur l'a demandé dans les réglages — jamais imposée, « Continuer »
      referme simplement la feuille. -->
+<!-- Choix du mode d'écoute (voir listenBtn) : APK avec service natif seulement. -->
+<div class="sheet" id="listenSheet" role="dialog" aria-modal="true" aria-labelledby="listenTitle">
+  <div class="sheet__panel" tabindex="-1">
+    <div class="sheet__grip"></div>
+    <h2 id="listenTitle" data-i18n="listen.mode.title">Écouter</h2>
+    <button class="applybtn" id="listenModeFeed" data-i18n="listen.mode.feed">Écouter le fil entièrement</button>
+    <p class="sub" data-i18n="listen.mode.feed.sub">Les cartes de votre fil, dans l'ordre, Wikipédia comprise.</p>
+    <button class="applybtn" id="listenModeFlash" data-i18n="listen.mode.flash">Uniquement le flash info</button>
+    <p class="sub" id="listenModeFlashSub"></p>
+    <button class="iobtn pausecont" id="listenModeCancel" data-i18n="listen.mode.cancel">Annuler</button>
+  </div>
+</div>
 <div class="sheet" id="pauseSheet" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
   <div class="sheet__panel" tabindex="-1">
     <div class="sheet__grip"></div>
@@ -1954,7 +1965,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=294"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=307"></script>
+<script src="src/i18n.js?v=308"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -3385,9 +3396,6 @@ function renderEcouteUI(){
   btn.classList.toggle("hidden",!ttsDispo());
   document.getElementById("listenBtnTxt").textContent=T(ecouteActive?"listen.stop":"listen.start");
   btn.querySelector(".menurow__i").innerHTML=ecouteActive?ICON_STOP:ICON_VOLUME;
-  const fl=document.getElementById("flashBtn");
-  fl.classList.toggle("hidden",!ecouteService());
-  fl.querySelector(".menurow__i").innerHTML=ICON_RSS;
   const pill=document.getElementById("listenPill");
   pill.classList.toggle("hidden",!ecouteActive);
   if(ecouteActive)placerPilule();
@@ -3400,13 +3408,29 @@ function placerPilule(){
   if(topEl.classList.contains("top--away")){pill.style.top="";return;}
   pill.style.top=Math.round(topEl.getBoundingClientRect().bottom+8)+"px";
 }
+/* Un seul bouton « Écouter le fil » dans le menu. Avec le service natif il ouvre
+   une feuille de CHOIX — le fil entier, ou seulement le flash info — plutôt que
+   d'ajouter une seconde entrée de menu. Déjà en écoute, il arrête, comme avant ;
+   sans service (web, ancien APK) il lance directement la boucle d'origine. */
+const listenSheet=document.getElementById("listenSheet");
+listenSheet.onclick=e=>{if(e.target===listenSheet)closeDialog(listenSheet);};
+document.getElementById("listenModeFeed").onclick=()=>{
+  closeDialog(listenSheet);
+  demarrerEcoute({intro:true});
+};
+document.getElementById("listenModeFlash").onclick=()=>{
+  closeDialog(listenSheet);
+  demarrerFlash();
+};
+document.getElementById("listenModeCancel").onclick=()=>closeDialog(listenSheet);
 document.getElementById("listenBtn").onclick=()=>{
+  if(!ecouteActive&&ecouteService()){
+    document.getElementById("listenModeFlashSub").textContent=T("listen.mode.flash.sub",{m:flashMin});
+    replaceDialog(menuSheet,listenSheet);
+    return;
+  }
   closeDialog(menuSheet);
   if(ecouteActive)arreterEcoute();else demarrerEcoute({intro:true});
-};
-document.getElementById("flashBtn").onclick=()=>{
-  closeDialog(menuSheet);
-  if(ecouteActive&&ecouteFlash)arreterEcoute();else demarrerFlash();
 };
 document.getElementById("listenPill").onclick=arreterEcoute;
 /* ---------- Pause douce ----------
@@ -3568,7 +3592,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="307";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="308";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à

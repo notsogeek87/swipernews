@@ -3416,6 +3416,17 @@ ${Array.from({ length: 12 }, (_, k) => {
     await page.click("#menuBtn");
     await page.waitForTimeout(300);
     await page.click("#listenBtn");
+    await page.waitForTimeout(400);
+    const choix = await page.evaluate(() => ({
+      feuille: document.getElementById("listenSheet").classList.contains("open"),
+      menuFerme: !document.getElementById("menuSheet").classList.contains("open"),
+      aucunDemarrage: window.__starts.length === 0,
+      pasDeBoutonFlash: !document.getElementById("flashBtn"),
+    }));
+    console.log(
+      `bouton « Écouter le fil » : feuille de choix ouverte ${choix.feuille}, menu fermé ${choix.menuFerme}, rien lancé avant le choix ${choix.aucunDemarrage}, plus de bouton flash dans le menu ${choix.pasDeBoutonFlash}`
+    );
+    await page.click("#listenModeFeed");
     await page.waitForTimeout(600);
     const a = await page.evaluate(() => {
       const f = window.__starts[0] && window.__starts[0].items;
@@ -3510,6 +3521,21 @@ ${Array.from({ length: 12 }, (_, k) => {
     });
     console.log(
       `flash + swipe : relances de file ${geste.relances} (attendu 0), flash toujours actif ${geste.flash}`
+    );
+    // Le même flash, choisi par la feuille (« Uniquement le flash info »)
+    await page.evaluate(() => {
+      arreterEcoute();
+      window.__starts.length = 0;
+      showTop();
+    });
+    await page.click("#menuBtn");
+    await page.waitForTimeout(300);
+    await page.click("#listenBtn");
+    await page.waitForTimeout(300);
+    await page.click("#listenModeFlash");
+    await page.waitForTimeout(300);
+    console.log(
+      `feuille → « Uniquement le flash info » : annonce flash envoyée ${await page.evaluate(() => !!window.__starts[0] && /Flash info/.test(window.__starts[0].intro) && ecouteFlash)}, feuille refermée ${await page.evaluate(() => !document.getElementById("listenSheet").classList.contains("open"))}`
     );
     await page.evaluate(() => {
       arreterEcoute();

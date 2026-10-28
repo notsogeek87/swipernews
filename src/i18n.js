@@ -120,14 +120,20 @@
       "listen.sleep.opt.off": "Non",
       "listen.slept": "Minuteur écoulé — écoute arrêtée",
       "listen.intro": "{n} infos, environ {m} min.",
-      "listen.flash.btn": "Flash info",
+      "listen.mode.title": "Écouter",
+      "listen.mode.feed": "Écouter le fil entièrement",
+      "listen.mode.feed.sub":
+        "Les cartes de votre fil, dans l'ordre, Wikipédia comprise.",
+      "listen.mode.flash": "Uniquement le flash info",
+      "listen.mode.flash.sub": "Les actus récentes pas encore lues, environ {m} min.",
+      "listen.mode.cancel": "Annuler",
       "listen.flash.none": "Rien de neuf à écouter pour l'instant",
       "listen.flash.intro": "Flash info : {n} infos, environ {m} min.",
       "listen.flash.label": "Durée du flash info",
       "listen.flash.desc":
         "Les actus récentes pas encore lues, pendant environ {m} minutes — sans vidéos ni Wikipédia.",
       "changelog.v307.item1":
-        "Nouveau « Flash info » (Android) : une revue de presse parlée de 5, 10 ou 20 minutes, avec les actus récentes que vous n'avez pas encore lues. Ce que vous avez entendu est marqué comme lu.",
+        "Nouveau « flash info » (Android), proposé quand on touche « Écouter le fil » : une revue de presse parlée de 5, 10 ou 20 minutes, avec les actus récentes que vous n'avez pas encore lues. Ce que vous avez entendu est marqué comme lu.",
       "changelog.v306.item1":
         "Écouter le fil (Android) : vitesse de la voix réglable, minuteur d'arrêt (15, 30 ou 60 min) et une courte annonce au début (nombre d'infos, durée).",
       "changelog.v305.item1":
@@ -662,14 +668,19 @@
       "listen.sleep.opt.off": "Off",
       "listen.slept": "Timer finished — listening stopped",
       "listen.intro": "{n} stories, about {m} min.",
-      "listen.flash.btn": "News flash",
+      "listen.mode.title": "Listen",
+      "listen.mode.feed": "Listen to the whole feed",
+      "listen.mode.feed.sub": "The cards of your feed, in order, Wikipedia included.",
+      "listen.mode.flash": "News flash only",
+      "listen.mode.flash.sub": "Recent news you haven't read yet, about {m} min.",
+      "listen.mode.cancel": "Cancel",
       "listen.flash.none": "Nothing new to listen to right now",
       "listen.flash.intro": "News flash: {n} stories, about {m} min.",
       "listen.flash.label": "News flash length",
       "listen.flash.desc":
         "Recent news you haven't read yet, for about {m} minutes — no videos or Wikipedia.",
       "changelog.v307.item1":
-        "New “News flash” (Android): a spoken press review of 5, 10 or 20 minutes with the recent news you haven't read yet. What you heard is marked as read.",
+        "New “news flash” (Android), offered when you tap “Listen to the feed”: a spoken press review of 5, 10 or 20 minutes with the recent news you haven't read yet. What you heard is marked as read.",
       "changelog.v306.item1":
         "Listen to the feed (Android): adjustable voice speed, a sleep timer (15, 30 or 60 min) and a short announcement at the start (number of stories, duration).",
       "changelog.v305.item1":
