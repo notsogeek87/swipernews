@@ -112,6 +112,8 @@
       "autoplay.delay.opt.2000": "2 s",
       "autoplay.delay.opt.3000": "3 s",
       "autoplay.delay.opt.5000": "5 s",
+      "changelog.v305.item1":
+        "Application Android : « Écouter le fil » continue téléphone posé, écran éteint. Une notification permet de mettre en pause, passer à l'article suivant ou précédent, ou arrêter — les boutons du casque aussi.",
       "changelog.v303.item1":
         "Le bouton ✨ résume aussi les vidéos YouTube, à partir de leurs sous-titres (s'il y en a).",
       "changelog.v301.item1":
@@ -634,6 +636,8 @@
 
       "changelog.title": "What's new",
       "changelog.sub": "What changed in SwiperNews.",
+      "changelog.v305.item1":
+        "Android app: “Listen to the feed” keeps going with your phone down and the screen off. A notification lets you pause, skip to the next or previous article, or stop — headset buttons work too.",
       "changelog.v303.item1":
         "The ✨ button also summarizes YouTube videos from their subtitles (when there are any).",
       "changelog.v301.item1":

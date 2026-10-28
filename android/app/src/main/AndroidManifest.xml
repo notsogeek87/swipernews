@@ -65,6 +65,14 @@
             android:theme="@style/AppTheme.Reader"
             android:parentActivityName=".MainActivity"
             android:exported="false" />
+
+        <!-- Mode radio (ListenService) : lecture du fil téléphone posé, écran
+             éteint. Service au premier plan de type mediaPlayback, non exporté :
+             seuls l'app et les boutons de sa propre notification le pilotent. -->
+        <service
+            android:name=".ListenService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="false" />
     </application>
 
     <!-- Permissions -->
@@ -75,6 +83,12 @@
          encore aucune permission — la déclarer ici ne change rien pour ces
          versions, c'est là qu'elle devient obligatoire. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Mode radio (ListenService) : service au premier plan de lecture média
+         (obligatoire dès Android 14 avec son type) et verrou CPU partiel, pour
+         que la voix continue écran éteint. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Bouton « Exclure de l'optimisation de batterie » des réglages notifs
          (InAppBrowserPlugin.requestIgnoreBatteryOptimizations) : seul levier
          qui rend NewsCheckWorker vraiment fiable en arrière-plan, Doze

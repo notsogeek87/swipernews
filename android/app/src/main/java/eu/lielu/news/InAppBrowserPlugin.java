@@ -26,6 +26,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
@@ -763,8 +767,94 @@ public class InAppBrowserPlugin extends Plugin {
         else c.reject(error);
     }
 
+    // ---------- Mode radio (ListenService) ----------
+    //
+    // Le service lit la file SANS la WebView (figée écran éteint) ; ces trois
+    // méthodes ne font que le démarrer, l'arrêter et dire où il en est. L'état
+    // revient au JS par l'événement « listen » tant que la page est vivante, et
+    // par listenStatus à chaque retour au premier plan (la page a pu être figée
+    // pendant que la lecture avançait).
+
+    @PluginMethod
+    public void listenStart(PluginCall call) {
+        JSArray arr = call.getArray("items");
+        if (arr == null || arr.length() == 0) {
+            call.reject("rien à lire");
+            return;
+        }
+        List<ListenService.Entry> queue = new ArrayList<>();
+        try {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                JSONArray cs = o.optJSONArray("chunks");
+                if (cs == null || cs.length() == 0) continue;
+                List<String> chunks = new ArrayList<>();
+                for (int j = 0; j < cs.length(); j++) {
+                    String c = cs.optString(j, "").trim();
+                    if (!c.isEmpty()) chunks.add(c);
+                }
+                if (chunks.isEmpty()) continue;
+                queue.add(new ListenService.Entry(o.optString("key", ""),
+                    o.optString("source", ""), o.optString("title", ""), chunks));
+            }
+        } catch (JSONException e) {
+            call.reject("file illisible");
+            return;
+        }
+        if (queue.isEmpty()) {
+            call.reject("rien à lire");
+            return;
+        }
+        ListenService.prepare(queue, 0, call.getString("lang", "fr-FR"));
+        ListenService.setListener((active, key, reason) -> {
+            JSObject ev = new JSObject();
+            ev.put("active", active);
+            ev.put("key", key);
+            ev.put("reason", reason);
+            notifyListeners("listen", ev);
+        });
+        try {
+            Intent i = new Intent(getContext(), ListenService.class).setAction(ListenService.ACTION_START);
+            if (Build.VERSION.SDK_INT >= 26) getContext().startForegroundService(i);
+            else getContext().startService(i);
+        } catch (RuntimeException e) {
+            call.reject("service indisponible");
+            return;
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void listenStop(PluginCall call) {
+        // Seulement s'il tourne : démarrer un service juste pour lui dire de
+        // s'arrêter serait refusé (ou inutile) quand rien ne joue.
+        if (ListenService.isActive()) {
+            getContext().startService(new Intent(getContext(), ListenService.class)
+                .setAction(ListenService.ACTION_STOP));
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void listenStatus(PluginCall call) {
+        ListenService.setListener((active, key, reason) -> {
+            JSObject ev = new JSObject();
+            ev.put("active", active);
+            ev.put("key", key);
+            ev.put("reason", reason);
+            notifyListeners("listen", ev);
+        });
+        JSObject res = new JSObject();
+        res.put("active", ListenService.isActive());
+        res.put("key", ListenService.currentKey());
+        call.resolve(res);
+    }
+
     @Override
     protected void handleOnDestroy() {
+        // Le service survit à l'activité (c'est son but) : on le détache seulement,
+        // pour ne pas retenir un plugin détruit. Le suivant se rebranche (listenStatus).
+        ListenService.setListener(null);
         List<PluginCall> pending;
         synchronized (this) {
             if (tts != null) {

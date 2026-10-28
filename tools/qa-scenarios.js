@@ -3341,6 +3341,160 @@ ${Array.from({ length: 12 }, (_, k) => {
       await browser.close();
     }
   },
+
+  /* Mode radio (APK) : un FAUX service natif (listenStart/listenStop/
+     listenStatus + événement « listen ») remplace ListenService. Vérifie ce
+     que la page doit à ce service : lui remettre une file BORNÉE de cartes
+     (clés, phrases courtes) en commençant par la carte courante ; NE PAS
+     couper l'écoute à l'arrière-plan (tout son objet) ; suivre la carte que le
+     service lit (défilement sans passer pour un swipe) ; se remettre à jour à
+     la fin et au retour au premier plan ; et arrêter le service quand un
+     panneau s'ouvre. */
+  async ecouteradio() {
+    const RSS_LONG = RSS_OK.replace(
+      "Resume 0 un peu de texte",
+      "Resume 0 un peu de texte. " +
+        "Une phrase de détail qui allonge nettement le résumé de cette carte. ".repeat(8)
+    );
+    const { browser, page, errors } = await boot({
+      storage: Object.assign({ "fluxswipe.notifnudge.answered.v1": "1" }, READY),
+      rss: RSS_LONG,
+      init: () => {
+        window.__starts = [];
+        window.__stopsSvc = 0;
+        window.__dits = [];
+        window.__svc = { active: false, key: "" };
+        let ecoute = null;
+        window.__push = (e) => ecoute && ecoute(e);
+        window.Capacitor = {
+          isNativePlatform: () => true,
+          Plugins: {
+            CapacitorHttp: {
+              request: async (o) => {
+                if (/^https:\/\/ex\.test\//.test(o.url))
+                  return {
+                    status: 200,
+                    data: "<!doctype html><title>a</title>" + "<p>texte</p>".repeat(40),
+                  };
+                const r = await fetch(
+                  "http://localhost:8124/__qa_feed?u=" + encodeURIComponent(o.url)
+                );
+                return { status: 200, data: await r.text() };
+              },
+            },
+            InAppBrowser: {
+              open: () => Promise.resolve(),
+              speak: (o) => (window.__dits.push(o), new Promise(() => {})),
+              stopSpeaking: () => Promise.resolve(),
+              addListener: (nom, f) => {
+                if (nom === "listen") ecoute = f;
+                return Promise.resolve({ remove() {} });
+              },
+              listenStart: (o) => {
+                window.__starts.push(o);
+                window.__svc = { active: true, key: o.items[0].key };
+                return Promise.resolve();
+              },
+              listenStop: () => {
+                window.__stopsSvc++;
+                window.__svc.active = false;
+                return Promise.resolve();
+              },
+              listenStatus: () => Promise.resolve(window.__svc),
+            },
+          },
+        };
+      },
+    });
+    await page.route("**/__qa_feed*", (r) =>
+      r.fulfill({ status: 200, contentType: "application/xml", body: RSS_LONG })
+    );
+    await page.goto(URL_APP);
+    await page.waitForTimeout(3000);
+    await page.evaluate(() => showTop());
+    await page.waitForTimeout(400);
+    await page.click("#menuBtn");
+    await page.waitForTimeout(300);
+    await page.click("#listenBtn");
+    await page.waitForTimeout(600);
+    const a = await page.evaluate(() => {
+      const f = window.__starts[0] && window.__starts[0].items;
+      return {
+        appels: window.__starts.length,
+        n: f ? f.length : 0,
+        premiere: f ? f[0].key === cleDeCarte(currentCardEl()) : false,
+        phrases: f
+          ? f.every((x) => x.chunks.length && x.chunks.every((c) => c.length <= 200))
+          : false,
+        lang: window.__starts[0] && window.__starts[0].lang,
+        pilule: !document.getElementById("listenPill").classList.contains("hidden"),
+        lecturePage: window.__dits.length,
+      };
+    });
+    console.log(
+      `démarrage : ${a.appels} appel, ${a.n} cartes (1..40 attendu), 1re = carte courante : ${a.premiere}, phrases ≤ 200 : ${a.phrases}, langue ${a.lang}, pilule ${a.pilule}, lecture par la page : ${a.lecturePage} (attendu 0)`
+    );
+    // Arrière-plan : l'écoute doit SURVIVRE (le service continue écran éteint)
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", {
+        value: "hidden",
+        configurable: true,
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await page.waitForTimeout(150);
+    console.log(
+      `arrière-plan : écoute active = ${await page.evaluate(() => ecouteActive)} (attendu true), arrêts du service = ${await page.evaluate(() => window.__stopsSvc)} (attendu 0)`
+    );
+    // Le service lit la carte 3 : la page doit la suivre, sans relancer de file
+    const suivi = await page.evaluate(async () => {
+      const cle = cleDeCarte(feedEl.children[3]);
+      window.__push({ active: true, key: cle, reason: "playing" });
+      await new Promise((r) => setTimeout(r, 900));
+      return {
+        index: currentIndex(),
+        relances: window.__starts.length,
+        cle: ecouteCle === cle,
+      };
+    });
+    console.log(
+      `service sur la carte 3 : index page ${suivi.index} (attendu 3), file relancée ${suivi.relances - 1} fois (attendu 0), clé suivie ${suivi.cle}`
+    );
+    // Retour au premier plan après un long arrière-plan : listenStatus recale
+    await page.evaluate(() => {
+      window.__svc = { active: true, key: cleDeCarte(feedEl.children[5]) };
+      Object.defineProperty(document, "visibilityState", {
+        value: "visible",
+        configurable: true,
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await page.waitForTimeout(900);
+    console.log(
+      `retour au premier plan : index page ${await page.evaluate(() => currentIndex())} (attendu 5)`
+    );
+    // Fin de file annoncée par le service
+    await page.evaluate(() => window.__push({ active: false, key: "", reason: "end" }));
+    await page.waitForTimeout(200);
+    const fin = await page.evaluate(() => ({
+      actif: ecouteActive,
+      pilule: !document.getElementById("listenPill").classList.contains("hidden"),
+    }));
+    console.log(
+      `fin du service : écoute active = ${fin.actif}, pilule = ${fin.pilule} (attendu false/false)`
+    );
+    // Un panneau ouvert arrête le service
+    await page.evaluate(() => demarrerEcoute());
+    await page.waitForTimeout(300);
+    const avant = await page.evaluate(() => window.__stopsSvc);
+    await page.evaluate(() => openSettings());
+    await page.waitForTimeout(300);
+    console.log(
+      `panneau ouvert : arrêts du service +${(await page.evaluate(() => window.__stopsSvc)) - avant} (attendu 1), écoute active = ${await page.evaluate(() => ecouteActive)}`
+    );
+    console.log(`erreurs : ${JSON.stringify(errors)}`);
+    await browser.close();
+  },
 };
 
 const which = process.argv[2];

@@ -105,4 +105,11 @@
     <string name="summary_err_short">Pas assez de texte à résumer ici.</string>
     <string name="summary_err_generic">Le résumé a échoué.</string>
     <string name="summary_err_unavailable">Le résumé n\'est pas disponible sur cet appareil.</string>
+    <string name="listen_channel">Écoute du fil</string>
+    <string name="listen_title">Écoute du fil</string>
+    <string name="listen_prev">Précédent</string>
+    <string name="listen_next">Suivant</string>
+    <string name="listen_play">Lecture</string>
+    <string name="listen_pause">Pause</string>
+    <string name="listen_stop">Arrêter</string>
 </resources>
