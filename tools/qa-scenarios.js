@@ -3452,7 +3452,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       window.__starts.length = 1;
     });
     console.log(
-      `rangées de réglage affichées : ${await page.evaluate(() => document.querySelectorAll("[data-listenmount] .prefrow").length)} (attendu 2 par point de montage)`
+      `rangées de réglage affichées : ${await page.evaluate(() => document.querySelectorAll("[data-listenmount] .prefrow").length)} (attendu 3 : vitesse, minuteur, flash)`
     );
     // Une carte vidéo (simulée sur la carte 1) n'entre PAS dans la file
     const vid = await page.evaluate(() => {
@@ -3468,6 +3468,55 @@ ${Array.from({ length: 12 }, (_, k) => {
     console.log(
       `carte vidéo écartée de la file : ${vid.sans} (attendu true), présente sinon : ${vid.avec} (attendu true)`
     );
+    // Flash info : actus récentes NON LUES, sans vidéo ni Wikipédia, bornées par
+    // la durée ; ce qui est entendu (clés « heard ») est marqué lu.
+    const fl = await page.evaluate(async () => {
+      setFlashMin("5");
+      const f5 = fileFlash();
+      setFlashMin("20");
+      const f20 = fileFlash();
+      setFlashMin("5");
+      const k0 = f5[0] && f5[0].key;
+      const avantVu = f5.length ? itemSeen(ecouteCartes.get(k0)[0]) : null;
+      window.__starts.length = 0;
+      demarrerFlash();
+      const d = window.__starts[0];
+      marquerEntendus([k0]);
+      const apresVu = itemSeen(ecouteCartes.get(k0)[0]);
+      const f5bis = fileFlash();
+      return {
+        n5: f5.length,
+        n20: f20.length,
+        keys: new Set(f5.map((x) => x.key)).size === f5.length,
+        flag: !!d && /Flash info/.test(d.intro),
+        avantVu,
+        apresVu,
+        ecartee: !f5bis.some((x) => x.key === k0),
+        flash: ecouteFlash,
+      };
+    });
+    console.log(
+      `flash : 5 min → ${fl.n5} infos, 20 min → ${fl.n20} (20 ≥ 5 attendu), clés distinctes ${fl.keys}, annonce « flash » envoyée ${fl.flag}, avant entendu vu=${fl.avantVu} → après vu=${fl.apresVu} (attendu false → true), écartée au flash suivant ${fl.ecartee}, mode flash ${fl.flash}`
+    );
+    // Un geste pendant le flash ne remplace PAS la file
+    const geste = await page.evaluate(async () => {
+      window.__starts.length = 0;
+      demarrerFlash();
+      const n = window.__starts.length;
+      feedEl.scrollTop = feedEl.children[currentIndex() + 2].offsetTop;
+      onCardChange(true);
+      await new Promise((r) => setTimeout(r, 800));
+      return { relances: window.__starts.length - n, flash: ecouteFlash };
+    });
+    console.log(
+      `flash + swipe : relances de file ${geste.relances} (attendu 0), flash toujours actif ${geste.flash}`
+    );
+    await page.evaluate(() => {
+      arreterEcoute();
+      demarrerEcoute();
+      window.__stopsSvc = 0;
+      window.__starts.length = 1;
+    });
     // Arrière-plan : l'écoute doit SURVIVRE (le service continue écran éteint)
     await page.evaluate(() => {
       Object.defineProperty(document, "visibilityState", {

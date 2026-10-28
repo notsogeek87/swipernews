@@ -811,7 +811,7 @@ public class InAppBrowserPlugin extends Plugin {
             // pas défiler la page, elle est déjà sur cette carte.
             List<String> ic = new ArrayList<>();
             ic.add(intro.trim());
-            queue.add(0, new ListenService.Entry(queue.get(0).key, "", "", ic));
+            queue.add(0, new ListenService.Entry(queue.get(0).key, "", "", ic, false));
         }
         Double rate = call.getDouble("rate", 1.0);
         Integer sleep = call.getInt("sleepMin", 0);
@@ -823,6 +823,7 @@ public class InAppBrowserPlugin extends Plugin {
             ev.put("active", active);
             ev.put("key", key);
             ev.put("reason", reason);
+            ev.put("heard", new JSArray(ListenService.heardKeys()));
             notifyListeners("listen", ev);
         });
         try {
@@ -854,11 +855,13 @@ public class InAppBrowserPlugin extends Plugin {
             ev.put("active", active);
             ev.put("key", key);
             ev.put("reason", reason);
+            ev.put("heard", new JSArray(ListenService.heardKeys()));
             notifyListeners("listen", ev);
         });
         JSObject res = new JSObject();
         res.put("active", ListenService.isActive());
         res.put("key", ListenService.currentKey());
+        res.put("heard", new JSArray(ListenService.heardKeys()));
         call.resolve(res);
     }
 

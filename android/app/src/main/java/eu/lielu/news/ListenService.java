@@ -65,12 +65,19 @@ public class ListenService extends Service {
         final String source;
         final String title;
         final List<String> chunks;
+        /** Faux pour l'annonce de début : elle porte la clé du 1er article sans l'avoir lu. */
+        final boolean counts;
 
         Entry(String key, String source, String title, List<String> chunks) {
+            this(key, source, title, chunks, true);
+        }
+
+        Entry(String key, String source, String title, List<String> chunks, boolean counts) {
             this.key = key;
             this.source = source;
             this.title = title;
             this.chunks = chunks;
+            this.counts = counts;
         }
     }
 
@@ -87,6 +94,16 @@ public class ListenService extends Service {
     private static volatile boolean active = false;
     private static volatile String currentKey = "";
     private static volatile Listener listener = null;
+
+    /**
+     * Clés des articles lus JUSQU'AU BOUT, dans l'ordre. C'est ce que la page marque
+     * « entendu » : elle peut avoir été figée pendant que la lecture avançait, et
+     * n'a alors vu passer aucune carte. Un article interrompu n'y figure pas.
+     */
+    private static final java.util.concurrent.CopyOnWriteArrayList<String> heard =
+        new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    static List<String> heardKeys() { return new ArrayList<>(heard); }
 
     static void setListener(Listener l) { listener = l; }
 
@@ -182,6 +199,7 @@ public class ListenService extends Service {
     }
 
     private void start() {
+        heard.clear();
         queue = new ArrayList<>(pendingQueue);
         index = Math.max(0, Math.min(pendingStart, queue.size() - 1));
         lang = pendingLang;
@@ -284,11 +302,18 @@ public class ListenService extends Service {
         final int myGen = gen;
         main.postDelayed(() -> {
             if (myGen != gen || !active || paused) return;
+            markHeard(index);
             if (index + 1 >= queue.size()) { stopAll("end"); return; }
             index++;
             chunk = 0;
             speakCurrent();
         }, BREATH_MS);
+    }
+
+    private void markHeard(int i) {
+        if (i < 0 || i >= queue.size()) return;
+        Entry e = queue.get(i);
+        if (e.counts && !e.key.isEmpty() && !heard.contains(e.key)) heard.add(e.key);
     }
 
     private void skipTo(int target) {
