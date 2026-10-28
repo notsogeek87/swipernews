@@ -34,8 +34,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <p>Licences, à garder en tête et à citer dans l'interface :
  * <ul>
- *   <li>Siwis : CC BY 4.0, University of Edinburgh (obligation d'attribution) ;</li>
- *   <li>UPMC (Jessica, Pierre) : CC BY-SA 4.0, voir marytts/upmc-pierre-data ;</li>
+ *   <li>Siwis (Piper) : CC BY 4.0, University of Edinburgh (obligation d'attribution) ;</li>
+ *   <li>Tom (Piper) : AGPL-3.0, voir git.bksp.space/Tjiho/French-tts-model-piper ;</li>
+ *   <li>Kokoro : poids Apache-2.0 ; sa voix française est entraînée sur le corpus SIWIS (CC BY 4.0) ;</li>
  *   <li>espeak-ng, livré avec chaque modèle : GPL-3.0, comme ce dépôt.</li>
  * </ul>
  * Les rappels reviennent sur le fil principal. Une seule opération à la fois.
@@ -50,14 +51,26 @@ final class NeuralVoices {
         final String sha256;
         final String dirName;
         final String modelFile;
+        /** Vrai pour un modèle Kokoro (fichier de voix en plus), faux pour un modèle Piper. */
+        final boolean kokoro;
 
-        Archive(String id, String url, long size, String sha256, String dirName, String modelFile) {
+        Archive(String id, String url, long size, String sha256, String dirName, String modelFile,
+                boolean kokoro) {
             this.id = id;
             this.url = url;
             this.size = size;
             this.sha256 = sha256;
             this.dirName = dirName;
             this.modelFile = modelFile;
+            this.kokoro = kokoro;
+        }
+
+        /** Ce qu'une archive complète contient : un dossier n'est « installé » qu'avec tout. */
+        boolean complete(File dir) {
+            return new File(dir, modelFile).isFile()
+                && new File(dir, "tokens.txt").isFile()
+                && new File(dir, "espeak-ng-data").isDirectory()
+                && (!kokoro || new File(dir, "voices.bin").isFile());
         }
     }
 
@@ -80,21 +93,37 @@ final class NeuralVoices {
     static final Archive SIWIS = new Archive("siwis",
         BASE + "vits-piper-fr_FR-siwis-medium.tar.bz2", 67_207_459L,
         "375909aa30842b3a4efa10b1beb1d761af792960ae6873b4d53889f96c66195b",
-        "vits-piper-fr_FR-siwis-medium", "fr_FR-siwis-medium.onnx");
+        "vits-piper-fr_FR-siwis-medium", "fr_FR-siwis-medium.onnx", false);
 
-    static final Archive UPMC = new Archive("upmc",
-        BASE + "vits-piper-fr_FR-upmc-medium.tar.bz2", 80_422_639L,
-        "e9830a331a16f6cc5ef3116a287065e015d3495c3f56b974889a266da7f89a7f",
-        "vits-piper-fr_FR-upmc-medium", "fr_FR-upmc-medium.onnx");
+    /** Piper, 44,1 kHz (les autres voix sont à 22,05 kHz). */
+    static final Archive TOM = new Archive("tom",
+        BASE + "vits-piper-fr_FR-tom-medium.tar.bz2", 67_202_955L,
+        "3d8258ef8466b5d5f2cc46c06e1415d3d01c9cbaeed8b6d5b3d152073672472c",
+        "vits-piper-fr_FR-tom-medium", "fr_FR-tom-medium.onnx", false);
 
-    static final Archive[] ARCHIVES = {SIWIS, UPMC};
+    /**
+     * Kokoro v1.0 multilingue, QUANTIFIÉ en 8 bits (132 Mo au lieu de 350 Mo). Le français n'y est
+     * pas « pris en charge » par sherpa-onnx (seulement anglais et chinois) : il passe par
+     * espeak-ng via le champ {@code lang} (voir {@link #load}), disponible depuis sherpa-onnx 1.12.2.
+     */
+    static final Archive KOKORO = new Archive("kokoro",
+        BASE + "kokoro-int8-multi-lang-v1_0.tar.bz2", 132_353_410L,
+        "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
+        "kokoro-int8-multi-lang-v1_0", "model.int8.onnx", true);
 
-    /** Numéros de locuteur lus dans le fr_FR-upmc-medium.onnx.json : jessica 0, pierre 1. */
+    static final Archive[] ARCHIVES = {SIWIS, TOM, KOKORO};
+
+    /** Numéro de la voix française « ff_siwis » dans le voices.bin de Kokoro v1.0 (table des 53 voix). */
+    private static final int KOKORO_FR_SID = 30;
+
     static final Voice[] VOICES = {
         new Voice("siwis", SIWIS, 0),
-        new Voice("jessica", UPMC, 0),
-        new Voice("pierre", UPMC, 1),
+        new Voice("tom", TOM, 0),
+        new Voice("kokoro", KOKORO, KOKORO_FR_SID),
     };
+
+    /** Dossiers d'une voix retirée du catalogue (UPMC : Jessica et Pierre) : à libérer, ~80 Mo. */
+    private static final String[] LEGACY_DIRS = {"vits-piper-fr_FR-upmc-medium"};
 
     static Voice voice(String id) {
         for (Voice v : VOICES) if (v.id.equals(id)) return v;
@@ -142,7 +171,7 @@ final class NeuralVoices {
     /** Installée = extraite en entier ET marquée, jamais « à moitié ». */
     boolean isInstalled(Archive a) {
         final File d = modelDir(a);
-        return new File(d, OK_MARKER).isFile() && new File(d, a.modelFile).isFile();
+        return new File(d, OK_MARKER).isFile() && a.complete(d);
     }
 
     long partialBytes(Archive a) {
@@ -191,11 +220,7 @@ final class NeuralVoices {
                 }
                 // L'archive contient UN dossier portant le nom du modèle.
                 final File inner = new File(tmp, a.dirName);
-                if (!new File(inner, a.modelFile).isFile()
-                    || !new File(inner, "tokens.txt").isFile()
-                    || !new File(inner, "espeak-ng-data").isDirectory()) {
-                    throw new IOException("contenu incomplet");
-                }
+                if (!a.complete(inner)) throw new IOException("contenu incomplet");
                 if (!new File(inner, OK_MARKER).createNewFile()) throw new IOException("marqueur");
                 final File dest = modelDir(a);
                 deleteTree(dest);
@@ -224,12 +249,35 @@ final class NeuralVoices {
     OfflineTts load(Voice v) {
         final File d = modelDir(v.archive);
         final OfflineTtsConfig c = new OfflineTtsConfig();
-        c.model.vits.model = new File(d, v.archive.modelFile).getAbsolutePath();
-        c.model.vits.tokens = new File(d, "tokens.txt").getAbsolutePath();
-        c.model.vits.dataDir = new File(d, "espeak-ng-data").getAbsolutePath();
-        // Deux fils : au-delà, les gros cœurs d'un SoC hétérogène attendent les petits.
-        c.model.numThreads = 2;
+        final String espeak = new File(d, "espeak-ng-data").getAbsolutePath();
+        if (v.archive.kokoro) {
+            c.model.kokoro.model = new File(d, v.archive.modelFile).getAbsolutePath();
+            c.model.kokoro.voices = new File(d, "voices.bin").getAbsolutePath();
+            c.model.kokoro.tokens = new File(d, "tokens.txt").getAbsolutePath();
+            c.model.kokoro.dataDir = espeak;
+            // Sans lexique et avec une langue, TOUT le texte est phonémisé par espeak-ng (voix « fr »).
+            c.model.kokoro.lang = "fr";
+            // Plus lourd que Piper : un fil de plus, sans dépasser la moitié des cœurs.
+            c.model.numThreads = Math.max(2, Math.min(4, Runtime.getRuntime().availableProcessors() / 2));
+        } else {
+            c.model.vits.model = new File(d, v.archive.modelFile).getAbsolutePath();
+            c.model.vits.tokens = new File(d, "tokens.txt").getAbsolutePath();
+            c.model.vits.dataDir = espeak;
+            // Deux fils : au-delà, les gros cœurs d'un SoC hétérogène attendent les petits.
+            c.model.numThreads = 2;
+        }
         return new OfflineTts(c);
+    }
+
+    /** Libère l'espace d'une voix retirée du catalogue (voir {@link #LEGACY_DIRS}). Sans effet pendant une opération. */
+    void purgeLegacy() {
+        if (busy) return;
+        for (String name : LEGACY_DIRS) {
+            deleteTree(new File(dir, name));
+            deleteTree(new File(dir, name + ".tmp"));
+            new File(dir, name + ".tar.bz2").delete();
+            new File(dir, name + ".tar.bz2.part").delete();
+        }
     }
 
     private File part(Archive a) {

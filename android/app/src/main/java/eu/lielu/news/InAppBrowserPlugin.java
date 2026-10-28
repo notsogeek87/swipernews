@@ -854,8 +854,8 @@ public class InAppBrowserPlugin extends Plugin {
 
     // ---------- Voix neuronales hors ligne (NeuralVoices) ----------
     //
-    // Le JS ne voit que des identifiants de VOIX (siwis, jessica, pierre) ; deux
-    // d'entre elles partagent un même téléchargement (l'archive « upmc »). L'état
+    // Le JS ne voit que des identifiants d'ARCHIVE (siwis, tom, kokoro) : un
+    // téléchargement par modèle, même si un modèle portait plusieurs voix. L'état
     // d'une opération en cours revient par l'événement « voice ».
 
     private NeuralVoices voices;
@@ -875,6 +875,7 @@ public class InAppBrowserPlugin extends Plugin {
     @PluginMethod
     public void voiceStatus(PluginCall call) {
         NeuralVoices v = voices();
+        v.purgeLegacy();
         JSArray list = new JSArray();
         for (NeuralVoices.Archive a : NeuralVoices.ARCHIVES) {
             JSObject o = new JSObject();

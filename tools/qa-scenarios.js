@@ -3373,7 +3373,8 @@ ${Array.from({ length: 12 }, (_, k) => {
         window.__resume = { engine: true, installed: false };
         window.__archives = [
           { archive: "siwis", size: 67207459, installed: false, partial: 0 },
-          { archive: "upmc", size: 80422639, installed: false, partial: 0 },
+          { archive: "tom", size: 67202955, installed: false, partial: 0 },
+          { archive: "kokoro", size: 132353410, installed: false, partial: 0 },
         ];
         window.Capacitor = {
           isNativePlatform: () => true,
@@ -3469,8 +3470,8 @@ ${Array.from({ length: 12 }, (_, k) => {
       r.rangees = mnt.querySelectorAll(".prefrow").length;
       btn.click();
       r.replieEncore = mnt.classList.contains("hidden");
-      setEcouteVoix("pierre");
-      r.voixAbsente = /Pierre \(.+\)/.test(somme());
+      setEcouteVoix("tom");
+      r.voixAbsente = /Tom \(.+\)/.test(somme());
       setFlashMode("ia");
       r.modeAbsent = /Résumé IA \(.+\)/.test(somme());
       r.subIa = document.getElementById("listenModeFlashSub").textContent;
@@ -3497,7 +3498,7 @@ ${Array.from({ length: 12 }, (_, k) => {
     }
     const mini = await page.evaluate(() => {
       const m = document.getElementById("listenVoiceMount");
-      const btn = m.querySelector('[data-pref="listenvoice"][data-val="pierre"]');
+      const btn = m.querySelector('[data-pref="listenvoice"][data-val="tom"]');
       btn.click();
       return {
         boutons: m.querySelectorAll('[data-pref="listenvoice"]').length,
@@ -3507,7 +3508,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       };
     });
     console.log(
-      `feuille : ${mini.boutons} voix proposées (attendu 4), note « français » ${mini.note}, choix depuis la feuille → ${mini.choisi} (attendu pierre), téléchargement proposé ${mini.blocTelecharger}`
+      `feuille : ${mini.boutons} voix proposées (attendu 4), note « français » ${mini.note}, choix depuis la feuille → ${mini.choisi} (attendu tom), téléchargement proposé ${mini.blocTelecharger}`
     );
     await page.evaluate(() => setEcouteVoix("system"));
     await page.click("#listenModeFeed");
@@ -3559,7 +3560,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       const bloc = () => document.querySelector("[data-listenmount] .voixbloc");
       const r = {};
       r.sansBlocSysteme = !bloc();
-      setEcouteVoix("pierre");
+      setEcouteVoix("tom");
       await att(100);
       r.blocTelecharger =
         !!bloc() && !!bloc().querySelector('[data-voiceact="download"]');
@@ -3570,23 +3571,23 @@ ${Array.from({ length: 12 }, (_, k) => {
       bloc().querySelector('[data-voiceact="download"]').click();
       await att(100);
       r.appel = JSON.stringify(window.__voiceCalls.at(-1));
-      window.__pushVoice({ archive: "upmc", state: "progress", done: 40, total: 80 });
+      window.__pushVoice({ archive: "tom", state: "progress", done: 40, total: 80 });
       await att(50);
       r.progression = bloc().textContent.includes("50");
-      window.__pushVoice({ archive: "upmc", state: "progress", done: 80, total: 80 });
+      window.__pushVoice({ archive: "tom", state: "progress", done: 80, total: 80 });
       await att(50);
       r.installation = /Installation/.test(bloc().textContent);
-      window.__archives.find((a) => a.archive === "upmc").installed = true;
-      window.__pushVoice({ archive: "upmc", state: "done" });
+      window.__archives.find((a) => a.archive === "tom").installed = true;
+      window.__pushVoice({ archive: "tom", state: "done" });
       await att(150);
       r.installee = !!bloc().querySelector('[data-voiceact="remove"]');
       window.__starts.length = 0;
       demarrerEcoute();
-      r.voixPierre = window.__starts[0].voice;
-      setEcouteVoix("jessica");
+      r.voixTom = window.__starts[0].voice;
+      setEcouteVoix("kokoro");
       window.__starts.length = 0;
       demarrerEcoute();
-      r.voixJessica = window.__starts[0].voice;
+      r.kokoroPasInstallee = window.__starts[0].voice === "";
       setEcouteVoix("siwis");
       window.__starts.length = 0;
       demarrerEcoute();
@@ -3596,12 +3597,12 @@ ${Array.from({ length: 12 }, (_, k) => {
       demarrerEcoute();
       r.systeme = window.__starts[0].voice === "";
       r.sansBlocFin = !bloc();
-      window.__archives.find((a) => a.archive === "upmc").installed = false;
+      window.__archives.find((a) => a.archive === "tom").installed = false;
       voixEtat = null;
       return r;
     });
     console.log(
-      `voix : bloc absent en voix système ${vx.sansBlocSysteme}, bouton « ${vx.bouton} », non installée → voix système ${vx.voixNonInstallee}, appel ${vx.appel}, progression 50 % ${vx.progression}, « Installation » ${vx.installation}, installée ${vx.installee}, pierre → "${vx.voixPierre}", jessica → "${vx.voixJessica}" (même modèle), siwis non installée → système ${vx.siwisPasInstallee}, retour système ${vx.systeme}`
+      `voix : bloc absent en voix système ${vx.sansBlocSysteme}, bouton « ${vx.bouton} », non installée → voix système ${vx.voixNonInstallee}, appel ${vx.appel}, progression 50 % ${vx.progression}, « Installation » ${vx.installation}, installée ${vx.installee}, tom → "${vx.voixTom}", kokoro non installée → système ${vx.kokoroPasInstallee}, siwis non installée → système ${vx.siwisPasInstallee}, retour système ${vx.systeme}`
     );
     await page.evaluate(() => {
       arreterEcoute();

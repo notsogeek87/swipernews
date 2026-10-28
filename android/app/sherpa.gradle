@@ -10,8 +10,8 @@
 // Changer de version = changer ENSEMBLE : sherpaVersion, sherpaSha256, et le
 // binding Java de com/k2fsa/sherpa/onnx (le code natif lit ces classes par leurs
 // champs, voir l'en-tête de OfflineTts.java).
-ext.sherpaVersion = "1.12.0"
-ext.sherpaSha256 = "ebe88e50bb3eaa9208849f94a1b9b61329c48ec637a40c5f0d4bb8c6a49f1d6e"
+ext.sherpaVersion = "1.12.7"
+ext.sherpaSha256 = "e5375fd998ea93f0d64206afcf1ed6ef255229a3b60d4eb92c016ad5af0f72c8"
 
 ext.fetchSherpa = tasks.register("fetchSherpa") {
     def version = sherpaVersion
