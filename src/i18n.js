@@ -132,6 +132,29 @@
       "listen.flash.label": "Durée du flash info",
       "listen.flash.desc":
         "Les actus récentes pas encore lues, pendant environ {m} minutes — sans vidéos ni Wikipédia.",
+      "listen.voice.label": "Voix de la lecture",
+      "listen.voice.desc.system": "La voix du téléphone.",
+      "listen.voice.desc.neural":
+        "Une voix naturelle qui fonctionne hors ligne (en français).",
+      "listen.voice.opt.system": "Système",
+      "listen.voice.opt.siwis": "Siwis",
+      "listen.voice.opt.jessica": "Jessica",
+      "listen.voice.opt.pierre": "Pierre",
+      "listen.voice.missing":
+        "Cette voix n'est pas encore sur l'appareil : la voix du téléphone est utilisée en attendant.",
+      "listen.voice.get": "Télécharger la voix ({m} Mo)",
+      "listen.voice.getting": "Téléchargement… {p} %",
+      "listen.voice.installing": "Installation…",
+      "listen.voice.cancel": "Annuler",
+      "listen.voice.ready": "Voix installée.",
+      "listen.voice.remove": "Supprimer cette voix",
+      "listen.voice.err.space": "Pas assez de place sur l'appareil pour cette voix.",
+      "listen.voice.err.net": "Téléchargement interrompu — réessayez.",
+      "listen.voice.err.invalid": "Fichier de voix invalide, il n'a pas été installé.",
+      "listen.voice.credit":
+        "Voix Piper. Siwis : CC BY 4.0, Université d'Édimbourg. Jessica et Pierre : CC BY-SA 4.0, UPMC.",
+      "changelog.v309.item1":
+        "Écouter le fil (Android) : des voix naturelles qui fonctionnent hors ligne — Siwis, Jessica ou Pierre — à télécharger depuis les réglages (environ 70 à 80 Mo). La voix du téléphone reste le choix par défaut.",
       "changelog.v307.item1":
         "Nouveau « flash info » (Android), proposé quand on touche « Écouter le fil » : une revue de presse parlée de 5, 10 ou 20 minutes, avec les actus récentes que vous n'avez pas encore lues. Ce que vous avez entendu est marqué comme lu.",
       "changelog.v306.item1":
@@ -679,6 +702,29 @@
       "listen.flash.label": "News flash length",
       "listen.flash.desc":
         "Recent news you haven't read yet, for about {m} minutes — no videos or Wikipedia.",
+      "listen.voice.label": "Reading voice",
+      "listen.voice.desc.system": "The phone's voice.",
+      "listen.voice.desc.neural":
+        "A natural-sounding voice that works offline (French only).",
+      "listen.voice.opt.system": "System",
+      "listen.voice.opt.siwis": "Siwis",
+      "listen.voice.opt.jessica": "Jessica",
+      "listen.voice.opt.pierre": "Pierre",
+      "listen.voice.missing":
+        "This voice isn't on the device yet: the phone's voice is used meanwhile.",
+      "listen.voice.get": "Download the voice ({m} MB)",
+      "listen.voice.getting": "Downloading… {p}%",
+      "listen.voice.installing": "Installing…",
+      "listen.voice.cancel": "Cancel",
+      "listen.voice.ready": "Voice installed.",
+      "listen.voice.remove": "Remove this voice",
+      "listen.voice.err.space": "Not enough space on the device for this voice.",
+      "listen.voice.err.net": "Download interrupted — try again.",
+      "listen.voice.err.invalid": "Invalid voice file, it was not installed.",
+      "listen.voice.credit":
+        "Piper voices. Siwis: CC BY 4.0, University of Edinburgh. Jessica and Pierre: CC BY-SA 4.0, UPMC.",
+      "changelog.v309.item1":
+        "Listen to the feed (Android): natural-sounding voices that work offline — Siwis, Jessica or Pierre — downloadable from the settings (about 70 to 80 MB). The phone's voice stays the default.",
       "changelog.v307.item1":
         "New “news flash” (Android), offered when you tap “Listen to the feed”: a spoken press review of 5, 10 or 20 minutes with the recent news you haven't read yet. What you heard is marked as read.",
       "changelog.v306.item1":

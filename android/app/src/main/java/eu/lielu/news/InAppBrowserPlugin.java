@@ -817,7 +817,8 @@ public class InAppBrowserPlugin extends Plugin {
         Integer sleep = call.getInt("sleepMin", 0);
         ListenService.prepare(queue, 0, call.getString("lang", "fr-FR"),
             rate == null ? 1f : rate.floatValue(), sleep == null ? 0 : sleep,
-            Boolean.TRUE.equals(call.getBoolean("keepTimer", false)));
+            Boolean.TRUE.equals(call.getBoolean("keepTimer", false)),
+            call.getString("voice", ""));
         ListenService.setListener((active, key, reason) -> {
             JSObject ev = new JSObject();
             ev.put("active", active);
@@ -834,6 +835,94 @@ public class InAppBrowserPlugin extends Plugin {
             call.reject("service indisponible");
             return;
         }
+        call.resolve();
+    }
+
+    // ---------- Voix neuronales hors ligne (NeuralVoices) ----------
+    //
+    // Le JS ne voit que des identifiants de VOIX (siwis, jessica, pierre) ; deux
+    // d'entre elles partagent un même téléchargement (l'archive « upmc »). L'état
+    // d'une opération en cours revient par l'événement « voice ».
+
+    private NeuralVoices voices;
+
+    private NeuralVoices voices() {
+        if (voices == null) voices = new NeuralVoices(getContext());
+        return voices;
+    }
+
+    private JSObject voiceEvent(String archive, String state) {
+        JSObject ev = new JSObject();
+        ev.put("archive", archive);
+        ev.put("state", state);
+        return ev;
+    }
+
+    @PluginMethod
+    public void voiceStatus(PluginCall call) {
+        NeuralVoices v = voices();
+        JSArray list = new JSArray();
+        for (NeuralVoices.Archive a : NeuralVoices.ARCHIVES) {
+            JSObject o = new JSObject();
+            o.put("archive", a.id);
+            o.put("size", a.size);
+            o.put("installed", v.isInstalled(a));
+            o.put("partial", v.partialBytes(a));
+            list.put(o);
+        }
+        JSObject res = new JSObject();
+        res.put("archives", list);
+        res.put("busy", v.isBusy());
+        call.resolve(res);
+    }
+
+    @PluginMethod
+    public void voiceDownload(PluginCall call) {
+        final NeuralVoices.Archive a = NeuralVoices.archive(call.getString("archive", ""));
+        if (a == null) {
+            call.reject("voix inconnue");
+            return;
+        }
+        voices().download(a, new NeuralVoices.Listener() {
+            @Override
+            public void onProgress(long done, long total) {
+                JSObject ev = voiceEvent(a.id, "progress");
+                ev.put("done", done);
+                ev.put("total", total);
+                notifyListeners("voice", ev);
+            }
+
+            @Override
+            public void onDone() { notifyListeners("voice", voiceEvent(a.id, "done")); }
+
+            @Override
+            public void onCancelled() { notifyListeners("voice", voiceEvent(a.id, "cancelled")); }
+
+            @Override
+            public void onError(int code) {
+                JSObject ev = voiceEvent(a.id, "error");
+                ev.put("code", code);
+                notifyListeners("voice", ev);
+            }
+        });
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void voiceCancel(PluginCall call) {
+        voices().cancel();
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void voiceRemove(PluginCall call) {
+        final NeuralVoices.Archive a = NeuralVoices.archive(call.getString("archive", ""));
+        if (a == null) {
+            call.reject("voix inconnue");
+            return;
+        }
+        voices().remove(a);
+        notifyListeners("voice", voiceEvent(a.id, "removed"));
         call.resolve();
     }
 

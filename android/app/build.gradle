@@ -1,4 +1,6 @@
 apply plugin: 'com.android.application'
+// Voix neuronale hors ligne : récupère les bibliothèques natives de sherpa-onnx.
+apply from: 'sherpa.gradle'
 
 // Clé de signature fournie par la CI depuis les secrets du dépôt. Absente en
 // local : Gradle retombe alors sur la clé debug.
@@ -77,6 +79,14 @@ android {
             version "3.22.1"
         }
     }
+    // Bibliothèques natives de sherpa-onnx, posées dans build/ par fetchSherpa
+    // (sherpa.gradle) : passer la tâche elle-même à srcDir suffit à Gradle pour
+    // l'exécuter avant l'assemblage des bibliothèques natives.
+    sourceSets {
+        main {
+            jniLibs.srcDir(project.ext.fetchSherpa)
+        }
+    }
     signingConfigs {
         if (hasReleaseKeystore) {
             release {
@@ -131,6 +141,11 @@ dependencies {
     // périodique garanti même l'app fermée ou le téléphone redémarré, sans
     // service tiers — voir CLAUDE.md, « aucun appel à un tiers non choisi ».
     implementation "androidx.work:work-runtime:$workManagerVersion"
+    // Décompression bzip2 de l'archive d'une voix (NeuralVoices). 1.21 et non une
+    // version plus récente : la 1.26+ s'appuie sur java.nio.file et commons-io, qui
+    // demandent Android 8 alors que le projet vise Android 7 (minSdk 24). Aucune
+    // dépendance transitive ; l'archive est de toute façon vérifiée par SHA-256.
+    implementation "org.apache.commons:commons-compress:1.21"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

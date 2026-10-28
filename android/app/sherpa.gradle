@@ -1,0 +1,64 @@
+// Moteur de voix neuronale hors ligne : sherpa-onnx (Apache 2.0), version ÉPINGLÉE.
+//
+// Ses bibliothèques natives (libsherpa-onnx-jni.so et libonnxruntime.so, pour les
+// trois architectures du projet) ne sont PAS versionnées dans git : ~70 Mo de
+// binaires qui n'auraient aucune raison d'être relus. Elles sont récupérées à la
+// compilation depuis la version publiée par le projet amont, et la somme
+// SHA-256 de l'archive est vérifiée — un fichier remplacé en amont fait échouer
+// le build au lieu d'entrer dans l'APK.
+//
+// Changer de version = changer ENSEMBLE : sherpaVersion, sherpaSha256, et le
+// binding Java de com/k2fsa/sherpa/onnx (le code natif lit ces classes par leurs
+// champs, voir l'en-tête de OfflineTts.java).
+ext.sherpaVersion = "1.12.0"
+ext.sherpaSha256 = "ebe88e50bb3eaa9208849f94a1b9b61329c48ec637a40c5f0d4bb8c6a49f1d6e"
+
+ext.fetchSherpa = tasks.register("fetchSherpa") {
+    def version = sherpaVersion
+    def expected = sherpaSha256
+    def work = layout.buildDirectory.dir("sherpa").get().asFile
+    def outDir = new File(work, "jniLibs")
+    inputs.property("version", version)
+    inputs.property("sha256", expected)
+    outputs.dir(outDir)
+    doLast {
+        def sha256 = { File f ->
+            def md = java.security.MessageDigest.getInstance("SHA-256")
+            f.withInputStream { ins ->
+                def buf = new byte[65536]
+                int n
+                while ((n = ins.read(buf)) > 0) md.update(buf, 0, n)
+            }
+            md.digest().collect { String.format("%02x", it & 0xff) }.join()
+        }
+        work.mkdirs()
+        def archive = new File(work, "sherpa-onnx-v${version}-android.tar.bz2")
+        if (!archive.isFile() || sha256(archive) != expected) {
+            def url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v${version}/sherpa-onnx-v${version}-android.tar.bz2"
+            def conn = new URL(url).openConnection()
+            conn.connectTimeout = 30000
+            conn.readTimeout = 120000
+            conn.inputStream.withStream { ins -> archive.withOutputStream { out -> out << ins } }
+            if (sha256(archive) != expected) {
+                archive.delete()
+                throw new GradleException("sherpa-onnx ${version} : somme de contrôle incorrecte pour ${url}")
+            }
+        }
+        delete(outDir)
+        copy {
+            from tarTree(resources.bzip2(archive))
+            ["arm64-v8a", "armeabi-v7a", "x86_64"].each { abi ->
+                include "jniLibs/${abi}/libsherpa-onnx-jni.so"
+                include "jniLibs/${abi}/libonnxruntime.so"
+            }
+            into work
+        }
+        ["arm64-v8a", "armeabi-v7a", "x86_64"].each { abi ->
+            ["libsherpa-onnx-jni.so", "libonnxruntime.so"].each { so ->
+                if (!new File(outDir, "${abi}/${so}").isFile()) {
+                    throw new GradleException("sherpa-onnx ${version} : ${abi}/${so} introuvable dans l'archive")
+                }
+            }
+        }
+    }
+}

@@ -50,6 +50,16 @@ final class ModelDownloader {
 
     static void download(String url, File part, File dest, long expectedSize, String sha256,
                          Progress progress, AtomicBoolean cancel) throws IOException {
+        download(url, part, dest, expectedSize, sha256, progress, cancel, true);
+    }
+
+    /**
+     * @param gguf vrai pour un modèle de résumé (le fichier doit commencer par
+     *             « GGUF ») ; faux pour tout autre contenu, que la taille et le
+     *             SHA-256 suffisent alors à garantir (archive d'une voix).
+     */
+    static void download(String url, File part, File dest, long expectedSize, String sha256,
+                         Progress progress, AtomicBoolean cancel, boolean gguf) throws IOException {
         long offset = part.exists() ? part.length() : 0;
         if (offset > expectedSize) {  // reste d'un autre fichier : repartir de zéro
             if (!part.delete()) throw new IOException("impossible de supprimer " + part);
@@ -75,7 +85,7 @@ final class ModelDownloader {
             part.delete();  // altéré : inutile de le reprendre
             throw new IOException("somme de contrôle incorrecte");
         }
-        if (!isGguf(part)) {
+        if (gguf && !isGguf(part)) {
             part.delete();
             throw new IOException("ce n'est pas un fichier GGUF");
         }

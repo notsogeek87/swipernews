@@ -22,6 +22,8 @@ import android.os.PowerManager;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 
+import com.k2fsa.sherpa.onnx.OfflineTts;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -111,6 +113,7 @@ public class ListenService extends Service {
 
     static String currentKey() { return currentKey; }
 
+    private static String pendingVoice = "";
     private static float pendingRate = 1f;
     private static int pendingSleepMin = 0;
     private static boolean pendingKeepTimer = false;
@@ -118,10 +121,14 @@ public class ListenService extends Service {
     /**
      * @param rate      vitesse de la voix (1 = normale), bornée à 0,5-2
      * @param sleepMin  minuteur d'arrêt en minutes, 0 = aucun
+     * @param voice     identifiant d'une voix neuronale installée (NeuralVoices), ou vide
+     *                  pour la voix du système
      * @param keepTimer vrai pour une RELANCE (swipe au premier plan) : le minuteur
      *                  en cours garde son échéance au lieu de repartir de zéro
      */
-    static void prepare(List<Entry> queue, int start, String lang, float rate, int sleepMin, boolean keepTimer) {
+    static void prepare(List<Entry> queue, int start, String lang, float rate, int sleepMin,
+                        boolean keepTimer, String voice) {
+        pendingVoice = voice == null ? "" : voice;
         pendingQueue = queue;
         pendingStart = start;
         pendingLang = lang == null || lang.isEmpty() ? "fr-FR" : lang;
@@ -140,6 +147,16 @@ public class ListenService extends Service {
     private String lang = "fr-FR";
     private float rate = 1f;
     private final Runnable sleepRunnable = () -> stopAll("sleep");
+
+    // Voix neuronale hors ligne (NeuralVoices) : choisie au démarrage si elle est
+    // installée et que la langue est le français (les modèles le sont). Tout échec
+    // — bibliothèque absente sur cette architecture, modèle illisible, synthèse en
+    // erreur — bascule sur la voix du système plutôt que de se taire.
+    private NeuralVoices.Voice neuralWanted = null;
+    private NeuralSpeaker neural = null;
+    private String neuralId = "";
+    private boolean neuralLoading = false;
+    private Runnable afterNeural = null;
 
     private TextToSpeech tts;
     private boolean ttsReady = false;
@@ -205,6 +222,14 @@ public class ListenService extends Service {
         lang = pendingLang;
         rate = pendingRate;
         if (tts != null && ttsReady) tts.setSpeechRate(rate);
+        if (neural != null) neural.setSpeed(rate);
+        neuralWanted = null;
+        final NeuralVoices.Voice wanted = NeuralVoices.voice(pendingVoice);
+        if (wanted != null && lang.toLowerCase(Locale.ROOT).startsWith("fr")
+            && new NeuralVoices(getApplicationContext()).isInstalled(wanted.archive)) {
+            neuralWanted = wanted;
+        }
+        if (neuralWanted == null) releaseNeural();   // retour à la voix système : libérer la mémoire
         // Minuteur : une relance (keepTimer) garde l'échéance en cours ; sinon il
         // repart, ou s'éteint si aucun n'est demandé.
         if (!(pendingKeepTimer && active)) {
@@ -224,10 +249,96 @@ public class ListenService extends Service {
         requestFocus();
         active = true;
         publishState("playing");
-        ensureTts(this::speakCurrent);
+        prepareEngine(this::speakCurrent);
     }
 
     // ---------- Moteur de synthèse ----------
+
+    private void prepareEngine(Runnable then) {
+        if (neuralWanted == null) {
+            ensureTts(then);
+            return;
+        }
+        if (neural != null && neuralId.equals(neuralWanted.id)) {
+            then.run();
+            return;
+        }
+        afterNeural = then;
+        if (neuralLoading) return;     // le chargement en cours reprendra cette demande
+        releaseNeural();
+        neuralLoading = true;
+        final NeuralVoices.Voice v = neuralWanted;
+        final float r = rate;
+        new Thread(() -> {
+            NeuralSpeaker sp = null;
+            try {
+                final OfflineTts engine = new NeuralVoices(getApplicationContext()).load(v);
+                final AudioAttributes attrs = new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build();
+                sp = new NeuralSpeaker(engine, v.sid, r, attrs,
+                    (id, ok) -> main.post(() -> neuralEnded(id, ok)));
+            } catch (Throwable e) {
+                sp = null;   // y compris UnsatisfiedLinkError : repli sur la voix système
+            }
+            final NeuralSpeaker loaded = sp;
+            main.post(() -> {
+                neuralLoading = false;
+                final Runnable next = afterNeural;
+                afterNeural = null;
+                if (!active) {
+                    if (loaded != null) loaded.shutdown();
+                    return;
+                }
+                if (loaded == null || neuralWanted == null) {
+                    if (loaded != null) loaded.shutdown();
+                    neuralWanted = null;
+                    if (next != null) ensureTts(next);
+                    return;
+                }
+                neural = loaded;
+                neuralId = v.id;
+                if (next != null) next.run();
+            });
+        }, "neural-load").start();
+    }
+
+    private void releaseNeural() {
+        if (neural != null) {
+            neural.shutdown();
+            neural = null;
+            neuralId = "";
+        }
+    }
+
+    /** Fin d'une phrase de la voix neuronale ; ok faux = elle a échoué en route. */
+    private void neuralEnded(String id, boolean ok) {
+        if (!active || paused || neural == null) return;
+        if (id == null || !id.equals(gen + ":" + index + ":" + chunk)) return;
+        if (ok) {
+            utteranceEnded(id);
+            return;
+        }
+        // Repli sur la voix du système, au même endroit de la file.
+        neuralWanted = null;
+        releaseNeural();
+        ensureTts(this::speakCurrent);
+    }
+
+    /** Texte de la phrase qui suivra (même article, ou début du suivant), pour la préparer d'avance. */
+    private String nextText() {
+        if (index < 0 || index >= queue.size()) return null;
+        final Entry e = queue.get(index);
+        if (chunk + 1 < e.chunks.size()) return e.chunks.get(chunk + 1);
+        if (index + 1 < queue.size()) return queue.get(index + 1).chunks.get(0);
+        return null;
+    }
+
+    private void stopSpeechOutput() {
+        if (tts != null && ttsReady) tts.stop();
+        if (neural != null) neural.stop();
+    }
 
     private void ensureTts(Runnable then) {
         if (ttsReady) { then.run(); return; }
@@ -269,7 +380,8 @@ public class ListenService extends Service {
     }
 
     private void speakCurrent() {
-        if (!active || paused || tts == null || !ttsReady) return;
+        if (!active || paused) return;
+        if (neural == null && (tts == null || !ttsReady)) return;
         if (index < 0 || index >= queue.size()) { stopAll("end"); return; }
         Entry e = queue.get(index);
         if (chunk == 0) {
@@ -278,6 +390,10 @@ public class ListenService extends Service {
             notifyListener("playing");
         }
         if (chunk >= e.chunks.size()) { advance(); return; }
+        if (neural != null) {
+            neural.speak(gen + ":" + index + ":" + chunk, e.chunks.get(chunk), nextText());
+            return;
+        }
         int support = tts.setLanguage(Locale.forLanguageTag(lang));
         if (support == TextToSpeech.LANG_MISSING_DATA || support == TextToSpeech.LANG_NOT_SUPPORTED) {
             stopAll("error");
@@ -320,7 +436,7 @@ public class ListenService extends Service {
         if (target < 0) target = 0;
         if (target >= queue.size()) { stopAll("end"); return; }
         gen++;
-        if (tts != null && ttsReady) tts.stop();
+        stopSpeechOutput();
         index = target;
         chunk = 0;
         paused = false;
@@ -334,7 +450,7 @@ public class ListenService extends Service {
         if (!active || paused) return;
         paused = true;
         gen++;
-        if (tts != null && ttsReady) tts.stop();
+        stopSpeechOutput();
         updatePlaybackState();
         updateNotification();
         notifyListener("paused");
@@ -362,6 +478,9 @@ public class ListenService extends Service {
         }
         ttsReady = false;
         afterReady = null;
+        afterNeural = null;
+        neuralWanted = null;
+        releaseNeural();
         abandonFocus();
         releaseWake();
         if (session != null) {
@@ -546,6 +665,7 @@ public class ListenService extends Service {
             try { tts.stop(); tts.shutdown(); } catch (RuntimeException ignored) { }
             tts = null;
         }
+        releaseNeural();
         abandonFocus();
         releaseWake();
         if (session != null) {

@@ -3366,6 +3366,13 @@ ${Array.from({ length: 12 }, (_, k) => {
         window.__svc = { active: false, key: "" };
         let ecoute = null;
         window.__push = (e) => ecoute && ecoute(e);
+        let voix = null;
+        window.__pushVoice = (e) => voix && voix(e);
+        window.__voiceCalls = [];
+        window.__archives = [
+          { archive: "siwis", size: 67207459, installed: false, partial: 0 },
+          { archive: "upmc", size: 80422639, installed: false, partial: 0 },
+        ];
         window.Capacitor = {
           isNativePlatform: () => true,
           Plugins: {
@@ -3388,6 +3395,7 @@ ${Array.from({ length: 12 }, (_, k) => {
               stopSpeaking: () => Promise.resolve(),
               addListener: (nom, f) => {
                 if (nom === "listen") ecoute = f;
+                if (nom === "voice") voix = f;
                 return Promise.resolve({ remove() {} });
               },
               listenStart: (o) => {
@@ -3401,6 +3409,21 @@ ${Array.from({ length: 12 }, (_, k) => {
                 return Promise.resolve();
               },
               listenStatus: () => Promise.resolve(window.__svc),
+              voiceStatus: () =>
+                Promise.resolve({ archives: window.__archives, busy: false }),
+              voiceDownload: (o) => (
+                window.__voiceCalls.push(["download", o.archive]),
+                Promise.resolve()
+              ),
+              voiceCancel: () => (
+                window.__voiceCalls.push(["cancel"]),
+                Promise.resolve()
+              ),
+              voiceRemove: (o) => {
+                window.__voiceCalls.push(["remove", o.archive]);
+                window.__archives.find((a) => a.archive === o.archive).installed = false;
+                return Promise.resolve();
+              },
             },
           },
         };
@@ -3463,8 +3486,66 @@ ${Array.from({ length: 12 }, (_, k) => {
       window.__starts.length = 1;
     });
     console.log(
-      `rangées de réglage affichées : ${await page.evaluate(() => document.querySelectorAll("[data-listenmount] .prefrow").length)} (attendu 3 : vitesse, minuteur, flash)`
+      `rangées de réglage affichées : ${await page.evaluate(() => document.querySelectorAll("[data-listenmount] .prefrow").length)} (attendu 4 : voix, vitesse, minuteur, flash)`
     );
+    // Voix neuronale : choix, téléchargement, progression, installation. Une voix
+    // non installée ne change RIEN au service (voix système), une installée est transmise.
+    const vx = await page.evaluate(async () => {
+      const att = (ms) => new Promise((r) => setTimeout(r, ms));
+      const bloc = () => document.querySelector("[data-listenmount] .voixbloc");
+      const r = {};
+      r.sansBlocSysteme = !bloc();
+      setEcouteVoix("pierre");
+      await att(100);
+      r.blocTelecharger =
+        !!bloc() && !!bloc().querySelector('[data-voiceact="download"]');
+      r.bouton = bloc().querySelector("button").textContent;
+      window.__starts.length = 0;
+      demarrerEcoute();
+      r.voixNonInstallee = window.__starts[0].voice === "";
+      bloc().querySelector('[data-voiceact="download"]').click();
+      await att(100);
+      r.appel = JSON.stringify(window.__voiceCalls.at(-1));
+      window.__pushVoice({ archive: "upmc", state: "progress", done: 40, total: 80 });
+      await att(50);
+      r.progression = bloc().textContent.includes("50");
+      window.__pushVoice({ archive: "upmc", state: "progress", done: 80, total: 80 });
+      await att(50);
+      r.installation = /Installation/.test(bloc().textContent);
+      window.__archives.find((a) => a.archive === "upmc").installed = true;
+      window.__pushVoice({ archive: "upmc", state: "done" });
+      await att(150);
+      r.installee = !!bloc().querySelector('[data-voiceact="remove"]');
+      window.__starts.length = 0;
+      demarrerEcoute();
+      r.voixPierre = window.__starts[0].voice;
+      setEcouteVoix("jessica");
+      window.__starts.length = 0;
+      demarrerEcoute();
+      r.voixJessica = window.__starts[0].voice;
+      setEcouteVoix("siwis");
+      window.__starts.length = 0;
+      demarrerEcoute();
+      r.siwisPasInstallee = window.__starts[0].voice === "";
+      setEcouteVoix("system");
+      window.__starts.length = 0;
+      demarrerEcoute();
+      r.systeme = window.__starts[0].voice === "";
+      r.sansBlocFin = !bloc();
+      window.__archives.find((a) => a.archive === "upmc").installed = false;
+      voixEtat = null;
+      return r;
+    });
+    console.log(
+      `voix : bloc absent en voix système ${vx.sansBlocSysteme}, bouton « ${vx.bouton} », non installée → voix système ${vx.voixNonInstallee}, appel ${vx.appel}, progression 50 % ${vx.progression}, « Installation » ${vx.installation}, installée ${vx.installee}, pierre → "${vx.voixPierre}", jessica → "${vx.voixJessica}" (même modèle), siwis non installée → système ${vx.siwisPasInstallee}, retour système ${vx.systeme}`
+    );
+    await page.evaluate(() => {
+      arreterEcoute();
+      window.__starts.length = 0;
+      demarrerEcoute();
+      window.__stopsSvc = 0;
+      window.__starts.length = 1;
+    });
     // Une carte vidéo (simulée sur la carte 1) n'entre PAS dans la file
     const vid = await page.evaluate(() => {
       const orig = window.videoIdOf;
