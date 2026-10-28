@@ -838,6 +838,7 @@ public class InAppBrowserPlugin extends Plugin {
             ev.put("reason", reason);
             ev.put("heard", new JSArray(ListenService.heardKeys()));
             ev.put("detail", ListenService.voiceError());
+            ev.put("paused", ListenService.isPaused());
             notifyListeners("listen", ev);
         });
         try {
@@ -939,6 +940,29 @@ public class InAppBrowserPlugin extends Plugin {
         call.resolve();
     }
 
+    /**
+     * Pause / reprise, article précédent, article suivant : les mêmes commandes que les
+     * boutons de la notification (elles passent par les mêmes actions du service), pour la
+     * pastille de l'écran. Sans effet quand rien ne joue.
+     */
+    @PluginMethod
+    public void listenControl(PluginCall call) {
+        final String a = call.getString("action", "");
+        final String action;
+        switch (a) {
+            case "toggle": action = ListenService.ACTION_TOGGLE; break;
+            case "next": action = ListenService.ACTION_NEXT; break;
+            case "prev": action = ListenService.ACTION_PREV; break;
+            default:
+                call.reject("action inconnue");
+                return;
+        }
+        if (ListenService.isActive()) {
+            getContext().startService(new Intent(getContext(), ListenService.class).setAction(action));
+        }
+        call.resolve();
+    }
+
     /** Le résumé IA est-il possible ici ? (moteur natif utilisable ET modèle de résumé installé) */
     @PluginMethod
     public void summaryStatus(PluginCall call) {
@@ -968,12 +992,14 @@ public class InAppBrowserPlugin extends Plugin {
             ev.put("reason", reason);
             ev.put("heard", new JSArray(ListenService.heardKeys()));
             ev.put("detail", ListenService.voiceError());
+            ev.put("paused", ListenService.isPaused());
             notifyListeners("listen", ev);
         });
         JSObject res = new JSObject();
         res.put("active", ListenService.isActive());
         res.put("key", ListenService.currentKey());
         res.put("heard", new JSArray(ListenService.heardKeys()));
+        res.put("paused", ListenService.isPaused());
         call.resolve(res);
     }
 

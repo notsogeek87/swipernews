@@ -3369,6 +3369,7 @@ ${Array.from({ length: 12 }, (_, k) => {
         let voix = null;
         window.__pushVoice = (e) => voix && voix(e);
         window.__voiceCalls = [];
+        window.__ctl = [];
         window.__resume = { engine: true, installed: false };
         window.__archives = [
           { archive: "siwis", size: 67207459, installed: false, partial: 0 },
@@ -3411,6 +3412,7 @@ ${Array.from({ length: 12 }, (_, k) => {
               },
               listenStatus: () => Promise.resolve(window.__svc),
               summaryStatus: () => Promise.resolve(window.__resume),
+              listenControl: (o) => (window.__ctl.push(o.action), Promise.resolve()),
               voiceStatus: () =>
                 Promise.resolve({ archives: window.__archives, busy: false }),
               voiceDownload: (o) => (
@@ -3672,6 +3674,74 @@ ${Array.from({ length: 12 }, (_, k) => {
     });
     console.log(
       `flash IA : mode extraits sans tête/lien ${ia.extraitSansTete}, mode IA avec tête+lien+extrait ${ia.iaAvecTete}, tête = début des morceaux ${ia.teteDansChunks}, ai envoyé ${ia.aiFlag}, annonce « ${ia.intro} », réglage → « installer » si modèle absent ${ia.descAbsent}, plus après installation ${ia.descPrete}, rangée dans la feuille ${ia.dansLaFeuille}, repli signalé « ${ia.toast} », extraits → ai=false ${ia.extraitAiFalse}`
+    );
+    // « Écouter le fil » aussi en résumé IA : les actus à carte simple portent tête+lien+extrait,
+    // pas Wikipédia ; le réglage est le même que pour le flash.
+    const fil = await page.evaluate(() => {
+      const r = {};
+      setFlashMode("ia");
+      const f = fileEcoute();
+      const avecIa = f.filter((x) => x.head);
+      const sansIa = f.filter((x) => !x.head);
+      r.total = f.length;
+      r.avecIa = avecIa.length;
+      r.iaToutesActus = avecIa.every(
+        (x) => ecouteCartes.get(x.key)[0].kind !== "learn" && x.link
+      );
+      r.wikiSansIa = sansIa.every((x) =>
+        ecouteCartes.get(x.key).some((it) => it.kind === "learn" || !it.link)
+      );
+      r.teteEstPrefixe = avecIa.every((x) => x.head.every((h, k) => x.chunks[k] === h));
+      window.__starts.length = 0;
+      demarrerEcoute({ intro: true });
+      r.aiEnvoye = window.__starts[0].ai === true;
+      arreterEcoute();
+      setFlashMode("extrait");
+      const g = fileEcoute();
+      r.extraitsSansIa = g.every((x) => !x.head && !x.link);
+      window.__starts.length = 0;
+      demarrerEcoute();
+      r.aiFauxEnExtraits = window.__starts[0].ai === false;
+      arreterEcoute();
+      return r;
+    });
+    console.log(
+      `fil entier en IA : ${fil.avecIa}/${fil.total} cartes avec résumé IA (actus seulement ${fil.iaToutesActus}), Wikipédia sans IA ${fil.wikiSansIa}, tête = préfixe des morceaux ${fil.teteEstPrefixe}, ai envoyé ${fil.aiEnvoye} ; en extraits : aucune tête/lien ${fil.extraitsSansIa}, ai=false ${fil.aiFauxEnExtraits}`
+    );
+    // Contrôles dans l'app : pause / reprise, suivant, précédent, arrêt
+    const ctl = await page.evaluate(async () => {
+      const att = (ms) => new Promise((r) => setTimeout(r, ms));
+      const r = {};
+      window.__ctl.length = 0;
+      window.__starts.length = 0;
+      demarrerEcoute();
+      await att(100);
+      const pill = document.getElementById("listenPill");
+      r.complete = pill.classList.contains("listenpill--full");
+      r.boutons = [...pill.querySelectorAll("[data-ctl]")]
+        .map((b) => b.dataset.ctl)
+        .join(",");
+      const tg = pill.querySelector('[data-ctl="toggle"]');
+      r.labelPause = tg.getAttribute("aria-label");
+      tg.click();
+      await att(50);
+      r.labelReprendre = tg.getAttribute("aria-label");
+      r.pauseEnvoyee = window.__ctl.at(-1);
+      // le service confirme (reprise venue de la notification) : l'icône revient
+      window.__push({ active: true, key: ecouteCle, reason: "playing", paused: false });
+      await att(50);
+      r.labelApresReprise = tg.getAttribute("aria-label");
+      pill.querySelector('[data-ctl="next"]').click();
+      pill.querySelector('[data-ctl="prev"]').click();
+      await att(50);
+      r.suiv = window.__ctl.slice(-2).join(",");
+      pill.querySelector('[data-ctl="stop"]').click();
+      await att(50);
+      r.arret = !ecouteActive && pill.classList.contains("hidden");
+      return r;
+    });
+    console.log(
+      `contrôles : pastille complète ${ctl.complete} (boutons ${ctl.boutons}), « ${ctl.labelPause} » → « ${ctl.labelReprendre} » après appui (commande ${ctl.pauseEnvoyee}), reprise confirmée par le service → « ${ctl.labelApresReprise} », suivant/précédent envoyés ${ctl.suiv}, arrêt ${ctl.arret}`
     );
     // Un geste pendant le flash ne remplace PAS la file
     const geste = await page.evaluate(async () => {

@@ -161,18 +161,27 @@
       "listen.voice.err.invalid": "Fichier de voix invalide, il n'a pas été installé.",
       "listen.voice.credit":
         "Voix Piper. Siwis : CC BY 4.0, Université d'Édimbourg. Jessica et Pierre : CC BY-SA 4.0, UPMC.",
-      "listen.flashmode.label": "Lecture du flash info",
+      "listen.flashmode.label": "Lecture des actus",
       "listen.flashmode.opt.extrait": "Extraits",
       "listen.flashmode.opt.ia": "Résumé IA",
       "listen.flashmode.desc.extrait":
-        "Le titre et le début de l'extrait de chaque article.",
+        "Le titre et le début de l'extrait de chaque article, pour le flash info comme pour le fil.",
       "listen.flashmode.desc.ia":
-        "Chaque article est résumé en deux phrases par l'IA, sur l'appareil. Plus lent, et le téléphone chauffe un peu plus.",
+        "Chaque actu est résumée en deux phrases par l'IA, sur l'appareil, pour le flash info comme pour le fil. Les articles Wikipédia sont lus tels quels. Plus lent, et le téléphone chauffe un peu plus.",
       "listen.flashmode.desc.missing":
         "Il faut d'abord installer le modèle de résumé : ouvrez un article et touchez ✨. En attendant, les extraits sont lus.",
       "listen.flashmode.fallback":
         "Modèle de résumé absent : les extraits sont lus à la place.",
       "listen.flash.intro.ia": "Flash info en résumé : {n} {i}, environ {m} {u}.",
+      "listen.pill.aria": "Contrôles de l'écoute",
+      "listen.ctl.prev": "Article précédent",
+      "listen.ctl.next": "Article suivant",
+      "listen.ctl.pause": "Pause",
+      "listen.ctl.play": "Reprendre",
+      "changelog.v314.item1":
+        "Le résumé IA vaut maintenant aussi pour « Écouter le fil » (les actus ; Wikipédia est lu tel quel).",
+      "changelog.v314.item2":
+        "Écoute (Android) : pause, article précédent et suivant directement dans l'app, en plus de la notification.",
       "changelog.v313.item1":
         "Flash info en résumé IA (Android) : chaque actu est résumée en deux phrases par le modèle installé sur l'appareil, à partir de la page de l'article. À choisir dans les réglages ou dans la feuille « Écouter ».",
       "changelog.v309.item1":
@@ -752,17 +761,26 @@
       "listen.voice.err.invalid": "Invalid voice file, it was not installed.",
       "listen.voice.credit":
         "Piper voices. Siwis: CC BY 4.0, University of Edinburgh. Jessica and Pierre: CC BY-SA 4.0, UPMC.",
-      "listen.flashmode.label": "News flash reading",
+      "listen.flashmode.label": "News reading",
       "listen.flashmode.opt.extrait": "Excerpts",
       "listen.flashmode.opt.ia": "AI summary",
       "listen.flashmode.desc.extrait":
-        "The title and the start of each article's excerpt.",
+        "The title and the start of each article's excerpt, for the news flash and for the feed.",
       "listen.flashmode.desc.ia":
-        "Each article is summarized in two sentences by the AI, on the device. Slower, and the phone warms up a bit more.",
+        "Each news story is summarized in two sentences by the AI, on the device, for the news flash and for the feed. Wikipedia articles are read as they are. Slower, and the phone warms up a bit more.",
       "listen.flashmode.desc.missing":
         "Install the summary model first: open an article and tap ✨. Excerpts are read meanwhile.",
       "listen.flashmode.fallback": "Summary model missing: excerpts are read instead.",
       "listen.flash.intro.ia": "Summarized news flash: {n} {i}, about {m} {u}.",
+      "listen.pill.aria": "Listening controls",
+      "listen.ctl.prev": "Previous story",
+      "listen.ctl.next": "Next story",
+      "listen.ctl.pause": "Pause",
+      "listen.ctl.play": "Resume",
+      "changelog.v314.item1":
+        "AI summaries now also work for “Listen to the feed” (news stories; Wikipedia is read as is).",
+      "changelog.v314.item2":
+        "Listening (Android): pause, previous and next story right in the app, besides the notification.",
       "changelog.v313.item1":
         "AI-summarized news flash (Android): each story is summarized in two sentences by the model on your device, from the article page. Choose it in the settings or in the “Listen” sheet.",
       "changelog.v309.item1":

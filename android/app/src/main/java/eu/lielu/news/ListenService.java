@@ -176,6 +176,11 @@ public class ListenService extends Service {
 
     static boolean isActive() { return active; }
 
+    /** Miroir statique de {@code paused} : la page le demande sans passer par l'instance du service. */
+    private static volatile boolean pausedFlag = false;
+
+    static boolean isPaused() { return pausedFlag; }
+
     static String currentKey() { return currentKey; }
 
     private static String pendingVoice = "";
@@ -304,6 +309,7 @@ public class ListenService extends Service {
         }
         chunk = 0;
         paused = false;
+        pausedFlag = false;
         pausedByFocus = false;
         gen++;
         // startForeground AVANT tout le reste : Android donne ~5 s après
@@ -603,6 +609,7 @@ public class ListenService extends Service {
         index = target;
         chunk = 0;
         paused = false;
+        pausedFlag = false;
         pausedByFocus = false;
         requestFocus();
         updatePlaybackState();
@@ -613,6 +620,7 @@ public class ListenService extends Service {
     private void pauseNow() {
         if (!active || paused) return;
         paused = true;
+        pausedFlag = true;
         gen++;
         stopSpeechOutput();
         updatePlaybackState();
@@ -623,6 +631,7 @@ public class ListenService extends Service {
     private void resumeNow() {
         if (!active || !paused) return;
         paused = false;
+        pausedFlag = false;
         gen++;
         requestFocus();
         updatePlaybackState();
@@ -634,6 +643,7 @@ public class ListenService extends Service {
     private void stopAll(String reason) {
         boolean wasActive = active;
         active = false;
+        pausedFlag = false;
         gen++;
         main.removeCallbacksAndMessages(null);
         if (tts != null) {

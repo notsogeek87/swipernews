@@ -511,6 +511,17 @@
     transition:top .25s ease}
   .listenpill.hidden{display:none}
   .listenpill__i svg{width:16px;height:16px;display:block}
+  /* Pastille d'écoute : un seul bouton « Arrêter » (web, ancien APK), ou — avec le service
+     natif, classe --full — précédent / pause / suivant / arrêt en icônes seules. */
+  .listenpill{padding:4px 6px;gap:2px}
+  .listenpill__b{display:inline-flex;align-items:center;gap:8px;border:none;background:transparent;
+    color:inherit;font:inherit;padding:6px 10px;border-radius:999px;cursor:pointer}
+  .listenpill__b:hover{background:rgba(var(--redline-rgb),.12)}
+  .listenpill__ctl{display:none}
+  .listenpill--full .listenpill__ctl{display:inline-flex}
+  .listenpill--full .listenpill__t{display:none}
+  .listenpill--full .listenpill__b{padding:6px 9px}
+  .listenpill--full .listenpill__b svg{width:20px;height:20px}
   .pausecont{display:block;width:100%;margin-top:10px}
   /* Posée par startVideo()/retirée par stopVideo() : enregistrer/partager
      n'ont rien à faire sur l'image pendant la lecture d'une vidéo. */
@@ -1567,7 +1578,12 @@
 <!-- Écoute du fil en cours (voir demarrerEcoute) : le seul moyen de l'arrêter
      sans repasser par le menu. Placée sous la barre du haut quand celle-ci est
      là (placerPilule), en haut de l'écran sinon. -->
-<button type="button" class="listenpill hidden" id="listenPill"><span class="listenpill__i" aria-hidden="true"></span><span data-i18n="listen.stop">Arrêter l'écoute</span></button>
+<div class="listenpill hidden" id="listenPill" role="group">
+  <button type="button" class="listenpill__b listenpill__ctl" data-ctl="prev"></button>
+  <button type="button" class="listenpill__b listenpill__ctl" data-ctl="toggle"></button>
+  <button type="button" class="listenpill__b listenpill__ctl" data-ctl="next"></button>
+  <button type="button" class="listenpill__b" data-ctl="stop"><span class="listenpill__i" aria-hidden="true"></span><span class="listenpill__t" data-i18n="listen.stop">Arrêter l'écoute</span></button>
+</div>
 
 <!-- Rail unique, partagé par toutes les cartes (agit sur la carte visible) -->
 <div class="rail hidden" id="rail">
@@ -1974,7 +1990,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=294"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=313"></script>
+<script src="src/i18n.js?v=314"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -3245,8 +3261,8 @@ function setEcouteVoix(v){
   try{localStorage.setItem(LS_VOIX,v);}catch(e){warn("save listenvoice",e);}
   renderListenPref();
 }
-/* FLASH INFO EN RÉSUMÉ IA (APK) : au lieu de « titre + deux phrases de l'extrait du
-   flux », chaque actu est résumée en deux phrases par le modèle LOCAL du lecteur (le
+/* RÉSUMÉ IA DES ACTUS (APK), pour le flash info ET l'écoute du fil : au lieu de « titre +
+   extrait du flux », chaque actu est résumée en deux phrases par le modèle LOCAL du lecteur (le
    même que le bouton ✨), à partir de la page de l'article. Le service les prépare
    pendant la lecture du précédent (FlashSummarizer) ; un article sans résumé prêt à
    temps, ou sans texte à résumer, est lu avec son extrait. Réglage par défaut :
@@ -3361,7 +3377,7 @@ function ecouteService(){
 /* Clé de carte -> articles qu'elle porte : de quoi marquer « entendu » (voir
    marquerEntendus) ce que le service a fini de lire, y compris quand la page
    était figée et n'a vu passer aucune carte. Refait avec chaque file. */
-let ecouteCartes=new Map(),ecouteMarques=new Set(),ecouteFlash=false,ecouteSwipeAt=0;
+let ecouteCartes=new Map(),ecouteMarques=new Set(),ecouteFlash=false,ecouteSwipeAt=0,ecoutePausee=false;
 function marquerEntendus(keys){
   if(!keys)return;
   for(const k of keys){
@@ -3392,8 +3408,7 @@ function fileFlash(){
     if(videoIdOf(it)||itemSeen(it)||estMasque(it))continue;
     const k=seenKey(it);
     if(!k||cartes.has(k))continue;
-    const tete=[it.source,it.title].map(sansEmoji).filter(Boolean).map(t=>t.replace(/[.…!?:;,]+$/,"")).join(". ")+".";
-    const head=ttsChunks(tete);
+    const head=ttsChunks(teteDActu(it));
     const resume=it.desc?ttsChunks(sansEmoji(it.desc)).slice(0,2):[];
     const chunks=[...head,...resume];
     if(!chunks.length)continue;
@@ -3418,13 +3433,31 @@ function fileEcoute(){
     // n'a pas sa place dans une radio. isSolo (groupItems) garantit qu'une carte
     // vidéo ne porte jamais d'article à côté.
     if(!its.length||its.every(it=>videoIdOf(it)))continue;
-    const chunks=ttsChunks(texteDeCarte(kids[k]));
+    let chunks=ttsChunks(texteDeCarte(kids[k]));
     if(!chunks.length)continue;
     const cle=cleDeCarte(kids[k]);
     ecouteCartes.set(cle,its);
-    out.push({key:cle,source:sansEmoji(its[0].source||""),title:sansEmoji(its[0].title||""),chunks});
+    const entree={key:cle,source:sansEmoji(its[0].source||""),title:sansEmoji(its[0].title||""),chunks};
+    // Résumé IA (même réglage que le flash info) : seulement pour une carte qui porte UNE
+    // actu — pas Wikipédia (pas de page d'éditeur à résumer), pas une carte à parts égales.
+    // Les morceaux de repli se recomposent « tête puis extrait » pour que la tête soit un
+    // vrai préfixe, ce que ttsChunks seul ne garantit pas (il fusionne les phrases).
+    const it0=its[0];
+    if(flashMode==="ia"&&its.length===1&&it0.kind!=="learn"&&it0.link){
+      const head=ttsChunks(teteDActu(it0));
+      const extrait=it0.desc?ttsChunks(sansEmoji(it0.desc)):[];
+      if(head.length){
+        entree.chunks=[...head,...extrait];
+        entree.head=head;entree.link=it0.link;entree.excerpt=it0.desc||"";
+      }
+    }
+    out.push(entree);
   }
   return out;
+}
+/* « Source. Titre. » d'une actu, tel qu'on le prononce en tête de lecture. */
+function teteDActu(it){
+  return [it.source,it.title].map(sansEmoji).filter(Boolean).map(t=>t.replace(/[.…!?:;,]+$/,"")).join(". ")+".";
 }
 /* État poussé par le service (lecture, pause, fin) ou relu par listenStatus. La
    carte en cours est suivie par son ARTICLE, et ecouteCle est posée AVANT le
@@ -3434,7 +3467,7 @@ function surEtatEcoute(e){
   marquerEntendus(e.heard);
   if(!e.active){
     if(!ecouteActive)return;
-    ecouteActive=false;ecouteFlash=false;ecouteCle="";ecouteGen++;
+    ecouteActive=false;ecouteFlash=false;ecoutePausee=false;ecouteCle="";ecouteGen++;
     clearTimeout(ecouteRepriseT);
     renderEcouteUI();
     if(e.reason==="end")toast(T("listen.end"));
@@ -3444,7 +3477,8 @@ function surEtatEcoute(e){
   }
   if(e.reason==="voicefallback")toast(T("listen.voice.fallback",{d:e.detail||""}));
   if(e.reason==="aifallback")toast(T("listen.flashmode.fallback"));
-  if(!ecouteActive){ecouteActive=true;renderEcouteUI();}
+  const pausee=typeof e.paused==="boolean"?e.paused:e.reason==="paused";
+  if(!ecouteActive||pausee!==ecoutePausee){ecouteActive=true;ecoutePausee=pausee;renderEcouteUI();}
   if(e.key&&e.key!==ecouteCle){
     const j=indexDeCle(e.key);
     // Flash : la page suit la carte lue, sauf juste après un geste — on ne
@@ -3461,7 +3495,7 @@ function syncEcouteService(){
   if(!svc||typeof svc.listenStatus!=="function")return;
   brancherEcoute(svc);
   svc.listenStatus().then(st=>{
-    if(st&&st.active)surEtatEcoute({active:true,key:st.key,heard:st.heard});
+    if(st&&st.active)surEtatEcoute({active:true,key:st.key,heard:st.heard,paused:!!st.paused});
     else if(ecouteActive)surEtatEcoute({active:false,reason:"stop",heard:st&&st.heard});
   }).catch(()=>{});
 }
@@ -3476,7 +3510,7 @@ function brancherEcoute(svc){
 function lancerService(svc,file,flash,intro,relance,ai){
   brancherEcoute(svc);
   const gen=++ecouteGen;
-  ecouteActive=true;ecouteFlash=flash;ecouteCle=file[0].key;
+  ecouteActive=true;ecouteFlash=flash;ecoutePausee=false;ecouteCle=file[0].key;
   ecouteMarques=new Set();
   renderEcouteUI();
   svc.listenStart({items:file,lang:TTS_LANG[LANG]||LANG,rate:+ecouteRate||1,
@@ -3510,7 +3544,7 @@ function demarrerEcoute(opts){
     const relance=ecouteActive;
     const file=fileEcoute();
     if(!file.length)return;
-    lancerService(svc,file,false,opts&&opts.intro?introEcoute(file):"",relance);
+    lancerService(svc,file,false,opts&&opts.intro?introEcoute(file):"",relance,file.some(x=>x.head));
     return;
   }
   taire();
@@ -3522,7 +3556,7 @@ function demarrerEcoute(opts){
 function arreterEcoute(){
   clearTimeout(ecouteRepriseT);
   if(!ecouteActive)return;
-  ecouteActive=false;ecouteFlash=false;ecouteCle="";
+  ecouteActive=false;ecouteFlash=false;ecoutePausee=false;ecouteCle="";
   ecouteGen++;                                      // toute promesse en vol devient muette
   const svc=ecouteService();
   if(svc){try{svc.listenStop();}catch(e){}}
@@ -3536,6 +3570,18 @@ function renderEcouteUI(){
   btn.querySelector(".menurow__i").innerHTML=ecouteActive?ICON_STOP:ICON_VOLUME;
   const pill=document.getElementById("listenPill");
   pill.classList.toggle("hidden",!ecouteActive);
+  // Contrôles complets seulement avec le service natif : lui seul sait faire pause,
+  // précédent et suivant (la boucle web n'a que « arrêter »).
+  const plein=!!ecouteService()&&typeof ecouteService().listenControl==="function";
+  pill.classList.toggle("listenpill--full",plein);
+  pill.setAttribute("aria-label",T("listen.pill.aria"));
+  const lab={prev:T("listen.ctl.prev"),toggle:T(ecoutePausee?"listen.ctl.play":"listen.ctl.pause"),next:T("listen.ctl.next"),stop:T("listen.stop")};
+  const ico={prev:ICON_CTL_PREV,toggle:ecoutePausee?ICON_CTL_PLAY:ICON_CTL_PAUSE,next:ICON_CTL_NEXT};
+  pill.querySelectorAll("[data-ctl]").forEach(b=>{
+    const k=b.dataset.ctl;
+    b.setAttribute("aria-label",lab[k]);b.title=lab[k];
+    if(ico[k])b.innerHTML=ico[k];
+  });
   if(ecouteActive)placerPilule();
 }
 /* Sous la barre du haut quand elle est affichée (sinon la pilule masquerait ses
@@ -3570,7 +3616,21 @@ document.getElementById("listenBtn").onclick=()=>{
   closeDialog(menuSheet);
   if(ecouteActive)arreterEcoute();else demarrerEcoute({intro:true});
 };
-document.getElementById("listenPill").onclick=arreterEcoute;
+document.getElementById("listenPill").onclick=e=>{
+  const b=e.target.closest("[data-ctl]");
+  if(!b||b.dataset.ctl==="stop"){arreterEcoute();return;}
+  controlerEcoute(b.dataset.ctl);
+};
+/* Pause, précédent, suivant : commandes du service natif, les mêmes que celles de sa
+   notification. La page ne rejoue rien elle-même ; le service renvoie l'état (carte lue,
+   en pause ou non) par l'événement « listen », qu'elle suit comme pour la lecture. */
+function controlerEcoute(act){
+  const svc=ecouteService();
+  if(!svc||typeof svc.listenControl!=="function"||!ecouteActive)return;
+  ecouteSwipeAt=0;                          // un geste explicite : la page doit suivre
+  if(act==="toggle"){ecoutePausee=!ecoutePausee;renderEcouteUI();}
+  svc.listenControl({action:act}).catch(e=>warn("écoute",e));
+}
 /* ---------- Pause douce ----------
    Le fil n'a pas de fin : c'est voulu (la moitié Wikipédia le rend infini), et
    c'est aussi le mécanisme qu'on reproche aux réseaux sociaux. Réglage
@@ -3730,7 +3790,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="313";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="314";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -3741,6 +3801,8 @@ const APP_VERSION="313";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:314,date:"2026-10-28",items:[
+    "changelog.v314.item1","changelog.v314.item2"]},
   {v:313,date:"2026-10-28",items:[
     "changelog.v313.item1"]},
   {v:309,date:"2026-10-28",items:[
@@ -6976,6 +7038,10 @@ const ICON_SAVED=`<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentCo
 // façon, autant en faire la référence commune (voir pvRowHTML).
 // Écouter le fil (menu) et l'arrêter (menu, pilule) : même famille de tracés.
 const ICON_VOLUME=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`;
+const ICON_CTL_PLAY=`<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"></path></svg>`;
+const ICON_CTL_PAUSE=`<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>`;
+const ICON_CTL_PREV=`<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="5" y="5" width="2.5" height="14" rx="1"></rect><path d="M19 6.2v11.6a1 1 0 0 1-1.55.83L9.4 12.83a1 1 0 0 1 0-1.66l8.05-5.8A1 1 0 0 1 19 6.2z"></path></svg>`;
+const ICON_CTL_NEXT=`<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="16.5" y="5" width="2.5" height="14" rx="1"></rect><path d="M5 6.2v11.6a1 1 0 0 0 1.55.83l8.05-5.8a1 1 0 0 0 0-1.66l-8.05-5.8A1 1 0 0 0 5 6.2z"></path></svg>`;
 const ICON_STOP=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="1" fill="currentColor"></rect></svg>`;
 const ICON_SHARE=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>`;
 const ICON_GITHUB=`<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>`;
