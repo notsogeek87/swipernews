@@ -1974,7 +1974,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=294"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=312"></script>
+<script src="src/i18n.js?v=313"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -3245,6 +3245,34 @@ function setEcouteVoix(v){
   try{localStorage.setItem(LS_VOIX,v);}catch(e){warn("save listenvoice",e);}
   renderListenPref();
 }
+/* FLASH INFO EN RÉSUMÉ IA (APK) : au lieu de « titre + deux phrases de l'extrait du
+   flux », chaque actu est résumée en deux phrases par le modèle LOCAL du lecteur (le
+   même que le bouton ✨), à partir de la page de l'article. Le service les prépare
+   pendant la lecture du précédent (FlashSummarizer) ; un article sans résumé prêt à
+   temps, ou sans texte à résumer, est lu avec son extrait. Réglage par défaut :
+   « extraits » — le résumé IA demande le modèle (téléchargé depuis le lecteur) et
+   consomme de la batterie. */
+const FLASH_MODES=["extrait","ia"];
+const LS_FLASHMODE="fluxswipe.flashmode.v1";
+let flashMode=(()=>{try{const v=localStorage.getItem(LS_FLASHMODE);return FLASH_MODES.includes(v)?v:"extrait";}catch(e){return "extrait";}})();
+let resumeEtat=null,resumeCharge=false;    // {engine,installed} relevé auprès du natif
+function setFlashMode(v){
+  if(!FLASH_MODES.includes(v)||v===flashMode)return;
+  flashMode=v;
+  try{localStorage.setItem(LS_FLASHMODE,v);}catch(e){warn("save flashmode",e);}
+  renderListenPref();
+}
+function rafraichirResume(){
+  const svc=ecouteService();
+  if(!svc||typeof svc.summaryStatus!=="function")return;
+  svc.summaryStatus().then(r=>{resumeEtat=r;renderListenPref();}).catch(e=>warn("résumé",e));
+}
+function flashModeRow(){
+  const dispo=!resumeEtat||(resumeEtat.engine&&resumeEtat.installed);
+  const desc=flashMode==="ia"?T(dispo?"listen.flashmode.desc.ia":"listen.flashmode.desc.missing"):T("listen.flashmode.desc.extrait");
+  return prefRow("flashmode",T("listen.flashmode.label"),desc,
+    FLASH_MODES.map(v=>({v,t:T("listen.flashmode.opt."+v)})),flashMode);
+}
 const FLASH_MINS=["5","10","20"];
 const LS_FLASH="fluxswipe.flashmin.v1";
 let flashMin=(()=>{try{const v=localStorage.getItem(LS_FLASH);return FLASH_MINS.includes(v)?v:"10";}catch(e){return "10";}})();
@@ -3259,7 +3287,7 @@ let ecouteRate=(()=>{try{const v=localStorage.getItem(LS_ECOUTE_RATE);return ECO
 let ecouteSleep=(()=>{try{const v=localStorage.getItem(LS_ECOUTE_SLEEP);return ECOUTE_SLEEPS.includes(v)?v:"off";}catch(e){return "off";}})();
 function renderListenPref(){
   const ok=!!ecouteService();
-  if(ok&&!voixCharge){voixCharge=true;rafraichirVoix();}
+  if(ok&&!voixCharge){voixCharge=true;rafraichirVoix();rafraichirResume();}
   const dec=v=>(LANG==="fr"?v.replace(".",","):v)+"×";
   const html=ok?prefRow("listenvoice",T("listen.voice.label"),T("listen.voice.desc."+(ecouteVoix==="system"?"system":"neural")),
       VOIX_IDS.map(v=>({v,t:T("listen.voice.opt."+v)})),ecouteVoix)+voixBloc()
@@ -3268,13 +3296,13 @@ function renderListenPref(){
     +prefRow("listensleep",T("listen.sleep.label"),ecouteSleep==="off"?T("listen.sleep.desc.off"):T("listen.sleep.desc",{m:ecouteSleep}),
       ECOUTE_SLEEPS.map(v=>({v,t:v==="off"?T("listen.sleep.opt.off"):v+" min"})),ecouteSleep)
     +prefRow("flashmin",T("listen.flash.label"),T("listen.flash.desc",{m:flashMin}),
-      FLASH_MINS.map(v=>({v,t:v+" min"})),flashMin):"";
+      FLASH_MINS.map(v=>({v,t:v+" min"})),flashMin)+flashModeRow():"";
   document.querySelectorAll("[data-listenmount]").forEach(el=>{el.innerHTML=html;});
   // Le même choix de voix, en petit, dans la feuille « Écouter » : c'est là qu'on
   // se demande avec quelle voix on va être lu. Mêmes boutons (data-pref), même état.
   const mini=document.getElementById("listenVoiceMount");
   if(mini)mini.innerHTML=ok?prefRow("listenvoice",T("listen.voice.label"),T("listen.voice.fronly"),
-    VOIX_IDS.map(v=>({v,t:T("listen.voice.opt."+v)})),ecouteVoix)+voixBloc():"";
+    VOIX_IDS.map(v=>({v,t:T("listen.voice.opt."+v)})),ecouteVoix)+voixBloc()+flashModeRow():"";
 }
 /* Sous le choix de voix : l'état de CETTE voix et l'action possible. */
 function voixBloc(){
@@ -3352,8 +3380,11 @@ function marquerEntendus(keys){
    l'EXTRAIT du flux, découpé, pas un résumé généré (le modèle local est trop
    lent pour une file entière). ~14 caractères par seconde à vitesse 1. */
 const FLASH_MAX=60;
+const FLASH_IA_CARS=260;
+let flashCars=0;
 function fileFlash(){
   const budget=(+flashMin||10)*60*(+ecouteRate||1)*14;   // en caractères
+  const ia=flashMode==="ia";
   const out=[],cartes=new Map();
   let car=0;
   for(const it of newsItems){
@@ -3362,13 +3393,19 @@ function fileFlash(){
     const k=seenKey(it);
     if(!k||cartes.has(k))continue;
     const tete=[it.source,it.title].map(sansEmoji).filter(Boolean).map(t=>t.replace(/[.…!?:;,]+$/,"")).join(". ")+".";
+    const head=ttsChunks(tete);
     const resume=it.desc?ttsChunks(sansEmoji(it.desc)).slice(0,2):[];
-    const chunks=[...ttsChunks(tete),...resume];
+    const chunks=[...head,...resume];
     if(!chunks.length)continue;
-    out.push({key:k,source:sansEmoji(it.source||""),title:sansEmoji(it.title||""),chunks});
+    const entree={key:k,source:sansEmoji(it.source||""),title:sansEmoji(it.title||""),chunks};
+    // En résumé IA le service lit « tête + résumé » (≈ 260 caractères : deux phrases de
+    // 40 mots) et garde l'extrait en repli ; le lien lui sert à aller chercher l'article.
+    if(ia&&head.length&&it.link){entree.head=head;entree.link=it.link;entree.excerpt=it.desc||"";}
+    out.push(entree);
     cartes.set(k,[it]);
-    car+=chunks.reduce((n,c)=>n+c.length,0);
+    car+=entree.head?head.reduce((n,c)=>n+c.length,0)+FLASH_IA_CARS:chunks.reduce((n,c)=>n+c.length,0);
   }
+  flashCars=car;
   ecouteCartes=cartes;
   return out;
 }
@@ -3406,6 +3443,7 @@ function surEtatEcoute(e){
     return;
   }
   if(e.reason==="voicefallback")toast(T("listen.voice.fallback",{d:e.detail||""}));
+  if(e.reason==="aifallback")toast(T("listen.flashmode.fallback"));
   if(!ecouteActive){ecouteActive=true;renderEcouteUI();}
   if(e.key&&e.key!==ecouteCle){
     const j=indexDeCle(e.key);
@@ -3435,14 +3473,14 @@ function brancherEcoute(svc){
   ecouteBranchee=true;
   try{svc.addListener("listen",surEtatEcoute);svc.addListener("voice",surEtatVoix);}catch(e){warn("écoute",e);}
 }
-function lancerService(svc,file,flash,intro,relance){
+function lancerService(svc,file,flash,intro,relance,ai){
   brancherEcoute(svc);
   const gen=++ecouteGen;
   ecouteActive=true;ecouteFlash=flash;ecouteCle=file[0].key;
   ecouteMarques=new Set();
   renderEcouteUI();
   svc.listenStart({items:file,lang:TTS_LANG[LANG]||LANG,rate:+ecouteRate||1,
-    sleepMin:ecouteSleep==="off"?0:+ecouteSleep,keepTimer:relance,intro,voice:voixPourService()}).catch(e=>{
+    sleepMin:ecouteSleep==="off"?0:+ecouteSleep,keepTimer:relance,intro,voice:voixPourService(),ai:!!ai}).catch(e=>{
     if(gen!==ecouteGen)return;
     warn("écoute",e);
     ecouteActive=false;ecouteFlash=false;ecouteCle="";ecouteGen++;
@@ -3456,9 +3494,9 @@ function demarrerFlash(){
   if(!file.length){toast(T("listen.flash.none"));return;}
   clearTimeout(ecouteRepriseT);
   stopVideo();
-  const car=file.reduce((n,x)=>n+x.chunks.reduce((m,c)=>m+c.length,0),0);
-  const min=Math.max(1,Math.round(car/(14*60)/(+ecouteRate||1)));
-  lancerService(svc,file,true,T("listen.flash.intro",motsAnnonce(file.length,min)),false);
+  const ia=file.some(x=>x.head);
+  const min=Math.max(1,Math.round(flashCars/(14*60)/(+ecouteRate||1)));
+  lancerService(svc,file,true,T(ia?"listen.flash.intro.ia":"listen.flash.intro",motsAnnonce(file.length,min)),false,ia);
 }
 /* opts.intro : annonce de début, seulement au lancement EXPLICITE (menu) — un
    swipe qui relance la lecture ne doit pas la répéter. Une relance (écoute déjà
@@ -3692,7 +3730,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="312";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="313";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -3703,6 +3741,8 @@ const APP_VERSION="312";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:313,date:"2026-10-28",items:[
+    "changelog.v313.item1"]},
   {v:309,date:"2026-10-28",items:[
     "changelog.v309.item1"]},
   {v:307,date:"2026-10-28",items:[
@@ -8064,6 +8104,7 @@ function setPref(name,v){
   if(name==="appscheme"){setAppScheme(v);return;}   // idem : clair/sombre/auto
   if(name==="cardsPerSwipe"){setCardsPerSwipe(v);return;}   // idem : recompose le fil
   if(name==="listenvoice"){setEcouteVoix(v);return;}   // idem, voir ecouteVoix
+  if(name==="flashmode"){setFlashMode(v);return;}   // idem, voir flashMode
   if(name==="flashmin"){setFlashMin(v);return;}   // idem, voir flashMin
   if(name==="listenrate"){setEcouteRate(v);return;}   // idem, voir ecouteRate
   if(name==="listensleep"){setEcouteSleep(v);return;}   // idem, voir ecouteSleep

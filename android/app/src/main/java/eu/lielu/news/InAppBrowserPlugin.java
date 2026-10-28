@@ -783,6 +783,8 @@ public class InAppBrowserPlugin extends Plugin {
             return;
         }
         List<ListenService.Entry> queue = new ArrayList<>();
+        // Flash info en résumé IA : chaque article porte alors sa tête, son lien et son extrait.
+        final boolean aiFlash = Boolean.TRUE.equals(call.getBoolean("ai", false));
         try {
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
@@ -794,8 +796,18 @@ public class InAppBrowserPlugin extends Plugin {
                     if (!c.isEmpty()) chunks.add(c);
                 }
                 if (chunks.isEmpty()) continue;
+                List<String> head = null;
+                final JSONArray hs = o.optJSONArray("head");
+                if (aiFlash && hs != null && hs.length() > 0) {
+                    head = new ArrayList<>();
+                    for (int j = 0; j < hs.length(); j++) {
+                        final String c = hs.optString(j, "").trim();
+                        if (!c.isEmpty()) head.add(c);
+                    }
+                }
                 queue.add(new ListenService.Entry(o.optString("key", ""),
-                    o.optString("source", ""), o.optString("title", ""), chunks));
+                    o.optString("source", ""), o.optString("title", ""), chunks, true,
+                    head, o.optString("link", ""), o.optString("excerpt", "")));
             }
         } catch (JSONException e) {
             call.reject("file illisible");
@@ -925,6 +937,15 @@ public class InAppBrowserPlugin extends Plugin {
         voices().remove(a);
         notifyListeners("voice", voiceEvent(a.id, "removed"));
         call.resolve();
+    }
+
+    /** Le résumé IA est-il possible ici ? (moteur natif utilisable ET modèle de résumé installé) */
+    @PluginMethod
+    public void summaryStatus(PluginCall call) {
+        JSObject res = new JSObject();
+        res.put("engine", Summarizer.isAvailable());
+        res.put("installed", new SummaryModelStore(getContext()).activeFile() != null);
+        call.resolve(res);
     }
 
     @PluginMethod

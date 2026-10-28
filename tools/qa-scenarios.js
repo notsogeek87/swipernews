@@ -3369,6 +3369,7 @@ ${Array.from({ length: 12 }, (_, k) => {
         let voix = null;
         window.__pushVoice = (e) => voix && voix(e);
         window.__voiceCalls = [];
+        window.__resume = { engine: true, installed: false };
         window.__archives = [
           { archive: "siwis", size: 67207459, installed: false, partial: 0 },
           { archive: "upmc", size: 80422639, installed: false, partial: 0 },
@@ -3409,6 +3410,7 @@ ${Array.from({ length: 12 }, (_, k) => {
                 return Promise.resolve();
               },
               listenStatus: () => Promise.resolve(window.__svc),
+              summaryStatus: () => Promise.resolve(window.__resume),
               voiceStatus: () =>
                 Promise.resolve({ archives: window.__archives, busy: false }),
               voiceDownload: (o) => (
@@ -3504,7 +3506,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       window.__starts.length = 1;
     });
     console.log(
-      `rangées de réglage affichées : ${await page.evaluate(() => document.querySelectorAll("[data-listenmount] .prefrow").length)} (attendu 4 : voix, vitesse, minuteur, flash)`
+      `rangées de réglage affichées : ${await page.evaluate(() => document.querySelectorAll("[data-listenmount] .prefrow").length)} (attendu 5 : voix, vitesse, minuteur, flash, mode du flash)`
     );
     // Voix neuronale : choix, téléchargement, progression, installation. Une voix
     // non installée ne change RIEN au service (voix système), une installée est transmise.
@@ -3607,6 +3609,69 @@ ${Array.from({ length: 12 }, (_, k) => {
     });
     console.log(
       `flash : 5 min → ${fl.n5} infos, 20 min → ${fl.n20} (20 ≥ 5 attendu), clés distinctes ${fl.keys}, annonce « flash » envoyée ${fl.flag}, avant entendu vu=${fl.avantVu} → après vu=${fl.apresVu} (attendu false → true), écartée au flash suivant ${fl.ecartee}, mode flash ${fl.flash}`
+    );
+    // Flash en RÉSUMÉ IA : chaque article porte sa tête, son lien et son extrait (le service va
+    // chercher la page et résume) ; le mode « extraits » n'envoie rien de tout cela.
+    const ia = await page.evaluate(async () => {
+      const att = (ms) => new Promise((r) => setTimeout(r, ms));
+      const r = {};
+      setFlashMode("extrait");
+      const fx = fileFlash();
+      r.extraitSansTete = fx.every((x) => !x.head && !x.link);
+      r.carsExtrait = flashCars;
+      setFlashMode("ia");
+      const fi = fileFlash();
+      r.iaAvecTete =
+        fi.length > 0 &&
+        fi.every((x) => x.head && x.link && typeof x.excerpt === "string");
+      r.teteDansChunks = fi.every((x) => x.head.every((h, k) => x.chunks[k] === h));
+      r.carsIa = flashCars;
+      window.__starts.length = 0;
+      demarrerFlash();
+      const d = window.__starts[0];
+      r.aiFlag = d.ai === true;
+      r.intro = d.intro;
+      // Description du réglage : modèle absent, puis installé
+      r.descAbsent = /installer/.test(
+        document
+          .querySelector('[data-listenmount] [data-pref="flashmode"]')
+          .closest(".prefrow").textContent
+      );
+      window.__resume = { engine: true, installed: true };
+      rafraichirResume();
+      await att(100);
+      r.descPrete =
+        /résumé/.test(
+          document
+            .querySelector('[data-listenmount] [data-pref="flashmode"]')
+            .closest(".prefrow").textContent
+        ) &&
+        !/installer/.test(
+          document
+            .querySelector('[data-listenmount] [data-pref="flashmode"]')
+            .closest(".prefrow").textContent
+        );
+      r.dansLaFeuille = !!document.querySelector(
+        '#listenVoiceMount [data-pref="flashmode"]'
+      );
+      // Le service prévient que le résumé est impossible : un message, pas un silence
+      const vus = [];
+      const orig = window.toast;
+      window.toast = (m) => vus.push(m);
+      window.__push({ active: true, key: d.items[0].key, reason: "aifallback" });
+      await att(50);
+      window.toast = orig;
+      r.toast = vus.join("|");
+      arreterEcoute();
+      setFlashMode("extrait");
+      window.__starts.length = 0;
+      demarrerFlash();
+      r.extraitAiFalse = window.__starts[0].ai === false;
+      arreterEcoute();
+      return r;
+    });
+    console.log(
+      `flash IA : mode extraits sans tête/lien ${ia.extraitSansTete}, mode IA avec tête+lien+extrait ${ia.iaAvecTete}, tête = début des morceaux ${ia.teteDansChunks}, ai envoyé ${ia.aiFlag}, annonce « ${ia.intro} », réglage → « installer » si modèle absent ${ia.descAbsent}, plus après installation ${ia.descPrete}, rangée dans la feuille ${ia.dansLaFeuille}, repli signalé « ${ia.toast} », extraits → ai=false ${ia.extraitAiFalse}`
     );
     // Un geste pendant le flash ne remplace PAS la file
     const geste = await page.evaluate(async () => {

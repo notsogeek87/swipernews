@@ -74,6 +74,8 @@ public final class Summarizer {
     static final int MAX_NEW_TOKENS_PART = 180;
     /** Plafond du résumé court d'une vidéo (jetons) : une quarantaine de mots visés dans le prompt. */
     static final int MAX_NEW_TOKENS_BRIEF = 140;
+    /** Plafond du résumé d'un flash info : deux phrases d'une quarantaine de mots, lues à voix haute. */
+    static final int MAX_NEW_TOKENS_FLASH = 100;
     /**
      * Fenêtre de contexte demandée (jetons) : prompt + résumé. 4000 caractères de
      * français font environ 1200 jetons, plus le prompt système et 320 jetons de
@@ -168,15 +170,28 @@ public final class Summarizer {
      *              par {@link YoutubeTranscript#condense}
      */
     public void summarize(File model, String title, String text, String lang, boolean brief, Listener l) {
+        run(model, title, text, lang, brief ? KIND_BRIEF : KIND_FULL, l);
+    }
+
+    private static final int KIND_FULL = 0;
+    private static final int KIND_BRIEF = 1;
+    private static final int KIND_FLASH = 2;
+
+    private void run(File model, String title, String text, String lang, int kind, Listener l) {
+        final boolean brief = kind == KIND_BRIEF;
+        final boolean flash = kind == KIND_FLASH;
         if (!LIB_OK) {
             main.post(() -> l.onError(ERR_UNAVAILABLE));
             return;
         }
         final int my = ++gen;
         nativeCancel();
-        final java.util.List<String> parts = splitParts(text);
+        java.util.List<String> all = splitParts(text);
+        // Un flash ne lit que la première partie : le début d'un article en dit l'essentiel.
+        final java.util.List<String> parts = flash && all.size() > 1 ? all.subList(0, 1) : all;
         final boolean multi = parts.size() > 1 && !brief;
-        final byte[] system = (brief ? videoSystemPrompt(lang) : multi ? partSystemPrompt(lang) : systemPrompt(lang))
+        final byte[] system = (flash ? flashSystemPrompt(lang)
+            : brief ? videoSystemPrompt(lang) : multi ? partSystemPrompt(lang) : systemPrompt(lang))
             .getBytes(StandardCharsets.UTF_8);
         final String path = model.getAbsolutePath();
         worker.execute(() -> {
@@ -198,7 +213,8 @@ public final class Summarizer {
                     : userPrompt(title, parts.get(index), lang)).getBytes(StandardCharsets.UTF_8);
                 wrote[0] = false;
                 final int res = nativeGenerate(handle, system, user,
-                    brief ? MAX_NEW_TOKENS_BRIEF : multi ? MAX_NEW_TOKENS_PART : MAX_NEW_TOKENS, bytes -> {
+                    flash ? MAX_NEW_TOKENS_FLASH : brief ? MAX_NEW_TOKENS_BRIEF
+                        : multi ? MAX_NEW_TOKENS_PART : MAX_NEW_TOKENS, bytes -> {
                         if (my != gen) return false;
                         String piece = new String(bytes, StandardCharsets.UTF_8);
                         if (!wrote[0]) {
@@ -226,6 +242,16 @@ public final class Summarizer {
             }
             post(my, () -> l.onDone(false));
         });
+    }
+
+    /**
+     * Résumé de FLASH INFO : deux phrases courtes faites pour être LUES À VOIX HAUTE
+     * (voir {@link FlashSummarizer}). Une seule passe, sur le début de l'article (les
+     * 4000 premiers caractères suffisent à dire l'essentiel d'un article de presse, où
+     * l'essentiel vient en tête) : un flash ne peut pas attendre quatre parties.
+     */
+    public void summarizeFlash(File model, String title, String text, String lang, Listener l) {
+        run(model, title, text, lang, KIND_FLASH, l);
     }
 
     /**
@@ -297,6 +323,23 @@ public final class Summarizer {
             + "100 mots, en un ou deux courts paragraphes (de 10 à 15 lignes sur un écran de "
             + "téléphone). Pas de liste, pas de titre. Appuie-toi uniquement sur l'article : "
             + "aucun avis, aucun fait ajouté.";
+    }
+
+    /**
+     * Consigne d'un résumé de FLASH INFO. Il sera PRONONCÉ par une synthèse vocale : phrases
+     * courtes, aucune parenthèse, aucun sigle ou abréviation à épeler, aucune liste.
+     */
+    static String flashSystemPrompt(String lang) {
+        if ("en".equals(lang)) {
+            return "You write a spoken news flash from a news article. Write two short sentences "
+                + "in English, 40 words at most, that give the essentials: who, what, why. This will "
+                + "be read aloud: no list, no title, no parentheses, no abbreviation. Use only what "
+                + "the article says: no opinion, no added fact.";
+        }
+        return "Tu rédiges un flash info parlé à partir d'un article de presse. Écris en français "
+            + "deux phrases courtes, quarante mots au plus, qui disent l'essentiel : qui, quoi, "
+            + "pourquoi. Ce sera lu à voix haute : pas de liste, pas de titre, pas de parenthèses, "
+            + "pas d'abréviation. Appuie-toi uniquement sur l'article : aucun avis, aucun fait ajouté.";
     }
 
     /** Consigne d'un résumé COURT de vidéo : ce qui est dit, en quelques phrases. */

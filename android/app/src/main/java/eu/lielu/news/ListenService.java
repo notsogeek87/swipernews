@@ -63,23 +63,84 @@ public class ListenService extends Service {
 
     /** Un article de la file : la clé est celle du fil (seenKey), rendue telle quelle au JS. */
     static final class Entry {
+        static final int AI_NONE = 0;
+        static final int AI_PENDING = 1;
+        static final int AI_DONE = 2;
+        static final int AI_FAILED = 3;
+        /** Attente maximale du résumé IA d'un article avant de lire son extrait à la place. */
+        static final long AI_WAIT_MS = 25_000;
+
         final String key;
         final String source;
         final String title;
+        /** Ce qui se lit SANS résumé IA : la tête (source, titre) puis l'extrait du flux. */
         final List<String> chunks;
         /** Faux pour l'annonce de début : elle porte la clé du 1er article sans l'avoir lu. */
         final boolean counts;
+
+        // Résumé IA du flash info. head == null : article lu tel quel, rien de tout ça ne sert.
+        // Avec head (les premiers morceaux de `chunks`, source et titre) : on lit la tête, puis le
+        // résumé s'il est prêt, sinon l'extrait.
+        final List<String> head;
+        final String link;
+        final String excerpt;
+        volatile int ai = AI_NONE;
+        volatile List<String> summary;
+        private List<String> frozen;
+        private long aiWaitSince;
 
         Entry(String key, String source, String title, List<String> chunks) {
             this(key, source, title, chunks, true);
         }
 
         Entry(String key, String source, String title, List<String> chunks, boolean counts) {
+            this(key, source, title, chunks, counts, null, null, null);
+        }
+
+        Entry(String key, String source, String title, List<String> chunks, boolean counts,
+              List<String> head, String link, String excerpt) {
             this.key = key;
             this.source = source;
             this.title = title;
             this.chunks = chunks;
             this.counts = counts;
+            this.head = head == null || head.isEmpty() || head.size() > chunks.size() ? null : head;
+            this.link = link;
+            this.excerpt = excerpt;
+        }
+
+        /**
+         * La liste de morceaux à lire pour le morceau {@code chunk}, ou null s'il faut ATTENDRE le
+         * résumé. La décision (résumé ou extrait) se prend une seule fois, au premier morceau qui
+         * suit la tête, et se FIGE : les deux listes ont la même tête, donc rien ne change avant ce
+         * point, et changer de liste en cours de route décalerait les numéros de morceau.
+         */
+        List<String> playList(int chunk, long now) {
+            if (head == null) return chunks;
+            if (frozen != null) return frozen;
+            if (chunk < head.size()) return chunks;
+            if (ai == AI_DONE && summary != null) {
+                final List<String> l = new ArrayList<>(head);
+                l.addAll(summary);
+                frozen = l;
+                return l;
+            }
+            if (ai == AI_PENDING) {
+                if (aiWaitSince == 0) aiWaitSince = now;
+                if (now - aiWaitSince < AI_WAIT_MS) return null;
+                ai = AI_FAILED;
+            }
+            frozen = chunks;
+            return chunks;
+        }
+
+        /** Vrai tant qu'on ne sait pas encore ce qui suivra la tête (voir {@link #playList}). */
+        boolean undecided(int chunk) {
+            return head != null && frozen == null && chunk + 1 >= head.size();
+        }
+
+        List<String> decided() {
+            return frozen != null ? frozen : chunks;
         }
     }
 
@@ -254,7 +315,82 @@ public class ListenService extends Service {
         requestFocus();
         active = true;
         publishState("playing");
+        final boolean aiMissing = startAi();
+        if (aiMissing) notifyListener("aifallback");
         prepareEngine(this::speakCurrent);
+    }
+
+    // ---------- Résumés IA du flash info ----------
+
+    private static final int AI_LOOKAHEAD = 2;
+    private FlashSummarizer flash = null;
+    /** Prochain article de la file dont le résumé n'a pas encore été demandé. */
+    private int aiNext = 0;
+
+    /**
+     * Prépare les résumés IA si la file en contient. Rend vrai quand ils étaient demandés mais
+     * impossibles ici (pas de modèle installé, pas de moteur natif) : tous les articles sont alors
+     * lus avec leur extrait, et la page en est prévenue.
+     */
+    private boolean startAi() {
+        releaseFlash();
+        boolean any = false;
+        for (Entry e : queue) if (e.head != null) any = true;
+        if (!any) return false;
+        final FlashSummarizer fs = new FlashSummarizer(getApplicationContext(), lang, this::aiResult);
+        if (!fs.ready()) {
+            fs.release();
+            for (Entry e : queue) if (e.head != null) e.ai = Entry.AI_FAILED;
+            return true;
+        }
+        flash = fs;
+        aiNext = index;
+        kickAi();
+        return false;
+    }
+
+    /** Demande les résumés des prochains articles, quelques-uns d'avance et pas plus (mémoire, énergie). */
+    private void kickAi() {
+        if (flash == null) return;
+        while (aiNext < queue.size() && aiNext <= index + AI_LOOKAHEAD) {
+            final Entry e = queue.get(aiNext);
+            if (e.head != null && e.ai == Entry.AI_NONE) {
+                e.ai = Entry.AI_PENDING;
+                flash.request(aiNext, e.title, e.link, e.excerpt);
+            }
+            aiNext++;
+        }
+    }
+
+    /** Saut dans la file : les résumés des articles passés ne servent plus, ceux d'après se demandent. */
+    private void skipAi() {
+        if (flash == null) return;
+        for (int i = 0; i < index; i++) {
+            final Entry e = queue.get(i);
+            if (e.ai == Entry.AI_PENDING) e.ai = Entry.AI_FAILED;
+        }
+        flash.dropBefore(index);
+        aiNext = Math.max(aiNext, index);
+        kickAi();
+    }
+
+    private void aiResult(int i, List<String> chunks) {
+        if (i < 0 || i >= queue.size()) return;
+        final Entry e = queue.get(i);
+        if (chunks != null) {
+            e.summary = chunks;
+            e.ai = Entry.AI_DONE;
+        } else {
+            e.ai = Entry.AI_FAILED;
+        }
+        kickAi();
+    }
+
+    private void releaseFlash() {
+        if (flash != null) {
+            flash.release();
+            flash = null;
+        }
     }
 
     // ---------- Moteur de synthèse ----------
@@ -342,7 +478,11 @@ public class ListenService extends Service {
     private String nextText() {
         if (index < 0 || index >= queue.size()) return null;
         final Entry e = queue.get(index);
-        if (chunk + 1 < e.chunks.size()) return e.chunks.get(chunk + 1);
+        // Le morceau suivant d'un article au résumé pas encore décidé n'est pas connu :
+        // pas de préparation d'avance, la voix le synthétisera à son tour.
+        if (e.undecided(chunk)) return null;
+        final List<String> cur = e.decided();
+        if (chunk + 1 < cur.size()) return cur.get(chunk + 1);
         if (index + 1 < queue.size()) return queue.get(index + 1).chunks.get(0);
         return null;
     }
@@ -401,9 +541,19 @@ public class ListenService extends Service {
             updateNotification();
             notifyListener("playing");
         }
-        if (chunk >= e.chunks.size()) { advance(); return; }
+        final List<String> list = e.playList(chunk, System.currentTimeMillis());
+        if (list == null) {
+            // Le résumé IA de cet article n'est pas prêt : on réessaie, sans rien bloquer d'autre
+            // (pause, saut et arrêt changent `gen` et annulent cette attente).
+            final int myGen = gen;
+            main.postDelayed(() -> {
+                if (myGen == gen && active && !paused) speakCurrent();
+            }, 400);
+            return;
+        }
+        if (chunk >= list.size()) { advance(); return; }
         if (neural != null) {
-            neural.speak(gen + ":" + index + ":" + chunk, e.chunks.get(chunk), nextText());
+            neural.speak(gen + ":" + index + ":" + chunk, list.get(chunk), nextText());
             return;
         }
         int support = tts.setLanguage(Locale.forLanguageTag(lang));
@@ -411,7 +561,7 @@ public class ListenService extends Service {
             stopAll("error");
             return;
         }
-        String t = e.chunks.get(chunk);
+        String t = list.get(chunk);
         int max = TextToSpeech.getMaxSpeechInputLength();
         if (t.length() > max) t = t.substring(0, max);
         String id = gen + ":" + index + ":" + chunk;
@@ -434,6 +584,7 @@ public class ListenService extends Service {
             if (index + 1 >= queue.size()) { stopAll("end"); return; }
             index++;
             chunk = 0;
+            kickAi();
             speakCurrent();
         }, BREATH_MS);
     }
@@ -455,6 +606,7 @@ public class ListenService extends Service {
         pausedByFocus = false;
         requestFocus();
         updatePlaybackState();
+        skipAi();
         speakCurrent();
     }
 
@@ -493,6 +645,7 @@ public class ListenService extends Service {
         afterNeural = null;
         neuralWanted = null;
         releaseNeural();
+        releaseFlash();
         abandonFocus();
         releaseWake();
         if (session != null) {
@@ -678,6 +831,7 @@ public class ListenService extends Service {
             tts = null;
         }
         releaseNeural();
+        releaseFlash();
         abandonFocus();
         releaseWake();
         if (session != null) {
