@@ -133,6 +133,10 @@
       "listen.flash.desc":
         "Les actus récentes pas encore lues, pendant environ {m} minutes — sans vidéos ni Wikipédia.",
       "listen.voice.label": "Voix de la lecture",
+      "listen.voice.fallback":
+        "Voix naturelle indisponible, voix du téléphone utilisée. {d}",
+      "listen.voice.fronly":
+        "Les voix naturelles lisent le français ; en anglais, la voix du téléphone est utilisée.",
       "listen.voice.desc.system": "La voix du téléphone.",
       "listen.voice.desc.neural":
         "Une voix naturelle qui fonctionne hors ligne (en français).",
@@ -703,6 +707,9 @@
       "listen.flash.desc":
         "Recent news you haven't read yet, for about {m} minutes — no videos or Wikipedia.",
       "listen.voice.label": "Reading voice",
+      "listen.voice.fallback": "Natural voice unavailable, using the phone's voice. {d}",
+      "listen.voice.fronly":
+        "Natural voices read French only; in English the phone's voice is used.",
       "listen.voice.desc.system": "The phone's voice.",
       "listen.voice.desc.neural":
         "A natural-sounding voice that works offline (French only).",

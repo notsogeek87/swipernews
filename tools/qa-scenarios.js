@@ -3449,6 +3449,21 @@ ${Array.from({ length: 12 }, (_, k) => {
     console.log(
       `bouton « Écouter le fil » : feuille de choix ouverte ${choix.feuille}, menu fermé ${choix.menuFerme}, rien lancé avant le choix ${choix.aucunDemarrage}, plus de bouton flash dans le menu ${choix.pasDeBoutonFlash}`
     );
+    const mini = await page.evaluate(() => {
+      const m = document.getElementById("listenVoiceMount");
+      const btn = m.querySelector('[data-pref="listenvoice"][data-val="pierre"]');
+      btn.click();
+      return {
+        boutons: m.querySelectorAll('[data-pref="listenvoice"]').length,
+        note: /français/.test(m.textContent),
+        choisi: ecouteVoix,
+        blocTelecharger: !!m.querySelector('[data-voiceact="download"]'),
+      };
+    });
+    console.log(
+      `feuille : ${mini.boutons} voix proposées (attendu 4), note « français » ${mini.note}, choix depuis la feuille → ${mini.choisi} (attendu pierre), téléchargement proposé ${mini.blocTelecharger}`
+    );
+    await page.evaluate(() => setEcouteVoix("system"));
     await page.click("#listenModeFeed");
     await page.waitForTimeout(600);
     const a = await page.evaluate(() => {

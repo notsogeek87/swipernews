@@ -825,6 +825,7 @@ public class InAppBrowserPlugin extends Plugin {
             ev.put("key", key);
             ev.put("reason", reason);
             ev.put("heard", new JSArray(ListenService.heardKeys()));
+            ev.put("detail", ListenService.voiceError());
             notifyListeners("listen", ev);
         });
         try {
@@ -945,6 +946,7 @@ public class InAppBrowserPlugin extends Plugin {
             ev.put("key", key);
             ev.put("reason", reason);
             ev.put("heard", new JSArray(ListenService.heardKeys()));
+            ev.put("detail", ListenService.voiceError());
             notifyListeners("listen", ev);
         });
         JSObject res = new JSObject();

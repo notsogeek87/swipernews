@@ -96,6 +96,10 @@ public class ListenService extends Service {
     private static volatile boolean active = false;
     private static volatile String currentKey = "";
     private static volatile Listener listener = null;
+    /** Dernière raison d'échec de la voix neuronale (classe + message), vide si tout va bien. */
+    private static volatile String voiceError = "";
+
+    static String voiceError() { return voiceError; }
 
     /**
      * Clés des articles lus JUSQU'AU BOUT, dans l'ordre. C'est ce que la page marque
@@ -216,6 +220,7 @@ public class ListenService extends Service {
     }
 
     private void start() {
+        voiceError = "";
         heard.clear();
         queue = new ArrayList<>(pendingQueue);
         index = Math.max(0, Math.min(pendingStart, queue.size() - 1));
@@ -281,6 +286,8 @@ public class ListenService extends Service {
                     (id, ok) -> main.post(() -> neuralEnded(id, ok)));
             } catch (Throwable e) {
                 sp = null;   // y compris UnsatisfiedLinkError : repli sur la voix système
+                voiceError = e.getClass().getSimpleName() + ": " + e.getMessage();
+                android.util.Log.w("ListenService", "voix neuronale indisponible", e);
             }
             final NeuralSpeaker loaded = sp;
             main.post(() -> {
@@ -294,6 +301,9 @@ public class ListenService extends Service {
                 if (loaded == null || neuralWanted == null) {
                     if (loaded != null) loaded.shutdown();
                     neuralWanted = null;
+                    // Le repli ne doit pas être silencieux : sans ce message, on croit
+                    // écouter la voix choisie alors que c'est celle du téléphone.
+                    if (loaded == null) notifyListener("voicefallback");
                     if (next != null) ensureTts(next);
                     return;
                 }
@@ -321,6 +331,8 @@ public class ListenService extends Service {
             return;
         }
         // Repli sur la voix du système, au même endroit de la file.
+        voiceError = "synthèse en erreur";
+        notifyListener("voicefallback");
         neuralWanted = null;
         releaseNeural();
         ensureTts(this::speakCurrent);

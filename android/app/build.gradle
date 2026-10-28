@@ -80,11 +80,13 @@ android {
         }
     }
     // Bibliothèques natives de sherpa-onnx, posées dans build/ par fetchSherpa
-    // (sherpa.gradle) : passer la tâche elle-même à srcDir suffit à Gradle pour
-    // l'exécuter avant l'assemblage des bibliothèques natives.
+    // (sherpa.gradle). Un DOSSIER explicite, et la dépendance de tâche déclarée
+    // à part plus bas : passer la tâche elle-même à srcDir compilait sans erreur
+    // mais n'empaquetait RIEN (l'APK du build 704 n'avait que libswiperllm.so), et
+    // la voix neuronale retombait en silence sur la voix du système.
     sourceSets {
         main {
-            jniLibs.srcDir(project.ext.fetchSherpa)
+            jniLibs.srcDir(layout.buildDirectory.dir("sherpa/jniLibs").get().asFile)
         }
     }
     signingConfigs {
@@ -118,6 +120,12 @@ if (project.hasProperty('versionCode')) {
 }
 if (project.hasProperty('versionName')) {
     android.defaultConfig.versionName = project.property('versionName')
+}
+
+// fetchSherpa doit avoir tourné avant que les bibliothèques natives soient
+// rassemblées (merge<Variante>NativeLibs) : c'est CE lien qui les met dans l'APK.
+tasks.matching { it.name ==~ /merge.*NativeLibs/ || it.name == "preBuild" }.configureEach {
+    dependsOn project.ext.fetchSherpa
 }
 
 repositories {
