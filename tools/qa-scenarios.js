@@ -3453,6 +3453,48 @@ ${Array.from({ length: 12 }, (_, k) => {
     console.log(
       `bouton « Écouter le fil » : feuille de choix ouverte ${choix.feuille}, menu fermé ${choix.menuFerme}, rien lancé avant le choix ${choix.aucunDemarrage}, plus de bouton flash dans le menu ${choix.pasDeBoutonFlash}`
     );
+    // Structure de la feuille : les deux choix d'abord, les réglages REPLIÉS sous une ligne
+    // de résumé qui dit aussi ce qui ne marchera pas encore.
+    const ux = await page.evaluate(() => {
+      const r = {};
+      const mnt = document.getElementById("listenVoiceMount");
+      const btn = document.getElementById("listenOptsBtn");
+      const somme = () => document.getElementById("listenOptsSum").textContent;
+      r.replie =
+        mnt.classList.contains("hidden") && btn.getAttribute("aria-expanded") === "false";
+      r.resume = somme();
+      btn.click();
+      r.deplie =
+        !mnt.classList.contains("hidden") && btn.getAttribute("aria-expanded") === "true";
+      r.rangees = mnt.querySelectorAll(".prefrow").length;
+      btn.click();
+      r.replieEncore = mnt.classList.contains("hidden");
+      setEcouteVoix("pierre");
+      r.voixAbsente = /Pierre \(.+\)/.test(somme());
+      setFlashMode("ia");
+      r.modeAbsent = /Résumé IA \(.+\)/.test(somme());
+      r.subIa = document.getElementById("listenModeFlashSub").textContent;
+      r.subFil = document.getElementById("listenModeFeedSub").textContent;
+      setEcouteVoix("system");
+      setFlashMode("extrait");
+      r.subExtrait = document.getElementById("listenModeFlashSub").textContent;
+      r.fermer = document.getElementById("listenModeCancel").textContent;
+      r.deuxChoix = document.querySelectorAll("#listenSheet .listenmode").length;
+      return r;
+    });
+    console.log(
+      `feuille UX : ${ux.deuxChoix} choix, réglages repliés ${ux.replie} puis dépliés ${ux.deplie} (${ux.rangees} rangées) puis repliés ${ux.replieEncore} ; résumé « ${ux.resume} » ; voix à télécharger signalée ${ux.voixAbsente}, modèle absent signalé ${ux.modeAbsent} ; sous-titres « ${ux.subExtrait} » → « ${ux.subIa} » / fil « ${ux.subFil} » ; bouton « ${ux.fermer} »`
+    );
+    if (process.env.QA_SHOTS) {
+      // Captures de la feuille « Écouter » (repliée puis dépliée), pour un regard humain.
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: process.env.QA_SHOTS + "/ecouter-replie.png" });
+      await page.click("#listenOptsBtn");
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: process.env.QA_SHOTS + "/ecouter-deplie.png" });
+      await page.click("#listenOptsBtn");
+    }
     const mini = await page.evaluate(() => {
       const m = document.getElementById("listenVoiceMount");
       const btn = m.querySelector('[data-pref="listenvoice"][data-val="pierre"]');

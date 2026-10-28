@@ -124,13 +124,20 @@
       "listen.word.minute": "minute",
       "listen.word.minutes": "minutes",
       "listen.intro": "{n} {i}, environ {m} {u}.",
+      "listen.opts.title": "Réglages de l'écoute",
+      "listen.opts.todl": "à télécharger",
+      "listen.opts.nomodel": "modèle absent",
+      "listen.mode.feed.sub.ia":
+        "Dans l'ordre, Wikipédia comprise. Les actus sont résumées par l'IA.",
+      "listen.mode.flash.sub.ia":
+        "Les actus récentes pas encore lues, résumées par l'IA, environ {m} min.",
       "listen.mode.title": "Écouter",
       "listen.mode.feed": "Écouter le fil entièrement",
       "listen.mode.feed.sub":
         "Les cartes de votre fil, dans l'ordre, Wikipédia comprise.",
       "listen.mode.flash": "Uniquement le flash info",
       "listen.mode.flash.sub": "Les actus récentes pas encore lues, environ {m} min.",
-      "listen.mode.cancel": "Annuler",
+      "listen.mode.cancel": "Fermer",
       "listen.flash.none": "Rien de neuf à écouter pour l'instant",
       "listen.flash.intro": "Flash info : {n} {i}, environ {m} {u}.",
       "listen.flash.label": "Durée du flash info",
@@ -139,8 +146,6 @@
       "listen.voice.label": "Voix de la lecture",
       "listen.voice.fallback":
         "Voix naturelle indisponible, voix du téléphone utilisée. {d}",
-      "listen.voice.fronly":
-        "Les voix naturelles lisent le français ; en anglais, la voix du téléphone est utilisée.",
       "listen.voice.desc.system": "La voix du téléphone.",
       "listen.voice.desc.neural":
         "Une voix naturelle qui fonctionne hors ligne (en français).",
@@ -726,12 +731,19 @@
       "listen.word.minute": "minute",
       "listen.word.minutes": "minutes",
       "listen.intro": "{n} {i}, about {m} {u}.",
+      "listen.opts.title": "Listening settings",
+      "listen.opts.todl": "to download",
+      "listen.opts.nomodel": "model missing",
+      "listen.mode.feed.sub.ia":
+        "In order, Wikipedia included. News stories are summarized by the AI.",
+      "listen.mode.flash.sub.ia":
+        "Recent news you haven't read yet, summarized by the AI, about {m} min.",
       "listen.mode.title": "Listen",
       "listen.mode.feed": "Listen to the whole feed",
       "listen.mode.feed.sub": "The cards of your feed, in order, Wikipedia included.",
       "listen.mode.flash": "News flash only",
       "listen.mode.flash.sub": "Recent news you haven't read yet, about {m} min.",
-      "listen.mode.cancel": "Cancel",
+      "listen.mode.cancel": "Close",
       "listen.flash.none": "Nothing new to listen to right now",
       "listen.flash.intro": "News flash: {n} {i}, about {m} {u}.",
       "listen.flash.label": "News flash length",
@@ -739,8 +751,6 @@
         "Recent news you haven't read yet, for about {m} minutes — no videos or Wikipedia.",
       "listen.voice.label": "Reading voice",
       "listen.voice.fallback": "Natural voice unavailable, using the phone's voice. {d}",
-      "listen.voice.fronly":
-        "Natural voices read French only; in English the phone's voice is used.",
       "listen.voice.desc.system": "The phone's voice.",
       "listen.voice.desc.neural":
         "A natural-sounding voice that works offline (French only).",
