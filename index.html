@@ -1974,7 +1974,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=294"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=311"></script>
+<script src="src/i18n.js?v=312"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -3315,11 +3315,16 @@ function setEcouteSleep(v){
 /* Annonce de début, lue par le service avant la première carte : de quoi se
    préparer (combien d'infos, combien de temps) sans regarder l'écran. ~14
    caractères par seconde à vitesse 1, c'est la cadence mesurée des voix système. */
+/* L'annonce est LUE par la synthèse : « min » serait épelé « m-i-n », il faut
+   « minutes » en toutes lettres — et le pluriel qui va avec. */
+function motsAnnonce(n,m){
+  return {n,m,i:T(n>1?"listen.word.infos":"listen.word.info"),u:T(m>1?"listen.word.minutes":"listen.word.minute")};
+}
 function introEcoute(file){
   if(file.length<2)return "";
   const car=file.reduce((n,x)=>n+x.chunks.reduce((m,c)=>m+c.length,0),0);
   const min=Math.max(1,Math.round(car/(14*60)/(+ecouteRate||1)));
-  return T("listen.intro",{n:file.length,m:min});
+  return T("listen.intro",motsAnnonce(file.length,min));
 }
 function ecouteService(){
   const p=ttsNatif();
@@ -3453,7 +3458,7 @@ function demarrerFlash(){
   stopVideo();
   const car=file.reduce((n,x)=>n+x.chunks.reduce((m,c)=>m+c.length,0),0);
   const min=Math.max(1,Math.round(car/(14*60)/(+ecouteRate||1)));
-  lancerService(svc,file,true,T("listen.flash.intro",{n:file.length,m:min}),false);
+  lancerService(svc,file,true,T("listen.flash.intro",motsAnnonce(file.length,min)),false);
 }
 /* opts.intro : annonce de début, seulement au lancement EXPLICITE (menu) — un
    swipe qui relance la lecture ne doit pas la répéter. Une relance (écoute déjà
@@ -3687,7 +3692,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="311";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="312";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à

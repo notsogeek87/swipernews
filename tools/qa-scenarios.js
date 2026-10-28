@@ -3494,6 +3494,9 @@ ${Array.from({ length: 12 }, (_, k) => {
     await page.evaluate(() => demarrerEcoute());
     const [d1, d2] = await page.evaluate(() => window.__starts.slice(-2));
     console.log(
+      `annonce lue en toutes lettres : « ${d1.intro} » — contient « minute » ${/minute/.test(d1.intro)}, pas de « min. » épelé ${!/\bmin\b/.test(d1.intro)}`
+    );
+    console.log(
       `réglages : vitesse ${d1.rate} (1.5), minuteur ${d1.sleepMin} (30), annonce « ${d1.intro} », relance sans annonce : ${d2.intro === ""}, relance garde le minuteur : ${d2.keepTimer}`
     );
     await page.evaluate(() => {
