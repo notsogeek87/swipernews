@@ -189,6 +189,8 @@
       "listen.sysvoice.default": "Défaut",
       "listen.sysvoice.n": "Voix {n}",
       "listen.sysvoice.sample": "Bonjour, voici cette voix.",
+      "changelog.v322.item1":
+        "Résumé IA d'un article : « Écouter le résumé » utilise maintenant la voix du téléphone choisie dans les réglages d'écoute.",
       "changelog.v321.item1":
         "Écoute : quand votre téléphone propose plusieurs voix (Samsung, Google…), vous pouvez choisir laquelle lit le fil — par exemple la voix masculine — dans les réglages d'écoute, avec un échantillon à chaque toucher.",
       "changelog.v320.item1":
@@ -809,6 +811,8 @@
       "listen.sysvoice.default": "Default",
       "listen.sysvoice.n": "Voice {n}",
       "listen.sysvoice.sample": "Hello, this is this voice.",
+      "changelog.v322.item1":
+        "AI article summary: « Listen to the summary » now uses the phone voice chosen in the listening settings.",
       "changelog.v321.item1":
         "Listening: when your phone offers several voices (Samsung, Google…), you can choose which one reads the feed — for instance the male voice — in the listening settings, with a sample on each tap.",
       "changelog.v320.item1":

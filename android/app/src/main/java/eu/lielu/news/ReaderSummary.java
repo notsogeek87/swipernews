@@ -93,7 +93,7 @@ final class ReaderSummary {
     private boolean writingLayout;
     private final int baseFabBottom;
 
-    ReaderSummary(Context ctx, View root, Host host, String themeSpec) {
+    ReaderSummary(Context ctx, View root, Host host, String themeSpec, String sysVoice) {
         this.ctx = ctx;
         this.host = host;
         fab = root.findViewById(R.id.reader_summary_fab);
@@ -107,7 +107,7 @@ final class ReaderSummary {
         btn2 = root.findViewById(R.id.reader_summary_btn2);
         btn3 = root.findViewById(R.id.reader_summary_btn3);
         listenBtn = root.findViewById(R.id.reader_summary_listen);
-        speaker = new SummarySpeaker(ctx, new SummarySpeaker.Listener() {
+        speaker = new SummarySpeaker(ctx, sysVoice, new SummarySpeaker.Listener() {
             @Override
             public void onFinished() {
                 if (!destroyed) refreshListen();

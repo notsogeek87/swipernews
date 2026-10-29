@@ -94,6 +94,10 @@ public class InAppBrowserPlugin extends Plugin {
         if (SummaryTheme.isValid(appTheme)) {
             intent.putExtra(InAppBrowserActivity.EXTRA_APP_THEME, appTheme);
         }
+        final String sysVoice = call.getString("sysVoice", "");
+        if (sysVoice != null && sysVoice.matches("[A-Za-z0-9_.\\-]{1,80}")) {
+            intent.putExtra(InAppBrowserActivity.EXTRA_SYS_VOICE, sysVoice);
+        }
         activity.startActivity(intent);
         // API 34+ : l'animation est déclarée par l'activité entrante elle-même.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {

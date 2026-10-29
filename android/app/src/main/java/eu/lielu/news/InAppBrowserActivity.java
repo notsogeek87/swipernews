@@ -77,6 +77,8 @@ public class InAppBrowserActivity extends AppCompatActivity {
     public static final String EXTRA_READER_THEME = "eu.lielu.news.reader.READER_THEME";
     /** Couleurs de l'habillage actif de l'app, pour la feuille de résumé (voir SummaryTheme). */
     public static final String EXTRA_APP_THEME = "eu.lielu.news.reader.APP_THEME";
+    /** Nom d'une voix du moteur système pour « Écouter le résumé » (voir SystemVoice), ou vide. */
+    public static final String EXTRA_SYS_VOICE = "eu.lielu.news.reader.SYS_VOICE";
     /** Résumé lancé depuis la carte : la page reste voilée, seule la feuille de résumé se montre. */
     /** Identifiant d'une vidéo YouTube à résumer : sa transcription remplace le texte de la page. */
     public static final String EXTRA_VIDEO_ID = "eu.lielu.news.reader.VIDEO_ID";
@@ -330,7 +332,7 @@ public class InAppBrowserActivity extends AppCompatActivity {
             public void onSheetClosed() {
                 finish();   // résumé lancé depuis la carte : on retourne au fil
             }
-        }, getIntent().getStringExtra(EXTRA_APP_THEME));
+        }, getIntent().getStringExtra(EXTRA_APP_THEME), getIntent().getStringExtra(EXTRA_SYS_VOICE));
 
         if (summaryVeil) {
             summary.startFromCard(videoId == null);

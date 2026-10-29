@@ -45,9 +45,12 @@ final class SummarySpeaker {
     private int gen;
     private boolean speaking;
     private boolean released;
+    /** Voix du moteur système choisie dans les réglages d'écoute, vide = voix par défaut. */
+    private final String voice;
 
-    SummarySpeaker(Context ctx, Listener listener) {
+    SummarySpeaker(Context ctx, String voice, Listener listener) {
         this.ctx = ctx;
+        this.voice = voice == null ? "" : voice;
         this.listener = listener;
     }
 
@@ -105,6 +108,7 @@ final class SummarySpeaker {
                 if (speaking) fail();
                 return;
             }
+            SystemVoice.apply(tts, voice);   // après setLanguage, qui remet la voix par défaut
             tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                 @Override
                 public void onStart(String id) { }
