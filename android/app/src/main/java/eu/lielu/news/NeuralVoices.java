@@ -38,7 +38,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <ul>
  *   <li>Siwis (Piper) : CC BY 4.0, University of Edinburgh (obligation d'attribution) ;</li>
  *   <li>Tom (Piper) : AGPL-3.0, voir git.bksp.space/Tjiho/French-tts-model-piper ;</li>
- *   <li>Tjiho 1, 2 et 3 (Piper) : même auteur que Tom, donc AGPL-3.0 ;</li>
  *   <li>espeak-ng, livré avec chaque modèle : GPL-3.0, comme ce dépôt.</li>
  * </ul>
  * Les rappels reviennent sur le fil principal. Une seule opération à la fois.
@@ -98,35 +97,17 @@ final class NeuralVoices {
         "3d8258ef8466b5d5f2cc46c06e1415d3d01c9cbaeed8b6d5b3d152073672472c",
         "vits-piper-fr_FR-tom-medium", "fr_FR-tom-medium.onnx");
 
-    /** Les trois modèles de Tjiho (l'auteur de Tom), à comparer : mêmes moteur et taille que Tom. */
-    static final Archive TJIHO1 = new Archive("tjiho1",
-        BASE + "vits-piper-fr_FR-tjiho-model1.tar.bz2", 67_204_019L,
-        "e48c52ee3dea03abc8c2d0bce143948b0d8cc50891e466e2a7481e14cf18c52c",
-        "vits-piper-fr_FR-tjiho-model1", "fr_FR-tjiho-model1.onnx");
-
-    static final Archive TJIHO2 = new Archive("tjiho2",
-        BASE + "vits-piper-fr_FR-tjiho-model2.tar.bz2", 67_204_483L,
-        "5b05e0f2532fd9be5306afc43b5046cb62fbb38df9dc323aa60994a6cf35b247",
-        "vits-piper-fr_FR-tjiho-model2", "fr_FR-tjiho-model2.onnx");
-
-    static final Archive TJIHO3 = new Archive("tjiho3",
-        BASE + "vits-piper-fr_FR-tjiho-model3.tar.bz2", 67_251_174L,
-        "cf8ec38f51687397f9515feca63276a022efde78d6e6a9e868c324b4d74cd58d",
-        "vits-piper-fr_FR-tjiho-model3", "fr_FR-tjiho-model3.onnx");
-
-    static final Archive[] ARCHIVES = {SIWIS, TOM, TJIHO1, TJIHO2, TJIHO3};
+    static final Archive[] ARCHIVES = {SIWIS, TOM};
 
     static final Voice[] VOICES = {
         new Voice("siwis", SIWIS, 0),
         new Voice("tom", TOM, 0),
-        new Voice("tjiho1", TJIHO1, 0),
-        new Voice("tjiho2", TJIHO2, 0),
-        new Voice("tjiho3", TJIHO3, 0),
     };
 
-    /** Dossiers d'une voix retirée du catalogue (UPMC : Jessica et Pierre ; Kokoro ; Supertonic) : à libérer, 80 à 180 Mo. */
+    /** Dossiers d'une voix retirée du catalogue (UPMC : Jessica et Pierre ; Kokoro ; Supertonic ; Tjiho 1 à 3) : à libérer, 80 à 180 Mo. */
     private static final String[] LEGACY_DIRS = {"vits-piper-fr_FR-upmc-medium", "kokoro-int8-multi-lang-v1_0",
-        "sherpa-onnx-supertonic-3-tts-int8-2026-05-11"};
+        "sherpa-onnx-supertonic-3-tts-int8-2026-05-11", "vits-piper-fr_FR-tjiho-model1",
+        "vits-piper-fr_FR-tjiho-model2", "vits-piper-fr_FR-tjiho-model3"};
 
     static Voice voice(String id) {
         for (Voice v : VOICES) if (v.id.equals(id)) return v;

@@ -854,7 +854,7 @@ public class InAppBrowserPlugin extends Plugin {
 
     // ---------- Voix neuronales hors ligne (NeuralVoices) ----------
     //
-    // Le JS ne voit que des identifiants d'ARCHIVE (siwis, tom, tjiho1 à 3) : un
+    // Le JS ne voit que des identifiants d'ARCHIVE (siwis, tom) : un
     // téléchargement par modèle, même si un modèle portait plusieurs voix. L'état
     // d'une opération en cours revient par l'événement « voice ».
 
