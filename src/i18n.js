@@ -182,6 +182,15 @@
       "listen.ctl.next": "Article suivant",
       "listen.ctl.pause": "Pause",
       "listen.ctl.play": "Reprendre",
+      "listen.sysvoice.label": "Voix du téléphone",
+      "listen.sysvoice.desc":
+        "Plusieurs voix sont installées : touchez-en une pour l'entendre et la choisir.",
+      "listen.sysvoice.desc.cur": "Voix choisie : {n}",
+      "listen.sysvoice.default": "Défaut",
+      "listen.sysvoice.n": "Voix {n}",
+      "listen.sysvoice.sample": "Bonjour, voici cette voix.",
+      "changelog.v321.item1":
+        "Écoute : quand votre téléphone propose plusieurs voix (Samsung, Google…), vous pouvez choisir laquelle lit le fil — par exemple la voix masculine — dans les réglages d'écoute, avec un échantillon à chaque toucher.",
       "changelog.v320.item1":
         "Écoute : les chiffres, pourcentages, euros, heures, siècles et abréviations (M., Dr, St, etc.) sont maintenant lus en toutes lettres — « 3 000 » se dit « trois mille », « XIXe » « dix-neuvième ».",
       "changelog.v318.item1":
@@ -793,6 +802,15 @@
       "listen.ctl.next": "Next story",
       "listen.ctl.pause": "Pause",
       "listen.ctl.play": "Resume",
+      "listen.sysvoice.label": "Phone voice",
+      "listen.sysvoice.desc":
+        "Several voices are installed: tap one to hear it and pick it.",
+      "listen.sysvoice.desc.cur": "Chosen voice: {n}",
+      "listen.sysvoice.default": "Default",
+      "listen.sysvoice.n": "Voice {n}",
+      "listen.sysvoice.sample": "Hello, this is this voice.",
+      "changelog.v321.item1":
+        "Listening: when your phone offers several voices (Samsung, Google…), you can choose which one reads the feed — for instance the male voice — in the listening settings, with a sample on each tap.",
       "changelog.v320.item1":
         "Listening: numbers, percentages, euros, times, centuries and abbreviations (M., Dr, St, etc.) are now read out in full — in French, « 3 000 » is spoken as « trois mille ».",
       "changelog.v318.item1":

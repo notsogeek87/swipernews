@@ -679,13 +679,14 @@ public class InAppBrowserPlugin extends Plugin {
             return;
         }
         String lang = call.getString("lang", "fr-FR");
+        final String voice = call.getString("voice", "");
         synchronized (this) {
             if (ttsState == -1) {
                 call.reject("synthèse vocale indisponible");
                 return;
             }
             if (ttsState != 2) {
-                ttsWaiting.add(() -> doSpeak(call, text, lang));
+                ttsWaiting.add(() -> doSpeak(call, text, lang, voice));
                 if (ttsState == 0) {
                     ttsState = 1;
                     // Affecté SOUS le verrou : onTtsInit (fil principal) le
@@ -695,7 +696,51 @@ public class InAppBrowserPlugin extends Plugin {
                 return;
             }
         }
-        doSpeak(call, text, lang);
+        doSpeak(call, text, lang, voice);
+    }
+
+    /**
+     * Les voix françaises (ou de la langue demandée) du moteur de synthèse du système, pour
+     * que la page en propose le choix. Même initialisation différée que {@link #speak}.
+     */
+    @PluginMethod
+    public void systemVoices(PluginCall call) {
+        final String lang = call.getString("lang", "fr-FR");
+        synchronized (this) {
+            if (ttsState == -1) {
+                call.reject("synthèse vocale indisponible");
+                return;
+            }
+            if (ttsState != 2) {
+                ttsWaiting.add(() -> doVoices(call, lang));
+                if (ttsState == 0) {
+                    ttsState = 1;
+                    tts = new TextToSpeech(getContext(), this::onTtsInit);
+                }
+                return;
+            }
+        }
+        doVoices(call, lang);
+    }
+
+    private void doVoices(PluginCall call, String lang) {
+        JSArray list = new JSArray();
+        synchronized (this) {
+            if (ttsState != 2 || tts == null) {
+                call.reject("synthèse vocale indisponible");
+                return;
+            }
+            for (android.speech.tts.Voice v : SystemVoice.forLanguage(tts, lang)) {
+                JSObject o = new JSObject();
+                o.put("name", v.getName());
+                o.put("locale", v.getLocale().toLanguageTag());
+                o.put("network", v.isNetworkConnectionRequired());
+                list.put(o);
+            }
+        }
+        JSObject res = new JSObject();
+        res.put("voices", list);
+        call.resolve(res);
     }
 
     @PluginMethod
@@ -735,7 +780,7 @@ public class InAppBrowserPlugin extends Plugin {
         for (Runnable r : waiting) r.run();
     }
 
-    private void doSpeak(PluginCall call, String text, String lang) {
+    private void doSpeak(PluginCall call, String text, String lang, String voice) {
         synchronized (this) {
             if (ttsState != 2 || tts == null) {
                 call.reject("synthèse vocale indisponible");
@@ -746,6 +791,7 @@ public class InAppBrowserPlugin extends Plugin {
                 call.reject("langue indisponible");
                 return;
             }
+            SystemVoice.apply(tts, voice);
             int max = TextToSpeech.getMaxSpeechInputLength();
             String t = text.length() > max ? text.substring(0, max) : text;
             String id = UUID.randomUUID().toString();
@@ -827,6 +873,7 @@ public class InAppBrowserPlugin extends Plugin {
         }
         Double rate = call.getDouble("rate", 1.0);
         Integer sleep = call.getInt("sleepMin", 0);
+        ListenService.setSystemVoice(call.getString("sysVoice", ""));
         ListenService.prepare(queue, 0, call.getString("lang", "fr-FR"),
             rate == null ? 1f : rate.floatValue(), sleep == null ? 0 : sleep,
             Boolean.TRUE.equals(call.getBoolean("keepTimer", false)),

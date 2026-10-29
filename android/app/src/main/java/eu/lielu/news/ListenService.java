@@ -184,9 +184,13 @@ public class ListenService extends Service {
     static String currentKey() { return currentKey; }
 
     private static String pendingVoice = "";
+    /** Nom d'une voix du moteur système (SystemVoice), ou vide pour sa voix par défaut. */
+    private static String pendingSysVoice = "";
     private static float pendingRate = 1f;
     private static int pendingSleepMin = 0;
     private static boolean pendingKeepTimer = false;
+
+    static void setSystemVoice(String name) { pendingSysVoice = name == null ? "" : name; }
 
     /**
      * @param rate      vitesse de la voix (1 = normale), bornée à 0,5-2
@@ -216,6 +220,7 @@ public class ListenService extends Service {
     private boolean pausedByFocus = false;
     private String lang = "fr-FR";
     private float rate = 1f;
+    private String sysVoice = "";
     private final Runnable sleepRunnable = () -> stopAll("sleep");
 
     // Voix neuronale hors ligne (NeuralVoices) : choisie au démarrage si elle est
@@ -293,6 +298,7 @@ public class ListenService extends Service {
         index = Math.max(0, Math.min(pendingStart, queue.size() - 1));
         lang = pendingLang;
         rate = pendingRate;
+        sysVoice = pendingSysVoice;
         if (tts != null && ttsReady) tts.setSpeechRate(rate);
         if (neural != null) neural.setSpeed(rate);
         neuralWanted = null;
@@ -577,6 +583,7 @@ public class ListenService extends Service {
             stopAll("error");
             return;
         }
+        SystemVoice.apply(tts, sysVoice);   // après setLanguage, qui remet la voix par défaut
         String t = list.get(chunk);
         int max = TextToSpeech.getMaxSpeechInputLength();
         if (t.length() > max) t = t.substring(0, max);
