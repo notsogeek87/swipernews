@@ -90,6 +90,8 @@
     <string name="summary_err_page">Cette page ne contient pas d\'article à résumer.</string>
     <string name="summary_err_no_transcript">Cette vidéo n\'a pas de sous-titres à résumer.</string>
     <string name="summary_listen">Écouter le résumé</string>
+    <string name="summary_listen_info_desc">Où régler l\'écoute</string>
+    <string name="summary_listen_info">Voix, vitesse et minuteur de l\'écoute se règlent dans l\'app, pas ici : fermez le lecteur, puis Menu ▸ Réglages ▸ « Voix de la lecture », ou le bouton Écouter du fil ▸ « Réglages de l\'écoute ».</string>
     <string name="summary_listen_stop">Arrêter la lecture</string>
     <string name="summary_listen_err">Lecture à voix haute indisponible sur cet appareil.</string>
     <string name="summary_close_btn">Fermer</string>

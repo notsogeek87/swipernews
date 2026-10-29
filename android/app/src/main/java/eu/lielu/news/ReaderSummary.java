@@ -66,6 +66,8 @@ final class ReaderSummary {
     private final Button btn2;
     private final Button btn3;
     private final android.widget.ImageButton listenBtn;
+    /** « i » à côté de l'écoute : dit où régler la voix, la vitesse et le minuteur. */
+    private final android.widget.ImageButton listenInfo;
     private final SummarySpeaker speaker;
     private final SummaryModelStore store;
     private SummaryTheme theme;
@@ -107,6 +109,7 @@ final class ReaderSummary {
         btn2 = root.findViewById(R.id.reader_summary_btn2);
         btn3 = root.findViewById(R.id.reader_summary_btn3);
         listenBtn = root.findViewById(R.id.reader_summary_listen);
+        listenInfo = root.findViewById(R.id.reader_summary_listen_info);
         speaker = new SummarySpeaker(ctx, sysVoice, new SummarySpeaker.Listener() {
             @Override
             public void onFinished() {
@@ -121,6 +124,10 @@ final class ReaderSummary {
             }
         });
         listenBtn.setOnClickListener(v -> toggleListen());
+        listenInfo.setOnClickListener(v -> new android.app.AlertDialog.Builder(ctx)
+            .setMessage(R.string.summary_listen_info)
+            .setPositiveButton(android.R.string.ok, null)
+            .show());
         store = new SummaryModelStore(ctx);
 
         basePanelBottom = panel.getPaddingBottom();
@@ -157,6 +164,7 @@ final class ReaderSummary {
         btn3.setBackground(t.secondaryButton());
         listenBtn.setColorFilter(t.ink);
         listenBtn.setBackground(t.fab());
+        listenInfo.setColorFilter(t.ash);
         for (Button b : new Button[] { btn1, btn2, btn3 }) b.setTextColor(t.ink);
     }
 
@@ -453,7 +461,7 @@ final class ReaderSummary {
             ctx.getString(R.string.summary_delete_model), v -> askDeleteModel());
         styleDeleteButton(btn3);
         refreshListen();
-        listenBtn.setVisibility(View.VISIBLE);
+        setListenVisibility(View.VISIBLE);
         // Même emprise que pendant l'écriture : la zone de texte rend à la feuille la place
         // que les boutons de fin viennent d'occuper, elle ne change pas de hauteur.
         scroll.setMaxHeightPx(baseMaxPx);
@@ -491,7 +499,7 @@ final class ReaderSummary {
      * pouce, au lieu de flotter au milieu avec du vide dessous.
      */
     private void enterWritingLayout() {
-        listenBtn.setVisibility(View.INVISIBLE);
+        setListenVisibility(View.INVISIBLE);
         if (writingLayout) return;
         writingLayout = true;
         scroll.setMaxHeightPx(baseMaxPx);
@@ -514,7 +522,7 @@ final class ReaderSummary {
         final int l = listenBtn.getVisibility(), b2 = btn2.getVisibility(), b3 = btn3.getVisibility();
         final int pg = progress.getVisibility();
         final CharSequence t2 = btn2.getText(), t3 = btn3.getText();
-        listenBtn.setVisibility(View.INVISIBLE);
+        setListenVisibility(View.INVISIBLE);
         panel.measure(wSpec, hSpec);
         final int working = panel.getMeasuredHeight();
         arrangeActions(true);
@@ -527,7 +535,7 @@ final class ReaderSummary {
         panel.measure(wSpec, hSpec);
         final int done = panel.getMeasuredHeight();
         arrangeActions(false);
-        listenBtn.setVisibility(l);
+        setListenVisibility(l);
         btn2.setVisibility(b2);
         btn3.setVisibility(b3);
         progress.setVisibility(pg);
@@ -550,6 +558,12 @@ final class ReaderSummary {
     private void stopListening() {
         speaker.stop();
         refreshListen();
+    }
+
+    /** Le « i » suit le bouton d'écoute : visible, caché ou réservé en même temps que lui. */
+    private void setListenVisibility(int v) {
+        listenBtn.setVisibility(v);
+        listenInfo.setVisibility(v);
     }
 
     private void refreshListen() {
@@ -647,7 +661,7 @@ final class ReaderSummary {
         stopListening();
         arrangeActions(false);
         // Pendant l'écriture l'icône garde sa place : l'en-tête ne change pas de hauteur à la fin.
-        listenBtn.setVisibility(writingLayout ? View.INVISIBLE : View.GONE);
+        setListenVisibility(writingLayout ? View.INVISIBLE : View.GONE);
         // Le 3e bouton a pu servir de lien discret : retour au style d'origine.
         btn3.setBackground(theme.secondaryButton());
         btn3.setTextColor(theme.ink);
