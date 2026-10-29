@@ -149,15 +149,18 @@
       "listen.voice.desc.system": "La voix du téléphone.",
       "listen.voice.desc.siwis": "Voix féminine claire, hors ligne (en français).",
       "listen.voice.desc.tom": "Voix masculine, hors ligne (en français).",
-      "listen.voice.desc.supertonicf":
-        "Voix féminine d'un modèle récent, la plus naturelle essayée jusqu'ici. Hors ligne (en français).",
-      "listen.voice.desc.supertonicm":
-        "Voix masculine du même modèle récent. Hors ligne (en français).",
+      "listen.voice.desc.tjiho1":
+        "Autre voix française de Tjiho, hors ligne : à comparer avec Tom.",
+      "listen.voice.desc.tjiho2":
+        "Autre voix française de Tjiho, hors ligne : à comparer avec Tom.",
+      "listen.voice.desc.tjiho3":
+        "Autre voix française de Tjiho, hors ligne : à comparer avec Tom.",
       "listen.voice.opt.system": "Système",
       "listen.voice.opt.siwis": "Siwis",
       "listen.voice.opt.tom": "Tom",
-      "listen.voice.opt.supertonicf": "Supertonic F",
-      "listen.voice.opt.supertonicm": "Supertonic M",
+      "listen.voice.opt.tjiho1": "Tjiho 1",
+      "listen.voice.opt.tjiho2": "Tjiho 2",
+      "listen.voice.opt.tjiho3": "Tjiho 3",
       "listen.voice.missing":
         "Cette voix n'est pas encore sur l'appareil : la voix du téléphone est utilisée en attendant.",
       "listen.voice.get": "Télécharger la voix ({m} Mo)",
@@ -170,7 +173,7 @@
       "listen.voice.err.net": "Téléchargement interrompu — réessayez.",
       "listen.voice.err.invalid": "Fichier de voix invalide, il n'a pas été installé.",
       "listen.voice.credit":
-        "Siwis : Piper, corpus SIWIS (CC BY 4.0, Université d'Édimbourg). Tom : Piper, licence AGPL-3.0 (Tjiho). Supertonic : modèle Supertone sous licence OpenRAIL-M, quantifié en 8 bits par sherpa-onnx.",
+        "Siwis : Piper, corpus SIWIS (CC BY 4.0, Université d'Édimbourg). Tom : Piper, licence AGPL-3.0 (Tjiho). Tjiho 1 à 3 : Piper, AGPL-3.0 (Tjiho).",
       "listen.flashmode.label": "Lecture des actus",
       "listen.flashmode.opt.extrait": "Extraits",
       "listen.flashmode.opt.ia": "Résumé IA",
@@ -188,6 +191,8 @@
       "listen.ctl.next": "Article suivant",
       "listen.ctl.pause": "Pause",
       "listen.ctl.play": "Reprendre",
+      "changelog.v318.item1":
+        "Écoute (Android) : Supertonic est retirée. Trois nouvelles voix françaises à comparer dans les réglages : Tjiho 1, 2 et 3.",
       "changelog.v317.item1":
         "Écoute (Android) : Kokoro est retirée. Nouvelle voix française à essayer dans les réglages, Supertonic (féminine ou masculine, 130 Mo), plus naturelle que Siwis et Tom.",
       "changelog.v316.item1":
@@ -763,15 +768,18 @@
       "listen.voice.desc.system": "The phone's voice.",
       "listen.voice.desc.siwis": "Clear female voice, offline (French only).",
       "listen.voice.desc.tom": "Male voice, offline (French only).",
-      "listen.voice.desc.supertonicf":
-        "Female voice from a recent model, the most natural so far. Offline (in French).",
-      "listen.voice.desc.supertonicm":
-        "Male voice from the same recent model. Offline (in French).",
+      "listen.voice.desc.tjiho1":
+        "Another French voice by Tjiho, offline: compare it with Tom.",
+      "listen.voice.desc.tjiho2":
+        "Another French voice by Tjiho, offline: compare it with Tom.",
+      "listen.voice.desc.tjiho3":
+        "Another French voice by Tjiho, offline: compare it with Tom.",
       "listen.voice.opt.system": "System",
       "listen.voice.opt.siwis": "Siwis",
       "listen.voice.opt.tom": "Tom",
-      "listen.voice.opt.supertonicf": "Supertonic F",
-      "listen.voice.opt.supertonicm": "Supertonic M",
+      "listen.voice.opt.tjiho1": "Tjiho 1",
+      "listen.voice.opt.tjiho2": "Tjiho 2",
+      "listen.voice.opt.tjiho3": "Tjiho 3",
       "listen.voice.missing":
         "This voice isn't on the device yet: the phone's voice is used meanwhile.",
       "listen.voice.get": "Download the voice ({m} MB)",
@@ -784,7 +792,7 @@
       "listen.voice.err.net": "Download interrupted — try again.",
       "listen.voice.err.invalid": "Invalid voice file, it was not installed.",
       "listen.voice.credit":
-        "Siwis: Piper, SIWIS corpus (CC BY 4.0, University of Edinburgh). Tom: Piper, AGPL-3.0 licence (Tjiho). Supertonic: Supertone model under the OpenRAIL-M licence, 8-bit quantised by sherpa-onnx.",
+        "Siwis: Piper, SIWIS corpus (CC BY 4.0, University of Edinburgh). Tom: Piper, AGPL-3.0 licence (Tjiho). Tjiho 1 to 3: Piper, AGPL-3.0 (Tjiho).",
       "listen.flashmode.label": "News reading",
       "listen.flashmode.opt.extrait": "Excerpts",
       "listen.flashmode.opt.ia": "AI summary",
@@ -801,6 +809,8 @@
       "listen.ctl.next": "Next story",
       "listen.ctl.pause": "Pause",
       "listen.ctl.play": "Resume",
+      "changelog.v318.item1":
+        "Listening (Android): Supertonic is removed. Three new French voices to compare in the settings: Tjiho 1, 2 and 3.",
       "changelog.v317.item1":
         "Listening (Android): Kokoro is removed. A new French voice to try in the settings, Supertonic (female or male, 130 MB), more natural than Siwis and Tom.",
       "changelog.v316.item1":

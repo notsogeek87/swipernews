@@ -3374,7 +3374,9 @@ ${Array.from({ length: 12 }, (_, k) => {
         window.__archives = [
           { archive: "siwis", size: 67207459, installed: false, partial: 0 },
           { archive: "tom", size: 67202955, installed: false, partial: 0 },
-          { archive: "supertonic", size: 128774318, installed: false, partial: 0 },
+          { archive: "tjiho1", size: 67204019, installed: false, partial: 0 },
+          { archive: "tjiho2", size: 67204483, installed: false, partial: 0 },
+          { archive: "tjiho3", size: 67251174, installed: false, partial: 0 },
         ];
         window.Capacitor = {
           isNativePlatform: () => true,
@@ -3508,7 +3510,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       };
     });
     console.log(
-      `feuille : ${mini.boutons} voix proposées (attendu 5), note « français » ${mini.note}, choix depuis la feuille → ${mini.choisi} (attendu tom), téléchargement proposé ${mini.blocTelecharger}`
+      `feuille : ${mini.boutons} voix proposées (attendu 6), note « français » ${mini.note}, choix depuis la feuille → ${mini.choisi} (attendu tom), téléchargement proposé ${mini.blocTelecharger}`
     );
     await page.evaluate(() => setEcouteVoix("system"));
     await page.click("#listenModeFeed");
@@ -3584,10 +3586,10 @@ ${Array.from({ length: 12 }, (_, k) => {
       window.__starts.length = 0;
       demarrerEcoute();
       r.voixTom = window.__starts[0].voice;
-      setEcouteVoix("supertonicf");
+      setEcouteVoix("tjiho1");
       window.__starts.length = 0;
       demarrerEcoute();
-      r.supertonicPasInstallee = window.__starts[0].voice === "";
+      r.tjihoPasInstallee = window.__starts[0].voice === "";
       setEcouteVoix("siwis");
       window.__starts.length = 0;
       demarrerEcoute();
@@ -3602,7 +3604,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       return r;
     });
     console.log(
-      `voix : bloc absent en voix système ${vx.sansBlocSysteme}, bouton « ${vx.bouton} », non installée → voix système ${vx.voixNonInstallee}, appel ${vx.appel}, progression 50 % ${vx.progression}, « Installation » ${vx.installation}, installée ${vx.installee}, tom → "${vx.voixTom}", supertonic non installée → système ${vx.supertonicPasInstallee}, siwis non installée → système ${vx.siwisPasInstallee}, retour système ${vx.systeme}`
+      `voix : bloc absent en voix système ${vx.sansBlocSysteme}, bouton « ${vx.bouton} », non installée → voix système ${vx.voixNonInstallee}, appel ${vx.appel}, progression 50 % ${vx.progression}, « Installation » ${vx.installation}, installée ${vx.installee}, tom → "${vx.voixTom}", tjiho non installée → système ${vx.tjihoPasInstallee}, siwis non installée → système ${vx.siwisPasInstallee}, retour système ${vx.systeme}`
     );
     await page.evaluate(() => {
       arreterEcoute();

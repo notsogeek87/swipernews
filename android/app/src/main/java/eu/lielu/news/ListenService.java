@@ -429,7 +429,7 @@ public class ListenService extends Service {
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build();
-                sp = new NeuralSpeaker(engine, v.sid, v.archive.supertonic ? "fr" : null, r, attrs,
+                sp = new NeuralSpeaker(engine, v.sid, r, attrs,
                     (id, ok) -> main.post(() -> neuralEnded(id, ok)));
             } catch (Throwable e) {
                 sp = null;   // y compris UnsatisfiedLinkError : repli sur la voix système

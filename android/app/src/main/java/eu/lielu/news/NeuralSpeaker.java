@@ -5,7 +5,6 @@ import android.media.AudioFormat;
 import android.media.AudioTrack;
 
 import com.k2fsa.sherpa.onnx.GeneratedAudio;
-import com.k2fsa.sherpa.onnx.GenerationConfig;
 import com.k2fsa.sherpa.onnx.OfflineTts;
 
 import java.util.concurrent.ExecutorService;
@@ -53,15 +52,8 @@ final class NeuralSpeaker {
     private Future<short[]> cached;
     private int sampleRate = 22050;
 
-    /** Langue passée à Supertonic ({@code extra["lang"]}) ; null pour Piper, dont la langue est celle du modèle. */
-    private final String lang;
-
-    /** Itérations du modèle de diffusion de Supertonic : 5 est le réglage par défaut de sherpa-onnx. */
-    private static final int SUPERTONIC_STEPS = 5;
-
-    NeuralSpeaker(OfflineTts tts, int sid, String lang, float speed, AudioAttributes attrs, Done done) {
+    NeuralSpeaker(OfflineTts tts, int sid, float speed, AudioAttributes attrs, Done done) {
         this.tts = tts;
-        this.lang = lang;
         this.sid = sid;
         this.speed = speed;
         this.attrs = attrs;
@@ -151,18 +143,7 @@ final class NeuralSpeaker {
     private short[] synth(String text) {
         synchronized (synthLock) {
             if (closed) throw new IllegalStateException("fermé");
-            final GeneratedAudio g;
-            if (lang == null) {
-                g = tts.generate(text, sid, speed);
-            } else {
-                final GenerationConfig c = new GenerationConfig();
-                c.setSid(sid);
-                c.setSpeed(speed);
-                c.setNumSteps(SUPERTONIC_STEPS);
-                c.setExtra(java.util.Collections.singletonMap("lang", lang));
-                // Pas de rappel par morceaux : une phrase entière suffit (la suivante est préparée à part).
-                g = tts.generateWithConfigAndCallback(text, c, (java.util.function.Consumer<float[]>) x -> { });
-            }
+            final GeneratedAudio g = tts.generate(text, sid, speed);
             sampleRate = g.getSampleRate();
             final float[] f = g.getSamples();
             final short[] s = new short[f.length];

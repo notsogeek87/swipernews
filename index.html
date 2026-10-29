@@ -2023,7 +2023,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=294"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=317"></script>
+<script src="src/i18n.js?v=318"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -3241,15 +3241,15 @@ const ECOUTE_FILE_MAX=40;
    l'APK). Lus À CHAQUE démarrage et transmis au service : il n'en garde rien. */
 const ECOUTE_RATES=["0.8","1","1.25","1.5"];
 const ECOUTE_SLEEPS=["off","15","30","60"];
-/* VOIX NEURONALE HORS LIGNE (APK, ListenService + NeuralVoices). Quatre voix, trois
-   téléchargements : Supertonic (voix F et M, un seul modèle), Siwis et Tom (Piper). On
+/* VOIX NEURONALE HORS LIGNE (APK, ListenService + NeuralVoices). Cinq voix Piper, un
+   téléchargement chacune : Siwis, Tom et les trois modèles de Tjiho. On
    choisit une voix ; si elle n'est pas installée, l'écoute prend la voix du système
    (voixPourService) — jamais un silence, jamais un téléchargement déclenché sans
    demande : le bouton ci-dessous est le seul chemin. Jessica et Pierre (UPMC) ont
-   été retirées, Kokoro aussi (voix jugée mauvaise) : une valeur enregistrée qui n'est plus au catalogue retombe sur
+   été retirées, Kokoro et Supertonic aussi (voix jugées mauvaises) : une valeur enregistrée qui n'est plus au catalogue retombe sur
    « Système » (voir ecouteVoix), et le natif libère leurs fichiers (purgeLegacy). */
-const VOIX={supertonicf:"supertonic",supertonicm:"supertonic",siwis:"siwis",tom:"tom"};
-const VOIX_IDS=["system","supertonicf","supertonicm","siwis","tom"];
+const VOIX={siwis:"siwis",tom:"tom",tjiho1:"tjiho1",tjiho2:"tjiho2",tjiho3:"tjiho3"};
+const VOIX_IDS=["system","siwis","tom","tjiho1","tjiho2","tjiho3"];
 const LS_VOIX="fluxswipe.listenvoice.v1";
 let ecouteVoix=(()=>{try{const v=localStorage.getItem(LS_VOIX);return VOIX_IDS.includes(v)?v:"system";}catch(e){return "system";}})();
 let voixEtat=null,voixCharge=false,voixOp=null;    // état natif, 1er relevé lancé, opération en cours {archive,done,total,phase}
@@ -3857,7 +3857,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="317";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="318";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -3868,6 +3868,8 @@ const APP_VERSION="317";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:318,date:"2026-10-29",items:[
+    "changelog.v318.item1"]},
   {v:317,date:"2026-10-29",items:[
     "changelog.v317.item1"]},
   {v:316,date:"2026-10-28",items:[

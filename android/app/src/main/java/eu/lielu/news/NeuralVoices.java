@@ -7,7 +7,6 @@ import android.os.Looper;
 import com.k2fsa.sherpa.onnx.OfflineTts;
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig;
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig;
-import com.k2fsa.sherpa.onnx.OfflineTtsSupertonicModelConfig;
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig;
 
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
@@ -39,8 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <ul>
  *   <li>Siwis (Piper) : CC BY 4.0, University of Edinburgh (obligation d'attribution) ;</li>
  *   <li>Tom (Piper) : AGPL-3.0, voir git.bksp.space/Tjiho/French-tts-model-piper ;</li>
- *   <li>Supertonic 3 (Supertone) : modèle sous licence OpenRAIL-M, exemples sous MIT ; quantifié en
- *       8 bits par sherpa-onnx ;</li>
+ *   <li>Tjiho 1, 2 et 3 (Piper) : même auteur que Tom, donc AGPL-3.0 ;</li>
  *   <li>espeak-ng, livré avec chaque modèle : GPL-3.0, comme ce dépôt.</li>
  * </ul>
  * Les rappels reviennent sur le fil principal. Une seule opération à la fois.
@@ -55,26 +53,18 @@ final class NeuralVoices {
         final String sha256;
         final String dirName;
         final String modelFile;
-        /** Vrai pour Supertonic (quatre réseaux et un fichier de styles), faux pour un modèle Piper. */
-        final boolean supertonic;
 
-        Archive(String id, String url, long size, String sha256, String dirName, String modelFile,
-                boolean supertonic) {
+        Archive(String id, String url, long size, String sha256, String dirName, String modelFile) {
             this.id = id;
             this.url = url;
             this.size = size;
             this.sha256 = sha256;
             this.dirName = dirName;
             this.modelFile = modelFile;
-            this.supertonic = supertonic;
         }
 
         /** Ce qu'une archive complète contient : un dossier n'est « installé » qu'avec tout. */
         boolean complete(File dir) {
-            if (supertonic) {
-                for (String f : SUPERTONIC_FILES) if (!new File(dir, f).isFile()) return false;
-                return true;
-            }
             return new File(dir, modelFile).isFile()
                 && new File(dir, "tokens.txt").isFile()
                 && new File(dir, "espeak-ng-data").isDirectory();
@@ -100,44 +90,43 @@ final class NeuralVoices {
     static final Archive SIWIS = new Archive("siwis",
         BASE + "vits-piper-fr_FR-siwis-medium.tar.bz2", 67_207_459L,
         "375909aa30842b3a4efa10b1beb1d761af792960ae6873b4d53889f96c66195b",
-        "vits-piper-fr_FR-siwis-medium", "fr_FR-siwis-medium.onnx", false);
+        "vits-piper-fr_FR-siwis-medium", "fr_FR-siwis-medium.onnx");
 
     /** Piper, 44,1 kHz (les autres voix sont à 22,05 kHz). */
     static final Archive TOM = new Archive("tom",
         BASE + "vits-piper-fr_FR-tom-medium.tar.bz2", 67_202_955L,
         "3d8258ef8466b5d5f2cc46c06e1415d3d01c9cbaeed8b6d5b3d152073672472c",
-        "vits-piper-fr_FR-tom-medium", "fr_FR-tom-medium.onnx", false);
+        "vits-piper-fr_FR-tom-medium", "fr_FR-tom-medium.onnx");
 
-    /**
-     * Supertonic 3 (Supertone), quantifié en 8 bits par sherpa-onnx : 31 langues, dix styles de voix
-     * (24 kHz), sans phonémiseur (le texte est lu tel quel, la langue passe par {@code extra["lang"]},
-     * voir {@link NeuralSpeaker}). Il demande sherpa-onnx >= 1.12.40 ; la 2.x, elle, n'embarque plus
-     * espeak-ng et ne sait plus lire les modèles Piper ci-dessus.
-     */
-    static final Archive SUPERTONIC = new Archive("supertonic",
-        BASE + "sherpa-onnx-supertonic-3-tts-int8-2026-05-11.tar.bz2", 128_774_318L,
-        "82fa96f91c4ef8abaae3a14a3f4153facf88bed821d1f7331cec2700f432c427",
-        "sherpa-onnx-supertonic-3-tts-int8-2026-05-11", "vector_estimator.int8.onnx", true);
+    /** Les trois modèles de Tjiho (l'auteur de Tom), à comparer : mêmes moteur et taille que Tom. */
+    static final Archive TJIHO1 = new Archive("tjiho1",
+        BASE + "vits-piper-fr_FR-tjiho-model1.tar.bz2", 67_204_019L,
+        "e48c52ee3dea03abc8c2d0bce143948b0d8cc50891e466e2a7481e14cf18c52c",
+        "vits-piper-fr_FR-tjiho-model1", "fr_FR-tjiho-model1.onnx");
 
-    private static final String[] SUPERTONIC_FILES = {
-        "duration_predictor.int8.onnx", "text_encoder.int8.onnx", "vector_estimator.int8.onnx",
-        "vocoder.int8.onnx", "tts.json", "unicode_indexer.bin", "voice.bin"};
+    static final Archive TJIHO2 = new Archive("tjiho2",
+        BASE + "vits-piper-fr_FR-tjiho-model2.tar.bz2", 67_204_483L,
+        "5b05e0f2532fd9be5306afc43b5046cb62fbb38df9dc323aa60994a6cf35b247",
+        "vits-piper-fr_FR-tjiho-model2", "fr_FR-tjiho-model2.onnx");
 
-    static final Archive[] ARCHIVES = {SUPERTONIC, SIWIS, TOM};
+    static final Archive TJIHO3 = new Archive("tjiho3",
+        BASE + "vits-piper-fr_FR-tjiho-model3.tar.bz2", 67_251_174L,
+        "cf8ec38f51687397f9515feca63276a022efde78d6e6a9e868c324b4d74cd58d",
+        "vits-piper-fr_FR-tjiho-model3", "fr_FR-tjiho-model3.onnx");
 
-    /** voice.bin range les dix styles dans l'ordre trié : sid 0 à 4 = F1 à F5, sid 5 à 9 = M1 à M5. */
-    private static final int SUPERTONIC_F1 = 0;
-    private static final int SUPERTONIC_M1 = 5;
+    static final Archive[] ARCHIVES = {SIWIS, TOM, TJIHO1, TJIHO2, TJIHO3};
 
     static final Voice[] VOICES = {
-        new Voice("supertonicf", SUPERTONIC, SUPERTONIC_F1),
-        new Voice("supertonicm", SUPERTONIC, SUPERTONIC_M1),
         new Voice("siwis", SIWIS, 0),
         new Voice("tom", TOM, 0),
+        new Voice("tjiho1", TJIHO1, 0),
+        new Voice("tjiho2", TJIHO2, 0),
+        new Voice("tjiho3", TJIHO3, 0),
     };
 
-    /** Dossiers d'une voix retirée du catalogue (UPMC : Jessica et Pierre ; Kokoro) : à libérer, 80 à 180 Mo. */
-    private static final String[] LEGACY_DIRS = {"vits-piper-fr_FR-upmc-medium", "kokoro-int8-multi-lang-v1_0"};
+    /** Dossiers d'une voix retirée du catalogue (UPMC : Jessica et Pierre ; Kokoro ; Supertonic) : à libérer, 80 à 180 Mo. */
+    private static final String[] LEGACY_DIRS = {"vits-piper-fr_FR-upmc-medium", "kokoro-int8-multi-lang-v1_0",
+        "sherpa-onnx-supertonic-3-tts-int8-2026-05-11"};
 
     static Voice voice(String id) {
         for (Voice v : VOICES) if (v.id.equals(id)) return v;
@@ -273,27 +262,13 @@ final class NeuralVoices {
     OfflineTts load(Voice v) {
         final File d = modelDir(v.archive);
         final OfflineTtsModelConfig.Builder m = OfflineTtsModelConfig.builder();
-        if (v.archive.supertonic) {
-            m.setSupertonic(OfflineTtsSupertonicModelConfig.builder()
-                .setDurationPredictor(new File(d, "duration_predictor.int8.onnx").getAbsolutePath())
-                .setTextEncoder(new File(d, "text_encoder.int8.onnx").getAbsolutePath())
-                .setVectorEstimator(new File(d, "vector_estimator.int8.onnx").getAbsolutePath())
-                .setVocoder(new File(d, "vocoder.int8.onnx").getAbsolutePath())
-                .setTtsJson(new File(d, "tts.json").getAbsolutePath())
-                .setUnicodeIndexer(new File(d, "unicode_indexer.bin").getAbsolutePath())
-                .setVoiceStyle(new File(d, "voice.bin").getAbsolutePath())
-                .build());
-            // Quatre réseaux : un peu plus de fils que Piper, sans dépasser la moitié des cœurs.
-            m.setNumThreads(Math.max(2, Math.min(4, Runtime.getRuntime().availableProcessors() / 2)));
-        } else {
-            m.setVits(OfflineTtsVitsModelConfig.builder()
-                .setModel(new File(d, v.archive.modelFile).getAbsolutePath())
-                .setTokens(new File(d, "tokens.txt").getAbsolutePath())
-                .setDataDir(new File(d, "espeak-ng-data").getAbsolutePath())
-                .build());
-            // Deux fils : au-delà, les gros cœurs d'un SoC hétérogène attendent les petits.
-            m.setNumThreads(2);
-        }
+        m.setVits(OfflineTtsVitsModelConfig.builder()
+            .setModel(new File(d, v.archive.modelFile).getAbsolutePath())
+            .setTokens(new File(d, "tokens.txt").getAbsolutePath())
+            .setDataDir(new File(d, "espeak-ng-data").getAbsolutePath())
+            .build());
+        // Deux fils : au-delà, les gros cœurs d'un SoC hétérogène attendent les petits.
+        m.setNumThreads(2);
         return new OfflineTts(OfflineTtsConfig.builder().setModel(m.build()).build());
     }
 
