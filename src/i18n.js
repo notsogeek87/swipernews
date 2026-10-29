@@ -139,6 +139,15 @@
       "listen.mode.flash.sub": "Les actus récentes pas encore lues, environ {m} min.",
       "listen.mode.cancel": "Fermer",
       "listen.flash.none": "Rien de neuf à écouter pour l'instant",
+      "listen.flashsrc.label": "Sources du flash info",
+      "listen.flashsrc.desc.all":
+        "Toutes les sources cochées. Touchez pour n'en garder que certaines.",
+      "listen.flashsrc.desc.n": "{n} source(s) choisie(s) pour le flash info.",
+      "listen.flashsrc.btn": "Choisir",
+      "listen.flashsrc.sub":
+        "Coche les sources à lire dans le flash info — plusieurs, si tu veux. Aucune cochée : elles y sont toutes. Le fil, lui, n'est pas touché.",
+      "listen.flashsrc.done": "Valider",
+      "listen.mode.flash.src": "Sur {n} source(s) choisie(s).",
       "listen.flash.intro": "Flash info : {n} {i}, environ {m} {u}.",
       "listen.flash.label": "Durée du flash info",
       "listen.flash.desc":
@@ -189,6 +198,8 @@
       "listen.sysvoice.default": "Défaut",
       "listen.sysvoice.n": "Voix {n}",
       "listen.sysvoice.sample": "Bonjour, voici cette voix.",
+      "changelog.v323.item1":
+        "Flash info : vous pouvez maintenant choisir les sources lues (Écouter, Réglages de l'écoute, Sources du flash info).",
       "changelog.v322.item1":
         "Résumé IA d'un article : « Écouter le résumé » utilise maintenant la voix du téléphone choisie dans les réglages d'écoute.",
       "changelog.v321.item1":
@@ -763,6 +774,14 @@
       "listen.mode.flash.sub": "Recent news you haven't read yet, about {m} min.",
       "listen.mode.cancel": "Close",
       "listen.flash.none": "Nothing new to listen to right now",
+      "listen.flashsrc.label": "News flash sources",
+      "listen.flashsrc.desc.all": "All ticked sources. Tap to keep only some of them.",
+      "listen.flashsrc.desc.n": "{n} source(s) picked for the news flash.",
+      "listen.flashsrc.btn": "Choose",
+      "listen.flashsrc.sub":
+        "Tick the sources to read in the news flash — as many as you like. None ticked: all of them. Your feed is left untouched.",
+      "listen.flashsrc.done": "Done",
+      "listen.mode.flash.src": "From {n} picked source(s).",
       "listen.flash.intro": "News flash: {n} {i}, about {m} {u}.",
       "listen.flash.label": "News flash length",
       "listen.flash.desc":
@@ -811,6 +830,8 @@
       "listen.sysvoice.default": "Default",
       "listen.sysvoice.n": "Voice {n}",
       "listen.sysvoice.sample": "Hello, this is this voice.",
+      "changelog.v323.item1":
+        "News flash: you can now pick which sources are read (Listen, Listening settings, News flash sources).",
       "changelog.v322.item1":
         "AI article summary: « Listen to the summary » now uses the phone voice chosen in the listening settings.",
       "changelog.v321.item1":

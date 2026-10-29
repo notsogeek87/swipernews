@@ -2023,7 +2023,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=321"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=322"></script>
+<script src="src/i18n.js?v=323"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -3372,6 +3372,29 @@ function setFlashMin(v){
   try{localStorage.setItem(LS_FLASH,v);}catch(e){warn("save flashmin",e);}
   renderListenPref();
 }
+/* SOURCES DU FLASH INFO : un sous-ensemble des sources cochées, par URL ; vide = toutes. Propre au
+   flash — le fil, lui, garde le filtre de la barre du haut (newsSrc). Les URL qui ne sont plus
+   cochées sont ignorées à l'usage (flashSrcActives), jamais effacées d'office : recocher une
+   source la ramène dans la sélection. */
+const LS_FLASHSRC="fluxswipe.flashsrc.v1";
+let flashSrc=(()=>{try{const v=JSON.parse(localStorage.getItem(LS_FLASHSRC)||"[]");return Array.isArray(v)?v.filter(u=>typeof u==="string"):[];}catch(e){return [];}})();
+function setFlashSrc(liste){
+  flashSrc=[...new Set(liste)];
+  try{localStorage.setItem(LS_FLASHSRC,JSON.stringify(flashSrc));}catch(e){warn("save flashsrc",e);}
+  renderListenPref();
+}
+function flashSrcActives(){
+  const ok=new Set(feeds.filter(f=>f.on&&!isYoutubeFeedUrl(f.url)).map(f=>f.url));
+  return flashSrc.filter(u=>ok.has(u));
+}
+function flashSrcRow(){
+  const n=flashSrcActives().length;
+  return `<div class="prefrow"><div class="prefrow__txt"><b>${esc(T("listen.flashsrc.label"))}</b><span>${esc(n?T("listen.flashsrc.desc.n",{n}):T("listen.flashsrc.desc.all"))}</span></div>
+    <div class="segbtns"><button type="button" class="iobtn" data-flashsrc="1">${esc(T("listen.flashsrc.btn"))}</button></div></div>`;
+}
+document.addEventListener("click",e=>{
+  if(e.target.closest&&e.target.closest("[data-flashsrc]"))openPicker("flash");
+});
 const LS_ECOUTE_RATE="fluxswipe.listenrate.v1",LS_ECOUTE_SLEEP="fluxswipe.listensleep.v1";
 let ecouteRate=(()=>{try{const v=localStorage.getItem(LS_ECOUTE_RATE);return ECOUTE_RATES.includes(v)?v:"1";}catch(e){return "1";}})();
 let ecouteSleep=(()=>{try{const v=localStorage.getItem(LS_ECOUTE_SLEEP);return ECOUTE_SLEEPS.includes(v)?v:"off";}catch(e){return "off";}})();
@@ -3396,6 +3419,7 @@ function reglagesEcoute(){
       ECOUTE_RATES.map(v=>({v,t:decRate(v)})),ecouteRate)
     +prefRow("flashmin",T("listen.flash.label"),T("listen.flash.desc",{m:flashMin}),
       FLASH_MINS.map(v=>({v,t:v+" min"})),flashMin)
+    +flashSrcRow()
     +prefRow("listensleep",T("listen.sleep.label"),ecouteSleep==="off"?T("listen.sleep.desc.off"):T("listen.sleep.desc",{m:ecouteSleep}),
       ECOUTE_SLEEPS.map(v=>({v,t:v==="off"?T("listen.sleep.opt.off"):v+" min"})),ecouteSleep);
 }
@@ -3408,7 +3432,9 @@ function renderListenSheet(ok){
   if(!feedSub)return;
   const ia=flashMode==="ia";
   feedSub.textContent=T(ia?"listen.mode.feed.sub.ia":"listen.mode.feed.sub");
-  document.getElementById("listenModeFlashSub").textContent=T(ia?"listen.mode.flash.sub.ia":"listen.mode.flash.sub",{m:flashMin});
+  const nSrc=flashSrcActives().length;
+  document.getElementById("listenModeFlashSub").textContent=T(ia?"listen.mode.flash.sub.ia":"listen.mode.flash.sub",{m:flashMin})
+    +(nSrc?" "+T("listen.mode.flash.src",{n:nSrc}):"");
   document.querySelector("#listenModeFeed .listenmode__i").innerHTML=ICON_VOLUME;
   document.querySelector("#listenModeFlash .listenmode__i").innerHTML=ICON_RSS;
   document.querySelector("#listenOptsBtn .listenopts__c").innerHTML=ICON_CHEV;
@@ -3500,10 +3526,13 @@ function fileFlash(){
   const budget=(+flashMin||10)*60*(+ecouteRate||1)*14;   // en caractères
   const ia=flashMode==="ia";
   const out=[],cartes=new Map();
+  // Sources choisies pour le flash : l'article porte le NOM de sa source (voir nomDeSource), pas l'URL.
+  const choisies=flashSrcActives(),noms=choisies.length?new Set(feeds.filter(f=>choisies.includes(f.url)).map(f=>f.name)):null;
   let car=0;
   for(const it of newsItems){
     if(out.length>=FLASH_MAX||(car>=budget&&out.length>=3))break;
     if(videoIdOf(it)||itemSeen(it)||estMasque(it))continue;
+    if(noms&&!noms.has(it.source))continue;
     const k=seenKey(it);
     if(!k||cartes.has(k))continue;
     const head=ttsChunks(teteDActu(it));
@@ -3896,7 +3925,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="322";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="323";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -3907,6 +3936,8 @@ const APP_VERSION="322";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:323,date:"2026-10-29",items:[
+    "changelog.v323.item1"]},
   {v:322,date:"2026-10-29",items:[
     "changelog.v322.item1"]},
   {v:321,date:"2026-10-29",items:[
@@ -9131,6 +9162,12 @@ setIcons();
    sur les cartes). D'où « Toutes » sans emoji d'un côté, « 🎓 Tous » de
    l'autre — l'incohérence serait d'en mettre un seul au milieu de noms nus. */
 function filterChips(kind){
+  if(kind==="flash"){
+    const on=feeds.filter(f=>f.on&&!isYoutubeFeedUrl(f.url)),lbl=feedLabels(on);
+    const chips=on.map((f,i)=>({k:f.url,label:lbl[i]}));
+    chips.sort((a,b)=>a.label.localeCompare(b.label,LANG));
+    return [{k:"all",label:T("filter.src.all")}].concat(chips);
+  }
   if(kind==="src"){
     // Libellés calculés sur les seules sources COCHÉES, celles que la liste
     // montre : préciser « · asie » n'a de sens que s'il y a bien deux
@@ -9200,15 +9237,16 @@ let pickKind="src";
    aussitôt. Nulle pour le filtre des thèmes, qui reste un choix UNIQUE — un
    article Wikipédia est tiré dans un thème, pas dans plusieurs. */
 let pickSel=null;
+let pickFrom=null;   // feuille d'où s'ouvre le choix des sources du flash, où l'on revient à la fermeture
 /* Vrai quand la puce `k` doit paraître cochée. « Toutes » n'est pas une valeur
    parmi les autres : elle s'allume quand RIEN n'est retenu. */
 function pickOn(k){
-  if(pickKind!=="src")return k===cat;
-  return k==="all"?pickSel.size===0:pickSel.has(k);
+  if(pickKind==="flash"||pickKind==="src")return k==="all"?pickSel.size===0:pickSel.has(k);
+  return k===cat;
 }
 /* Construit la grille : UNE fois, à l'ouverture. */
 function renderPickGrid(){
-  const src=pickKind==="src";
+  const src=pickKind==="src"||pickKind==="flash";
   document.getElementById("pickGrid").innerHTML=filterChips(pickKind).map(c=>
     // role/aria-checked : une puce qui se coche et se décoche n'est pas un
     // bouton ordinaire, et un choix multiple n'est pas un choix unique.
@@ -9229,19 +9267,22 @@ function syncPickGrid(){
 }
 function openPicker(kind){
   pickKind=kind;
-  const src=kind==="src";
-  pickSel=src?new Set(newsSrc):null;
-  document.getElementById("pickTitle").textContent=T(src?"filter.src.label":"filter.cat.label");
-  document.getElementById("pickSub").textContent=T(src?"filter.src.sub":"filter.cat.sub");
+  const flash=kind==="flash",src=kind==="src"||flash;
+  pickSel=flash?new Set(flashSrcActives()):src?new Set(newsSrc):null;
+  document.getElementById("pickTitle").textContent=T(flash?"listen.flashsrc.label":src?"filter.src.label":"filter.cat.label");
+  document.getElementById("pickSub").textContent=T(flash?"listen.flashsrc.sub":src?"filter.src.sub":"filter.cat.sub");
   pickApply.classList.toggle("hidden",!src);   // le choix unique s'applique au tap, sans bouton
+  pickApply.textContent=T(flash?"listen.flashsrc.done":"sheet.apply");
   renderPickGrid();
-  openDialog(pickSheet);
+  // Depuis une feuille déjà ouverte (Écouter, Réglages) : bascule SANS toucher à l'historique.
+  pickFrom=flash?document.querySelector(".sheet.open"):null;
+  if(pickFrom)replaceDialog(pickFrom,pickSheet);else openDialog(pickSheet);
 }
 document.getElementById("pickGrid").addEventListener("click",e=>{
   const b=e.target.closest("[data-k]");
   if(!b)return;
   const k=b.dataset.k;
-  if(pickKind!=="src"){
+  if(pickKind==="cat"){
     closeDialog(pickSheet);            // d'abord refermer : le fil se recompose derrière
     setCat(k);
     return;
@@ -9256,8 +9297,14 @@ document.getElementById("pickGrid").addEventListener("click",e=>{
    sur le fond, Échap : une sélection ne doit pas se perdre parce qu'on a
    refermé autrement qu'avec le bouton. */
 function closePicker(fromHistory){
-  const sel=pickKind==="src"&&pickSel?[...pickSel]:null;
+  const sel=(pickKind==="src"||pickKind==="flash")&&pickSel?[...pickSel]:null;
   pickSel=null;
+  if(pickKind==="flash"){
+    const from=pickFrom;pickFrom=null;
+    if(sel)setFlashSrc(sel);
+    if(from&&!fromHistory)replaceDialog(pickSheet,from);else closeDialog(pickSheet,fromHistory);
+    return;
+  }
   closeDialog(pickSheet,fromHistory);
   if(sel)setNewsSrc(sel);
   // Le filtre de contenu (voir setContentFilter) recharge déjà lui-même dès
