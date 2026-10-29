@@ -3265,7 +3265,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       // abandonnent sans prévenir).
       const detail = await page.evaluate(() => ({
         lu: window.__dits.map((d) => d.text).join(" "),
-        attendu: (cardItems(feedEl.children[0])[0] || {}).desc || "",
+        attendu: parle((cardItems(feedEl.children[0])[0] || {}).desc || ""),
         plusLong: Math.max(...window.__dits.map((d) => d.text.length)),
         emoji: window.__dits.some((d) => /🔥/.test(d.text)),
       }));
@@ -3304,7 +3304,7 @@ ${Array.from({ length: 12 }, (_, k) => {
         avantSwipe
       );
       console.log(
-        `[${label}] swipe vers « ${cible.titre} » → lecture reprise sur : « ${r2.slice(0, 60)} » (reprise juste : ${r2.includes(cible.titre + ".")})`
+        `[${label}] swipe vers « ${cible.titre} » → lecture reprise sur : « ${r2.slice(0, 60)} » (reprise juste : ${r2.includes(await page.evaluate((t) => parle(t + "."), cible.titre))})`
       );
       // Un panneau ouvert coupe l'écoute
       await page.evaluate(() => openSettings());

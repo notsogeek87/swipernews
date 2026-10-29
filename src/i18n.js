@@ -182,6 +182,8 @@
       "listen.ctl.next": "Article suivant",
       "listen.ctl.pause": "Pause",
       "listen.ctl.play": "Reprendre",
+      "changelog.v320.item1":
+        "Écoute : les chiffres, pourcentages, euros, heures, siècles et abréviations (M., Dr, St, etc.) sont maintenant lus en toutes lettres — « 3 000 » se dit « trois mille », « XIXe » « dix-neuvième ».",
       "changelog.v318.item1":
         "Écoute (Android) : les voix d'essai Kokoro, Supertonic et Tjiho sont retirées ; il reste Siwis et Tom.",
       "changelog.v317.item1":
@@ -791,6 +793,8 @@
       "listen.ctl.next": "Next story",
       "listen.ctl.pause": "Pause",
       "listen.ctl.play": "Resume",
+      "changelog.v320.item1":
+        "Listening: numbers, percentages, euros, times, centuries and abbreviations (M., Dr, St, etc.) are now read out in full — in French, « 3 000 » is spoken as « trois mille ».",
       "changelog.v318.item1":
         "Listening (Android): the trial voices Kokoro, Supertonic and Tjiho are removed; Siwis and Tom remain.",
       "changelog.v317.item1":

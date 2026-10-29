@@ -1594,3 +1594,62 @@ test("SOURCE_KINDS : chaque type est documenté (fr et en) et reconnu", () => {
       assert.ok(kinds.has(c.kind), c.kind + " absent de SOURCE_KINDS");
   }
 });
+
+test("parlable : chiffres, unités et abréviations en toutes lettres", () => {
+  const p = lib.parlable;
+  assert.equal(
+    p("12,5 % en 2024"),
+    "douze virgule cinq pour cent en deux mille vingt-quatre"
+  );
+  assert.equal(p("3 000 morts"), "trois mille morts");
+  assert.equal(p("M. Dupont et Mme Martin"), "monsieur Dupont et madame Martin");
+  assert.equal(p("le Dr Durand à 14h30"), "le docteur Durand à quatorze heures trente");
+  assert.equal(
+    p("le XIXe siècle, Louis XIV, Napoléon Ier"),
+    "le dix-neuvième siècle, Louis quatorze, Napoléon premier"
+  );
+  assert.equal(
+    p("le 1er mars, la 21e édition"),
+    "le premier mars, la vingt et unième édition"
+  );
+  assert.equal(p("3,50 € et 5€"), "trois euros cinquante et cinq euros");
+  assert.equal(
+    p("80 km/h, -5 °C, 1 kg"),
+    "quatre-vingts kilomètres par heure, moins cinq degrés Celsius, un kilogramme"
+  );
+  assert.equal(
+    p("le 12/03/2024, score 2-1, n°5"),
+    "le douze mars deux mille vingt-quatre, score deux à un, numéro cinq"
+  );
+  assert.equal(p("1,5 km"), "un virgule cinq kilomètre");
+  assert.equal(p("0,05 %"), "zéro virgule zéro cinq pour cent");
+});
+
+test("parlable : rien d'abusif sur ce qui n'est pas un nombre isolé", () => {
+  const p = lib.parlable;
+  assert.equal(p("la 5G et le G7"), "la 5G et le G7");
+  assert.equal(p("Ce n'est pas le Xavier"), "Ce n'est pas le Xavier");
+  assert.equal(
+    p("06 12 34 56 78"),
+    "06 douze trente-quatre cinquante-six soixante-dix-huit"
+  );
+  assert.equal(p("voir https://exemple.fr/a [+1234 chars]"), "voir");
+  assert.equal(p(""), "");
+});
+
+test("nombreEnLettres : accords du français", () => {
+  const n = lib.nombreEnLettres;
+  assert.equal(n(0), "zéro");
+  assert.equal(n(71), "soixante et onze");
+  assert.equal(n(80), "quatre-vingts");
+  assert.equal(n(81), "quatre-vingt-un");
+  assert.equal(n(200), "deux cents");
+  assert.equal(n(201), "deux cent un");
+  assert.equal(n(1000), "mille");
+  assert.equal(n(80000), "quatre-vingt mille");
+  assert.equal(n(1984), "mille neuf cent quatre-vingt-quatre");
+  assert.equal(n(2000000), "deux millions");
+  assert.equal(lib.ordinalEnLettres(21), "vingt et unième");
+  assert.equal(lib.ordinalEnLettres(5), "cinquième");
+  assert.equal(lib.ordinalEnLettres(9), "neuvième");
+});

@@ -2021,9 +2021,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=294"></script>
+<script src="src/lib.js?v=320"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=319"></script>
+<script src="src/i18n.js?v=320"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2031,7 +2031,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","roundRobin","weightedRoundRobin","dedupNews","feedLabels","isPromotionalItem","ttsChunks","sansEmoji","mutedMatcher","sanitizeMutedWords","parseMutedInput","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeShortsFeedUrl","isYoutubeShortsFeedUrl","youtubeFeedName","isLequipeFeedUrl","lequipeRubrique","lequipeFeedName","feedLinkFromHtml","commonFeedUrlCandidates","SOURCE_KINDS","socialFeedCandidates"],
+  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","roundRobin","weightedRoundRobin","dedupNews","feedLabels","isPromotionalItem","ttsChunks","sansEmoji","parlable","mutedMatcher","sanitizeMutedWords","parseMutedInput","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeShortsFeedUrl","isYoutubeShortsFeedUrl","youtubeFeedName","isLequipeFeedUrl","lequipeRubrique","lequipeFeedName","feedLinkFromHtml","commonFeedUrlCandidates","SOURCE_KINDS","socialFeedCandidates"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket","perCatLimit"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -2251,7 +2251,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,dayKey,quarterIndex,statsBuckets,shuffle,
-  seenKey,dropSeen,roundRobin,weightedRoundRobin,groupItems,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,YT_SHORT_MAX_DURATION_S,youtubeApiVideosDurationUrl,youtubeApiDurationsFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,ttsChunks,sansEmoji,mutedMatcher,sanitizeMutedWords,parseMutedInput,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities,feedLinkFromHtml,commonFeedUrlCandidates,SOURCE_KINDS,socialFeedCandidates}=self.SwiperLib;
+  seenKey,dropSeen,roundRobin,weightedRoundRobin,groupItems,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,YT_SHORT_MAX_DURATION_S,youtubeApiVideosDurationUrl,youtubeApiDurationsFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,ttsChunks,sansEmoji,parlable,mutedMatcher,sanitizeMutedWords,parseMutedInput,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities,feedLinkFromHtml,commonFeedUrlCandidates,SOURCE_KINDS,socialFeedCandidates}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -3176,14 +3176,19 @@ function taire(){
   if(n){try{n.stopSpeaking();}catch(e){}return;}
   try{if(typeof window.speechSynthesis!=="undefined")speechSynthesis.cancel();}catch(e){}
 }
+/* Ce qu'on PRONONCE n'est pas ce qu'on AFFICHE : chiffres, unités et abréviations
+   récrits en mots (parlable, src/lib.js) AVANT le découpage en phrases — « M. » y
+   serait coupé au point. Seulement en français : l'anglais n'a pas ces règles. Le
+   texte affiché, lui, ne change jamais (titre de notification, `entree.title`). */
+const parle=t=>LANG==="fr"?parlable(t):t;
 function texteDeCarte(card){
-  return cardItems(card).map(it=>{
+  return parle(cardItems(card).map(it=>{
     const morceaux=[it.source,it.title];
     if(!videoIdOf(it)&&it.desc)morceaux.push(it.desc);
     // sansEmoji AVANT le filtre : une source ou un titre fait d'emoji seuls
     // ne doit pas laisser un « . » orphelin à prononcer.
     return morceaux.map(sansEmoji).filter(Boolean).map(t=>t.replace(/[.…!?:;,]+$/,"")).join(". ")+".";
-  }).join(" … ");
+  }).join(" … "));
 }
 const attendre=ms=>new Promise(r=>setTimeout(r,ms));
 async function lireEnBoucle(gen){
@@ -3468,7 +3473,7 @@ function fileFlash(){
     const k=seenKey(it);
     if(!k||cartes.has(k))continue;
     const head=ttsChunks(teteDActu(it));
-    const resume=it.desc?ttsChunks(sansEmoji(it.desc)).slice(0,2):[];
+    const resume=it.desc?ttsChunks(parle(sansEmoji(it.desc))).slice(0,2):[];
     const chunks=[...head,...resume];
     if(!chunks.length)continue;
     const entree={key:k,source:sansEmoji(it.source||""),title:sansEmoji(it.title||""),chunks};
@@ -3504,7 +3509,7 @@ function fileEcoute(){
     const it0=its[0];
     if(flashMode==="ia"&&its.length===1&&it0.kind!=="learn"&&it0.link){
       const head=ttsChunks(teteDActu(it0));
-      const extrait=it0.desc?ttsChunks(sansEmoji(it0.desc)):[];
+      const extrait=it0.desc?ttsChunks(parle(sansEmoji(it0.desc))):[];
       if(head.length){
         entree.chunks=[...head,...extrait];
         entree.head=head;entree.link=it0.link;entree.excerpt=it0.desc||"";
@@ -3516,7 +3521,7 @@ function fileEcoute(){
 }
 /* « Source. Titre. » d'une actu, tel qu'on le prononce en tête de lecture. */
 function teteDActu(it){
-  return [it.source,it.title].map(sansEmoji).filter(Boolean).map(t=>t.replace(/[.…!?:;,]+$/,"")).join(". ")+".";
+  return parle([it.source,it.title].map(sansEmoji).filter(Boolean).map(t=>t.replace(/[.…!?:;,]+$/,"")).join(". ")+".");
 }
 /* État poussé par le service (lecture, pause, fin) ou relu par listenStatus. La
    carte en cours est suivie par son ARTICLE, et ecouteCle est posée AVANT le
@@ -3857,7 +3862,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="319";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="320";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -3868,6 +3873,8 @@ const APP_VERSION="319";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:320,date:"2026-10-29",items:[
+    "changelog.v320.item1"]},
   {v:318,date:"2026-10-29",items:[
     "changelog.v318.item1"]},
   {v:317,date:"2026-10-29",items:[

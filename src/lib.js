@@ -1568,6 +1568,331 @@
     return out;
   }
 
+  // ---------- Lecture à voix haute : chiffres, symboles, abréviations ----------
+  // Les moteurs de synthèse lisent mal ce qui n'est pas du texte : « 3 000 »
+  // devient « trois zéro zéro zéro », « M. Dupont » est coupé au point, « 12,5 % »
+  // perd son unité. parlable() récrit TOUT en mots français AVANT le découpage en
+  // phrases (ttsChunks coupe aux points : « M. » doit être développé d'abord).
+  // Pur, sans lookbehind (vieux moteurs) : la frontière gauche est capturée.
+  const FR_UNITS = [
+    "zéro",
+    "un",
+    "deux",
+    "trois",
+    "quatre",
+    "cinq",
+    "six",
+    "sept",
+    "huit",
+    "neuf",
+    "dix",
+    "onze",
+    "douze",
+    "treize",
+    "quatorze",
+    "quinze",
+    "seize",
+    "dix-sept",
+    "dix-huit",
+    "dix-neuf",
+  ];
+  const FR_TENS = ["", "", "vingt", "trente", "quarante", "cinquante", "soixante"];
+
+  function frInf100(n, final) {
+    if (n < 20) return FR_UNITS[n];
+    if (n < 70) {
+      const d = Math.floor(n / 10);
+      const u = n % 10;
+      return FR_TENS[d] + (u === 0 ? "" : u === 1 ? " et un" : "-" + FR_UNITS[u]);
+    }
+    if (n < 80) {
+      const u = n - 60;
+      return "soixante" + (u === 11 ? " et onze" : "-" + FR_UNITS[u]);
+    }
+    const u = n - 80;
+    if (u === 0) return final ? "quatre-vingts" : "quatre-vingt";
+    return "quatre-vingt-" + FR_UNITS[u];
+  }
+
+  function frInf1000(n, final) {
+    const c = Math.floor(n / 100);
+    const r = n % 100;
+    let s = "";
+    if (c > 0)
+      s = c === 1 ? "cent" : FR_UNITS[c] + " cent" + (r === 0 && final ? "s" : "");
+    if (r > 0) s += (s ? " " : "") + frInf100(r, final);
+    return s;
+  }
+
+  /** 0 à 999 999 999 999 en toutes lettres (accords : « quatre-vingts », « deux cents »). */
+  function nombreEnLettres(n) {
+    if (!(n >= 0) || n >= 1e12 || Math.floor(n) !== n) return String(n);
+    if (n === 0) return "zéro";
+    const out = [];
+    let rest = n;
+    for (const [v, nom] of [
+      [1e9, "milliard"],
+      [1e6, "million"],
+      [1e3, "mille"],
+    ]) {
+      const q = Math.floor(rest / v);
+      rest %= v;
+      if (!q) continue;
+      if (v === 1e3) out.push(q === 1 ? "mille" : frInf1000(q, false) + " mille");
+      else out.push(frInf1000(q, true) + " " + nom + (q > 1 ? "s" : ""));
+    }
+    if (rest > 0) out.push(frInf1000(rest, true));
+    return out.join(" ");
+  }
+
+  /** « 21 » -> « vingt et unième », « 19 » -> « dix-neuvième ». `fem` : « première ». */
+  function ordinalEnLettres(n, fem) {
+    if (n === 1) return fem ? "première" : "premier";
+    let s = nombreEnLettres(n)
+      .replace(/(quatre-vingt)s$/, "$1")
+      .replace(/(cent)s$/, "$1");
+    if (/cinq$/.test(s)) s += "uième";
+    else if (/neuf$/.test(s)) s = s.slice(0, -1) + "vième";
+    else if (/e$/.test(s)) s = s.slice(0, -1) + "ième";
+    else s += "ième";
+    return s;
+  }
+
+  function romainEnNombre(r) {
+    const v = { I: 1, V: 5, X: 10 };
+    let t = 0;
+    for (let i = 0; i < r.length; i++) {
+      const a = v[r[i]];
+      const b = v[r[i + 1]] || 0;
+      t += a < b ? -a : a;
+    }
+    return t;
+  }
+  const romainValide = (r) => {
+    const n = romainEnNombre(r);
+    if (!(n > 0 && n < 40)) return 0;
+    let ref = "";
+    let k = n;
+    for (const [val, sym] of [
+      [10, "X"],
+      [9, "IX"],
+      [5, "V"],
+      [4, "IV"],
+      [1, "I"],
+    ]) {
+      while (k >= val) {
+        ref += sym;
+        k -= val;
+      }
+    }
+    return ref === r ? n : 0;
+  };
+
+  const FR_L = "A-Za-zÀ-ÿ";
+  const FR_NB = "(^|[^" + FR_L + "0-9])"; // frontière gauche (capturée)
+  const FR_NR = "(?![" + FR_L + "0-9])"; // frontière droite
+  const FR_MOIS = [
+    "janvier",
+    "février",
+    "mars",
+    "avril",
+    "mai",
+    "juin",
+    "juillet",
+    "août",
+    "septembre",
+    "octobre",
+    "novembre",
+    "décembre",
+  ];
+  // [motif, remplacement, lookahead] — sensibles à la casse.
+  const FR_ABBR = [
+    ["av\\. J\\.-C\\.", "avant Jésus-Christ", ""],
+    ["apr\\. J\\.-C\\.", "après Jésus-Christ", ""],
+    ["J\\.-C\\.", "Jésus-Christ", ""],
+    ["MM\\.?", "messieurs", "(?=\\s+[A-ZÀ-Þ])"],
+    ["M\\.", "monsieur", "(?=\\s+[A-ZÀ-Þ])"],
+    ["Mmes", "mesdames", FR_NR],
+    ["Mme", "madame", FR_NR],
+    ["Mlle", "mademoiselle", FR_NR],
+    ["Mgr", "monseigneur", FR_NR],
+    ["Dr\\.?", "docteur", "(?=\\s+[A-ZÀ-Þ])"],
+    ["Pr\\.?", "professeur", "(?=\\s+[A-ZÀ-Þ])"],
+    ["Ste", "sainte", "(?=[-\\s]+[A-ZÀ-Þ])"],
+    ["St", "saint", "(?=[-\\s]+[A-ZÀ-Þ])"],
+    ["Cie", "compagnie", FR_NR],
+    ["env\\.", "environ", "(?=\\s*\\d)"],
+    ["[nN]°", "numéro ", ""],
+    ["etc\\.", "et cetera.", ""],
+  ].map(([src, rep, look]) => [new RegExp(FR_NB + "(" + src + ")" + look, "g"), rep]);
+
+  const FR_PRENOMS_ROMAINS =
+    "Louis|Henri|Charles|Jean|Philippe|François|Napoléon|Pie|Paul|Benoît|Grégoire|Léon|" +
+    "Guillaume|Alexandre|Nicolas|Élisabeth|Elisabeth|Ramsès|Baudouin|Albert|Édouard|Georges|" +
+    "Frédéric|Clément|Urbain|Innocent|Boniface|Sixte|Victor|Jacques|Louis-Philippe";
+
+  // [symbole, pluriel] — le singulier se déduit (voir frUnite).
+  const FR_UNITES = {
+    "Md€": "milliards d'euros",
+    "M€": "millions d'euros",
+    "k€": "mille euros",
+    "km/h": "kilomètres par heure",
+    "km²": "kilomètres carrés",
+    "m²": "mètres carrés",
+    "m³": "mètres cubes",
+    kWh: "kilowattheures",
+    "°C": "degrés Celsius",
+    km: "kilomètres",
+    cm: "centimètres",
+    mm: "millimètres",
+    kg: "kilogrammes",
+    mg: "milligrammes",
+    ml: "millilitres",
+    cl: "centilitres",
+    ha: "hectares",
+    kW: "kilowatts",
+    MW: "mégawatts",
+    GW: "gigawatts",
+    Mo: "mégaoctets",
+    Go: "gigaoctets",
+    To: "téraoctets",
+    Ko: "kilo-octets",
+    min: "minutes",
+    "°": "degrés",
+    "%": "pour cent",
+    "€": "euros",
+    $: "dollars",
+    "£": "livres",
+    h: "heures",
+    g: "grammes",
+    l: "litres",
+    m: "mètres",
+  };
+  const FR_INVARIABLES = /^(par|Celsius|pour|cent|d'euros|mille)$/;
+  const frUnite = (sym, sing) => {
+    const p = FR_UNITES[sym];
+    if (!sing || sym === "%" || sym === "M€" || sym === "Md€" || sym === "k€") return p;
+    return p
+      .split(" ")
+      .map((w) => (FR_INVARIABLES.test(w) ? w : w.replace(/s$/, "")))
+      .join(" ");
+  };
+  const FR_UNITE_RE = Object.keys(FR_UNITES)
+    .sort((a, b) => b.length - a.length)
+    .map((k) => k.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&"))
+    .join("|");
+  const FR_NOMBRE_RE = new RegExp(
+    FR_NB +
+      "(\\d{1,3}(?:[ \\u00a0\\u202f]\\d{3})+|\\d{1,3}(?:\\.\\d{3})+|\\d+)(?:[,.](\\d+))?" +
+      "(?:\\s?(" +
+      FR_UNITE_RE +
+      "))?" +
+      FR_NR,
+    "g"
+  );
+
+  function frDecimales(dec) {
+    if (dec.length <= 2 && dec[0] !== "0") return nombreEnLettres(+dec);
+    return dec
+      .split("")
+      .map((d) => FR_UNITS[+d])
+      .join(" ");
+  }
+
+  function frOrdinal(n, suffixe) {
+    if (!(n > 0 && n < 1e12)) return null;
+    const pl = /s$/.test(suffixe);
+    if (/^(nd|nde)/.test(suffixe))
+      return n === 2 ? (suffixe === "nde" ? "seconde" : "second") : null;
+    const fem = /^re/.test(suffixe);
+    return ordinalEnLettres(n, fem) + (pl ? "s" : "");
+  }
+
+  /** Texte à lire : chiffres, symboles et abréviations en toutes lettres (français). */
+  function parlable(text) {
+    let s = String(text || "");
+    s = s.replace(/https?:\/\/\S+/g, " ").replace(/\[\+?\d+ chars?\]/g, " ");
+    for (const [re, rep] of FR_ABBR) s = s.replace(re, (m, pre) => pre + rep);
+    // Dates 12/03/2024
+    s = s.replace(
+      new RegExp(FR_NB + "(\\d{1,2})/(\\d{1,2})/(\\d{4})" + FR_NR, "g"),
+      (m, pre, j, mo, a) => {
+        const jour = +j;
+        const mois = +mo;
+        if (jour < 1 || jour > 31 || mois < 1 || mois > 12) return m;
+        return pre + (jour === 1 ? "1er" : jour) + " " + FR_MOIS[mois - 1] + " " + a;
+      }
+    );
+    // Rois et papes : « Louis XIV » -> « Louis quatorze » (cardinal, « premier » pour I).
+    s = s.replace(
+      new RegExp(FR_NB + "(" + FR_PRENOMS_ROMAINS + ")\\s+([IVX]{1,6})" + FR_NR, "g"),
+      (m, pre, nom, r) => {
+        const n = romainValide(r);
+        return n ? pre + nom + " " + (n === 1 ? "premier" : nombreEnLettres(n)) : m;
+      }
+    );
+    // Siècles et rangs en chiffres romains : XIXe, Ier, IIe.
+    s = s.replace(
+      new RegExp(FR_NB + "([IVX]{1,6})(ers|er|res|re|es|e|èmes|ème)" + FR_NR, "g"),
+      (m, pre, r, suf) => {
+        const n = romainValide(r);
+        const o = n ? frOrdinal(n, suf) : null;
+        return o ? pre + o : m;
+      }
+    );
+    // Rangs en chiffres : 1er, 2e, 21ème, 2nde.
+    s = s.replace(
+      new RegExp(FR_NB + "(\\d+)(ers|er|res|re|nde|nd|es|e|èmes|ème)" + FR_NR, "g"),
+      (m, pre, d, suf) => {
+        const o = frOrdinal(+d, suf);
+        return o ? pre + o : m;
+      }
+    );
+    // Heures : 14h30, 9 h, 1h05.
+    s = s.replace(
+      new RegExp(FR_NB + "(\\d{1,2})\\s?h(?:\\s?(\\d{2}))?" + FR_NR, "g"),
+      (m, pre, h, mi) => {
+        const heures = +h;
+        if (heures > 24) return m;
+        const minutes = mi ? +mi : 0;
+        if (minutes > 59) return m;
+        return (
+          pre +
+          (heures === 1 ? "une" : nombreEnLettres(heures)) +
+          (heures < 2 ? " heure" : " heures") +
+          (minutes ? " " + nombreEnLettres(minutes) : "")
+        );
+      }
+    );
+    // Plages et scores : 10-12, 2-1 -> « dix à douze ».
+    s = s.replace(
+      new RegExp(FR_NB + "([1-9]\\d*)\\s?[–-]\\s?([1-9]\\d*)" + FR_NR, "g"),
+      (m, pre, a, b) => pre + a + " à " + b
+    );
+    // Signes devant un nombre.
+    s = s
+      .replace(/(^|[\s(])[-−–](?=\d)/g, "$1moins ")
+      .replace(/(^|[\s(])\+(?=\d)/g, "$1plus ");
+    // Nombres, avec leur unité éventuelle.
+    s = s.replace(FR_NOMBRE_RE, (m, pre, ent, dec, unite) => {
+      const chiffres = ent.replace(/[^\d]/g, "");
+      if (chiffres.length > 12) return m;
+      if (chiffres.length > 1 && chiffres[0] === "0" && !dec) return m; // 06, 007 : laissé au moteur
+      const n = +chiffres;
+      const mots = nombreEnLettres(n);
+      if (dec && unite && /^[€$£]$/.test(unite) && dec.length <= 2) {
+        const c = +dec.padEnd(2, "0");
+        return (
+          pre + mots + " " + frUnite(unite, n < 2) + (c ? " " + nombreEnLettres(c) : "")
+        );
+      }
+      const corps = dec ? mots + " virgule " + frDecimales(dec) : mots;
+      return pre + corps + (unite ? " " + frUnite(unite, n < 2) : "");
+    });
+    s = s.replace(/\s&\s/g, " et ");
+    return collapse(s);
+  }
+
   /** Sites où au moins UNE PARTIE du contenu est réservée aux abonnés — quasi
    *  aucun site de presse n'est payant à 100 %, même ceux au paywall le plus
    *  strict publient des dépêches ou de l'actu chaude en accès libre. Cette
@@ -1995,6 +2320,9 @@
     isMutedItem,
     ttsChunks,
     sansEmoji,
+    parlable,
+    nombreEnLettres,
+    ordinalEnLettres,
     isPaywallCandidateDomain,
     isPaywalledHtml,
     isSponsoredHtml,
