@@ -161,7 +161,16 @@ final class NeuralVoices {
     private final AtomicBoolean cancel = new AtomicBoolean();
     private volatile boolean busy;
 
+    /** Identifie l'installation de l'APK : un repère écrit par une AUTRE version ne compte plus. */
+    private final String build;
+
     NeuralVoices(Context ctx) {
+        String b = "";
+        try {
+            Context c = ctx.getApplicationContext();
+            b = String.valueOf(c.getPackageManager().getPackageInfo(c.getPackageName(), 0).lastUpdateTime);
+        } catch (Exception ignore) { }
+        build = b;
         dir = new File(ctx.getApplicationContext().getFilesDir(), "voices");
     }
 
@@ -281,10 +290,22 @@ final class NeuralVoices {
      */
     private File repere(Voice v) { return new File(dir, v.id + ".crash"); }
 
-    boolean aPlante(Voice v) { return repere(v).exists(); }
+    boolean aPlante(Voice v) {
+        final File f = repere(v);
+        if (!f.exists()) return false;
+        try (java.io.FileInputStream in = new java.io.FileInputStream(f)) {
+            final byte[] buf = new byte[64];
+            final int n = in.read(buf);
+            if (n > 0 && new String(buf, 0, n, java.nio.charset.StandardCharsets.UTF_8).equals(build)) return true;
+        } catch (Exception ignore) { }
+        f.delete();   // posé par une autre version de l'APK (ou illisible) : correctif possible, on réessaie
+        return false;
+    }
 
     void poserRepere(Voice v) {
-        try { repere(v).createNewFile(); } catch (java.io.IOException ignore) { }
+        try (java.io.FileOutputStream out = new java.io.FileOutputStream(repere(v))) {
+            out.write(build.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (Exception ignore) { }
     }
 
     void leverRepere(Voice v) { repere(v).delete(); }
