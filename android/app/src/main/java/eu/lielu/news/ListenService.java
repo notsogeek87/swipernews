@@ -226,6 +226,7 @@ public class ListenService extends Service {
     private NeuralSpeaker neural = null;
     private String neuralId = "";
     private boolean neuralLoading = false;
+    private boolean neuralProved = false;   // première phrase réussie : le repère de plantage est levé
     private Runnable afterNeural = null;
 
     private TextToSpeech tts;
@@ -414,12 +415,16 @@ public class ListenService extends Service {
         if (neuralLoading) return;     // le chargement en cours reprendra cette demande
         releaseNeural();
         neuralLoading = true;
+        neuralProved = false;
         final NeuralVoices.Voice v = neuralWanted;
         final float r = rate;
         new Thread(() -> {
             NeuralSpeaker sp = null;
             try {
-                final OfflineTts engine = new NeuralVoices(getApplicationContext()).load(v);
+                final NeuralVoices nv = new NeuralVoices(getApplicationContext());
+                if (nv.aPlante(v)) throw new IllegalStateException("cette voix a fait planter l'app");
+                nv.poserRepere(v);
+                final OfflineTts engine = nv.load(v);
                 final AudioAttributes attrs = new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -469,6 +474,11 @@ public class ListenService extends Service {
         if (!active || paused || neural == null) return;
         if (id == null || !id.equals(gen + ":" + index + ":" + chunk)) return;
         if (ok) {
+            if (!neuralProved) {
+                neuralProved = true;
+                final NeuralVoices.Voice w = neuralWanted;
+                if (w != null) new NeuralVoices(getApplicationContext()).leverRepere(w);
+            }
             utteranceEnded(id);
             return;
         }

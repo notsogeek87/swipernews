@@ -70,7 +70,8 @@ final class NeuralVoices {
             return new File(dir, modelFile).isFile()
                 && new File(dir, "tokens.txt").isFile()
                 && new File(dir, "espeak-ng-data").isDirectory()
-                && (!kokoro || new File(dir, "voices.bin").isFile());
+                && (!kokoro || (new File(dir, "voices.bin").isFile()
+                    && new File(dir, "dict/jieba.dict.utf8").isFile()));
         }
     }
 
@@ -191,6 +192,7 @@ final class NeuralVoices {
         if (busy) return;
         deleteTree(modelDir(a));
         part(a).delete();
+        for (Voice v : VOICES) if (v.archive == a) leverRepere(v);   // retirer puis réinstaller = nouvelle chance
     }
 
     void download(final Archive a, final Listener l) {
@@ -257,6 +259,9 @@ final class NeuralVoices {
             c.model.kokoro.dataDir = espeak;
             // Sans lexique et avec une langue, TOUT le texte est phonémisé par espeak-ng (voix « fr »).
             c.model.kokoro.lang = "fr";
+            // OBLIGATOIRE pour Kokoro >= 1.0, même sans chinois : sherpa-onnx 1.12.7 appelle exit(-1) (donc
+            // tue l'app, rien à attraper en Java) quand dict_dir est vide. C'était le plantage de Kokoro.
+            c.model.kokoro.dictDir = new File(d, "dict").getAbsolutePath();
             // Plus lourd que Piper : un fil de plus, sans dépasser la moitié des cœurs.
             c.model.numThreads = Math.max(2, Math.min(4, Runtime.getRuntime().availableProcessors() / 2));
         } else {
@@ -268,6 +273,21 @@ final class NeuralVoices {
         }
         return new OfflineTts(c);
     }
+
+    /**
+     * Garde anti-boucle de plantage : un abandon NATIF (exit, SIGSEGV) ne s'attrape pas en Java. Le
+     * repère est posé avant le chargement et levé à la première phrase réussie ; s'il survit, la voix a
+     * tué le processus et n'est plus proposée tant qu'on ne l'a pas retirée puis réinstallée.
+     */
+    private File repere(Voice v) { return new File(dir, v.id + ".crash"); }
+
+    boolean aPlante(Voice v) { return repere(v).exists(); }
+
+    void poserRepere(Voice v) {
+        try { repere(v).createNewFile(); } catch (java.io.IOException ignore) { }
+    }
+
+    void leverRepere(Voice v) { repere(v).delete(); }
 
     /** Libère l'espace d'une voix retirée du catalogue (voir {@link #LEGACY_DIRS}). Sans effet pendant une opération. */
     void purgeLegacy() {
