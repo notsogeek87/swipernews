@@ -1,19 +1,104 @@
-// Binding Java minimal de sherpa-onnx v1.12.7 (https://github.com/k2-fsa/sherpa-onnx,
-// Apache License 2.0, Copyright (c) 2023 Xiaomi Corporation). Réécrit d'après
-// kotlin-api/Tts.kt de cette version (1.12.7 : comme la 1.12.0, plus le champ « lang » de Kokoro) : le code natif (libsherpa-onnx-jni.so) lit
-// ces classes PAR LEUR NOM ET LEURS CHAMPS, donc le paquet, les noms et les types
-// ne doivent pas changer — ni être « nettoyés » — sans changer la version de la
-// bibliothèque en même temps (voir android/app/build.gradle, tâche fetchSherpa).
+// Copyright 2025 Xiaomi Corporation
 package com.k2fsa.sherpa.onnx;
 
 public class OfflineTtsKokoroModelConfig {
-    public String model = "";
-    public String voices = "";
-    public String tokens = "";
-    public String dataDir = "";
-    public String lexicon = "";
-    /** Code de voix espeak-ng (« fr ») : phonémise TOUT le texte avec espeak-ng au lieu des lexiques anglais/chinois. */
-    public String lang = "";
-    public String dictDir = "";
-    public float lengthScale = 1.0f;
+    private final String model;
+    private final String voices;
+    private final String tokens;
+    private final String lexicon;
+    private final String lang;
+    private final String dataDir;
+    private final String dictDir;  // unused
+    private final float lengthScale;
+
+    private OfflineTtsKokoroModelConfig(Builder builder) {
+        this.model = builder.model;
+        this.voices = builder.voices;
+        this.tokens = builder.tokens;
+        this.lexicon = builder.lexicon;
+        this.lang = builder.lang;
+        this.dataDir = builder.dataDir;
+        this.dictDir = builder.dictDir;
+        this.lengthScale = builder.lengthScale;
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public String getModel() {
+        return model;
+    }
+
+    public String getVoices() {
+        return voices;
+    }
+
+    public String getTokens() {
+        return tokens;
+    }
+
+    public String getDataDir() {
+        return dataDir;
+    }
+
+    public float getLengthScale() {
+        return lengthScale;
+    }
+
+
+    public static class Builder {
+        private String model = "";
+        private String voices = "";
+        private String tokens = "";
+        private String lexicon = "";
+        private String lang = "";
+        private String dataDir = "";
+        private String dictDir = "";
+        private float lengthScale = 1.0f;
+
+        public OfflineTtsKokoroModelConfig build() {
+            return new OfflineTtsKokoroModelConfig(this);
+        }
+
+        public Builder setModel(String model) {
+            this.model = model;
+            return this;
+        }
+
+        public Builder setVoices(String voices) {
+            this.voices = voices;
+            return this;
+        }
+
+        public Builder setTokens(String tokens) {
+            this.tokens = tokens;
+            return this;
+        }
+
+        public Builder setLexicon(String lexicon) {
+            this.lexicon = lexicon;
+            return this;
+        }
+
+        public Builder setLang(String lang) {
+            this.lang = lang;
+            return this;
+        }
+
+        public Builder setDataDir(String dataDir) {
+            this.dataDir = dataDir;
+            return this;
+        }
+
+        public Builder setDictDir(String dictDir) {
+            this.dictDir = dictDir;
+            return this;
+        }
+
+        public Builder setLengthScale(float lengthScale) {
+            this.lengthScale = lengthScale;
+            return this;
+        }
+    }
 }

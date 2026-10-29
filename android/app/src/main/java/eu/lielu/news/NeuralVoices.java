@@ -6,6 +6,9 @@ import android.os.Looper;
 
 import com.k2fsa.sherpa.onnx.OfflineTts;
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig;
+import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig;
+import com.k2fsa.sherpa.onnx.OfflineTtsSupertonicModelConfig;
+import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig;
 
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 
@@ -36,7 +39,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <ul>
  *   <li>Siwis (Piper) : CC BY 4.0, University of Edinburgh (obligation d'attribution) ;</li>
  *   <li>Tom (Piper) : AGPL-3.0, voir git.bksp.space/Tjiho/French-tts-model-piper ;</li>
- *   <li>Kokoro : poids Apache-2.0 ; sa voix française est entraînée sur le corpus SIWIS (CC BY 4.0) ;</li>
+ *   <li>Supertonic 3 (Supertone) : modèle sous licence OpenRAIL-M, exemples sous MIT ; quantifié en
+ *       8 bits par sherpa-onnx ;</li>
  *   <li>espeak-ng, livré avec chaque modèle : GPL-3.0, comme ce dépôt.</li>
  * </ul>
  * Les rappels reviennent sur le fil principal. Une seule opération à la fois.
@@ -51,27 +55,29 @@ final class NeuralVoices {
         final String sha256;
         final String dirName;
         final String modelFile;
-        /** Vrai pour un modèle Kokoro (fichier de voix en plus), faux pour un modèle Piper. */
-        final boolean kokoro;
+        /** Vrai pour Supertonic (quatre réseaux et un fichier de styles), faux pour un modèle Piper. */
+        final boolean supertonic;
 
         Archive(String id, String url, long size, String sha256, String dirName, String modelFile,
-                boolean kokoro) {
+                boolean supertonic) {
             this.id = id;
             this.url = url;
             this.size = size;
             this.sha256 = sha256;
             this.dirName = dirName;
             this.modelFile = modelFile;
-            this.kokoro = kokoro;
+            this.supertonic = supertonic;
         }
 
         /** Ce qu'une archive complète contient : un dossier n'est « installé » qu'avec tout. */
         boolean complete(File dir) {
+            if (supertonic) {
+                for (String f : SUPERTONIC_FILES) if (!new File(dir, f).isFile()) return false;
+                return true;
+            }
             return new File(dir, modelFile).isFile()
                 && new File(dir, "tokens.txt").isFile()
-                && new File(dir, "espeak-ng-data").isDirectory()
-                && (!kokoro || (new File(dir, "voices.bin").isFile()
-                    && new File(dir, "dict/jieba.dict.utf8").isFile()));
+                && new File(dir, "espeak-ng-data").isDirectory();
         }
     }
 
@@ -103,28 +109,35 @@ final class NeuralVoices {
         "vits-piper-fr_FR-tom-medium", "fr_FR-tom-medium.onnx", false);
 
     /**
-     * Kokoro v1.0 multilingue, QUANTIFIÉ en 8 bits (132 Mo au lieu de 350 Mo). Le français n'y est
-     * pas « pris en charge » par sherpa-onnx (seulement anglais et chinois) : il passe par
-     * espeak-ng via le champ {@code lang} (voir {@link #load}), disponible depuis sherpa-onnx 1.12.2.
+     * Supertonic 3 (Supertone), quantifié en 8 bits par sherpa-onnx : 31 langues, dix styles de voix
+     * (24 kHz), sans phonémiseur (le texte est lu tel quel, la langue passe par {@code extra["lang"]},
+     * voir {@link NeuralSpeaker}). Il demande sherpa-onnx >= 1.12.40 ; la 2.x, elle, n'embarque plus
+     * espeak-ng et ne sait plus lire les modèles Piper ci-dessus.
      */
-    static final Archive KOKORO = new Archive("kokoro",
-        BASE + "kokoro-int8-multi-lang-v1_0.tar.bz2", 132_353_410L,
-        "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
-        "kokoro-int8-multi-lang-v1_0", "model.int8.onnx", true);
+    static final Archive SUPERTONIC = new Archive("supertonic",
+        BASE + "sherpa-onnx-supertonic-3-tts-int8-2026-05-11.tar.bz2", 128_774_318L,
+        "82fa96f91c4ef8abaae3a14a3f4153facf88bed821d1f7331cec2700f432c427",
+        "sherpa-onnx-supertonic-3-tts-int8-2026-05-11", "vector_estimator.int8.onnx", true);
 
-    static final Archive[] ARCHIVES = {SIWIS, TOM, KOKORO};
+    private static final String[] SUPERTONIC_FILES = {
+        "duration_predictor.int8.onnx", "text_encoder.int8.onnx", "vector_estimator.int8.onnx",
+        "vocoder.int8.onnx", "tts.json", "unicode_indexer.bin", "voice.bin"};
 
-    /** Numéro de la voix française « ff_siwis » dans le voices.bin de Kokoro v1.0 (table des 53 voix). */
-    private static final int KOKORO_FR_SID = 30;
+    static final Archive[] ARCHIVES = {SUPERTONIC, SIWIS, TOM};
+
+    /** voice.bin range les dix styles dans l'ordre trié : sid 0 à 4 = F1 à F5, sid 5 à 9 = M1 à M5. */
+    private static final int SUPERTONIC_F1 = 0;
+    private static final int SUPERTONIC_M1 = 5;
 
     static final Voice[] VOICES = {
+        new Voice("supertonicf", SUPERTONIC, SUPERTONIC_F1),
+        new Voice("supertonicm", SUPERTONIC, SUPERTONIC_M1),
         new Voice("siwis", SIWIS, 0),
         new Voice("tom", TOM, 0),
-        new Voice("kokoro", KOKORO, KOKORO_FR_SID),
     };
 
-    /** Dossiers d'une voix retirée du catalogue (UPMC : Jessica et Pierre) : à libérer, ~80 Mo. */
-    private static final String[] LEGACY_DIRS = {"vits-piper-fr_FR-upmc-medium"};
+    /** Dossiers d'une voix retirée du catalogue (UPMC : Jessica et Pierre ; Kokoro) : à libérer, 80 à 180 Mo. */
+    private static final String[] LEGACY_DIRS = {"vits-piper-fr_FR-upmc-medium", "kokoro-int8-multi-lang-v1_0"};
 
     static Voice voice(String id) {
         for (Voice v : VOICES) if (v.id.equals(id)) return v;
@@ -259,28 +272,29 @@ final class NeuralVoices {
     /** Charge le moteur d'une voix installée. Lourd (~1 à 3 s) : jamais sur le fil principal. */
     OfflineTts load(Voice v) {
         final File d = modelDir(v.archive);
-        final OfflineTtsConfig c = new OfflineTtsConfig();
-        final String espeak = new File(d, "espeak-ng-data").getAbsolutePath();
-        if (v.archive.kokoro) {
-            c.model.kokoro.model = new File(d, v.archive.modelFile).getAbsolutePath();
-            c.model.kokoro.voices = new File(d, "voices.bin").getAbsolutePath();
-            c.model.kokoro.tokens = new File(d, "tokens.txt").getAbsolutePath();
-            c.model.kokoro.dataDir = espeak;
-            // Sans lexique et avec une langue, TOUT le texte est phonémisé par espeak-ng (voix « fr »).
-            c.model.kokoro.lang = "fr";
-            // OBLIGATOIRE pour Kokoro >= 1.0, même sans chinois : sherpa-onnx 1.12.7 appelle exit(-1) (donc
-            // tue l'app, rien à attraper en Java) quand dict_dir est vide. C'était le plantage de Kokoro.
-            c.model.kokoro.dictDir = new File(d, "dict").getAbsolutePath();
-            // Plus lourd que Piper : un fil de plus, sans dépasser la moitié des cœurs.
-            c.model.numThreads = Math.max(2, Math.min(4, Runtime.getRuntime().availableProcessors() / 2));
+        final OfflineTtsModelConfig.Builder m = OfflineTtsModelConfig.builder();
+        if (v.archive.supertonic) {
+            m.setSupertonic(OfflineTtsSupertonicModelConfig.builder()
+                .setDurationPredictor(new File(d, "duration_predictor.int8.onnx").getAbsolutePath())
+                .setTextEncoder(new File(d, "text_encoder.int8.onnx").getAbsolutePath())
+                .setVectorEstimator(new File(d, "vector_estimator.int8.onnx").getAbsolutePath())
+                .setVocoder(new File(d, "vocoder.int8.onnx").getAbsolutePath())
+                .setTtsJson(new File(d, "tts.json").getAbsolutePath())
+                .setUnicodeIndexer(new File(d, "unicode_indexer.bin").getAbsolutePath())
+                .setVoiceStyle(new File(d, "voice.bin").getAbsolutePath())
+                .build());
+            // Quatre réseaux : un peu plus de fils que Piper, sans dépasser la moitié des cœurs.
+            m.setNumThreads(Math.max(2, Math.min(4, Runtime.getRuntime().availableProcessors() / 2)));
         } else {
-            c.model.vits.model = new File(d, v.archive.modelFile).getAbsolutePath();
-            c.model.vits.tokens = new File(d, "tokens.txt").getAbsolutePath();
-            c.model.vits.dataDir = espeak;
+            m.setVits(OfflineTtsVitsModelConfig.builder()
+                .setModel(new File(d, v.archive.modelFile).getAbsolutePath())
+                .setTokens(new File(d, "tokens.txt").getAbsolutePath())
+                .setDataDir(new File(d, "espeak-ng-data").getAbsolutePath())
+                .build());
             // Deux fils : au-delà, les gros cœurs d'un SoC hétérogène attendent les petits.
-            c.model.numThreads = 2;
+            m.setNumThreads(2);
         }
-        return new OfflineTts(c);
+        return new OfflineTts(OfflineTtsConfig.builder().setModel(m.build()).build());
     }
 
     /**

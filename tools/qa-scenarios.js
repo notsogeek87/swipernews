@@ -3374,7 +3374,7 @@ ${Array.from({ length: 12 }, (_, k) => {
         window.__archives = [
           { archive: "siwis", size: 67207459, installed: false, partial: 0 },
           { archive: "tom", size: 67202955, installed: false, partial: 0 },
-          { archive: "kokoro", size: 132353410, installed: false, partial: 0 },
+          { archive: "supertonic", size: 128774318, installed: false, partial: 0 },
         ];
         window.Capacitor = {
           isNativePlatform: () => true,
@@ -3508,7 +3508,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       };
     });
     console.log(
-      `feuille : ${mini.boutons} voix proposées (attendu 4), note « français » ${mini.note}, choix depuis la feuille → ${mini.choisi} (attendu tom), téléchargement proposé ${mini.blocTelecharger}`
+      `feuille : ${mini.boutons} voix proposées (attendu 5), note « français » ${mini.note}, choix depuis la feuille → ${mini.choisi} (attendu tom), téléchargement proposé ${mini.blocTelecharger}`
     );
     await page.evaluate(() => setEcouteVoix("system"));
     await page.click("#listenModeFeed");
@@ -3584,10 +3584,10 @@ ${Array.from({ length: 12 }, (_, k) => {
       window.__starts.length = 0;
       demarrerEcoute();
       r.voixTom = window.__starts[0].voice;
-      setEcouteVoix("kokoro");
+      setEcouteVoix("supertonicf");
       window.__starts.length = 0;
       demarrerEcoute();
-      r.kokoroPasInstallee = window.__starts[0].voice === "";
+      r.supertonicPasInstallee = window.__starts[0].voice === "";
       setEcouteVoix("siwis");
       window.__starts.length = 0;
       demarrerEcoute();
@@ -3602,7 +3602,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       return r;
     });
     console.log(
-      `voix : bloc absent en voix système ${vx.sansBlocSysteme}, bouton « ${vx.bouton} », non installée → voix système ${vx.voixNonInstallee}, appel ${vx.appel}, progression 50 % ${vx.progression}, « Installation » ${vx.installation}, installée ${vx.installee}, tom → "${vx.voixTom}", kokoro non installée → système ${vx.kokoroPasInstallee}, siwis non installée → système ${vx.siwisPasInstallee}, retour système ${vx.systeme}`
+      `voix : bloc absent en voix système ${vx.sansBlocSysteme}, bouton « ${vx.bouton} », non installée → voix système ${vx.voixNonInstallee}, appel ${vx.appel}, progression 50 % ${vx.progression}, « Installation » ${vx.installation}, installée ${vx.installee}, tom → "${vx.voixTom}", supertonic non installée → système ${vx.supertonicPasInstallee}, siwis non installée → système ${vx.siwisPasInstallee}, retour système ${vx.systeme}`
     );
     await page.evaluate(() => {
       arreterEcoute();
