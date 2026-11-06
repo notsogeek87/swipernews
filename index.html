@@ -254,6 +254,13 @@
   /* Tant que le lecteur charge, l'iframe reste TRANSPARENTE : on voit la
      vignette de la carte, jamais un aplat noir entre les deux. */
   .card__video.card__video--loading{background:transparent}
+  /* Aperçu pendant la lecture (voir apercuVideo) : un toucher sur la vidéo
+     rend, 3 s, la chaîne, le titre et la date de publication — mais ni
+     l'extrait ni « Regarder », sans objet ici. `!important` : doit primer sur
+     html.autovid0 (plus spécifique). pointer-events:none : les contrôles de
+     YouTube, dessous, restent touchables. */
+  .card--playing.card--peek .card__body{opacity:1!important;pointer-events:none!important;transition:opacity .18s ease}
+  .card--playing.card--peek .card__desc,.card--playing.card--peek .card__actions{display:none}
   /* Échappatoire posée par startVideo()/retirée par stopVideo() — voir son
      commentaire : YouTube bloque parfois la lecture derrière un mur « confirmez
      que vous n'êtes pas un robot » (réputation de l'IP, rien que l'app puisse
@@ -3965,7 +3972,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="325";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="326";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -7377,9 +7384,43 @@ function popVideoState(){
 // startVideo(), annulée par stopVideo() pour ne jamais courir après une carte
 // qui a déjà quitté la lecture.
 let vcloseDimTimer=null;
+/* Aperçu pendant la lecture. L'iframe (autre origine) ne laisse remonter
+   AUCUN clic à la page — mais un toucher lui donne le FOCUS, donc la page
+   reçoit `blur` avec l'iframe pour activeElement : c'est le seul signal
+   fiable qu'on ait d'un toucher sur la vidéo. On montre alors la barre du
+   haut, la chaîne, le titre, la date (.card--peek) et le rail partager /
+   enregistrer, le temps de TOP_AWAY_MS. Le toucher, lui, arrive quand même au
+   lecteur (pause, etc.). À la fin, le focus est rendu à la page, sinon le
+   toucher suivant ne déclencherait plus de `blur`. */
+let peekT=null;
+function finApercuVideo(){
+  clearTimeout(peekT);peekT=null;
+  if(!playingCard)return;
+  playingCard.classList.remove("card--peek");
+  railEl.classList.add("rail--away");
+  const f=playingCard.querySelector(".card__video");
+  if(f&&document.activeElement===f){try{f.blur();window.focus();}catch(e){}}
+}
+function apercuVideo(){
+  if(!playingCard)return;
+  showTop();
+  playingCard.classList.add("card--peek");
+  railEl.classList.remove("rail--away");
+  clearTimeout(peekT);
+  peekT=setTimeout(finApercuVideo,TOP_AWAY_MS);
+}
+addEventListener("blur",()=>{
+  // activeElement n'est à jour qu'après l'événement.
+  setTimeout(()=>{
+    const a=document.activeElement;
+    if(playingCard&&a&&a.classList&&a.classList.contains("card__video")&&playingCard.contains(a))apercuVideo();
+  },0);
+});
 function stopVideo(){
   if(!playingCard)return;
   clearTimeout(vcloseDimTimer);
+  clearTimeout(peekT);peekT=null;
+  playingCard.classList.remove("card--peek");
   const f=playingCard.querySelector(".card__video");
   if(f)f.remove();               // retirer l'iframe suffit à couper l'image ET le son
   const c=playingCard.querySelector(".card__vclose");
@@ -7437,9 +7478,8 @@ function startVideo(card){
   card.classList.add("card--playing");
   playingCard=card;
   disableCaptions(f);
-  // Enregistrer/partager n'ont pas de sens tant qu'on regarde : le rail
-  // s'efface pour toute la durée de la lecture, sans minuterie ni retour au
-  // toucher — stopVideo() le restaure. Plus simple que le cycle masquage/
+  // Le rail s'efface pendant la lecture ; il ne revient que le temps d'un
+  // aperçu (toucher sur la vidéo, voir apercuVideo) — stopVideo() le restaure. Plus simple que le cycle masquage/
   // réapparition essayé d'abord, qui butait sur le même mur qu'ailleurs dans
   // ce fichier : un iframe cross-origin n'expose aucun clic à la page qui
   // l'englobe, donc rien à l'intérieur de la vidéo ne peut fiablement
