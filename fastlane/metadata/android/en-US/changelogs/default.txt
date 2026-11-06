@@ -1,0 +1,5 @@
+• Listen to your feed with the screen off (radio mode), with a news flash of unread stories and source choice
+• Natural offline voices (Siwis, Tom) or your phone's voice
+• Local AI summary of articles, to read or listen to
+• Videos: instant autoplay, and a tap during playback shows channel, date and share
+• Fixed: after a long break, the feed no longer shows only videos

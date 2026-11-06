@@ -199,6 +199,12 @@
       "listen.sysvoice.default": "Défaut",
       "listen.sysvoice.n": "Voix {n}",
       "listen.sysvoice.sample": "Bonjour, voici cette voix.",
+      "changelog.v327.item1":
+        "Vidéos : nouveau délai « 0 s » pour la lecture auto (Réglages) — le swipe enchaîne directement la vidéo suivante.",
+      "changelog.v327.item2":
+        "Pendant une vidéo, touchez l'écran pour voir la chaîne, la date de publication et le bouton partager.",
+      "changelog.v327.item3":
+        "Corrigé : en rouvrant l'app après une longue absence, le fil ne montre plus uniquement des vidéos YouTube.",
       "changelog.v323.item1":
         "Flash info : vous pouvez maintenant choisir les sources lues (Écouter, Réglages de l'écoute, Sources du flash info).",
       "changelog.v322.item1":
@@ -831,6 +837,12 @@
       "listen.sysvoice.default": "Default",
       "listen.sysvoice.n": "Voice {n}",
       "listen.sysvoice.sample": "Hello, this is this voice.",
+      "changelog.v327.item1":
+        "Videos: new « 0 s » delay for autoplay (Settings) — swiping goes straight into the next video.",
+      "changelog.v327.item2":
+        "While a video plays, tap the screen to see the channel, publication date and share button.",
+      "changelog.v327.item3":
+        "Fixed: reopening the app after a long break no longer shows only YouTube videos.",
       "changelog.v323.item1":
         "News flash: you can now pick which sources are read (Listen, Listening settings, News flash sources).",
       "changelog.v322.item1":

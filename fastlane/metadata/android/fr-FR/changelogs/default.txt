@@ -1,0 +1,5 @@
+• Écouter le fil écran éteint (mode radio), avec flash info des actus non lues et choix de ses sources
+• Voix naturelles hors ligne (Siwis, Tom) ou voix du téléphone au choix
+• Résumé IA local des articles, à lire ou à écouter
+• Vidéos : lecture auto sans délai, et un toucher pendant la lecture montre chaîne, date et partage
+• Corrigé : après une longue absence, le fil ne montre plus que des vidéos

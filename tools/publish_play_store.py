@@ -30,13 +30,42 @@ from googleapiclient.http import MediaFileUpload
 SCOPES = ["https://www.googleapis.com/auth/androidpublisher"]
 
 
+NOTES_MAX = 500  # limite de Google Play, par langue
+
+
+def release_notes(root):
+    """[{language, text}] depuis <root>/<langue>/changelogs/default.txt.
+
+    Échoue AVANT tout appel réseau si une note dépasse la limite de Play :
+    l'API ne le dirait qu'au commit, après l'upload complet du bundle."""
+    out = []
+    if not os.path.isdir(root):
+        return out
+    for lang in sorted(os.listdir(root)):
+        f = os.path.join(root, lang, "changelogs", "default.txt")
+        if not os.path.isfile(f):
+            continue
+        with open(f, encoding="utf-8") as fh:
+            text = fh.read().strip()
+        if not text:
+            continue
+        if len(text) > NOTES_MAX:
+            sys.exit(f"Notes {lang} : {len(text)} caractères, Play en accepte {NOTES_MAX}.")
+        out.append({"language": lang, "text": text})
+    return out
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--package", required=True)
     p.add_argument("--aab", required=True)
     p.add_argument("--track", required=True)
     p.add_argument("--status", default="completed")
+    # Notes de version (« Nouveautés » de la fiche Play Store) : un fichier
+    # par langue, fastlane/metadata/android/<langue>/changelogs/default.txt.
+    p.add_argument("--notes-dir", default="fastlane/metadata/android")
     args = p.parse_args()
+    notes = release_notes(args.notes_dir)
 
     creds_json = os.environ.get("PLAY_STORE_SERVICE_ACCOUNT_JSON")
     if not creds_json:
@@ -73,11 +102,16 @@ def main():
         editId=edit_id,
         packageName=args.package,
         track=args.track,
-        body={"releases": [{"versionCodes": [version_code], "status": args.status}]},
+        body={"releases": [dict(
+            {"versionCodes": [version_code], "status": args.status},
+            **({"releaseNotes": notes} if notes else {}),
+        )]},
     ).execute()
 
     edits.commit(editId=edit_id, packageName=args.package).execute()
     print(f"Publié sur le canal « {args.track} » : versionCode {version_code}")
+    for n in notes:
+        print(f"Notes de version ({n['language']}) envoyées, {len(n['text'])} caractères.")
 
 
 if __name__ == "__main__":
