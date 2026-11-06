@@ -2140,6 +2140,19 @@ const CONFIG = {
   // sources rapides, souvent des chaînes YouTube) si peu de sources ont
   // répondu à 2,5 s — le défaut que cette échéance dure existait pour éviter.
   NEWS_DEADLINE_HARD_MS: 2500,
+  /* Plafond PROPRE à la garde de NATURE (`melangeAttendu` dans armerEcheance),
+     décompté comme NEWS_DEADLINE_HARD_MS depuis l'armement de l'échéance.
+     Ramener NEWS_DEADLINE_HARD_MS à NEWS_DEADLINE_MS avait neutralisé les DEUX
+     gardes à la fois, alors que seule celle de diversité de sources posait
+     problème (seuil rarement atteint, donc attente quasi systématique). Celle
+     de nature, elle, n'attend qu'UN article de presse, quel qu'il soit — et
+     sans elle, une réouverture après une longue absence (réseau mobile qui se
+     réveille, chaînes YouTube plus rapides que les sites de presse) peignait
+     un premier fil fait UNIQUEMENT de vidéos (retour utilisateur : « que des
+     flux YouTube, je dois relancer le refresh pour avoir le mélange » —
+     reproduit par `seriesvideo` : first10=vvvvvvvvvv à 3 s). Elle ne coûte
+     rien au cas ordinaire : dès qu'un article est là, on peint. */
+  NEWS_NATURE_HARD_MS: 5000,
   /* FILET DE SÉCURITÉ seulement — le signal normal est `teteDecidee` (voir sa
      définition dans index.html, posé par `paint()` et par `armerEcheance`),
      que `loadLearnPart` (revealLearn) attend pour ne pas peindre une tête que
@@ -2162,7 +2175,9 @@ const CONFIG = {
      de ce nombre-ci un filet qui ne devrait normalement jamais se
      déclencher. Abaissé à nouveau (4500→3000) avec NEWS_DEADLINE_HARD_MS
      ci-dessus, pour garder la même marge (+500 ms) au-dessus de lui. */
-  HEAD_COORD_MS: 3000,
+  // Doit couvrir NEWS_NATURE_HARD_MS (+500 ms), le plus long délai
+  // qu'armerEcheance peut prendre pour se décider.
+  HEAD_COORD_MS: 5500,
   HEAD_COORD_RECHECK_MS: 120,
   /* Budget total accordé à UNE source, tous replis compris (backend, proxys
      publics, rss2json). Sans lui, une source morte cumulait les délais de
@@ -3925,7 +3940,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="323";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="324";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -6075,8 +6090,11 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
       if(!collected.size){echeancePassee=true;teteDecidee=my;return;}   // rien reçu : scheduleRender s'en chargera
       const d=diversiteCollectee();
       const seuil=Math.min(groupesActifs,CONFIG.NEWS_DIVERSITY_MIN);
-      const manque=d.sources<seuil||(melangeAttendu&&!(d.vid&&d.art));
-      if(manque&&Date.now()-depart<CONFIG.NEWS_DEADLINE_HARD_MS){
+      // Deux gardes, deux plafonds : voir NEWS_NATURE_HARD_MS.
+      const ecoule=Date.now()-depart;
+      const manque=(d.sources<seuil&&ecoule<CONFIG.NEWS_DEADLINE_HARD_MS)
+        ||(melangeAttendu&&!(d.vid&&d.art)&&ecoule<CONFIG.NEWS_NATURE_HARD_MS);
+      if(manque){
         echeanceT=setTimeout(verifier,CONFIG.NEWS_DEADLINE_RECHECK_MS);
         return;
       }
@@ -6089,6 +6107,11 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
 
   // Récupération par lots bornés plutôt que tout en parallèle.
   let cursor=0,inFlight=0,done=0,jeton=true;
+  // File réellement servie par pump() : `active`, plus les sources de presse
+  // réessayées une fois (voir relancePresse dans finish). Distincte d'`active`,
+  // que rebuild() parcourt — y remettre une source la compterait deux fois.
+  const file=active.slice();
+  let relancePresse=false;
   /* Jeton de l'indicateur de chargement (voir syncing, devenu un COMPTEUR
      puisque les deux moitiés du fil le pilotent en parallèle) : rendu UNE seule
      fois, quelle que soit la sortie. Le chemin qui manquait : un chargement
@@ -6097,8 +6120,8 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
   function rendreJeton(){if(jeton){jeton=false;syncing(false);}}
   syncing(true);
   function pump(){
-    while(inFlight<CONFIG.MAX_PARALLEL&&cursor<active.length){
-      const f=active[cursor++];
+    while(inFlight<CONFIG.MAX_PARALLEL&&cursor<file.length){
+      const f=file[cursor++];
       inFlight++;
       fetchFeedRobust(f).then(res=>{
         if(my!==loadSeq)return;
@@ -6120,12 +6143,28 @@ async function loadNewsPart(my,key,perime,cached,sameFeed,attempt=0){
         .finally(()=>{
           inFlight--;
           if(my!==loadSeq){rendreJeton();return;}
-          if(++done<active.length){pump();return;}   // au suivant
+          if(++done<file.length){pump();return;}   // au suivant
           finish();
         });
     }
   }
   function finish(){
+    /* Vidéos reçues, mais AUCUN article alors que des sites de presse sont
+       cochés : toutes les sources de presse ont échoué sur ce chargement-ci
+       (typiquement le premier réveil du réseau après une longue absence), et
+       le fil resterait fait uniquement de vidéos jusqu'au prochain ↻ — la
+       retentative ci-dessous ne joue que si RIEN n'a été collecté. On les
+       réessaie donc UNE fois, dans le même chargement (même jeton, même
+       échéance) : ce qui arrive s'insère par les repeintures ordinaires. */
+    if(!relancePresse&&collected.size&&melangeAttendu&&!diversiteCollectee().art){
+      const presse=failed.filter(f=>!isYoutubeFeedUrl(f.url));
+      if(presse.length){
+        relancePresse=true;
+        failed.splice(0,failed.length,...failed.filter(f=>isYoutubeFeedUrl(f.url)));
+        setTimeout(()=>{if(my!==loadSeq){rendreJeton();return;}file.push(...presse);pump();},RETRY_DELAYS_MS[0]);
+        return;
+      }
+    }
     // Plus rien n'arrivera : l'échéance n'a plus lieu d'être, quelle que soit
     // la sortie prise ci-dessous (retentative comprise — celle-ci arme la
     // sienne).
