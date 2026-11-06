@@ -107,6 +107,7 @@
       "autoplay.delay.label": "Délai avant lecture",
       "autoplay.delay.desc":
         "Temps d'attente après le swipe avant le lancement de la vidéo.",
+      "autoplay.delay.opt.0": "0 s",
       "autoplay.delay.opt.500": "0,5 s",
       "autoplay.delay.opt.1000": "1 s",
       "autoplay.delay.opt.2000": "2 s",
@@ -917,6 +918,7 @@
       "autoplay.opt.on": "On",
       "autoplay.delay.label": "Delay before playing",
       "autoplay.delay.desc": "How long to wait after the swipe before the video starts.",
+      "autoplay.delay.opt.0": "0 s",
       "autoplay.delay.opt.500": "0.5 s",
       "autoplay.delay.opt.1000": "1 s",
       "autoplay.delay.opt.2000": "2 s",

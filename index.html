@@ -243,6 +243,17 @@
      pendant la lecture, startVideo() l'efface pour toute sa durée (voir
      .rail--away plus bas). */
   .card--playing .card__body,.card--playing .card__play{opacity:0;pointer-events:none}
+  /* Lecture auto à 0 s (voir majAutoVid) : le swipe enchaîne directement une
+     vidéo. Le texte et le ▶ d'une carte vidéo y sont masqués D'EMBLÉE — pas
+     seulement une fois la lecture lancée — sinon on les verrait passer une
+     fraction de seconde, le temps que l'iframe se crée : un clignotement.
+     `transition:none` pour la même raison. Ils reviennent (`card--stopped`)
+     seulement si la vidéo ne part pas (panneau ouvert, ✕), pour garder ▶. */
+  html.autovid0 .card--video:not(.card--stopped) .card__body,
+  html.autovid0 .card--video:not(.card--stopped) .card__play{opacity:0;pointer-events:none;transition:none}
+  /* Tant que le lecteur charge, l'iframe reste TRANSPARENTE : on voit la
+     vignette de la carte, jamais un aplat noir entre les deux. */
+  .card__video.card__video--loading{background:transparent}
   /* Échappatoire posée par startVideo()/retirée par stopVideo() — voir son
      commentaire : YouTube bloque parfois la lecture derrière un mur « confirmez
      que vous n'êtes pas un robot » (réputation de l'IP, rien que l'app puisse
@@ -2023,7 +2034,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=321"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=323"></script>
+<script src="src/i18n.js?v=325"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -3802,7 +3813,7 @@ let pauseVueA=0,pauseT=null;
    demandé contredirait la façade de la carte vidéo (voir startVideo). Armé par
    onCardChange(userScroll), jamais par un simple recalage ; annulé dès qu'on
    quitte la carte avant l'échéance. */
-const AUTOPLAY_DELAYS=["500","1000","2000","3000","5000"];
+const AUTOPLAY_DELAYS=["0","500","1000","2000","3000","5000"];
 const LS_AUTOPLAY="fluxswipe.autoplay.v1";
 const LS_AUTOPLAY_DELAY="fluxswipe.autoplaydelay.v1";
 let autoplayDelay=(()=>{try{const v=localStorage.getItem(LS_AUTOPLAY_DELAY);return AUTOPLAY_DELAYS.includes(v)?v:"500";}catch(e){return "500";}})();
@@ -3816,10 +3827,17 @@ function renderAutoplayPref(){
     AUTOPLAY_DELAYS.map(v=>({v,t:T("autoplay.delay.opt."+v)})),autoplayDelay):"";
   document.querySelectorAll("[data-autoplaymount]").forEach(el=>{el.innerHTML=html+delai;});
 }
+/* « 0 s » : le swipe enchaîne une vidéo directement. La classe sur <html>
+   masque d'avance le texte des cartes vidéo (voir html.autovid0 en CSS) ;
+   reposée à chaque changement de réglage ou de nature. */
+function majAutoVid(){
+  document.documentElement.classList.toggle("autovid0",autoplayPref==="on"&&autoplayDelay==="0"&&nature==="videos");
+}
 function setAutoplayDelay(v){
   if(!AUTOPLAY_DELAYS.includes(v)||v===autoplayDelay)return;
   autoplayDelay=v;
   try{localStorage.setItem(LS_AUTOPLAY_DELAY,v);}catch(e){warn("save autoplay delay",e);}
+  majAutoVid();
   renderAutoplayPref();
 }
 function setAutoplayPref(v){
@@ -3828,18 +3846,24 @@ function setAutoplayPref(v){
   autoplayPref=next;
   try{localStorage.setItem(LS_AUTOPLAY,next);}catch(e){warn("save autoplay",e);}
   if(next==="off")clearTimeout(autoplayT);
+  majAutoVid();
   renderAutoplayPref();
 }
 function armerAutoplay(card){
   clearTimeout(autoplayT);
   if(autoplayPref!=="on"||nature!=="videos"||!card||!card.dataset.vid)return;
-  autoplayT=setTimeout(()=>{
+  const lancer=()=>{
     // La carte doit être TOUJOURS celle sous les yeux, sans panneau ouvert ni
     // app en arrière-plan : sinon le son partirait derrière un autre écran.
     if(currentCardEl()!==card||!card.isConnected)return;
-    if(document.querySelector(".sheet.open")||document.visibilityState==="hidden")return;
+    // Vidéo qui ne part pas : à 0 s, son ▶ était masqué d'avance — on le rend.
+    if(document.querySelector(".sheet.open")||document.visibilityState==="hidden"){card.classList.add("card--stopped");return;}
     startVideo(card);
-  },+autoplayDelay);
+  };
+  // 0 s : tout de suite, dans la même frame que l'arrivée sur la carte — même
+  // un setTimeout(0) laisserait passer une peinture de la carte sans lecteur.
+  if(autoplayDelay==="0")lancer();
+  else autoplayT=setTimeout(lancer,+autoplayDelay);
 }
 function renderPausePref(){
   const html=prefRow("pause",T("pause.label"),T("pause.desc."+pausePref),
@@ -3896,7 +3920,8 @@ function onCardChange(userScroll){
   if(playingCard&&feedEl.children[i]!==playingCard)stopVideo();
   // Lecture auto : une seule armée par ARRIVÉE sur une carte (pas à chaque frame
   // du défilement), et seulement après un vrai swipe — un recalage annule.
-  if(card!==lastAutoCard){lastAutoCard=card;if(userScroll)armerAutoplay(card);else clearTimeout(autoplayT);}
+  // card--stopped ne survit pas au départ de la carte : y revenir la relance.
+  if(card!==lastAutoCard){if(lastAutoCard)lastAutoCard.classList.remove("card--stopped");lastAutoCard=card;if(userScroll)armerAutoplay(card);else clearTimeout(autoplayT);}
   const samePending=pendingSeenItem===it||(pendingSeenItem&&it&&pendingSeenItem.link&&pendingSeenItem.link===it.link);
   if(!samePending){
     if(pendingSeenItem&&userScroll){bumpCardScroll();verifierPause();}   // VRAI swipe seulement : une de plus au compteur
@@ -3940,7 +3965,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="324";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="325";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -7369,8 +7394,10 @@ function startVideo(card){
   if(!id||playingCard===card)return;
   stopVideo();                   // jamais deux lecteurs vivants à la fois
   arreterEcoute();               // ni une vidéo par-dessus une voix
+  card.classList.remove("card--stopped");
   const f=document.createElement("iframe");
-  f.className="card__video";
+  f.className="card__video card__video--loading";
+  f.addEventListener("load",()=>f.classList.remove("card__video--loading"),{once:true});
   f.title=T("card.playVideo");
   // `allow` DÉLÈGUE ces permissions à l'iframe : sans lui, la politique par
   // défaut ('self') les refuse à un cadre d'une autre origine, et le lecteur
@@ -7400,7 +7427,8 @@ function startVideo(card){
   // une vidéo pendant que la barre est masquée (swipe juste avant ▶) la
   // laissait invisible pour de bon, aucun tap sur l'iframe ne pouvant plus la
   // ramener.
-  closeBtn.onclick=e=>{e.stopPropagation();e.preventDefault();stopVideo();showTop();};
+  // card--stopped : vidéo fermée à la main, son ▶ doit revenir même à 0 s.
+  closeBtn.onclick=e=>{e.stopPropagation();e.preventDefault();card.classList.add("card--stopped");stopVideo();showTop();};
   card.appendChild(closeBtn);
   // Estompé après un court délai (voir .card__vclose.dim en CSS) : la cible
   // reste entière, seule sa présence visuelle s'efface le temps d'une lecture
@@ -8588,7 +8616,7 @@ renderThemePref();renderSchemePref();
 renderCardsPref();
 renderPausePref();
 renderListenPref();
-renderAutoplayPref();
+majAutoVid();renderAutoplayPref();
 renderEcouteUI();
 renderAutoExport();refreshAutoExport();
 /* Rafraîchissement hebdomadaire, en silence : une liste de blocage vieille de
@@ -8815,6 +8843,7 @@ function setNature(k){
   const avant=mixLevel();
   const dir=NATURES.indexOf(k)-NATURES.indexOf(nature);   // >0 : vers la droite (Vidéos)
   nature=k;
+  majAutoVid();
   stopVideo();
   try{navigator.vibrate&&navigator.vibrate(8);}catch(_){}
   feedEl.style.setProperty("--natdx",(dir>0?"":"-")+"36px");
