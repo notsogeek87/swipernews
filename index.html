@@ -3837,8 +3837,19 @@ function renderAutoplayPref(){
 /* « 0 s » : le swipe enchaîne une vidéo directement. La classe sur <html>
    masque d'avance le texte des cartes vidéo (voir html.autovid0 en CSS) ;
    reposée à chaque changement de réglage ou de nature. */
+const autoVid0=()=>autoplayPref==="on"&&autoplayDelay==="0"&&nature==="videos";
 function majAutoVid(){
-  document.documentElement.classList.toggle("autovid0",autoplayPref==="on"&&autoplayDelay==="0"&&nature==="videos");
+  document.documentElement.classList.toggle("autovid0",autoVid0());
+  montrerPlaySiArrete(currentCardEl());
+}
+/* À 0 s, le ▶ d'une carte vidéo est masqué d'avance (html.autovid0). Il ne
+   doit l'être QUE tant que la vidéo va partir : toute carte vidéo SOUS LES
+   YEUX qui ne joue pas (première carte du fil, arrivée sans swipe, lecture
+   refusée) le récupère — sinon elle ne pourrait plus être regardée du tout.
+   La carte qui arrive pendant un swipe n'est pas encore « sous les yeux » :
+   elle reste masquée, donc pas de clignotement. */
+function montrerPlaySiArrete(card){
+  if(autoVid0()&&card&&card.dataset.vid&&playingCard!==card)card.classList.add("card--stopped");
 }
 function setAutoplayDelay(v){
   if(!AUTOPLAY_DELAYS.includes(v)||v===autoplayDelay)return;
@@ -3924,11 +3935,15 @@ function onCardChange(userScroll){
   const it=itemAt(i);
   // Arrêt n°1 : on a quitté la carte qui jouait. C'est le geste attendu — swiper
   // coupe la vidéo, comme sur n'importe quel fil vertical.
-  if(playingCard&&feedEl.children[i]!==playingCard)stopVideo();
+  // Relais si la carte d'arrivée va enchaîner sa propre vidéo (0 s, vrai swipe).
+  if(playingCard&&feedEl.children[i]!==playingCard)stopVideo(userScroll&&autoVid0()&&!!(card&&card.dataset.vid));
   // Lecture auto : une seule armée par ARRIVÉE sur une carte (pas à chaque frame
   // du défilement), et seulement après un vrai swipe — un recalage annule.
   // card--stopped ne survit pas au départ de la carte : y revenir la relance.
   if(card!==lastAutoCard){if(lastAutoCard)lastAutoCard.classList.remove("card--stopped");lastAutoCard=card;if(userScroll)armerAutoplay(card);else clearTimeout(autoplayT);}
+  // Relais annoncé mais la suivante n'est pas partie : l'entrée est rendue.
+  if(entreeVideoLibre){entreeVideoLibre=false;popVideoState();}
+  montrerPlaySiArrete(card);
   const samePending=pendingSeenItem===it||(pendingSeenItem&&it&&pendingSeenItem.link&&pendingSeenItem.link===it.link);
   if(!samePending){
     if(pendingSeenItem&&userScroll){bumpCardScroll();verifierPause();}   // VRAI swipe seulement : une de plus au compteur
@@ -3972,7 +3987,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="327";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="328";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -7418,7 +7433,13 @@ addEventListener("blur",()=>{
     if(playingCard&&a&&a.classList&&a.classList.contains("card__video")&&playingCard.contains(a))apercuVideo();
   },0);
 });
-function stopVideo(){
+/* Relais d'une vidéo à la suivante (lecture auto à 0 s) : l'arrêt ne rend pas
+   son entrée d'historique, la vidéo suivante la reprend. Sans cela,
+   history.back() (asynchrone) arrivait APRÈS le lancement de la suivante, et
+   son popstate — « retour = quitter la vidéo » — l'arrêtait aussitôt : une
+   vidéo sur deux restait sur sa vignette, sans ▶. */
+let entreeVideoLibre=false;
+function stopVideo(relais){
   if(!playingCard)return;
   clearTimeout(vcloseDimTimer);
   clearTimeout(peekT);peekT=null;
@@ -7430,7 +7451,11 @@ function stopVideo(){
   railEl.classList.remove("rail--away");   // le prochain rail (autre carte) repart visible
   playingCard.classList.remove("card--playing");
   playingCard=null;
-  popVideoState();                // consomme l'entrée posée par pushVideoState
+  if(relais)entreeVideoLibre=true;   // gardée pour la vidéo suivante, voir plus haut
+  else{
+    popVideoState();                 // consomme l'entrée posée par pushVideoState
+    montrerPlaySiArrete(currentCardEl());   // retour, panneau… : ▶ de nouveau visible
+  }
 }
 function startVideo(card){
   const id=card&&card.dataset.vid;
@@ -7490,7 +7515,8 @@ function startVideo(card){
   /* Intercepte le bouton retour pour quitter la vidéo (comme pour les panneaux).
      Sans cela, le retour quitte l'app ; ici, il rend la carte vidéo avec son
      titre et son bouton play. */
-  pushVideoState();
+  if(entreeVideoLibre)entreeVideoLibre=false;   // relais : l'entrée est déjà là
+  else pushVideoState();
   // Lancer la vidéo ne la marque PAS « vue » : comme pour un article, seul le
   // swipe qui quitte la carte le fait (voir markOneSeen). Regarder puis swiper
   // marque bien la vidéo, exactement comme lire un article puis passer au
