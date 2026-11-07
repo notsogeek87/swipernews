@@ -526,6 +526,26 @@ hors du dépôt, jamais dans `package.json`.
   est concaténé dans l'`src` sans échappement, ce qui n'est légitime QUE parce
   que `youtubeId` ne rend rien d'autre que `[A-Za-z0-9_-]{11}` — même rôle que
   `oneOf()` côté natif. Scénario `video`.
+- `autoVid0()` / `montrerPlaySiArrete()` / `stopVideo(relais)` /
+  `apercuVideo()` / `rendreFocusPage()` — la lecture auto à **0 s** et le
+  toucher pendant une vidéo. À 0 s (nature « Vidéos » seulement), le texte et
+  le ▶ des cartes vidéo sont masqués D'AVANCE (`html.autovid0`, sans
+  transition) pour qu'aucun article ne clignote pendant le swipe ; toute carte
+  vidéo SOUS LES YEUX qui ne joue pas récupère son ▶ (`card--stopped`) — sinon
+  la première carte, ou une lecture refusée, ne se regarderait plus du tout.
+  D'une vidéo à la suivante, l'entrée d'historique est PASSÉE (`relais`,
+  `entreeVideoLibre`), jamais rendue puis reprise : le `history.back()`
+  asynchrone arrivait après le lancement de la suivante et son popstate
+  l'arrêtait — une vidéo sur deux restait sur sa vignette (mesuré).
+  L'iframe n'expose aucun clic : un toucher se voit seulement à la perte de
+  focus de la page (`blur`, activeElement = l'iframe), qui ouvre l'aperçu
+  (barre, chaîne, date, rail) et COMPTE COMME UN GESTE (`gesteDepuisArrivee`),
+  de même qu'un défilement pendant une lecture (`onScrollFrame`) — sinon,
+  après un retour au premier plan, la barre ne repartait plus jamais. Le
+  focus est ensuite rendu à un élément de la PAGE (puits invisible), et un
+  filet le reprend chaque seconde hors aperçu : `iframe.blur()`/
+  `window.focus()` seuls ne suffisent pas dans la WebView, et sans focus côté
+  page plus aucun toucher ne déclenche d'aperçu.
 - `SOURCE_KINDS` / `socialFeedCandidates()` / `renderSourceHelp()` — les façons
   d'ajouter une source, et leur AIDE. `socialFeedCandidates` (`src/lib.js`, pure,
   testée) lit ce que l'utilisateur tape — `r/france`, `u/nom`, `@nom@instance`

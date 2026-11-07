@@ -3987,7 +3987,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="328";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="329";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -7409,14 +7409,47 @@ let vcloseDimTimer=null;
    enregistrer, le temps de TOP_AWAY_MS. Le toucher, lui, arrive quand même au
    lecteur (pause, etc.). À la fin, le focus est rendu à la page, sinon le
    toucher suivant ne déclencherait plus de `blur`. */
-let peekT=null;
+let peekT=null,focusGardeT=null;
+/* Rendre le focus à la page. `iframe.blur()`/`window.focus()` seuls ne
+   suffisent pas partout : dans la WebView Android, la page ne le récupérait
+   pas toujours, et sans focus côté page le toucher suivant ne produit plus de
+   `blur` — « parfois le clic ne fait plus réapparaître les éléments ». Donner
+   le focus à un élément DE LA PAGE (un puits invisible, tabindex=-1) le
+   reprend à coup sûr au cadre de l'autre origine. */
+let puitsFocus=null;
+function rendreFocusPage(){
+  if(!puitsFocus){
+    puitsFocus=document.createElement("span");
+    puitsFocus.tabIndex=-1;puitsFocus.setAttribute("aria-hidden","true");
+    puitsFocus.style.cssText="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;outline:none";
+    document.body.appendChild(puitsFocus);
+  }
+  const a=document.activeElement;
+  if(a&&a.tagName==="IFRAME"){try{a.blur();}catch(e){}}
+  try{puitsFocus.focus({preventScroll:true});}catch(e){}
+  try{window.focus();}catch(e){}
+}
+/* Filet pendant toute la lecture : un toucher sur les contrôles YouTube (ou un
+   aperçu dont la fin n'a pas rendu le focus) laisserait l'iframe focalisée
+   pour de bon, et plus aucun toucher ne déclencherait d'aperçu. Hors aperçu,
+   on reprend donc le focus chaque seconde. */
+function garderFocusPage(){
+  clearInterval(focusGardeT);focusGardeT=null;
+  if(!playingCard)return;
+  focusGardeT=setInterval(()=>{
+    if(!playingCard){clearInterval(focusGardeT);focusGardeT=null;return;}
+    if(peekT)return;   // aperçu en cours : le focus dans l'iframe est voulu
+    const a=document.activeElement;
+    if(document.visibilityState!=="visible")return;
+    if((a&&a.tagName==="IFRAME")||!document.hasFocus())rendreFocusPage();
+  },1000);
+}
 function finApercuVideo(){
   clearTimeout(peekT);peekT=null;
   if(!playingCard)return;
   playingCard.classList.remove("card--peek");
   railEl.classList.add("rail--away");
-  const f=playingCard.querySelector(".card__video");
-  if(f&&document.activeElement===f){try{f.blur();window.focus();}catch(e){}}
+  rendreFocusPage();
 }
 function apercuVideo(){
   if(!playingCard)return;
@@ -7430,7 +7463,13 @@ addEventListener("blur",()=>{
   // activeElement n'est à jour qu'après l'événement.
   setTimeout(()=>{
     const a=document.activeElement;
-    if(playingCard&&a&&a.classList&&a.classList.contains("card__video")&&playingCard.contains(a))apercuVideo();
+    if(playingCard&&a&&a.classList&&a.classList.contains("card__video")&&playingCard.contains(a)){
+      // Ce toucher est un vrai geste, que les écouteurs de la page n'ont pas
+      // vu (il est parti dans l'iframe) : sans cela, gesteDepuisArrivee
+      // restait faux et la barre ne repartait plus jamais (voir onScrollFrame).
+      dernierGesteAt=Date.now();gesteDepuisArrivee=true;
+      apercuVideo();
+    }
   },0);
 });
 /* Relais d'une vidéo à la suivante (lecture auto à 0 s) : l'arrêt ne rend pas
@@ -7504,13 +7543,12 @@ function startVideo(card){
   vcloseDimTimer=setTimeout(()=>closeBtn.classList.add("dim"),2200);
   card.classList.add("card--playing");
   playingCard=card;
+  garderFocusPage();
   disableCaptions(f);
   // Le rail s'efface pendant la lecture ; il ne revient que le temps d'un
-  // aperçu (toucher sur la vidéo, voir apercuVideo) — stopVideo() le restaure. Plus simple que le cycle masquage/
-  // réapparition essayé d'abord, qui butait sur le même mur qu'ailleurs dans
-  // ce fichier : un iframe cross-origin n'expose aucun clic à la page qui
-  // l'englobe, donc rien à l'intérieur de la vidéo ne peut fiablement
-  // redéclencher une réapparition.
+  // aperçu — stopVideo() le restaure. L'iframe d'une autre origine n'expose
+  // aucun clic à la page : le seul signal d'un toucher est la perte de focus
+  // de la page (voir apercuVideo et rendreFocusPage, qui le rend après).
   railEl.classList.add("rail--away");
   /* Intercepte le bouton retour pour quitter la vidéo (comme pour les panneaux).
      Sans cela, le retour quitte l'app ; ici, il rend la carte vidéo avec son
@@ -8118,7 +8156,14 @@ function onScrollFrame(){
      « le menu ne s'affiche pas à l'ouverture, seul le clic le fait revenir ».
      On exige donc un contact récent (voir gesteRecent) : c'est le seul signal
      qui distingue vraiment un doigt d'un reflow. */
-  if(Math.abs(top-lastScrollY)>4&&gesteRecent()){gesteDepuisArrivee=true;hideTop();}
+  /* `playingCard` : un swipe commencé SUR une vidéo en lecture part dans
+     l'iframe (autre origine), dont aucun pointerdown/touchstart ne remonte
+     jusqu'ici — gesteRecent() restait faux. Avec la lecture auto à 0 s, où
+     chaque carte joue, plus AUCUN swipe ne comptait : après un retour au
+     premier plan (reprendreBarre), la barre ne repartait plus jamais. Un
+     défilement pendant une lecture est donc pris pour un geste : au pire, un
+     reflow masque une barre qui n'a rien à faire par-dessus une vidéo. */
+  if(Math.abs(top-lastScrollY)>4&&(gesteRecent()||playingCard)){gesteDepuisArrivee=true;hideTop();}
   lastScrollY=top;
   // L'utilisateur a franchi au moins une carte avant la reprise → on l'annule
   if(resumePending&&top>h*0.5)resumePending=false;
