@@ -251,9 +251,15 @@
      seulement si la vidéo ne part pas (panneau ouvert, ✕), pour garder ▶. */
   html.autovid0 .card--video:not(.card--stopped) .card__body,
   html.autovid0 .card--video:not(.card--stopped) .card__play{opacity:0;pointer-events:none;transition:none}
-  /* Tant que le lecteur charge, l'iframe reste TRANSPARENTE : on voit la
-     vignette de la carte, jamais un aplat noir entre les deux. */
-  .card__video.card__video--loading{background:transparent}
+  /* Tant que la vidéo ne JOUE pas, l'iframe reste SOUS la vignette de la
+     carte (z-index 0, et insérée avant .card__bg : celle-ci la recouvre).
+     Pas seulement pendant le chargement : une fois chargé, le lecteur montre
+     d'abord SA propre affiche (autre cadrage, bandes noires) une fraction de
+     seconde avant la lecture — un clignotement. Elle ne passe devant qu'au
+     signal « lecture » de YouTube (voir surMessageYoutube), ou au filet
+     VIDEO_REVEAL_MS si la lecture auto est refusée (son ▶ doit se voir).
+     Jamais opacity:0 : un cadre invisible peut voir sa lecture auto bloquée. */
+  .card__video.card__video--loading{background:transparent;z-index:0}
   /* Aperçu pendant la lecture (voir apercuVideo) : un toucher sur la vidéo
      rend, 3 s, la chaîne, le titre et la date de publication — mais ni
      l'extrait ni « Regarder », sans objet ici. `!important` : doit primer sur
@@ -3987,7 +3993,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="329";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="330";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -7391,6 +7397,28 @@ function disableCaptions(f){
   };
   [300,900,1800].forEach(ms=>setTimeout(send,ms));
 }
+/* Révélation du lecteur (voir .card__video--loading en CSS). Le lecteur
+   n'émet ses événements qu'après un « listening » de la page (protocole de
+   l'API iframe, déjà activée par enablejsapi=1) ; playerState 1 = lecture. */
+const VIDEO_REVEAL_MS=3000;
+function reveleVideo(f){clearTimeout(f._revealT);f.classList.remove("card__video--loading");}
+function ecouterYoutube(f){
+  const send=()=>{
+    if(!f.isConnected||!f.classList.contains("card__video--loading")||!f.contentWindow)return;
+    try{f.contentWindow.postMessage(JSON.stringify({event:"listening",id:1,channel:"widget"}),"*");}
+    catch(e){warn("ecouterYoutube",e);}
+  };
+  [0,250,700].forEach(ms=>setTimeout(send,ms));
+}
+window.addEventListener("message",e=>{
+  if(!/^https:\/\/www\.youtube(-nocookie)?\.com$/.test(e.origin)||!playingCard)return;
+  const f=playingCard.querySelector(".card__video--loading");
+  if(!f||e.source!==f.contentWindow)return;
+  let d;try{d=typeof e.data==="string"?JSON.parse(e.data):e.data;}catch(_){return;}
+  if(!d)return;
+  const st=d.event==="onStateChange"?d.info:(d.event==="infoDelivery"&&d.info?d.info.playerState:undefined);
+  if(st===1)reveleVideo(f);
+});
 function pushVideoState(){
   try{history.pushState({snVideo:true},"");}catch(e){warn("history push",e);}
 }
@@ -7484,7 +7512,7 @@ function stopVideo(relais){
   clearTimeout(peekT);peekT=null;
   playingCard.classList.remove("card--peek");
   const f=playingCard.querySelector(".card__video");
-  if(f)f.remove();               // retirer l'iframe suffit à couper l'image ET le son
+  if(f){clearTimeout(f._revealT);f.remove();}              // retirer l'iframe suffit à couper l'image ET le son
   const c=playingCard.querySelector(".card__vclose");
   if(c)c.remove();
   railEl.classList.remove("rail--away");   // le prochain rail (autre carte) repart visible
@@ -7504,7 +7532,7 @@ function startVideo(card){
   card.classList.remove("card--stopped");
   const f=document.createElement("iframe");
   f.className="card__video card__video--loading";
-  f.addEventListener("load",()=>f.classList.remove("card__video--loading"),{once:true});
+  f.addEventListener("load",()=>{ecouterYoutube(f);f._revealT=setTimeout(()=>reveleVideo(f),VIDEO_REVEAL_MS);},{once:true});
   f.title=T("card.playVideo");
   // `allow` DÉLÈGUE ces permissions à l'iframe : sans lui, la politique par
   // défaut ('self') les refuse à un cadre d'une autre origine, et le lecteur
