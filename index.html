@@ -56,7 +56,7 @@
      les habillages précédents de ce dépôt, qui n'embarquent aucun fichier de
      police) : elle s'affiche si le système la fournit, sinon repli sur une
      géométrique proche puis sur le système. */
-  :root{
+  :root{--vidctl:64px;
     --bg:#190501;--surface:#340a01;--molten:#631303;--redline:#951c04;
     --flare:#fa5838;--blush:#fcac9c;--ink:#f7f6ff;--ash:#baadab;--black:#000;
     /* Mêmes couleurs que --redline/--blush ci-dessus, mais en triplet R,G,B
@@ -267,6 +267,14 @@
      YouTube, dessous, restent touchables. */
   .card--playing.card--peek .card__body{opacity:1!important;pointer-events:none!important;transition:opacity .18s ease}
   .card--playing.card--peek .card__desc,.card--playing.card--peek .card__actions{display:none}
+  /* …et l'aperçu ne doit pas MANGER les contrôles de YouTube, posés en bas du
+     lecteur (barre de progression, temps, plein écran) : le flou local du bloc
+     de texte les rendait illisibles, et le texte comme le rail les
+     recouvraient. Pendant l'aperçu, pas de flou (le halo du titre suffit) et
+     texte + rail remontent de --vidctl, la hauteur de cette barre. */
+  .card--playing.card--peek .card__body::before{display:none}
+  .card--playing.card--peek .card__body{padding-bottom:calc(44px + var(--vidctl) + max(env(safe-area-inset-bottom),var(--sysbot,0px)))}
+  .rail.rail--vid{bottom:calc(44px + var(--vidctl) + max(env(safe-area-inset-bottom),var(--sysbot,0px)))}
   /* Échappatoire posée par startVideo()/retirée par stopVideo() — voir son
      commentaire : YouTube bloque parfois la lecture derrière un mur « confirmez
      que vous n'êtes pas un robot » (réputation de l'IP, rien que l'app puisse
@@ -3993,7 +4001,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="330";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="331";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -7477,12 +7485,14 @@ function finApercuVideo(){
   if(!playingCard)return;
   playingCard.classList.remove("card--peek");
   railEl.classList.add("rail--away");
+  railEl.classList.remove("rail--vid");
   rendreFocusPage();
 }
 function apercuVideo(){
   if(!playingCard)return;
   showTop();
   playingCard.classList.add("card--peek");
+  railEl.classList.add("rail--vid");      // au-dessus des contrôles du lecteur
   railEl.classList.remove("rail--away");
   clearTimeout(peekT);
   peekT=setTimeout(finApercuVideo,TOP_AWAY_MS);
@@ -7515,7 +7525,7 @@ function stopVideo(relais){
   if(f){clearTimeout(f._revealT);f.remove();}              // retirer l'iframe suffit à couper l'image ET le son
   const c=playingCard.querySelector(".card__vclose");
   if(c)c.remove();
-  railEl.classList.remove("rail--away");   // le prochain rail (autre carte) repart visible
+  railEl.classList.remove("rail--away","rail--vid");   // le prochain rail (autre carte) repart visible
   playingCard.classList.remove("card--playing");
   playingCard=null;
   if(relais)entreeVideoLibre=true;   // gardée pour la vidéo suivante, voir plus haut
