@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- '*.html' exemple.opml sw.js manifest.webmanifest 'logo-*.png' fonts src api well-known vercel.json .vercelignore package.json",
   "headers": [
     {
       "source": "/(.*)",

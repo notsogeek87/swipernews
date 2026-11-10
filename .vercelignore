@@ -1,0 +1,18 @@
+# Fichiers inutiles au site web : ne pas les envoyer dans chaque déploiement Vercel
+# (stockage des déploiements limité à 10 Go sur l'offre gratuite).
+# Le site n'utilise que : *.html, exemple.opml, sw.js, manifest.webmanifest,
+# logo-*.png, fonts/, src/, api/, well-known/.
+android
+fastlane
+resources
+tools
+scripts
+test
+docs
+.claude
+.vibe
+.github
+*.md
+eslint.config.js
+.prettierrc.json
+.prettierignore
