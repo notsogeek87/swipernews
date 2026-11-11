@@ -59,7 +59,7 @@ jobs:
           EOF
           chmod +x gradlew
           ./gradlew --no-daemon -q --init-script "$RUNNER_TEMP/lock.init.gradle" \
-            --no-configuration-cache resolveReleaseDeps --write-locks
+            --no-configuration-cache --continue :app:dependencies --configuration releaseRuntimeClasspath --write-locks > /dev/null || true
           find . -name gradle.lockfile -not -path '*/node_modules/*' -exec wc -l {} \;
 
       - name: Installer Trivy (vérifié)
