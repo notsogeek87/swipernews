@@ -34,6 +34,7 @@ jobs:
         continue-on-error: true
         run: |
           npm ci --ignore-scripts
+          npm run cap:prepare || true
           npx cap sync android || true
 
       - if: env.GRADLE_DIR != ''
@@ -47,11 +48,18 @@ jobs:
         working-directory: ${{ env.GRADLE_DIR }}
         run: |
           cat > "$RUNNER_TEMP/lock.init.gradle" <<'EOF'
-          allprojects { dependencyLocking { lockAllConfigurations() } }
+          allprojects {
+            dependencyLocking { lockAllConfigurations() }
+            tasks.register("resolveReleaseDeps") {
+              doLast {
+                configurations.findAll { it.canBeResolved && it.name ==~ /(?i).*releaseRuntimeClasspath/ }.each { it.resolve() }
+              }
+            }
+          }
           EOF
           chmod +x gradlew
           ./gradlew --no-daemon -q --init-script "$RUNNER_TEMP/lock.init.gradle" \
-            :app:dependencies --configuration releaseRuntimeClasspath --write-locks > /dev/null
+            --no-configuration-cache resolveReleaseDeps --write-locks
           find . -name gradle.lockfile -not -path '*/node_modules/*' -exec wc -l {} \;
 
       - name: Installer Trivy (vérifié)
@@ -73,8 +81,10 @@ jobs:
       - name: Scan Trivy
         run: |
           T="$RUNNER_TEMP/trivy"
-          $T fs --scanners vuln --severity CRITICAL,HIGH,MEDIUM --format table . | tee trivy.txt
-          $T fs --scanners vuln --severity CRITICAL,HIGH,MEDIUM,LOW --format json --output trivy.json .
+          $T fs --scanners vuln --skip-version-check --include-dev-deps --severity CRITICAL,HIGH,MEDIUM --format table . | tee trivy.txt
+          $T fs --scanners vuln --skip-version-check --include-dev-deps --severity CRITICAL,HIGH,MEDIUM,LOW --format json --output trivy.json .
+          echo "--- détail JSON compact :"
+          jq -r '.Results[]? | .Target as $t | .Vulnerabilities[]? | [$t,.PkgName,.InstalledVersion,.Severity,.VulnerabilityID,(.FixedVersion//"-")] | @tsv' trivy.json
           echo "--- fichiers de dépendances vus :"
           jq -r '.Results[]? | "\(.Type)\t\(.Target)\t\(.Vulnerabilities|length? // 0)"' trivy.json
 
