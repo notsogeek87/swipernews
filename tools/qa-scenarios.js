@@ -2348,10 +2348,52 @@ const scenarios = {
       dep.apres,
       "(attendu : 1 → 0, pas de redémarrage fantôme)"
     );
+    // Passage en ARRIÈRE-PLAN (répondre à un message) puis retour : la vidéo est
+    // bien coupée en partant (aucun son hors de l'app), mais elle reprend au
+    // retour, sur la même carte, à la position relevée (`start=`).
+    await page.evaluate(() => {
+      const c = [...feedEl.children].find((x) => x.dataset.vid);
+      feedEl.scrollTo({
+        top: feedEl.clientHeight * [...feedEl.children].indexOf(c),
+        behavior: "instant",
+      });
+    });
+    await page.waitForTimeout(400);
+    await page.evaluate(() => startVideo(currentCardEl()));
+    await page.waitForTimeout(300);
+    const reprise = await page.evaluate(async () => {
+      playingCard.querySelector(".card__video")._t = 42.7; // relevé d'infoDelivery
+      const vis = (v) => {
+        Object.defineProperty(document, "visibilityState", {
+          value: v,
+          configurable: true,
+        });
+        document.dispatchEvent(new Event("visibilitychange"));
+      };
+      vis("hidden");
+      const parti = document.querySelectorAll(".card__video").length;
+      await new Promise((r) => setTimeout(r, 300));
+      vis("visible");
+      const f = document.querySelector(".card__video");
+      return {
+        parti,
+        src: f ? f.src : "",
+        meme: !!f && f.closest(".card") === currentCardEl(),
+      };
+    });
+    console.log(
+      "arrière-plan — iframes en partant (attendu : 0) :",
+      reprise.parti,
+      "| au retour, même carte (attendu : true) :",
+      reprise.meme,
+      "| reprise à 42 s (attendu : true) :",
+      /[?&]start=42(&|$)/.test(reprise.src)
+    );
+    await page.waitForTimeout(400);
     console.log(
       "lecteurs chargés au total :",
       calls.player,
-      "(attendu : 2, un par appui)"
+      "(attendu : 4, un par appui + la reprise)"
     );
     console.log("erreurs :", errors);
     await browser.close();

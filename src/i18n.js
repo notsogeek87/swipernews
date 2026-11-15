@@ -199,6 +199,8 @@
       "listen.sysvoice.default": "Défaut",
       "listen.sysvoice.n": "Voix {n}",
       "listen.sysvoice.sample": "Bonjour, voici cette voix.",
+      "changelog.v332.item1":
+        "Vidéos : en revenant dans l'app (après avoir répondu à un message, par exemple), la vidéo reprend là où elle en était.",
       "changelog.v327.item1":
         "Vidéos : nouveau délai « 0 s » pour la lecture auto (Réglages) — le swipe enchaîne directement la vidéo suivante.",
       "changelog.v327.item2":
@@ -837,6 +839,8 @@
       "listen.sysvoice.default": "Default",
       "listen.sysvoice.n": "Voice {n}",
       "listen.sysvoice.sample": "Hello, this is this voice.",
+      "changelog.v332.item1":
+        "Videos: when you come back to the app (after replying to a message, say), the video picks up where it left off.",
       "changelog.v327.item1":
         "Videos: new « 0 s » delay for autoplay (Settings) — swiping goes straight into the next video.",
       "changelog.v327.item2":
