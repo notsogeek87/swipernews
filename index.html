@@ -2654,26 +2654,49 @@ function adoptItems(list){
    décalerait tous les indices suivants, et le filtre désignerait alors une
    autre source sans que rien ne l'indique. Une URL disparue est simplement
    retirée de la sélection (voir sanitizeNewsSrc). */
-let newsSrc=(()=>{
+/* UNE sélection de sources PAR ONGLET (Articles | Tout | Vidéos) : on peut ne
+   suivre que deux journaux dans « Articles » et une seule chaîne dans
+   « Vidéos », sans que l'un déteigne sur l'autre. `newsSrc` reste la sélection
+   de l'onglet COURANT (tout le reste du code la lit telle quelle) ; setNature()
+   la range dans `newsSrcStore` et prend celle de l'onglet d'arrivée.
+   Stockage : {articles:[…],tout:[…],videos:[…]}. L'ancien format (un tableau
+   d'URL, ou une URL nue) valait pour tous les onglets : il est repris tel quel
+   pour chacun, puis réduit à ce qui a du sens dans l'onglet (une chaîne
+   YouTube n'a rien à faire dans « Articles », ni un site de presse dans
+   « Vidéos »). */
+const srcDeNature=(u,n)=>{const yt=isYoutubeFeedUrl(u);return n==="articles"?!yt:n==="videos"?yt:true;};
+const newsSrcStore=(()=>{
+  const out={articles:[],tout:[],videos:[]};
   try{
     const v=localStorage.getItem(LS_NSRC);
-    if(!v)return [];
-    // Format d'avant le choix multiple : "all", ou UNE url en clair.
-    if(v[0]!=="[")return v==="all"?[]:[v];
-    const a=JSON.parse(v);
-    return Array.isArray(a)?a.filter(x=>typeof x==="string"):[];
-  }catch(e){return [];}
+    if(!v)return out;
+    const liste=a=>Array.isArray(a)?a.filter(x=>typeof x==="string"):[];
+    if(v[0]==="{"){
+      const o=JSON.parse(v)||{};
+      NATURES.forEach(k=>{out[k]=liste(o[k]).filter(u=>srcDeNature(u,k));});
+      return out;
+    }
+    // Format d'avant le choix par onglet : "all", une url en clair, ou un tableau.
+    const a=v[0]!=="["?(v==="all"?[]:[v]):liste(JSON.parse(v));
+    NATURES.forEach(k=>{out[k]=a.filter(u=>srcDeNature(u,k));});
+  }catch(e){}
+  return out;
 })();
-function saveNewsSrc(){try{localStorage.setItem(LS_NSRC,JSON.stringify(newsSrc));}catch(e){warn("save newsSrc",e);}}
+let newsSrc=newsSrcStore[nature];
+function saveNewsSrc(){newsSrcStore[nature]=newsSrc;try{localStorage.setItem(LS_NSRC,JSON.stringify(newsSrcStore));}catch(e){warn("save newsSrc",e);}}
 /* Identité stable de la sélection, indépendante de l'ordre des taps : deux
    sélections des mêmes sources sont le MÊME fil, donc la même clé de cache. */
 function newsSrcKey(sel){const a=sel||newsSrc;return a.length?[...a].sort().join(","):"all";}
 function sanitizeNewsSrc(){
-  if(!newsSrc.length)return false;
   const ok=new Set(feeds.filter(f=>f.on).map(f=>f.url));
-  const garde=newsSrc.filter(u=>ok.has(u));
-  if(garde.length===newsSrc.length)return false;
-  newsSrc=garde;                      // sources décochées, supprimées, ou jamais vues
+  let change=false;
+  NATURES.forEach(k=>{
+    const cur=k===nature?newsSrc:newsSrcStore[k];
+    const garde=cur.filter(u=>ok.has(u)&&srcDeNature(u,k));
+    if(garde.length!==cur.length){newsSrcStore[k]=garde;change=true;}   // décochées, supprimées, ou jamais vues
+  });
+  if(!change)return false;
+  newsSrc=newsSrcStore[nature];
   saveNewsSrc();
   return true;
 }
@@ -4001,7 +4024,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="332";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="333";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -9023,13 +9046,25 @@ function setNature(k){
   if(!NATURES.includes(k)||k===nature)return;
   const avant=mixLevel();
   const dir=NATURES.indexOf(k)-NATURES.indexOf(nature);   // >0 : vers la droite (Vidéos)
+  // Chaque onglet a SA sélection de sources : si elle diffère de celle qu'on
+  // quitte, le fil à charger n'est pas le même — instantané AVANT de changer
+  // de clé (comme setNewsSrc), puis bascule par switchFeed.
+  newsSrcStore[nature]=newsSrc;
+  const cible=newsSrcStore[k],autreFil=newsSrcKey(cible)!==newsSrcKey();
+  if(autreFil)snapshotFeed();
   nature=k;
+  newsSrc=cible;
   majAutoVid();
   stopVideo();
   try{navigator.vibrate&&navigator.vibrate(8);}catch(_){}
   feedEl.style.setProperty("--natdx",(dir>0?"":"-")+"36px");
   feedEl.classList.remove("nat-in");void feedEl.offsetWidth;feedEl.classList.add("nat-in");
   feedEl.addEventListener("animationend",()=>feedEl.classList.remove("nat-in"),{once:true});
+  if(autreFil){
+    renderNatures();renderMixUI();hideStates();
+    switchFeed();
+    return;
+  }
   remix();render(true);
   renderNatures();renderMixUI();hideStates();
   const m=mixLevel();
@@ -9421,7 +9456,7 @@ function filterChips(kind){
     // Libellés calculés sur les seules sources COCHÉES, celles que la liste
     // montre : préciser « · asie » n'a de sens que s'il y a bien deux
     // « Courrier international » sous les yeux (voir feedLabels, src/lib.js).
-    const on=feeds.filter(f=>f.on),lbl=feedLabels(on);
+    const on=feeds.filter(f=>f.on&&srcDeNature(f.url,nature)),lbl=feedLabels(on);
     // RSS avant YouTube, puis ordre alphabétique à l'intérieur de chaque
     // groupe — l'ordre d'ajout des sources n'a sinon aucun sens pour qui
     // cherche une source dans la liste.
@@ -9444,7 +9479,7 @@ function filterValue(kind){
     // pastille tient sur une ligne, et trois noms concaténés y seraient
     // tronqués au milieu d'un mot.
     if(newsSrc.length>1)return T("filter.src.count",{n:newsSrc.length});
-    const on=feeds.filter(f=>f.on),lbl=feedLabels(on);
+    const on=feeds.filter(f=>f.on&&srcDeNature(f.url,nature)),lbl=feedLabels(on);
     const i=on.findIndex(x=>x.url===newsSrc[0]);
     return i>=0?lbl[i]:hostOf(newsSrc[0]);
   }
@@ -9586,7 +9621,7 @@ function setNewsSrc(liste){
   // Toutes les sources cochées une par une, c'est « Toutes » : exactement le
   // même fil, donc la même clé de cache — et la pastille le dit ainsi plutôt
   // que d'annoncer « 8 sources ».
-  const actives=feeds.filter(f=>f.on).map(f=>f.url);
+  const actives=feeds.filter(f=>f.on&&srcDeNature(f.url,nature)).map(f=>f.url);
   if(sel.length&&actives.length&&actives.every(u=>sel.includes(u)))sel=[];
   if(newsSrcKey(sel)===newsSrcKey())return;   // même sélection : rien à recharger
   // Instantané AVANT le changement de `newsSrc`, sinon le fil qu'on quitte
@@ -10666,7 +10701,8 @@ function settingsSnapshot(){
     cardsPerSwipe,
     interests,
     cat,
-    newsSrc,
+    newsSrc:newsSrcStore.tout,
+    newsSrcParOnglet:{...newsSrcStore,[nature]:newsSrc},
     feeds,
     filterSponsored,
     mutedWords,
@@ -10811,7 +10847,11 @@ function applySettingsImport(obj){
     const ok=sanitizeFeeds(obj.feeds);
     if(ok){localStorage.setItem(LS_KEY,JSON.stringify(ok));n++;}
   }
-  if(Array.isArray(obj.newsSrc)&&obj.newsSrc.every(x=>typeof x==="string")){
+  const strs=a=>Array.isArray(a)&&a.every(x=>typeof x==="string");
+  if(obj.newsSrcParOnglet&&typeof obj.newsSrcParOnglet==="object"&&NATURES.every(k=>strs(obj.newsSrcParOnglet[k]))){
+    const o={};NATURES.forEach(k=>{o[k]=obj.newsSrcParOnglet[k];});
+    localStorage.setItem(LS_NSRC,JSON.stringify(o));n++;
+  }else if(strs(obj.newsSrc)){
     localStorage.setItem(LS_NSRC,JSON.stringify(obj.newsSrc));n++;
   }
   if(typeof obj.filterSponsored==="boolean"){
