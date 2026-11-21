@@ -273,7 +273,9 @@
       var m = document.querySelector(sel);
       return (m && m.getAttribute("content")) || "";
     }
-    var title = (meta('meta[property="og:title"]') || document.title || "").trim();
+    var ogTitle = meta('meta[property="og:title"]').replace(/\s+/g, " ").trim();
+    var docTitle = (document.title || "").replace(/\s+/g, " ").trim();
+    var title = ogTitle || docTitle;
     var description = meta('meta[property="og:description"]') || meta('meta[name="description"]');
 
     /* Mots de référence de la PAGE (titre + description), posés par le site
@@ -287,7 +289,26 @@
         .split(/[^a-z0-9]+/)
         .filter(function (w) { return w.length >= 3 && !STOPWORDS.test(w); });
     }
-    var refWords = keywords(title + " " + description);
+    /* L'og:title n'est pas toujours celui de l'article : il n'est lu que par
+       les réseaux sociaux, donc personne ne voit qu'il est faux. Cas réel
+       rencontré (Les Surligneurs) : un script du site le réécrit après
+       chargement en « my new title », reste d'un test — le HTML servi, lui,
+       porte le bon. Pris comme seule référence, il faisait refuser TOUS les
+       candidats par le filet « le bloc parle du sujet » (aucun mot commun avec
+       « new title »), et l'article entier tombait en « ne peut pas être
+       simplifié » ; en titre, il aurait affiché « my new title ».
+       Le <title>, lui, est ce que le navigateur montre : un site le voit tous
+       les jours. Quand les deux ne partagent AUCUN mot significatif, c'est
+       donc le <title> qui fait foi. Et les mots de référence réunissent les
+       deux : un seul mot commun avec l'un OU l'autre suffit à valider. */
+    if (ogTitle && docTitle) {
+      var docSet = {}, dw = keywords(docTitle), ow = keywords(ogTitle), shared = false;
+      for (var di = 0; di < dw.length; di++) docSet[dw[di]] = true;
+      for (var oi = 0; oi < ow.length; oi++) if (docSet[ow[oi]]) { shared = true; break; }
+      // Deux mots au moins : un <title> générique (« Accueil ») ne remplace rien.
+      if (dw.length >= 2 && !shared) title = docTitle;
+    }
+    var refWords = keywords(title + " " + docTitle + " " + description);
 
     /* Ce que la page NE MONTRE PAS ne doit pas réapparaître à la lecture.
        Beaucoup de sites laissent dans le DOM du texte que leur feuille de style
