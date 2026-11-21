@@ -677,6 +677,63 @@
       break;
     }
 
+    /* 8 bis. L'image de tête. Beaucoup de gabarits de presse posent la photo
+       principale HORS du bloc qui porte le texte — dans un en-tête d'article,
+       à côté du titre — et le bloc retenu par la notation n'en contient donc
+       aucune. Cas réel rencontré (20 Minutes) : `figure.c-media` frère du
+       corps, article lu sans une seule image alors que la page en avait une
+       en 1444×920 juste sous le titre.
+       La source sûre est l'og:image, que le site pose lui-même pour illustrer
+       CET article (aperçus de partage) : aucune devinette sur le DOM, aucune
+       requête de plus — l'image est déjà celle que la page allait charger.
+       On ne l'ajoute que si l'extraction n'a pas déjà sa propre image de tête
+       (une image avant le premier vrai paragraphe), ou si cette image-là est
+       déjà dans l'article : sinon on doublerait la photo, souvent sous un
+       autre recadrage (1200×630 pour les réseaux) qu'aucune comparaison
+       d'URL ne reconnaîtrait. Écartés aussi : une og:image déclarée petite et
+       les images génériques du site (logo, image par défaut), que certains
+       sites servent quand l'article n'a pas de photo. Le texte alternatif
+       vient de la vraie <img> de la page quand on la retrouve. */
+    (function () {
+      var hero = meta('meta[property="og:image"]') || meta('meta[property="og:image:url"]')
+              || meta('meta[name="twitter:image"]') || meta('meta[property="twitter:image"]');
+      if (!hero || hero.indexOf("data:") === 0) return;
+      try { hero = new URL(hero, document.baseURI).href; } catch (e) { return; }
+      if (!/^https?:/i.test(hero)) return;
+      if (/(logo|default|placeholder|fallback|favicon|sprite|blank)/i.test(hero.split("?")[0].split("/").pop())) return;
+      var hw = parseInt(meta('meta[property="og:image:width"]') || "0", 10);
+      if (hw && hw < 300) return;
+      var inArt = art.getElementsByTagName("img");
+      for (var q = 0; q < inArt.length; q++) {
+        if (inArt[q].getAttribute("src") === hero) return;
+      }
+      // Une image AVANT le premier paragraphe de prose : l'article a déjà la sienne.
+      var walker = document.createTreeWalker(art, NodeFilter.SHOW_ELEMENT, null, false);
+      for (var nd = walker.nextNode(); nd; nd = walker.nextNode()) {
+        if (nd.tagName === "IMG") return;
+        if (nd.tagName === "P" && len(nd) > 90) break;
+      }
+      var alt = "";
+      var pageImgs = document.images;
+      for (q = 0; q < pageImgs.length && q < 400; q++) {
+        var pi = pageImgs[q];
+        if (pi.currentSrc === hero || pi.getAttribute("src") === hero
+            || (pi.getAttribute("srcset") || "").indexOf(hero) >= 0) {
+          alt = pi.getAttribute("alt") || "";
+          break;
+        }
+      }
+      var fig = document.createElement("figure");
+      fig.className = "sn-hero";
+      var im = document.createElement("img");
+      im.setAttribute("src", hero);
+      im.setAttribute("alt", alt);
+      // Une og:image introuvable ne doit pas laisser un cadre vide en tête.
+      im.onerror = function () { if (fig.parentNode) fig.parentNode.removeChild(fig); };
+      fig.appendChild(im);
+      art.insertBefore(fig, art.firstChild);
+    })();
+
     /* Temps de lecture : 220 mots/minute, la moyenne admise en lecture d'écran.
        Il ne sert pas à mesurer mais à décider — « j'ai le temps, ou pas ». */
     var words = (art.textContent || "").trim().split(/\s+/).length;
@@ -744,6 +801,7 @@
       '.sn-read img{display:block;max-width:100%;height:auto;margin:1.8em auto;border-radius:12px}' +
       '.sn-read figure{margin:1.8em 0}' +
       '.sn-read figure img{margin:0 auto}' +
+      '.sn-read .sn-hero{margin:1.2em 0 1.6em}' +
       '.sn-read figcaption{font:13px/1.5 system-ui,sans-serif;color:' + T.mute + ';text-align:center;' +
         'margin:.7em 4px 0;hyphens:none;-webkit-hyphens:none}' +
       '.sn-read blockquote{margin:1.6em 0;padding:.1em 0 .1em 16px;border-left:3px solid ' + T.quote + ';' +
