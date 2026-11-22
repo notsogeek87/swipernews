@@ -1653,3 +1653,114 @@ test("nombreEnLettres : accords du français", () => {
   assert.equal(lib.ordinalEnLettres(5), "cinquième");
   assert.equal(lib.ordinalEnLettres(9), "neuvième");
 });
+
+/* ---------- Regroupement par sujet ---------- */
+const sujet = (source, title, date = "2026-11-20T10:00:00Z") => ({
+  source,
+  title,
+  date,
+  link: "https://" + source.replace(/\W/g, "") + ".example/" + encodeURIComponent(title),
+});
+
+test("memeSujet : même événement, titré par plusieurs rédactions", () => {
+  const vrais = [
+    [
+      "Séisme de magnitude 7 au Japon : alerte au tsunami",
+      "Japon : un séisme de magnitude 7,1 déclenche une alerte au tsunami",
+    ],
+    [
+      "Réforme des retraites : le gouvernement dégaine le 49.3",
+      "Retraites : le gouvernement recourt au 49.3 pour faire passer la réforme",
+    ],
+    [
+      "Grève SNCF : trafic très perturbé ce week-end, les prévisions",
+      "Grèves à la SNCF : le trafic sera très perturbé ce week-end",
+    ],
+    [
+      "Mort de l'acteur Jean Dupont à 84 ans",
+      "L'acteur Jean Dupont est mort à l'âge de 84 ans",
+    ],
+  ];
+  for (const [a, b] of vrais)
+    assert.ok(lib.memeSujet(sujet("Le Monde", a), sujet("franceinfo", b)), `${a} | ${b}`);
+});
+
+test("memeSujet : sujets voisins mais distincts ne fusionnent pas", () => {
+  const faux = [
+    [
+      "Emmanuel Macron en visite à Berlin pour rencontrer Olaf Scholz",
+      "Emmanuel Macron en visite à Rome pour rencontrer Giorgia Meloni",
+    ],
+    ["Ligue 1 : le PSG s'impose face à Lyon", "Ligue 1 : Marseille s'impose face à Lens"],
+    [
+      "Météo : alerte orange aux orages dans le Sud-Ouest",
+      "Météo : alerte orange à la neige dans les Alpes",
+    ],
+    [
+      "Prix de l'essence : nouvelle hausse à la pompe",
+      "Prix de l'électricité : nouvelle baisse en février",
+    ],
+  ];
+  for (const [a, b] of faux)
+    assert.ok(
+      !lib.memeSujet(sujet("Le Monde", a), sujet("franceinfo", b)),
+      `${a} | ${b}`
+    );
+});
+
+test("memeSujet : jamais deux articles de la même source, ni trop éloignés", () => {
+  const a = "Séisme de magnitude 7 au Japon : alerte au tsunami";
+  const b = "Japon : un séisme de magnitude 7,1 déclenche une alerte au tsunami";
+  assert.ok(!lib.memeSujet(sujet("Le Monde", a), sujet("le monde", b)));
+  assert.ok(
+    !lib.memeSujet(
+      sujet("Le Monde", a, "2026-11-20T10:00:00Z"),
+      sujet("franceinfo", b, "2026-11-23T10:00:00Z")
+    )
+  );
+  // Date absente : le titre tranche seul.
+  assert.ok(lib.memeSujet(sujet("Le Monde", a, ""), sujet("franceinfo", b)));
+  // Titre trop court pour décider : jamais regroupé.
+  assert.ok(
+    !lib.memeSujet(sujet("Le Monde", "Le direct"), sujet("franceinfo", "Le direct"))
+  );
+});
+
+test("regroupeSujets : le premier dans l'ordre représente le sujet, rien n'est perdu", () => {
+  const l = [
+    sujet("Le Monde", "Séisme de magnitude 7 au Japon : alerte au tsunami"),
+    sujet("Libération", "Budget 2027 : le Sénat rejette la première partie du texte"),
+    sujet(
+      "franceinfo",
+      "Japon : un séisme de magnitude 7,1 déclenche une alerte au tsunami"
+    ),
+    {
+      kind: "learn",
+      title: "Séisme de magnitude 7 au Japon alerte tsunami",
+      source: "Wikipédia",
+      link: "w",
+    },
+    sujet("20 Minutes", "Alerte au tsunami au Japon après un séisme de magnitude 7"),
+    sujet("Le Monde", "Japon : séisme de magnitude 7, l'alerte au tsunami levée"),
+  ];
+  const r = lib.regroupeSujets(l, {
+    cle: (i) => i.link,
+    estCandidat: (i) => i.kind !== "learn",
+  });
+  assert.deepStrictEqual(
+    r.gardes.map((i) => i.source),
+    ["Le Monde", "Libération", "Wikipédia", "Le Monde"]
+  );
+  const autres = r.autres.get(l[0].link).map((i) => i.source);
+  assert.deepStrictEqual(autres, ["franceinfo", "20 Minutes"]);
+  assert.strictEqual(r.absorbes.size, 2);
+  assert.strictEqual(r.gardes.length + r.absorbes.size, l.length);
+});
+
+test("regroupeSujets : entrée vide ou abîmée", () => {
+  const r = lib.regroupeSujets(null);
+  assert.deepStrictEqual(r.gardes, []);
+  assert.strictEqual(r.autres.size, 0);
+  const r2 = lib.regroupeSujets([null, { title: 42 }, {}]);
+  assert.strictEqual(r2.gardes.length, 3);
+});

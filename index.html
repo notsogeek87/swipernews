@@ -370,6 +370,13 @@
   .card__desc{font-size:15px;line-height:1.5;color:var(--ink);max-width:46ch;
     display:-webkit-box;-webkit-line-clamp:10;-webkit-box-orient:vertical;overflow:hidden}
   .card__meta{margin-top:16px;display:flex;align-items:center;gap:14px;color:var(--ash);font-size:13px}
+  /* Pastille « N sources » (regroupement par sujet, voir regrouperSujets) :
+     une INFO touchable dans la ligne de méta, pas un second bouton d'action —
+     liseré discret, même taille de texte que la date qu'elle côtoie. */
+  .card__sujet{display:inline-flex;align-items:center;gap:6px;font:inherit;color:var(--ink);
+    background:rgba(var(--redline-rgb),.16);border:1px solid var(--redline);border-radius:999px;padding:4px 11px;cursor:pointer}
+  .card__sujet[hidden]{display:none}
+  .card__sujet svg{width:14px;height:14px;flex:0 0 auto}
   /* Bouton primaire plein : dégradé cocoa -> molten et halo intérieur « braise »
      (seule ombre de tout le système), conformes à la charte au pixel près. */
   .card__actions{margin-top:20px;display:flex;align-items:stretch;gap:10px}
@@ -1794,6 +1801,7 @@
     <h3 class="secttl" data-i18n="sheet.sources.title">📰 Sources d'actualité</h3>
     <p class="sub" data-i18n="sheet.sources.sub">Coche les flux à afficher, ajoute ceux que tu veux.</p>
     <label class="sponsorrow"><input type="checkbox" id="sponsorFilterChk"><span data-i18n="sheet.sources.filterSponsored">Filtrer les articles sponsorisés et bons plans</span></label>
+    <label class="sponsorrow"><input type="checkbox" id="sujetsChk"><span data-i18n="sheet.sources.groupTopics">Regrouper les articles qui parlent du même sujet</span></label>
     <div id="feedList"></div>
     <div class="addbox">
       <input id="newUrl" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-attr="placeholder:sheet.sources.placeholder" placeholder="Adresse, r/sous-reddit, @compte…" inputmode="url">
@@ -1910,6 +1918,21 @@
       <p class="sub" id="savedSub"></p>
     </div>
     <div id="savedList"></div>
+  </div>
+</div>
+
+<!-- Même sujet, autres sources : ouverte par la pastille « N sources » d'une
+     carte (voir regrouperSujets). Une VUE de sujetsAutres, refaite à chaque
+     ouverture ; une rangée OUVRE l'article, comme dans « Enregistrés » — les
+     versions regroupées ne sont pas dans le fil, il n'y a nulle part où sauter. -->
+<div class="sheet" id="sujetSheet" role="dialog" aria-modal="true" aria-labelledby="sujetTitle">
+  <div class="sheet__panel" tabindex="-1">
+    <div class="sheet__grip"></div>
+    <div class="histhead">
+      <h2 id="sujetTitle" data-i18n="sujet.title">Le même sujet ailleurs</h2>
+      <p class="sub" id="sujetSub"></p>
+    </div>
+    <div id="sujetList"></div>
   </div>
 </div>
 
@@ -2053,9 +2076,9 @@
      périmé en cache ne peut jamais être servi à un index.html neuf.
      À CHAQUE modification de ce fichier ou de src/*.js : incrémenter ici ET
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
-<script src="src/lib.js?v=321"></script>
+<script src="src/lib.js?v=334"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=332"></script>
+<script src="src/i18n.js?v=334"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2063,7 +2086,7 @@
    images ni interactions. Plutôt que de laisser un écran à moitié cassé, on
    purge caches et service worker, puis on recharge UNE fois. */
 (function guardModules(){
-  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","roundRobin","weightedRoundRobin","dedupNews","feedLabels","isPromotionalItem","ttsChunks","sansEmoji","parlable","mutedMatcher","sanitizeMutedWords","parseMutedInput","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeShortsFeedUrl","isYoutubeShortsFeedUrl","youtubeFeedName","isLequipeFeedUrl","lequipeRubrique","lequipeFeedName","feedLinkFromHtml","commonFeedUrlCandidates","SOURCE_KINDS","socialFeedCandidates"],
+  const need={SwiperLib:["stripHtml","clampText","isFeedUrl","safeImg","cssString","parseOpmlFeeds","roundRobin","weightedRoundRobin","dedupNews","regroupeSujets","feedLabels","isPromotionalItem","ttsChunks","sansEmoji","parlable","mutedMatcher","sanitizeMutedWords","parseMutedInput","isPaywallCandidateDomain","isPaywalledHtml","isSponsoredHtml","isSponsorCandidateDomain","youtubeId","isYoutubeFeedUrl","youtubeShortsFeedUrl","isYoutubeShortsFeedUrl","youtubeFeedName","isLequipeFeedUrl","lequipeRubrique","lequipeFeedName","feedLinkFromHtml","commonFeedUrlCandidates","SOURCE_KINDS","socialFeedCandidates"],
               SwiperLearn:["CATEGORIES","wikiUrl","normalizeWiki","randomBucket","perCatLimit"],
               SwiperI18n:["LANGS","t"]};
   const missing=[];
@@ -2298,7 +2321,7 @@ const CONFIG = {
 /* Fonctions pures partagées (src/lib.js, src/learn-core.js) : mêmes
    implémentations que celles couvertes par `npm test` et que le backend. */
 const {stripHtml,clampText,isFeedUrl,imgFromHtml,safeLink,safeImg,cssString,upscaleImageUrl,imageSizeFromUrl,esc,escAttr,relTime,dayKey,quarterIndex,statsBuckets,shuffle,
-  seenKey,dropSeen,roundRobin,weightedRoundRobin,groupItems,dedupNews,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,YT_SHORT_MAX_DURATION_S,youtubeApiVideosDurationUrl,youtubeApiDurationsFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,ttsChunks,sansEmoji,parlable,mutedMatcher,sanitizeMutedWords,parseMutedInput,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities,feedLinkFromHtml,commonFeedUrlCandidates,SOURCE_KINDS,socialFeedCandidates}=self.SwiperLib;
+  seenKey,dropSeen,roundRobin,weightedRoundRobin,groupItems,dedupNews,regroupeSujets,canonicalLink,youtubeId,isYoutubeFeedUrl,youtubeShortsFeedUrl,isYoutubeShortsFeedUrl,youtubeFeedName,isYoutubeChannelPageUrl,youtubeChannelIdFromChannelUrl,youtubeChannelHandleFromUrl,youtubeFeedUrlFromChannelHtml,youtubeApiChannelsByHandleUrl,youtubeApiChannelsByUsernameUrl,youtubeApiSearchChannelUrl,youtubeApiChannelIdFromResponse,youtubeApiPlaylistItemsUrl,youtubeApiItemsFromPlaylistResponse,YT_SHORT_MAX_DURATION_S,youtubeApiVideosDurationUrl,youtubeApiDurationsFromResponse,isLequipeFeedUrl,lequipeRubrique,lequipeFeedName,feedLabels,isPromotionalItem,ttsChunks,sansEmoji,parlable,mutedMatcher,sanitizeMutedWords,parseMutedInput,isPaywallCandidateDomain,isPaywalledHtml,isSponsoredHtml,isSponsorCandidateDomain,hostOf,parseJsonFeeds,parseOpmlFeeds,metaContent,decodeEntities,feedLinkFromHtml,commonFeedUrlCandidates,SOURCE_KINDS,socialFeedCandidates}=self.SwiperLib;
 const LEARN=self.SwiperLearn;
 
 /* ---------- Langue de l'interface ----------
@@ -2541,6 +2564,21 @@ const LS_MUTES="fluxswipe.mutes.v1";
 let mutedWords=(()=>{try{return sanitizeMutedWords(JSON.parse(localStorage.getItem(LS_MUTES)||"[]"));}catch(e){return [];}})();
 let estMasque=mutedMatcher(mutedWords)||(()=>false);
 function mutedSig(){return mutedWords.join("\n");}
+/* Regroupement par sujet (voir regroupeSujets, src/lib.js) : plusieurs
+   rédactions qui couvrent le même événement ne font plus qu'UNE carte, les
+   autres versions derrière la pastille « N sources ». Même place que les mots
+   masqués, et pour la même raison : appliqué dans remix(), à l'ENTRELACEMENT,
+   jamais à la récupération. `newsItems` garde tout, décocher la case ramène
+   les versions regroupées sans réseau, et feedKey()/le cache n'en savent rien.
+   Défaut ACTIVÉ : rien n'est retiré, seulement rangé derrière une pastille.
+   `sujetsAutres` (clé du représentant -> autres versions) et
+   `sujetsAbsorbes` (clés passées derrière un représentant) sont recalculés à
+   CHAQUE remix : jamais stockés, jamais périmés. */
+const LS_SUJETS="fluxswipe.sujets.v1";
+let regrouperSujets=(()=>{try{return localStorage.getItem(LS_SUJETS)!=="0";}catch(e){return true;}})();
+let sujetsAutres=new Map(),sujetsAbsorbes=new Set();
+const sujetCandidat=i=>i&&i.kind!=="learn"&&!videoIdOf(i);
+function autresDuSujet(it){return (it&&sujetsAutres.get(seenKey(it)))||[];}
 function persistCardsPerSwipe(n){
   cardsPerSwipe=clampCardsPerSwipe(n);
   try{localStorage.setItem(LS_CARDSPERSWIPE,String(cardsPerSwipe));}catch(e){warn("save cardspercard",e);}
@@ -2618,11 +2656,26 @@ function remix(geleAvant){
   // aussi, c'est précisément ce qu'on vient de demander.
   fige=fige.filter(i=>!estMasque(i)&&natureOk(i));
   const pris=new Set(fige.map(seenKey));
-  const resteNews=newsItems.filter(i=>!pris.has(seenKey(i))&&!estMasque(i)&&natureOk(i));
+  let resteNews=newsItems.filter(i=>!pris.has(seenKey(i))&&!estMasque(i)&&natureOk(i));
   const resteLearn=learnItems.filter(i=>!pris.has(seenKey(i))&&!estMasque(i)&&natureOk(i));
+  /* Regroupement par sujet : les cartes FIGÉES passent en tête de la
+     comparaison, donc deviennent représentantes de leur sujet — la carte sous
+     le doigt ne disparaît jamais derrière une autre. Seul le reste peut être
+     absorbé (une carte figée reconnue après coup comme une autre version reste
+     où elle est : on ne retire rien de ce qui est à l'écran). */
+  sujetsAutres=new Map();sujetsAbsorbes=new Set();
+  if(regrouperSujets){
+    const r=regroupeSujets(fige.filter(sujetCandidat).concat(resteNews),{cle:seenKey,estCandidat:sujetCandidat});
+    sujetsAutres=r.autres;sujetsAbsorbes=r.absorbes;
+    if(sujetsAbsorbes.size)resteNews=resteNews.filter(i=>!sujetsAbsorbes.has(seenKey(i)));
+  }
   items=fige.concat(mixLists(resteNews,resteLearn,mixLevel()));
   if(items.length<=CONFIG.MAX_ITEMS)return;
   const partis=new Set(items.slice(0,items.length-CONFIG.MAX_ITEMS).map(seenKey));
+  // Un représentant qui sort du fil emmène ses autres versions : laissées dans
+  // `newsItems`, l'une d'elles deviendrait représentante au mélange suivant et
+  // ramènerait sous les yeux un sujet déjà dépassé.
+  for(const k of [...partis])for(const a of sujetsAutres.get(k)||[])partis.add(seenKey(a));
   items=items.slice(items.length-CONFIG.MAX_ITEMS);
   newsItems=newsItems.filter(i=>!partis.has(seenKey(i)));
   learnItems=learnItems.filter(i=>!partis.has(seenKey(i)));
@@ -3602,6 +3655,7 @@ function fileFlash(){
   for(const it of newsItems){
     if(out.length>=FLASH_MAX||(car>=budget&&out.length>=3))break;
     if(videoIdOf(it)||itemSeen(it)||estMasque(it))continue;
+    if(sujetsAbsorbes.has(seenKey(it)))continue;   // un sujet lu une fois, pas cinq
     if(noms&&!noms.has(it.source))continue;
     const k=seenKey(it);
     if(!k||cartes.has(k))continue;
@@ -4024,7 +4078,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="333";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="334";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4035,6 +4089,8 @@ const APP_VERSION="333";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:334,date:"2026-11-22",items:[
+    "changelog.v334.item1"]},
   {v:332,date:"2026-11-15",items:[
     "changelog.v332.item1"]},
   {v:327,date:"2026-11-06",items:[
@@ -6569,7 +6625,13 @@ function markVisibleSeen(it,cardId){
 function markOneSeen(it){
   if(!it)return;
   if(it.kind==="learn")addSeen(it);
-  else addSeenNews(it);
+  else{
+    addSeenNews(it);
+    /* Vu au sens du SUJET : sans cela, au ↻ suivant la version lue part en
+       fin de file (voir seenNews), une version JAMAIS vue d'une autre source
+       devient représentante, et le même sujet revient en tête du fil. */
+    for(const a of autresDuSujet(it))addSeenNews(a);
+  }
 }
 /* Marquage « vu » IMMÉDIAT pour un article ouvert depuis une ligne d'une
    carte à parts égales (cardsPerSwipe>1, voir pvRowHTML — jamais une vidéo,
@@ -7205,6 +7267,7 @@ function render(forceTop,altAnchor){
   // d'un contenu qui n'a rien à voir.
   if(!top)setScrollTopInstant(feedEl,0);
   observeBackgrounds();observePaywall();observeMissingImages();observeSponsor();
+  majPastillesSujets();
   if(DEBUG){const e=posEntry(),l=(e&&e.link)||"";const i=e?resolveResume(e):-1;
     dbg(`v${APP_VERSION}  items=${items.length} (${newsItems.length} actus / ${learnItems.length} wiki)\n`+
         `mémorisé=…${l.slice(-24)||"(rien)"}\n`+
@@ -7215,6 +7278,24 @@ function render(forceTop,altAnchor){
   onCardChange();                               // suit la 1ère carte ; vue seulement au swipe
   renderLoadMoreCard();          // toujours en dernier : elle doit rester la DERNIÈRE carte
   attemptPendingJump();   // voir requestJumpToArticle : l'article annoncé vient peut-être d'arriver
+}
+/* Pastille « N sources » de chaque carte héros. Posée APRÈS la réconciliation
+   et pas dans cardHTML : render() réutilise une carte déjà en place sans la
+   réécrire (réconciliation par lien), alors que son sujet peut gagner une
+   version à chaque lot d'actus qui arrive. Ne touche le DOM que si le texte
+   change — pas d'écriture à chaque rendu progressif. */
+function majPastillesSujets(){
+  for(const el of feedEl.children){
+    const b=el.querySelector(".card__sujet");
+    if(!b)continue;
+    const n=autresDuSujet(cardReg.get(+el.dataset.id)).length;
+    const txt=n?T("sujet.pill",{n:n+1}):"";
+    if(b.dataset.n===String(n))continue;
+    b.dataset.n=String(n);
+    b.hidden=!n;
+    b.innerHTML=n?`${ICON_SUJET}<span>${esc(txt)}</span>`:"";
+    if(n)b.setAttribute("aria-label",T("sujet.pillAria",{n:n+1}));else b.removeAttribute("aria-label");
+  }
 }
 /* Carte de fin provisoire : visible tant que loadMore() est en vol, pour que
    swiper au-delà de la dernière carte réelle mène quelque part (un écran de
@@ -7282,6 +7363,8 @@ async function loadMore(){
    Les emoji restent là où ils sont une VALEUR et non une décoration : badge de
    thème sur les cartes, puces des listes (chaque centre d'intérêt a le sien). */
 const ICON_DISCOVER=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>`;
+// Pastille « N sources » : deux feuilles décalées, l'une derrière l'autre.
+const ICON_SUJET=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="13" height="15" rx="2"></rect><path d="M4 7v12a2 2 0 0 0 2 2h10"></path></svg>`;
 const ICON_READ=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>`;
 // Flux RSS (la source d'une actu) et étiquette (le thème d'un article) : deux
 // dessins nettement différents, pour que les deux pastilles ne se confondent pas.
@@ -7384,7 +7467,7 @@ function cardHTML(it,id){
       <span class="card__source"><span class="dot"></span><span class="txt">${esc(it.source)}</span></span>
       <h2 class="card__title">${titleHTML}</h2>
       ${it.desc?`<p class="card__desc">${esc(it.desc)}</p>`:""}
-      <div class="card__meta">${it.date?`<span>${relTime(it.date)}</span>`:""}</div>
+      <div class="card__meta">${it.date?`<span>${relTime(it.date)}</span>`:""}${!learnCard&&!vid?`<button type="button" class="card__sujet" data-sujet hidden></button>`:""}</div>
       <div class="card__actions">
         ${vid?`<button type="button" class="card__open" data-play>${ICON_PLAY}<span>${T("card.watch")}</span></button>`
           :link?`<a class="card__open" data-open href="${escAttr(link)}" target="_blank" rel="noopener">${openIcon}<span>${openLabel}</span></a>`
@@ -7707,6 +7790,13 @@ feedEl.addEventListener("click",e=>{
   // deux passent par [data-play] ci-dessus, donc jamais par cette branche —
   // « vu » ne s'y acquiert que par swipe, comme pour toute carte, voir
   // markOneSeen.)
+  const sujetBtn=e.target.closest("[data-sujet]");
+  if(sujetBtn){
+    const card=sujetBtn.closest(".card");
+    const it=card&&cardReg.get(+card.dataset.id);
+    if(it)openSujet(it);
+    return;
+  }
   const openLink=e.target.closest("a[data-open]");
   if(openLink&&openLink.href){
     const card=openLink.closest(".card");
@@ -9407,6 +9497,45 @@ savedListEl.addEventListener("click",e=>{
   }
 });
 
+/* ---------- Même sujet, autres sources (sujetSheet) ----------
+   Toutes les versions du sujet, représentant en tête : c'est lui qu'on lisait,
+   il sert de repère. Rangées au gabarit d'« Enregistrés » (savedrow, sans
+   bouton de retrait), même ouverture d'article. */
+const sujetSheet=document.getElementById("sujetSheet"),sujetListEl=document.getElementById("sujetList");
+function sujetRowHTML(x){
+  const img=safeImg(x.img,location.href);
+  const link=safeLink(x.link,location.href);
+  return `<div class="histrow savedrow">
+    <a class="savedrow__open" data-open href="${escAttr(link||"")}" target="_blank" rel="noopener">
+      ${img?`<img class="histrow__th" src="${escAttr(img)}" alt="" loading="lazy" decoding="async" width="58" height="58">`
+      :`<span class="histrow__th"></span>`}
+      <span class="histrow__txt">
+        <span class="histrow__top">
+          <span class="histrow__src">${esc(x.source||"")}</span>
+          ${x.date?`<span class="histrow__date">${esc(relTime(x.date))}</span>`:""}
+        </span>
+        <span class="histrow__ttl">${esc(x.title||"")}</span>
+      </span>
+    </a>
+  </div>`;
+}
+function openSujet(it){
+  const tous=[it,...autresDuSujet(it)];
+  if(tous.length<2)return;
+  sujetListEl.innerHTML=tous.map(sujetRowHTML).join("");
+  document.getElementById("sujetSub").textContent=T("sujet.sub",{n:tous.length});
+  openDialog(sujetSheet);
+}
+sujetSheet.onclick=e=>{if(e.target===sujetSheet)closeDialog(sujetSheet);};
+sujetListEl.addEventListener("click",e=>{
+  const open=e.target.closest("a[data-open]");
+  if(open&&open.href){
+    const t=open.querySelector(".histrow__ttl");
+    bumpArticleOpen();
+    if(openArticle(open.href,t?t.textContent:""))e.preventDefault();
+  }
+});
+
 /* ---------- Les deux filtres : une pastille chacun ----------
    📰 restreint la moitié « actus » à UNE source, 🎓 la moitié Wikipédia à UN
    thème — depuis la page principale, sans ouvrir les réglages. Les sources
@@ -9980,6 +10109,7 @@ function openSettings(replaceFrom){
   suggestGroupOpen={};
   renderMix();renderIntGrid("intGrid");renderList();renderSuggest();renderReadPref();renderLangPref();renderThemePref();renderSchemePref();renderAutoExport();refreshAutoExport();
   document.getElementById("sponsorFilterChk").checked=filterSponsored;
+  document.getElementById("sujetsChk").checked=regrouperSujets;
   renderMutes();renderSourceHelp();
   document.getElementById("ytApiKeyInput").value=ytApiKey;
   if(replaceFrom)replaceDialog(replaceFrom,sheet);else openDialog(sheet);
@@ -10182,6 +10312,14 @@ document.getElementById("sponsorFilterChk").onchange=e=>{
   try{localStorage.setItem(LS_SPONSOR,filterSponsored?"1":"0");}catch(_){}
   feedsDirty=true;   // même flag que save() : signale un rechargement dû à applySettings()
 };
+/* Regroupement par sujet : s'applique à l'instant et SANS réseau, comme un mot
+   masqué — remix(true) garde la carte sous le doigt. */
+function setRegrouperSujets(v){
+  regrouperSujets=!!v;
+  try{localStorage.setItem(LS_SUJETS,regrouperSujets?"1":"0");}catch(e){warn("save sujets",e);}
+  if(items.length){remix(true);render();}
+}
+document.getElementById("sujetsChk").onchange=e=>setRegrouperSujets(e.target.checked);
 /* Mots masqués : une puce par mot, × pour le retirer. S'applique à l'instant,
    sans réseau (voir mutedWords) : remix(true) garde la carte sous le doigt et
    son aperçu, sauf s'ils sont eux-mêmes masqués. Pas de toast (il se poserait
@@ -10705,6 +10843,7 @@ function settingsSnapshot(){
     newsSrcParOnglet:{...newsSrcStore,[nature]:newsSrc},
     feeds,
     filterSponsored,
+    regrouperSujets,
     mutedWords,
     pause:pausePref,
     autoplay:autoplayPref,
@@ -10856,6 +10995,9 @@ function applySettingsImport(obj){
   }
   if(typeof obj.filterSponsored==="boolean"){
     localStorage.setItem(LS_SPONSOR,obj.filterSponsored?"1":"0");n++;
+  }
+  if(typeof obj.regrouperSujets==="boolean"){
+    localStorage.setItem(LS_SUJETS,obj.regrouperSujets?"1":"0");n++;
   }
   if(typeof obj.pause==="string"&&PAUSE_VALS.includes(obj.pause)){
     localStorage.setItem(LS_PAUSE,obj.pause);n++;

@@ -66,7 +66,7 @@ async function boot(opts = {}) {
       return route.fulfill({
         status: 200,
         contentType: "application/xml",
-        body: opts.rss ?? RSS_OK,
+        body: (opts.rssFor && opts.rssFor(u)) ?? opts.rss ?? RSS_OK,
       });
     if (/wikipedia\.org|api\/learn/.test(u))
       return route.fulfill({
@@ -3915,6 +3915,134 @@ ${Array.from({ length: 12 }, (_, k) => {
     console.log(
       `panneau ouvert : arrêts du service +${(await page.evaluate(() => window.__stopsSvc)) - avant} (attendu 1), écoute active = ${await page.evaluate(() => ecouteActive)}`
     );
+    console.log(`erreurs : ${JSON.stringify(errors)}`);
+    await browser.close();
+  },
+
+  /* Regroupement par sujet : chaque source sert UNE version du même événement
+     (titres réécrits, liens distincts) plus ses propres articles. Vérifie : une
+     seule carte pour le sujet, la pastille « N sources » sur elle, la feuille
+     qui liste toutes les versions, la case décochée qui ramène les versions SANS
+     réseau, et le marquage « vu » qui couvre tout le sujet (sinon une autre
+     version revient en tête au ↻ suivant). */
+  async sujets() {
+    const titresSujet = [
+      "Séisme de magnitude 7 au Japon : alerte au tsunami",
+      "Japon : un séisme de magnitude 7,1 déclenche une alerte au tsunami",
+      "Alerte au tsunami au Japon après un séisme de magnitude 7",
+      "Séisme au Japon : magnitude 7 et alerte tsunami sur la côte est",
+    ];
+    const index = new Map();
+    const rssFor = (u) => {
+      const m = /[?&]url=([^&]+)/.exec(u);
+      const cle = m ? decodeURIComponent(m[1]) : u;
+      if (!index.has(cle)) index.set(cle, index.size);
+      const n = index.get(cle);
+      const now = Date.now();
+      const items = [];
+      if (n < titresSujet.length)
+        items.push(
+          `<item><title>${titresSujet[n]}</title><link>https://s${n}.test/seisme</link><description>Version ${n}</description><pubDate>${new Date(now - n * 60e3).toUTCString()}</pubDate></item>`
+        );
+      for (let i = 0; i < 4; i++)
+        items.push(
+          `<item><title>Sujet propre ${n}-${i} sans rapport ${i * 7 + n}</title><link>https://s${n}.test/p${i}</link><description>Texte ${n} ${i}</description><pubDate>${new Date(now - (i + 1) * 3600e3).toUTCString()}</pubDate></item>`
+        );
+      return `<?xml version="1.0"?><rss version="2.0"><channel><title>S${n}</title>${items.join("")}</channel></rss>`;
+    };
+    const { browser, page, errors } = await boot({ storage: READY, rssFor });
+    await page.goto(URL_APP);
+    await page.waitForTimeout(4000);
+    const etat = () =>
+      page.evaluate(() => {
+        const s = items.filter((i) => /Japon/.test(i.title));
+        const rep = s[0];
+        const card = [...feedEl.children].find(
+          (el) => cardReg.get(+el.dataset.id) === rep
+        );
+        const b = card && card.querySelector(".card__sujet");
+        return {
+          sources: index_sources(),
+          dansLeFil: s.length,
+          autres: rep ? autresDuSujet(rep).length : -1,
+          pastille: b && !b.hidden ? b.textContent.trim() : "(absente)",
+        };
+        function index_sources() {
+          return new Set(newsItems.map((i) => i.source)).size;
+        }
+      });
+    const e1 = await etat();
+    console.log(
+      `regroupé : ${e1.dansLeFil} carte(s) « Japon » dans le fil (attendu 1), ${e1.autres} autres versions (attendu ${Math.min(titresSujet.length, e1.sources) - 1}), pastille « ${e1.pastille} », ${e1.sources} sources`
+    );
+    // Feuille
+    await page.evaluate(() => {
+      const rep = items.find((i) => /Japon/.test(i.title));
+      openSujet(rep);
+    });
+    await page.waitForTimeout(300);
+    const lignes = await page.$$eval("#sujetList .histrow__ttl", (n) => n.length);
+    const ouverte = await page.evaluate(() =>
+      document.getElementById("sujetSheet").classList.contains("open")
+    );
+    console.log(
+      `feuille ouverte : ${ouverte}, ${lignes} versions listées (attendu ${Math.min(titresSujet.length, e1.sources)})`
+    );
+    await page.evaluate(() => closeDialog(document.getElementById("sujetSheet")));
+    // Pastille cliquable dans le fil
+    await page.evaluate(() => {
+      const rep = items.find((i) => /Japon/.test(i.title));
+      const k = [...feedEl.children].findIndex(
+        (el) => cardReg.get(+el.dataset.id) === rep
+      );
+      scrollToCard(k);
+    });
+    await page.waitForTimeout(400);
+    if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+    await page.click(".card__sujet:not([hidden])");
+    await page.waitForTimeout(300);
+    console.log(
+      `clic sur la pastille : feuille ouverte = ${await page.evaluate(() => document.getElementById("sujetSheet").classList.contains("open"))}`
+    );
+    await page.evaluate(() => closeDialog(document.getElementById("sujetSheet")));
+    // Décocher : sans réseau
+    let requetes = 0;
+    page.on("request", (r) => {
+      if (/api\/(feed|learn)|wikipedia/.test(r.url())) requetes++;
+    });
+    await page.evaluate(() => setRegrouperSujets(false));
+    await page.waitForTimeout(300);
+    const e2 = await etat();
+    console.log(
+      `case décochée : ${e2.dansLeFil} cartes « Japon » (attendu ${Math.min(titresSujet.length, e1.sources)}), pastille « ${e2.pastille} », requêtes ${requetes} (attendu 0)`
+    );
+    await page.evaluate(() => setRegrouperSujets(true));
+    await page.waitForTimeout(300);
+    const e3 = await etat();
+    console.log(`recochée : ${e3.dansLeFil} carte « Japon » (attendu 1)`);
+    // « Vu » couvre tout le sujet
+    const vus = await page.evaluate(() => {
+      const rep = items.find((i) => /Japon/.test(i.title));
+      markOneSeen(rep);
+      return newsItems.filter((i) => /Japon/.test(i.title)).map((i) => itemSeen(i));
+    });
+    console.log(
+      `vu : ${vus.filter(Boolean).length}/${vus.length} versions marquées (attendu toutes)`
+    );
+    // Réglage persistant + stockage abîmé
+    await page.reload();
+    await page.waitForTimeout(3000);
+    console.log(
+      `après relancement : regroupement = ${await page.evaluate(() => regrouperSujets)}`
+    );
+    await page.evaluate(() => localStorage.setItem("fluxswipe.sujets.v1", "{abîmé"));
+    await page.reload();
+    await page.waitForTimeout(3000);
+    const ab = await page.evaluate(() => ({
+      r: regrouperSujets,
+      c: feedEl.children.length,
+    }));
+    console.log(`stockage abîmé : regroupement = ${ab.r}, ${ab.c} cartes`);
     console.log(`erreurs : ${JSON.stringify(errors)}`);
     await browser.close();
   },
