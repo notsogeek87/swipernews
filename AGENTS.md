@@ -238,7 +238,7 @@ Les procédures répétitives vivent dans des skills ; ce fichier garde le *pour
 ## Commandes
 
 ```bash
-npm test            # node --test sur test/ — 146 tests, aucune dépendance à installer
+npm test            # node --test sur test/ — 154 tests, aucune dépendance à installer
 npm run lint        # eslint api src test eslint.config.js  (PAS index.html)
 npm run format:check
 npm run cap:sync    # régénère www/ puis cap sync android
@@ -443,6 +443,26 @@ hors du dépôt, jamais dans `package.json`.
   l'exécution avec un repli : en littéral, un vieux moteur refuserait d'analyser
   tout `src/lib.js`. Les notifications natives (`NewsCheckWorker`) ne les
   appliquent pas.
+- `regrouperSujets` / `sujetsAutres` / `majPastillesSujets()` / `openSujet()`
+  (et `regroupeSujets`/`memeSujet`, `src/lib.js`, testées) — le regroupement
+  par sujet : plusieurs sources qui couvrent le même événement ne font qu'UNE
+  carte, les autres versions derrière la pastille « N sources » (`sujetSheet`).
+  Même place que les mots masqués : dans `remix()`, à l'ENTRELACEMENT, jamais
+  à la récupération — `newsItems` garde tout, décocher la case (panneau
+  Sources, `LS_SUJETS`, activée par défaut) ramène les versions sans réseau.
+  Le critère est PRUDENT exprès (fusionner deux sujets fait perdre un article,
+  en manquer un ne coûte qu'une carte) : ≥ 3 mots porteurs communs ET ≥ 60 %
+  du titre le plus court, dates à moins de 36 h, jamais deux articles de la
+  même source. Comparaison aux seuls REPRÉSENTANTS, jamais à tous les membres
+  (sinon des titres voisins deux à deux s'enchaînent). Trois points à ne pas
+  défaire : les cartes figées passent en tête de la comparaison (la carte sous
+  le doigt reste représentante) ; `markOneSeen` marque TOUTES les versions du
+  sujet (sinon, au ↻ suivant, une version jamais vue d'une autre source
+  redevient représentante et le sujet revient en tête) ; un représentant qui
+  sort par `MAX_ITEMS` emmène ses versions. La pastille est posée APRÈS la
+  réconciliation de `render()`, pas dans `cardHTML` : une carte réutilisée
+  n'est jamais réécrite, alors que son sujet gagne des versions à chaque lot.
+  Le flash info saute les versions absorbées. Scénario `sujets`.
 - `demarrerEcoute()` / `arreterEcoute()` / `lireEnBoucle()` — « Écouter le
   fil ». Une GÉNÉRATION (`ecouteGen`) comme `loadSeq` : toute promesse d'une
   lecture dépassée est ignorée. Le texte (titre PUIS détail) est lu PHRASE PAR
@@ -1538,6 +1558,10 @@ Trois cas, chacun surveillant `items[0]` render après render : actus lentes
 (aucune reprise ne doit être visible), actus mortes (Wikipédia s'affiche quand
 même, après une attente bornée plutôt qu'immédiatement), et dose sans actus
 actives (aucune attente, rien à coordonner).
+
+`sujets` couvre le regroupement par sujet : une carte pour quatre versions,
+la pastille et sa feuille, la case décochée sans requête réseau, « vu » sur
+tout le sujet, stockage abîmé.
 
 `motsmasques`, `pausedouce` et `ecoute` couvrent les trois fonctions du même
 nom. `motsmasques` vérifie qu'un mot agit SANS requête réseau, survit au

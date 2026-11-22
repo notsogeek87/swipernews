@@ -1371,6 +1371,150 @@
     return out;
   }
 
+  /* ---------- Regroupement par sujet ----------
+   * Dix rédactions qui couvrent le même événement donnent dix cartes au titre
+   * presque identique. Ce n'est pas un doublon au sens de dedupNews (deux
+   * articles DIFFÉRENTS, deux liens, deux sites) : on ne retire rien, on
+   * REGROUPE — une carte pour le sujet, les autres versions derrière une
+   * pastille. Purement local, sur le texte du titre : aucun appel réseau,
+   * aucun modèle, aucun classement.
+   *
+   * Le critère est volontairement prudent. Fusionner deux sujets différents
+   * (« Macron à Berlin » / « Macron à Rome ») fait PERDRE un article de vue ;
+   * en manquer un ne coûte qu'une carte de plus, comme avant. D'où :
+   *   — au moins SUJET_COMMUNS_MIN mots porteurs en commun (mots vides et mots
+   *     d'habillage — « vidéo », « direct »… — retirés) ;
+   *   — ET une part commune d'au moins SUJET_SEUIL du plus court des deux
+   *     titres (coefficient de recouvrement, pas Jaccard : un titre long qui
+   *     développe un titre court parle bien du même sujet) ;
+   *   — ET des dates à moins de SUJET_FENETRE_MS (une date absente ne
+   *     disqualifie pas, même règle que sameDayish) ;
+   *   — et JAMAIS deux articles de la même source : un site qui publie deux
+   *     papiers sur un même sujet (le fait, puis l'analyse) donne deux angles,
+   *     pas deux copies.
+   */
+  const SUJET_SEUIL = 0.6;
+  const SUJET_COMMUNS_MIN = 3;
+  const SUJET_FENETRE_MS = 36 * 60 * 60 * 1000;
+  const SUJET_VIDES = new Set(
+    // français
+    (
+      "les des une un le la de du et en au aux pour par sur dans avec sans sous " +
+      "est sont ont été etre être fait faire plus moins tres très son sa ses leur " +
+      "leurs ce cet cette ces qui que quoi dont ou où mais donc car ne pas apres " +
+      "après avant entre contre vers chez lors depuis selon comme tout tous toute " +
+      "toutes aussi encore deja déjà quand comment pourquoi elle elles ils nous vous " +
+      "va vont peut doit veut dit selon face fois ans an jour jours hier demain " +
+      "aujourd nouvelle nouveau nouveaux nouvelles premier premiere première deux trois " +
+      // anglais
+      "the and for with from that this are was were has have had will would can " +
+      "could into over after before about against than then them they their its " +
+      "not but who what when where why how new says said more most just " +
+      // habillage éditorial, commun à tout un flux
+      "video videos direct live info infos actu actus exclusif exclusive photos photo " +
+      "replay podcast breaking urgent alerte"
+    )
+      .split(/\s+/)
+      .map((w) => titleKey(w))
+  );
+  const motsCache = typeof WeakMap === "function" ? new WeakMap() : null;
+  /** Mots porteurs d'un titre : repliés (titleKey), sans mots vides, au moins
+   *  trois lettres (ou un nombre de deux chiffres et plus — « 49.3 », « 2026 »
+   *  sont souvent ce qui identifie un sujet). Pluriel naïf retiré (« -s »,
+   *  « -x ») pour que « grève » et « grèves » se rejoignent. */
+  function motsDeSujet(title) {
+    const out = new Set();
+    for (let w of titleKey(typeof title === "string" ? title : "").split(" ")) {
+      if (!w || SUJET_VIDES.has(w)) continue;
+      const num = /^[0-9]+$/.test(w);
+      if (num ? w.length < 2 : w.length < 3) continue;
+      if (!num && w.length > 4) w = w.replace(/[sx]$/, "");
+      if (!SUJET_VIDES.has(w)) out.add(w);
+    }
+    return out;
+  }
+  function motsDe(it) {
+    if (!it || typeof it !== "object" || !motsCache) return motsDeSujet(it && it.title);
+    let m = motsCache.get(it);
+    if (!m || m.t !== it.title) {
+      m = { t: it.title, s: motsDeSujet(it.title) };
+      motsCache.set(it, m);
+    }
+    return m.s;
+  }
+  function datesProches(a, b) {
+    const ta = Date.parse(a || "");
+    const tb = Date.parse(b || "");
+    if (isNaN(ta) || isNaN(tb)) return true;
+    return Math.abs(ta - tb) <= SUJET_FENETRE_MS;
+  }
+  /** Deux actus parlent-elles du même sujet ? (voir les règles ci-dessus) */
+  function memeSujet(a, b) {
+    if (!a || !b) return false;
+    const sa = ((a.source || "") + "").trim().toLowerCase();
+    const sb = ((b.source || "") + "").trim().toLowerCase();
+    if (sa && sa === sb) return false;
+    if (!datesProches(a.date, b.date)) return false;
+    const A = motsDe(a);
+    const B = motsDe(b);
+    if (A.size < SUJET_COMMUNS_MIN || B.size < SUJET_COMMUNS_MIN) return false;
+    const [petit, grand] = A.size <= B.size ? [A, B] : [B, A];
+    let n = 0;
+    for (const w of petit) if (grand.has(w)) n++;
+    return n >= SUJET_COMMUNS_MIN && n / petit.size >= SUJET_SEUIL;
+  }
+  /**
+   * Regroupe une liste d'actus DÉJÀ ORDONNÉE (l'ordre du fil). Le premier
+   * article d'un sujet dans cet ordre en devient le représentant : c'est lui
+   * qui garde sa place, les suivants passent derrière lui. Un article n'est
+   * comparé qu'aux REPRÉSENTANTS (pas à tous les membres) : sans cela, une
+   * chaîne de titres voisins deux à deux finirait par réunir des sujets sans
+   * rapport.
+   *
+   * @param list   articles, dans l'ordre du fil
+   * @param opts.cle          item -> identifiant (seenKey côté app)
+   * @param opts.estCandidat  item -> bool ; les autres traversent intacts
+   *                          (Wikipédia, vidéos)
+   * @returns { gardes: représentants et non-candidats, dans l'ordre ;
+   *            autres: Map(cle du représentant -> [autres versions]) ;
+   *            absorbes: Set des clés passées derrière un représentant }
+   */
+  function regroupeSujets(list, opts) {
+    const o = opts || {};
+    const cle = typeof o.cle === "function" ? o.cle : (it) => (it && it.link) || "";
+    const estCandidat = typeof o.estCandidat === "function" ? o.estCandidat : () => true;
+    const gardes = [];
+    const autres = new Map();
+    const absorbes = new Set();
+    const groupes = []; // { rep, sources:Set }
+    for (const it of list || []) {
+      if (!it || !estCandidat(it) || motsDe(it).size < SUJET_COMMUNS_MIN) {
+        gardes.push(it);
+        continue;
+      }
+      const src = ((it.source || "") + "").trim().toLowerCase();
+      let g = null;
+      for (const cand of groupes) {
+        if (src && cand.sources.has(src)) continue;
+        if (memeSujet(cand.rep, it)) {
+          g = cand;
+          break;
+        }
+      }
+      if (!g) {
+        groupes.push({ rep: it, sources: new Set(src ? [src] : []) });
+        gardes.push(it);
+        continue;
+      }
+      const k = cle(g.rep);
+      if (!autres.has(k)) autres.set(k, []);
+      autres.get(k).push(it);
+      absorbes.add(cle(it));
+      if (src) g.sources.add(src);
+    }
+    return { gardes, autres, absorbes };
+  }
+
   /** Libellés éditoriaux standard du contenu sponsorisé (fr + en), pas de mot
    *  générique comme « partenaire » ou « communiqué de presse » : trop de
    *  faux positifs sur du contenu éditorial légitime. */
@@ -2282,6 +2426,8 @@
     weightedRoundRobin,
     dedupAndRank,
     dedupNews,
+    memeSujet,
+    regroupeSujets,
     canonicalLink,
     youtubeId,
     isYoutubeFeedUrl,

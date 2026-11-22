@@ -217,8 +217,10 @@
       "listen.sysvoice.default": "Défaut",
       "listen.sysvoice.n": "Voix {n}",
       "listen.sysvoice.sample": "Bonjour, voici cette voix.",
-      "changelog.v334.item1":
+      "changelog.v335.item1":
         "Menu et réglages plus simples : chaque entrée du menu dit ce qu'elle ouvre, et les réglages sont rangés en six sections repliables.",
+      "changelog.v334.item1":
+        "Un sujet, une carte : quand plusieurs de tes sources couvrent le même événement, tu ne le vois plus qu'une fois, avec une pastille « N sources » pour lire les autres versions. Désactivable dans Sources.",
       "changelog.v332.item1":
         "Vidéos : en revenant dans l'app (après avoir répondu à un message, par exemple), la vidéo reprend là où elle en était.",
       "changelog.v327.item1":
@@ -404,6 +406,10 @@
       "volet.count": "{n} articles",
 
       "saved.title": "Enregistrés",
+      "sujet.title": "Le même sujet ailleurs",
+      "sujet.sub": "{n} sources en parlent",
+      "sujet.pill": "{n} sources",
+      "sujet.pillAria": "Ce sujet est couvert par {n} sources : voir les autres versions",
       "saved.sub": "{n} articles enregistrés. Touche-en un pour l'ouvrir.",
       "saved.subEmpty": "Rien d'enregistré pour l'instant.",
       "saved.empty": "Enregistre une carte pour la retrouver ici.",
@@ -511,6 +517,7 @@
       "sheet.sources.title": "📰 Sources d'actualité",
       "sheet.sources.sub": "Coche les flux à afficher, ajoute ceux que tu veux.",
       "sheet.sources.filterSponsored": "Filtrer les articles sponsorisés et bons plans",
+      "sheet.sources.groupTopics": "Regrouper les articles qui parlent du même sujet",
       "sheet.sources.groupRss": "Flux RSS",
       "sheet.sources.groupVideo": "Chaînes YouTube",
       "sheet.sources.placeholder": "Adresse, r/sous-reddit, @compte…",
@@ -877,8 +884,10 @@
       "listen.sysvoice.default": "Default",
       "listen.sysvoice.n": "Voice {n}",
       "listen.sysvoice.sample": "Hello, this is this voice.",
-      "changelog.v334.item1":
+      "changelog.v335.item1":
         "Simpler menu and settings: each menu entry says what it opens, and settings are grouped into six collapsible sections.",
+      "changelog.v334.item1":
+        "Same story, one card: when several of your sources cover the same event, you see it once, with an “N sources” badge to read the other versions. Can be turned off in Sources.",
       "changelog.v332.item1":
         "Videos: when you come back to the app (after replying to a message, say), the video picks up where it left off.",
       "changelog.v327.item1":
@@ -1119,6 +1128,10 @@
       "volet.count": "{n} articles",
 
       "saved.title": "Saved",
+      "sujet.title": "Same story elsewhere",
+      "sujet.sub": "{n} sources cover it",
+      "sujet.pill": "{n} sources",
+      "sujet.pillAria": "This story is covered by {n} sources: see the other versions",
       "saved.sub": "{n} saved articles. Tap one to open it.",
       "saved.subEmpty": "Nothing saved yet.",
       "saved.empty": "Save a card to find it here.",
@@ -1223,6 +1236,7 @@
       "sheet.sources.title": "📰 News sources",
       "sheet.sources.sub": "Check the feeds to show, add whichever you like.",
       "sheet.sources.filterSponsored": "Filter out sponsored articles and deals",
+      "sheet.sources.groupTopics": "Group articles about the same story",
       "sheet.sources.groupRss": "RSS feeds",
       "sheet.sources.groupVideo": "YouTube channels",
       "sheet.sources.placeholder": "Address, r/subreddit, @account…",
