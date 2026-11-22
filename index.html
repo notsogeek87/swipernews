@@ -1100,12 +1100,36 @@
      ne sont que des actions, rien à prévisualiser. */
   .menulist{display:flex;flex-direction:column;margin-top:6px}
   .menurow{display:flex;align-items:center;gap:14px;width:100%;text-align:left;
-    background:transparent;border:none;border-bottom:1px solid rgba(var(--redline-rgb),.3);
+    background:transparent;border:none;
     color:var(--ink);font-family:var(--font-sans);font-size:15px;font-weight:500;
-    padding:14px 2px;cursor:pointer;text-decoration:none}
+    padding:11px 2px;cursor:pointer;text-decoration:none}
   .menurow:hover{background:rgba(var(--redline-rgb),.12)}
   .menurow:active{transform:scale(.99)}
-  .menurow:last-child{border-bottom:none}
+  /* Libellé + une phrase d'explication : le libellé seul ne disait pas ce que
+     la ligne ouvre. Séparateur entre blocs plutôt qu'un liseré par ligne. */
+  .menurow__t{display:flex;flex-direction:column;min-width:0}
+  .menurow__t b{font-weight:600}
+  .menurow__t span{color:var(--ash);font-size:12.5px;font-weight:400;margin-top:2px}
+  .menurow--small{font-size:13px;color:var(--ash)}
+  .menurow--small .menurow__t b{font-weight:500}
+  .menusep{height:1px;margin:6px 0;background:rgba(var(--redline-rgb),.3)}
+  /* Sections repliables du panneau Réglages (voir le commentaire de #sheet). */
+  .setgrp{margin-top:10px;border:1px solid rgba(var(--redline-rgb),.35);border-radius:var(--radius);
+    background:var(--surface)}
+  .setgrp>summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;padding:14px 16px}
+  .setgrp>summary::-webkit-details-marker{display:none}
+  .setgrp>summary::after{content:"";flex:0 0 auto;margin-left:auto;width:8px;height:8px;
+    border-right:2px solid var(--ash);border-bottom:2px solid var(--ash);transform:rotate(45deg);
+    transition:transform .15s ease}
+  .setgrp[open]>summary::after{transform:rotate(-135deg)}
+  .setgrp__t{min-width:0}
+  .setgrp__t b{display:block;font-family:var(--font-sans);font-size:15.5px;font-weight:700;letter-spacing:-.01em}
+  .setgrp__t span{display:block;color:var(--ash);font-size:12.5px;line-height:1.4;margin-top:2px}
+  .setgrp__body{padding:0 16px 16px}
+  .setgrp__body>p.sub:first-child{margin-top:0}
+  /* Sous-titres DANS une section : la section porte déjà le liseré. */
+  .setgrp .secttl{margin-top:18px;padding-top:0;border-top:none;font-size:14.5px}
+  .setgrp .secttl:first-child{margin-top:4px}
   /* Feuille « Écouter » : deux CHOIX d'abord (ce qu'on vient faire), puis les réglages,
      repliés sous une ligne qui résume leur état (ce qu'on règle rarement). */
   .listenmodes{display:grid;gap:10px;margin:14px 0 12px}
@@ -1614,14 +1638,20 @@
   <div class="sheet__panel" tabindex="-1">
     <div class="sheet__grip"></div>
     <h2 id="menuTitle" data-i18n="menu.title">Menu</h2>
+    <!-- Trois blocs, du plus utile au plus rare : régler le fil ; relire ou
+         écouter ; le reste. Chaque ligne dit en une phrase ce qu'elle ouvre —
+         « Liste des articles » ou « Mon activité » seuls ne le disaient pas
+         (retour utilisateur : « j'y comprends plus rien »). -->
     <div class="menulist">
-      <button type="button" class="menurow" id="histBtn"><span class="menurow__i"></span><span data-i18n="top.history.aria">Liste des articles</span></button>
-      <button type="button" class="menurow" id="savedBtn"><span class="menurow__i"></span><span data-i18n="top.saved.aria">Enregistrés</span></button>
-      <button type="button" class="menurow hidden" id="listenBtn"><span class="menurow__i"></span><span id="listenBtnTxt" data-i18n="listen.start">Écouter le fil</span></button>
-      <button type="button" class="menurow" id="menuStatsBtn"><span class="menurow__i"></span><span data-i18n="menu.stats">Mon activité</span></button>
-      <button type="button" class="menurow" id="changelogBtn"><span class="menurow__i"></span><span data-i18n="menu.changelog">Nouveautés</span></button>
-      <button type="button" class="menurow" id="openSheet"><span class="menurow__i"></span><span data-i18n="top.settings.aria">Réglages</span></button>
-      <a class="menurow" id="githubLink" href="https://github.com/notsogeek87/swipernews" target="_blank" rel="noopener"><span class="menurow__i"></span><span data-i18n="menu.github">Code source sur GitHub ↗</span></a>
+      <button type="button" class="menurow" id="openSheet"><span class="menurow__i"></span><span class="menurow__t"><b data-i18n="top.settings.aria">Réglages</b><span data-i18n="menu.d.settings">Sources, Wikipédia, affichage…</span></span></button>
+      <div class="menusep" aria-hidden="true"></div>
+      <button type="button" class="menurow" id="histBtn"><span class="menurow__i"></span><span class="menurow__t"><b data-i18n="top.history.aria">Liste des articles</b><span data-i18n="menu.d.hist">Retrouver un article déjà passé</span></span></button>
+      <button type="button" class="menurow" id="savedBtn"><span class="menurow__i"></span><span class="menurow__t"><b data-i18n="top.saved.aria">Enregistrés</b><span data-i18n="menu.d.saved">Les articles que tu as gardés</span></span></button>
+      <button type="button" class="menurow hidden" id="listenBtn"><span class="menurow__i"></span><span class="menurow__t"><b id="listenBtnTxt" data-i18n="listen.start">Écouter le fil</b><span data-i18n="menu.d.listen">Ton fil lu à voix haute</span></span></button>
+      <div class="menusep" aria-hidden="true"></div>
+      <button type="button" class="menurow" id="menuStatsBtn"><span class="menurow__i"></span><span class="menurow__t"><b data-i18n="menu.stats">Mon activité</b><span data-i18n="menu.d.stats">Combien de cartes tu as parcourues</span></span></button>
+      <button type="button" class="menurow" id="changelogBtn"><span class="menurow__i"></span><span class="menurow__t"><b data-i18n="menu.changelog">Nouveautés</b><span data-i18n="menu.d.changelog">Ce qui a changé dans l'app</span></span></button>
+      <a class="menurow menurow--small" id="githubLink" href="https://github.com/notsogeek87/swipernews" target="_blank" rel="noopener"><span class="menurow__i"></span><span class="menurow__t"><b data-i18n="menu.github">Code source sur GitHub ↗</b></span></a>
     </div>
   </div>
 </div>
@@ -1743,120 +1773,156 @@
     <h2 data-i18n="sheet.title">Ton fil</h2>
     <p class="sub" data-i18n="sheet.subtitle">Tes actus et des articles Wikipédia, en alternance dans un seul fil.</p>
 
-    <!-- Langue de l'app (et de Wikipédia, voir renderLangPref) : un seul point
-         de montage, sur le même modèle que la dose et les réglages du lecteur. -->
-    <div data-langmount></div>
+    <!-- SIX sections repliables, toutes fermées à chaque ouverture (voir
+         openSettings) : le panneau empilait une vingtaine de réglages à plat,
+         du plus courant (sources) au plus rare (sauvegarde, clé API) — retour
+         utilisateur « j'y comprends plus rien ». Chaque en-tête dit en une
+         ligne ce qu'il contient ; on n'ouvre que ce qu'on vient régler. Les
+         points de montage sont INCHANGÉS (mêmes data-*mount, mêmes id) : seul
+         leur conteneur a changé. Une section dont tous les points de montage
+         restent vides (data-hideempty : Lecture & écoute sur le web) est
+         masquée par majSectionsReglages(). -->
+    <details class="setgrp" data-grp="sources">
+      <summary><span class="setgrp__t"><b data-i18n="setgrp.sources.t">📰 Mes sources</b><span data-i18n="setgrp.sources.d">Sites, chaînes YouTube et comptes à suivre</span></span></summary>
+      <div class="setgrp__body">
+        <p class="sub" data-i18n="sheet.sources.sub">Coche les flux à afficher, ajoute ceux que tu veux.</p>
+        <label class="sponsorrow"><input type="checkbox" id="sponsorFilterChk"><span data-i18n="sheet.sources.filterSponsored">Filtrer les articles sponsorisés et bons plans</span></label>
+        <div id="feedList"></div>
+        <div class="addbox">
+          <input id="newUrl" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-attr="placeholder:sheet.sources.placeholder" placeholder="Adresse, r/sous-reddit, @compte…" inputmode="url">
+          <button id="addFeedBtn" data-i18n="sheet.sources.add">Ajouter</button>
+        </div>
 
-    <!-- Thème des couleurs (voir renderThemePref/setAppTheme) : même point de
-         montage unique que les autres réglages ci-dessus/dessous, et même
-         absence de secttl/sub séparé que data-langmount juste au-dessus —
-         prefRow() porte déjà son propre libellé + description de l'option en
-         cours (apptheme.label), un secttl "Thème" par-dessus ne faisait que
-         répéter la même idée deux fois de suite (retour utilisateur : "ça
-         fait doublon"). -->
-    <div data-thememount></div>
+        <!-- Aide à l'ajout : rempli par renderSourceHelp() depuis SOURCE_KINDS
+             (src/lib.js). Toute nouvelle façon d'ajouter une source doit y figurer. -->
+        <details class="srchelp">
+          <summary data-i18n="sheet.sources.help.summary">ℹ️ Que peut-on ajouter ?</summary>
+          <p class="sub" data-i18n="sheet.sources.help.intro">Tape ou colle n'importe laquelle de ces formes dans le champ ci-dessus. Touche un exemple pour le mettre dans le champ.</p>
+          <div id="srcHelpList"></div>
+        </details>
 
-    <!-- Apparence clair/sombre/auto (voir renderSchemePref/setAppScheme) :
-         même forme prefRow que le thème juste au-dessus. -->
-    <div data-schememount></div>
+        <div id="suggestBox"></div>
 
-    <h3 class="secttl" data-i18n="sheet.mix.title">🎚️ Dose d'apprentissage</h3>
-    <p class="sub" data-i18n="dose.sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
-    <div data-mixmount></div>
+        <!-- Secours optionnel, replié par défaut : n'existe que pour qui tombe
+             vraiment sur une chaîne YouTube que RSS/HTML n'arrivent pas à
+             résoudre (voir resolveYoutubeChannelFeed). Rien à configurer pour
+             tout le monde d'autre — la clé, propre à l'utilisateur, n'est jamais
+             envoyée nulle part sauf à l'API YouTube elle-même. -->
+        <details class="ytadv">
+          <summary data-i18n="sheet.sources.ytkey.summary">🔑 Secours : clé API YouTube (avancé)</summary>
+          <p class="sub" data-i18n="sheet.sources.ytkey.desc">Seulement si l'ajout d'une chaîne échoue. Optionnelle, et propre à toi : jamais partagée avec personne d'autre.</p>
+          <div class="addbox">
+            <input id="ytApiKeyInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-attr="placeholder:sheet.sources.ytkey.placeholder" placeholder="Clé API YouTube Data v3">
+            <button type="button" id="ytApiKeyVerify" data-i18n="sheet.sources.ytkey.verify">Vérifier</button>
+          </div>
+          <p class="sub"><a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener" data-i18n="sheet.sources.ytkey.link">Comment obtenir une clé gratuite ↗</a></p>
+        </details>
 
-    <!-- Articles par carte (voir renderCardsPref/prefRow, comme apptheme/lang
-         ci-dessus) : pas de secttl/sub séparé, prefRow porte déjà son propre
-         libellé + description de l'option en cours. -->
-    <div data-cardsmount></div>
-
-    <!-- Pause douce (voir renderPausePref/verifierPause) : même forme prefRow. -->
-    <div data-pausemount></div>
-
-    <!-- Écoute du fil, APK seulement (voir renderListenPref/ListenService) : vitesse de voix et minuteur d'arrêt. -->
-    <div data-listenmount></div>
-
-    <!-- Lecture auto des vidéos (voir renderAutoplayPref/armerAutoplay) : même forme prefRow. -->
-    <div data-autoplaymount></div>
-
-    <h3 class="secttl" data-i18n="sheet.interests.title">🎓 Centres d'intérêt</h3>
-    <p class="sub" data-i18n="sheet.interests.sub">Les thèmes des articles Wikipédia glissés entre tes actus.</p>
-    <div class="intgrid" id="intGrid"></div>
-
-    <!-- Mots masqués : rempli par renderMutes() (voir mutedWords). -->
-    <h3 class="secttl" data-i18n="mute.title">🚫 Mots masqués</h3>
-    <p class="sub" data-i18n="mute.sub">Les articles qui contiennent un de ces mots disparaissent du fil. Ajoute * à la fin pour couvrir aussi les variantes (chat* → chats).</p>
-    <div class="addbox">
-      <input id="muteInput" type="text" autocomplete="off" spellcheck="false" maxlength="200" data-i18n-attr="placeholder:mute.placeholder,aria-label:mute.placeholder" placeholder="Un mot, ou plusieurs séparés par des virgules">
-      <button type="button" id="muteAddBtn" data-i18n="mute.add">Masquer</button>
-    </div>
-    <div class="intgrid mutelist" id="muteList"></div>
-
-    <h3 class="secttl" data-i18n="sheet.sources.title">📰 Sources d'actualité</h3>
-    <p class="sub" data-i18n="sheet.sources.sub">Coche les flux à afficher, ajoute ceux que tu veux.</p>
-    <label class="sponsorrow"><input type="checkbox" id="sponsorFilterChk"><span data-i18n="sheet.sources.filterSponsored">Filtrer les articles sponsorisés et bons plans</span></label>
-    <div id="feedList"></div>
-    <div class="addbox">
-      <input id="newUrl" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-attr="placeholder:sheet.sources.placeholder" placeholder="Adresse, r/sous-reddit, @compte…" inputmode="url">
-      <button id="addFeedBtn" data-i18n="sheet.sources.add">Ajouter</button>
-    </div>
-
-    <!-- Aide à l'ajout : rempli par renderSourceHelp() depuis SOURCE_KINDS
-         (src/lib.js). Toute nouvelle façon d'ajouter une source doit y figurer. -->
-    <details class="srchelp">
-      <summary data-i18n="sheet.sources.help.summary">ℹ️ Que peut-on ajouter ?</summary>
-      <p class="sub" data-i18n="sheet.sources.help.intro">Tape ou colle n'importe laquelle de ces formes dans le champ ci-dessus. Touche un exemple pour le mettre dans le champ.</p>
-      <div id="srcHelpList"></div>
-    </details>
-
-    <div id="suggestBox"></div>
-
-    <!-- Secours optionnel, replié par défaut : n'existe que pour qui tombe
-         vraiment sur une chaîne YouTube que RSS/HTML n'arrivent pas à
-         résoudre (voir resolveYoutubeChannelFeed). Rien à configurer pour
-         tout le monde d'autre — la clé, propre à l'utilisateur, n'est jamais
-         envoyée nulle part sauf à l'API YouTube elle-même. -->
-    <details class="ytadv">
-      <summary data-i18n="sheet.sources.ytkey.summary">🔑 Secours : clé API YouTube (avancé)</summary>
-      <p class="sub" data-i18n="sheet.sources.ytkey.desc">Seulement si l'ajout d'une chaîne échoue. Optionnelle, et propre à toi : jamais partagée avec personne d'autre.</p>
-      <div class="addbox">
-        <input id="ytApiKeyInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-attr="placeholder:sheet.sources.ytkey.placeholder" placeholder="Clé API YouTube Data v3">
-        <button type="button" id="ytApiKeyVerify" data-i18n="sheet.sources.ytkey.verify">Vérifier</button>
+        <div class="iorow">
+          <button class="iobtn" id="exportOpml" data-i18n="sheet.sources.exportOpml">↓ Exporter (OPML)</button>
+          <button class="iobtn" id="exportJson" data-i18n="sheet.sources.exportJson">↓ Exporter (JSON)</button>
+          <button class="iobtn" id="importBtn" data-i18n="sheet.sources.importFile">↑ Importer un fichier</button>
+        </div>
+        <!-- ".opml" ne suffit pas seul : Android n'a aucune entrée pour cette
+             extension dans son MimeTypeMap, donc le sélecteur de documents (qui
+             filtre par MIME, pas par extension) lui attribue "application/octet-
+             stream" et le masque — seul ".xml" passait. D'où les MIME génériques
+             en plus des types XML/JSON attendus ; importFromFile() reste la seule
+             vraie validation, par contenu. -->
+        <input id="importFile" type="file" accept=".opml,.xml,.json,application/json,text/xml,application/xml,text/x-opml,application/octet-stream,text/plain" style="display:none">
       </div>
-      <p class="sub"><a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener" data-i18n="sheet.sources.ytkey.link">Comment obtenir une clé gratuite ↗</a></p>
     </details>
 
-    <div class="iorow">
-      <button class="iobtn" id="exportOpml" data-i18n="sheet.sources.exportOpml">↓ Exporter (OPML)</button>
-      <button class="iobtn" id="exportJson" data-i18n="sheet.sources.exportJson">↓ Exporter (JSON)</button>
-      <button class="iobtn" id="importBtn" data-i18n="sheet.sources.importFile">↑ Importer un fichier</button>
-    </div>
-    <!-- ".opml" ne suffit pas seul : Android n'a aucune entrée pour cette
-         extension dans son MimeTypeMap, donc le sélecteur de documents (qui
-         filtre par MIME, pas par extension) lui attribue "application/octet-
-         stream" et le masque — seul ".xml" passait. D'où les MIME génériques
-         en plus des types XML/JSON attendus ; importFromFile() reste la seule
-         vraie validation, par contenu. -->
-    <input id="importFile" type="file" accept=".opml,.xml,.json,application/json,text/xml,application/xml,text/x-opml,application/octet-stream,text/plain" style="display:none">
+    <details class="setgrp" data-grp="wiki">
+      <summary><span class="setgrp__t"><b data-i18n="setgrp.wiki.t">🎓 Wikipédia</b><span data-i18n="setgrp.wiki.d">Combien d'articles, et sur quels thèmes</span></span></summary>
+      <div class="setgrp__body">
+        <h3 class="secttl" data-i18n="sheet.mix.title">🎚️ Dose d'apprentissage</h3>
+        <p class="sub" data-i18n="dose.sub">Combien d'articles Wikipédia se glissent entre tes actus.</p>
+        <div data-mixmount></div>
 
-    <!-- Réglages du lecteur, remplis par renderReadPref() (vide hors app
-         packagée). Un seul point de montage depuis la fusion des panneaux. -->
-    <div data-readmount></div>
+        <h3 class="secttl" data-i18n="sheet.interests.title">🎓 Centres d'intérêt</h3>
+        <p class="sub" data-i18n="sheet.interests.sub">Les thèmes des articles Wikipédia glissés entre tes actus.</p>
+        <div class="intgrid" id="intGrid"></div>
+      </div>
+    </details>
 
-    <!-- Sauvegarde COMPLÈTE : contrairement à l'OPML/JSON de la section
-         Sources (qui ne portent que les flux), ce fichier reprend tout ce qui
-         est configurable dans l'app — dose, centres d'intérêt, sources, clé
-         API YouTube, réglages du lecteur — pour changer d'appareil sans tout
-         reconfigurer à la main. Voir settingsSnapshot()/applySettingsImport(). -->
-    <h3 class="secttl" data-i18n="sheet.backup.title">💾 Sauvegarde complète</h3>
-    <p class="sub" data-i18n="sheet.backup.sub">Exporte ou importe TOUS tes réglages en un seul fichier — pratique pour changer d'appareil.</p>
-    <div class="iorow">
-      <button class="iobtn" id="exportAllBtn" data-i18n="sheet.backup.export">↓ Exporter tous les réglages</button>
-      <button class="iobtn" id="importAllBtn" data-i18n="sheet.backup.import">↑ Importer tous les réglages</button>
-    </div>
-    <input id="importAllFile" type="file" accept=".json,application/json,text/plain" style="display:none">
-    <!-- Export automatique dans un dossier (APK seulement), rempli par
-         renderAutoExport() — vide sur le web. -->
-    <div data-autoexportmount></div>
+    <details class="setgrp" data-grp="mute">
+      <summary><span class="setgrp__t"><b data-i18n="setgrp.mute.t">🚫 Mots masqués</b><span data-i18n="setgrp.mute.d">Ne plus voir certains sujets</span></span></summary>
+      <div class="setgrp__body">
+        <!-- Mots masqués : rempli par renderMutes() (voir mutedWords). -->
+        <p class="sub" data-i18n="mute.sub">Les articles qui contiennent un de ces mots disparaissent du fil. Ajoute * à la fin pour couvrir aussi les variantes (chat* → chats).</p>
+        <div class="addbox">
+          <input id="muteInput" type="text" autocomplete="off" spellcheck="false" maxlength="200" data-i18n-attr="placeholder:mute.placeholder,aria-label:mute.placeholder" placeholder="Un mot, ou plusieurs séparés par des virgules">
+          <button type="button" id="muteAddBtn" data-i18n="mute.add">Masquer</button>
+        </div>
+        <div class="intgrid mutelist" id="muteList"></div>
+      </div>
+    </details>
+
+    <details class="setgrp" data-grp="display">
+      <summary><span class="setgrp__t"><b data-i18n="setgrp.display.t">🎨 Affichage</b><span data-i18n="setgrp.display.d">Langue, couleurs, cartes, vidéos, pauses</span></span></summary>
+      <div class="setgrp__body">
+        <!-- Langue de l'app (et de Wikipédia, voir renderLangPref) : un seul point
+             de montage, sur le même modèle que la dose et les réglages du lecteur. -->
+        <div data-langmount></div>
+
+        <!-- Thème des couleurs (voir renderThemePref/setAppTheme) : même point de
+             montage unique que les autres réglages ci-dessus/dessous, et même
+             absence de secttl/sub séparé que data-langmount juste au-dessus —
+             prefRow() porte déjà son propre libellé + description de l'option en
+             cours (apptheme.label), un secttl "Thème" par-dessus ne faisait que
+             répéter la même idée deux fois de suite (retour utilisateur : "ça
+             fait doublon"). -->
+        <div data-thememount></div>
+
+        <!-- Apparence clair/sombre/auto (voir renderSchemePref/setAppScheme) :
+             même forme prefRow que le thème juste au-dessus. -->
+        <div data-schememount></div>
+
+        <!-- Articles par carte (voir renderCardsPref/prefRow, comme apptheme/lang
+             ci-dessus) : pas de secttl/sub séparé, prefRow porte déjà son propre
+             libellé + description de l'option en cours. -->
+        <div data-cardsmount></div>
+
+        <!-- Lecture auto des vidéos (voir renderAutoplayPref/armerAutoplay) : même forme prefRow. -->
+        <div data-autoplaymount></div>
+
+        <!-- Pause douce (voir renderPausePref/verifierPause) : même forme prefRow. -->
+        <div data-pausemount></div>
+      </div>
+    </details>
+
+    <details class="setgrp" data-grp="reading" data-hideempty>
+      <summary><span class="setgrp__t"><b data-i18n="setgrp.reading.t">📖 Lecture et écoute</b><span data-i18n="setgrp.reading.d">Ouverture des articles, voix, notifications</span></span></summary>
+      <div class="setgrp__body">
+        <!-- Réglages du lecteur, remplis par renderReadPref() (vide hors app
+             packagée). Un seul point de montage depuis la fusion des panneaux. -->
+        <div data-readmount></div>
+
+        <!-- Écoute du fil, APK seulement (voir renderListenPref/ListenService) : vitesse de voix et minuteur d'arrêt. -->
+        <div data-listenmount></div>
+      </div>
+    </details>
+
+    <details class="setgrp" data-grp="backup">
+      <summary><span class="setgrp__t"><b data-i18n="setgrp.backup.t">💾 Sauvegarde</b><span data-i18n="setgrp.backup.d">Exporter ou importer tous tes réglages</span></span></summary>
+      <div class="setgrp__body">
+        <!-- Sauvegarde COMPLÈTE : contrairement à l'OPML/JSON de la section
+             Sources (qui ne portent que les flux), ce fichier reprend tout ce qui
+             est configurable dans l'app — dose, centres d'intérêt, sources, clé
+             API YouTube, réglages du lecteur — pour changer d'appareil sans tout
+             reconfigurer à la main. Voir settingsSnapshot()/applySettingsImport(). -->
+        <p class="sub" data-i18n="sheet.backup.sub">Exporte ou importe TOUS tes réglages en un seul fichier — pratique pour changer d'appareil.</p>
+        <div class="iorow">
+          <button class="iobtn" id="exportAllBtn" data-i18n="sheet.backup.export">↓ Exporter tous les réglages</button>
+          <button class="iobtn" id="importAllBtn" data-i18n="sheet.backup.import">↑ Importer tous les réglages</button>
+        </div>
+        <input id="importAllFile" type="file" accept=".json,application/json,text/plain" style="display:none">
+        <!-- Export automatique dans un dossier (APK seulement), rempli par
+             renderAutoExport() — vide sur le web. -->
+        <div data-autoexportmount></div>
+      </div>
+    </details>
 
     <button class="applybtn" id="applySettings" data-i18n="sheet.apply">Voir mon fil</button>
     <!-- Pied de panneau : la version, et rien d'autre. Rempli par
@@ -2055,7 +2121,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=321"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=332"></script>
+<script src="src/i18n.js?v=334"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -4024,7 +4090,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="333";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="334";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4035,6 +4101,8 @@ const APP_VERSION="333";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:334,date:"2026-11-22",items:[
+    "changelog.v334.item1"]},
   {v:332,date:"2026-11-15",items:[
     "changelog.v332.item1"]},
   {v:327,date:"2026-11-06",items:[
@@ -8843,7 +8911,7 @@ document.getElementById("emptyRetry").onclick=()=>loadFeeds(true);
 // Appel DIRECT (pas via le menu, jamais ouvert ici) : openSettings() sans
 // argument pousse sa propre entrée d'historique, comme n'importe quel
 // panneau ouvert seul.
-document.getElementById("emptyOpen").onclick=()=>openSettings();
+document.getElementById("emptyOpen").onclick=()=>openSettings(null,"sources");
 // Délégation des lignes de flux générées (case à cocher + suppression)
 document.getElementById("feedList").addEventListener("click",e=>{
   const del=e.target.closest("[data-del]");
@@ -9968,7 +10036,19 @@ let suggestGroupOpen={};
 // premier rendu de la liste, avant que sa déclaration plus bas (près de
 // delFeed, qui l'écrit) n'ait pu s'exécuter.
 let delConfirm=null,delConfirmT;
-function openSettings(replaceFrom){
+/* Sections repliables du panneau (voir le commentaire de #sheet) : toutes
+   refermées à chaque ouverture, comme feedGroupOpen juste en dessous ; `grp`
+   en ouvre une d'emblée (le fil vide mène droit aux sources). Une section
+   data-hideempty dont rien n'a été rendu (Lecture et écoute sur le web, sans
+   notifications) est masquée plutôt que montrée vide. */
+function majSectionsReglages(grp){
+  sheet.querySelectorAll(".setgrp").forEach(d=>{
+    if(d.hasAttribute("data-hideempty"))
+      d.hidden=![...d.querySelectorAll(".setgrp__body>div")].some(m=>m.innerHTML.trim());
+    d.open=d.dataset.grp===grp;
+  });
+}
+function openSettings(replaceFrom,grp){
   pendingInt=new Set(interests);
   intAtOpen=interests.join(",");
   // Repliés à CHAQUE ouverture du panneau, pas seulement au 1er chargement :
@@ -9982,6 +10062,7 @@ function openSettings(replaceFrom){
   document.getElementById("sponsorFilterChk").checked=filterSponsored;
   renderMutes();renderSourceHelp();
   document.getElementById("ytApiKeyInput").value=ytApiKey;
+  majSectionsReglages(grp);
   if(replaceFrom)replaceDialog(replaceFrom,sheet);else openDialog(sheet);
 }
 function openStats(replaceFrom){

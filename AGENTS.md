@@ -301,6 +301,15 @@ hors du dépôt, jamais dans `package.json`.
   quand le lien doit garder son comportement normal (`target="_blank"`).
 - `renderReadPref()` / `PREFS` / `setPref()` — les réglages du lecteur, rendus
   dans le point de montage `[data-readmount]` du panneau unique.
+- `majSectionsReglages()` — le panneau Réglages est rangé en SIX sections
+  repliables (`details.setgrp` : sources, Wikipédia, mots masqués, affichage,
+  lecture et écoute, sauvegarde), toutes refermées à chaque `openSettings()` ;
+  `openSettings(replaceFrom,grp)` en ouvre une d'emblée (le fil vide ouvre
+  « sources »). Une section `data-hideempty` sans rien de rendu est masquée.
+  Les points de montage et les id n'ont pas bougé : un scénario du banc qui
+  CLIQUE dedans doit d'abord ouvrir la section (`.setgrp[data-grp=…] > summary`).
+  Le menu (`menuSheet`) montre une phrase d'explication sous chaque libellé
+  (`menu.d.*`), en trois blocs séparés — retour « j'y comprends plus rien ».
 - `appTheme` / `APP_THEMES` / `renderThemePref()` / `setAppTheme()` — l'habillage
   de couleurs (`[data-thememount]`), en réponse au retour « les couleurs sont
   flash ». Hors de `PREFS`/`setPref()` pour la même raison que `LANG` : un

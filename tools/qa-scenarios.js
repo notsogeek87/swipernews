@@ -3091,8 +3091,12 @@ ${Array.from({ length: 12 }, (_, k) => {
       `après relancement : mots ${JSON.stringify(relance.mots)}, Actu 3 présent : ${relance.present}`
     );
     // Puces dans le panneau, puis retrait d'un mot par sa puce
+    // Les réglages sont rangés en sections repliables (voir majSectionsReglages) :
+    // on ouvre celle des mots masqués, comme l'utilisateur.
     await page.evaluate(() => openSettings());
     await page.waitForTimeout(300);
+    await page.click('#sheet .setgrp[data-grp="mute"] > summary');
+    await page.waitForTimeout(200);
     const puces = await page.$$eval("#muteList [data-unmute]", (b) =>
       b.map((x) => x.textContent)
     );
