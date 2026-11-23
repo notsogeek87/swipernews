@@ -4110,6 +4110,10 @@ ${Array.from({ length: 12 }, (_, k) => {
                       status: 200,
                       data: "<!doctype html><title>a</title>" + "<p>texte</p>".repeat(40),
                     };
+                  // Lot imposé par le scénario (le service worker, une fois actif, ne
+                  // laisserait plus passer les requêtes par les routes du banc).
+                  if (window.__rss)
+                    return { status: 200, data: await window.__rss(o.url) };
                   const r = await fetch(
                     "http://localhost:8124/__qa_feed?u=" + encodeURIComponent(o.url)
                   );
@@ -4152,12 +4156,12 @@ ${Array.from({ length: 12 }, (_, k) => {
                       bouts.forEach((b, i) =>
                         setTimeout(
                           () => !coupe && morceau && morceau({ key: o.key, piece: b }),
-                          150 * (i + 1)
+                          150 * (window.__lent || 1) * (i + 1)
                         )
                       );
                       setTimeout(
                         () => !coupe && res(Object.assign(fin, { text: t })),
-                        150 * (bouts.length + 1)
+                        150 * (window.__lent || 1) * (bouts.length + 1)
                       );
                       return;
                     }
@@ -4188,7 +4192,12 @@ ${Array.from({ length: 12 }, (_, k) => {
                     }
                   return Promise.resolve();
                 },
-                cardSummaryRelease: () => (window.__releases++, Promise.resolve()),
+                cardSummaryRelease: () => {
+                  window.__releases++;
+                  // Comme le natif : l'écriture en cours est rendue « abandonnée ».
+                  if (window.__couperDirect) window.__couperDirect("liberation");
+                  return Promise.resolve();
+                },
                 cardSummaryWarm: (o) => (
                   (window.__warms = (window.__warms || 0) + 1),
                   Promise.resolve()
@@ -4306,6 +4315,129 @@ ${Array.from({ length: 12 }, (_, k) => {
       console.log(
         `demandes : ${JSON.stringify(await page.evaluate(() => window.__calls.map((c) => c.title + (c.stream ? " (direct)" : ""))))}`
       );
+      console.log(`erreurs : ${JSON.stringify(errors)}`);
+      await browser.close();
+    }
+    // 0 bis. Réouverture TARDIVE (fil en mémoire au-delà de 30 min), mode résumé actif :
+    // le fil se renouvelle, et la première carte neuve ne doit afficher qu'UN résumé,
+    // sans jamais reculer ni changer d'article sous les yeux.
+    {
+      const { browser, page, errors } = await lancer(
+        { "fluxswipe.cardai.v1": "on", "fluxswipe.cardai.mode.v1": "1" },
+        OK
+      );
+      await page.waitForTimeout(3000);
+      // Lot neuf, sources plus ou moins lentes (comme un réseau mobile).
+      await page.evaluate((rss) => {
+        let n = 0;
+        window.__rss = async (u) => {
+          const d = [150, 600, 1200, 2200, 3200, 5000, 7000][n++ % 7];
+          await new Promise((r) => setTimeout(r, d));
+          const h =
+            Math.abs([...u].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7)) % 97;
+          return rss
+            .replace(/Actu (\d+)/g, (m, i) => `Neuve ${h}-${i}`)
+            .replace(/a(\d+)<\/link>/g, (m, i) => `n${h}-${i}</link>`)
+            .replace(
+              /<pubDate>[^<]*/g,
+              () => "<pubDate>" + new Date(Date.now() - h * 60e3).toUTCString()
+            );
+        };
+      }, RSS_OK);
+      await page.evaluate(() => {
+        window.__lent = 12; // un vrai modèle sur téléphone : une dizaine de secondes
+        lastNewsLoad = Date.now() - 2 * 3600e3;
+        window.__trace.length = 0;
+        Object.defineProperty(document, "visibilityState", {
+          configurable: true,
+          get: () => "hidden",
+        });
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await page.waitForTimeout(500);
+      await page.evaluate(() => {
+        Object.defineProperty(document, "visibilityState", {
+          configurable: true,
+          get: () => "visible",
+        });
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await page.waitForTimeout(20000);
+      const tr = await page.evaluate(() => window.__trace);
+      const ids = [...new Set(tr.map((x) => x.v.split("|")[0]).filter(Boolean))];
+      let reculs = 0;
+      for (let i = 1; i < tr.length; i++) {
+        const [ida, aia, ta] = tr[i - 1].v.split("|");
+        const [idb, aib, tb] = tr[i].v.split("|");
+        if (
+          ida === idb &&
+          aia === "flux" &&
+          aib === "flux" &&
+          !/préparation/.test(ta) &&
+          tb.length < ta.length
+        )
+          reculs++;
+        if (ida === idb && aia && !aib) reculs++;
+      }
+      // La carte neuve ne montre JAMAIS son extrait avant le résumé : elle part directement
+      // en préparation (pas de « affiche, retire, remet » sur la 1re carte).
+      const neuve = ids[ids.length - 1];
+      const etats = tr
+        .filter((x) => x.v.split("|")[0] === neuve)
+        .map((x) => x.v.split("|")[1] || "extrait");
+      console.log(
+        `réouverture tardive en mode résumé : ancienne carte puis ${ids.length - 1} carte neuve (attendu 1), états de la carte neuve ${[...new Set(etats)].join(" → ")} (attendu flux → sum), reculs ${reculs} (attendu 0), écritures en direct ${await page.evaluate(() => window.__calls.filter((c) => c.stream).length)}`
+      );
+      if (process.env.QA_TRACE)
+        for (const x of tr) console.log("  " + x.t + " " + x.v.slice(0, 90));
+      console.log(`erreurs : ${JSON.stringify(errors)}`);
+      await browser.close();
+    }
+    // 0 ter. Arrière-plan PENDANT l'écriture, retour rapide (fil encore frais) : la carte
+    // garde son texte, ne repasse jamais par l'extrait, et l'écriture reprend.
+    {
+      const { browser, page, errors } = await lancer(
+        { "fluxswipe.cardai.v1": "on", "fluxswipe.cardai.mode.v1": "1" },
+        OK
+      );
+      await page.evaluate(() => {
+        window.__lent = 6;
+      });
+      await page.waitForTimeout(600);
+      await page.evaluate(() => {
+        delete window.__couperDirect;
+        const el = currentCardEl(),
+          it = cardReg.get(+el.dataset.id);
+        cardAiCache.delete(newsKey(it));
+        delete el.dataset.ai;
+        cardAiCarte = null;
+        planifierResumes(el);
+      });
+      await page.waitForTimeout(3000);
+      await page.evaluate(() => {
+        window.__trace.length = 0;
+        Object.defineProperty(document, "visibilityState", {
+          configurable: true,
+          get: () => "hidden",
+        });
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await page.waitForTimeout(400);
+      await page.evaluate(() => {
+        Object.defineProperty(document, "visibilityState", {
+          configurable: true,
+          get: () => "visible",
+        });
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await page.waitForTimeout(9000);
+      const tr = await page.evaluate(() => window.__trace);
+      const etats = [...new Set(tr.map((x) => x.v.split("|")[1] || "extrait"))];
+      console.log(
+        `arrière-plan pendant l'écriture : états ${etats.join(" → ")} (attendu flux → sum, jamais l'extrait)`
+      );
+      if (process.env.QA_TRACE)
+        for (const x of tr) console.log("  " + x.t + " " + x.v.slice(0, 90));
       console.log(`erreurs : ${JSON.stringify(errors)}`);
       await browser.close();
     }
