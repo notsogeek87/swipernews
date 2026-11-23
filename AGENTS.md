@@ -528,8 +528,8 @@ hors du dépôt, jamais dans `package.json`.
   pousse le titre vers le haut à chaque ligne (même défaut que dans la feuille de
   résumé du lecteur, revenu avec les résumés de quatre phrases) ; la réserve n'est
   rendue qu'aux cartes QUITTÉES (`libererHauteurs`), jamais sous les yeux. Et le texte
-  affiché pendant l'écriture ne recule jamais (`p.dataset.vu`) : retour « ça affiche un
-  début, ça l'efface, ça remet ». Versions écartées, dans l'ordre : remplacement automatique du
+  affiché pendant l'écriture ne recule jamais (`cardAiVu`, tenu PAR ARTICLE et non par élément : une carte reconstruite ou une écriture relancée repart de ce qui était à l'écran) : retour « ça affiche un
+  début, ça l'efface, ça remet ». Un résumé a droit à 12 lignes (10 pour un extrait) et ce qui dépasse encore est retiré par PHRASES entières (`tenirDansCoupe`) : la coupe CSS seule finissait sur « … » en pleine phrase. Versions écartées, dans l'ordre : remplacement automatique du
   texte des cartes hors écran sans geste (tantôt résumé, tantôt extrait selon le
   timing), pastille dans la carte (doublon du ✨ du rail), ✨ valable pour UNE carte
   (il fallait réappuyer à chaque swipe), et carte laissée sur son extrait pendant la

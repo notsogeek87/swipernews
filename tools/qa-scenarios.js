@@ -4073,6 +4073,24 @@ ${Array.from({ length: 12 }, (_, k) => {
           window.__releases = 0;
           window.__echec = new Set();
           window.__opens = [];
+          // Trace du texte de la carte sous les yeux, dès l'ouverture (« ça saute au début »).
+          window.__trace = [];
+          setInterval(() => {
+            try {
+              const el = currentCardEl();
+              const d = el && el.querySelector(".card__desc");
+              const v = el
+                ? el.dataset.id +
+                  "|" +
+                  (el.dataset.ai || "") +
+                  "|" +
+                  (d ? d.textContent : "")
+                : "";
+              const t = window.__trace;
+              if (!t.length || t[t.length - 1].v !== v)
+                t.push({ t: Math.round(performance.now()), v });
+            } catch (e) {}
+          }, 30);
           const enVol = new Map();
           let morceau = null;
           const texte = (o) =>
@@ -4250,6 +4268,47 @@ ${Array.from({ length: 12 }, (_, k) => {
         pred
       );
 
+    // 0. Ouverture à froid, mode résumé déjà actif : le texte de la carte sous les yeux ne
+    // doit jamais RECULER (retour d'essai : « le résumé de la première carte saute au début »).
+    {
+      const { browser, page, errors } = await lancer(
+        { "fluxswipe.cardai.v1": "on", "fluxswipe.cardai.mode.v1": "1" },
+        OK
+      );
+      await page.waitForTimeout(5000);
+      const tr = await page.evaluate(() => window.__trace);
+      let reculs = 0;
+      for (let i = 1; i < tr.length; i++) {
+        const [ida, aia, ta] = tr[i - 1].v.split("|");
+        const [idb, aib, tb] = tr[i].v.split("|");
+        if (
+          ida === idb &&
+          aia === "flux" &&
+          ta &&
+          !/préparation/.test(ta) &&
+          !tb.startsWith(ta.slice(0, Math.min(ta.length, 30)))
+        )
+          reculs++;
+        if (
+          ida === idb &&
+          aia === "flux" &&
+          aib === "flux" &&
+          tb.length < ta.length &&
+          !/préparation/.test(ta)
+        )
+          reculs++;
+      }
+      console.log(
+        `ouverture en mode résumé : ${tr.length} états, reculs ${reculs} (attendu 0)`
+      );
+      if (process.env.QA_TRACE)
+        for (const x of tr) console.log("  " + x.t + " " + x.v.slice(0, 90));
+      console.log(
+        `demandes : ${JSON.stringify(await page.evaluate(() => window.__calls.map((c) => c.title + (c.stream ? " (direct)" : ""))))}`
+      );
+      console.log(`erreurs : ${JSON.stringify(errors)}`);
+      await browser.close();
+    }
     // 1. Par défaut : rien ne part, et le ✨ ouvre la feuille du lecteur comme avant.
     {
       const { browser, page, errors } = await lancer({}, OK);
@@ -4352,6 +4411,26 @@ ${Array.from({ length: 12 }, (_, k) => {
       await aller(page, 1);
       const retour = await carte(1);
       console.log(`retour sur la carte 1 : ${retour.ai}, résumé ${retour.resume}`);
+      // Résumé trop long pour la carte : coupé à la dernière phrase qui tient, jamais sur « … ».
+      const long = await page.evaluate(() => {
+        const el = currentCardEl(),
+          it = cardReg.get(+el.dataset.id),
+          k = newsKey(it);
+        const ph =
+          "Une phrase assez longue pour remplir plusieurs lignes de la carte sans peine.";
+        cardAiCache.set(k, Array(14).fill(ph).join(" "));
+        el.dataset.ai = "sum";
+        afficherResume(el, it);
+        const d = el.querySelector(".card__desc");
+        return {
+          tient: d.scrollHeight <= d.clientHeight + 2,
+          fin: d.textContent.slice(-12),
+          phrases: d.textContent.split(". ").length,
+        };
+      });
+      console.log(
+        `résumé trop long : tient dans la carte ${long.tient}, finit sur une phrase complète ${/\.$/.test(long.fin)} (${long.phrases} phrases gardées sur 14)`
+      );
       // Défilement rapide en mode : aucune écriture lancée pour les cartes effleurées.
       const n0 = await page.evaluate(() => window.__calls.filter((c) => c.stream).length);
       const debut = await premiere(page, "neuve");
