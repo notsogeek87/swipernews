@@ -4052,11 +4052,12 @@ ${Array.from({ length: 12 }, (_, k) => {
   },
 
   /* ESSAI « résumé IA sur les cartes » (voir planifierResumes, index.html), pont natif
-     simulé : un faux résumeur qui répond en 600 ms. Vérifie la règle d'or — la carte
-     SOUS LES YEUX ne change jamais toute seule (pastille seulement), la SUIVANTE reçoit
-     le résumé — et ce qui ne doit rien coûter : réglage coupé par défaut, défilement
-     rapide, cartes Wikipédia, mode « Wi-Fi et en charge » sur réseau facturé, stockage
-     abîmé. */
+     simulé : un faux résumeur (600 ms d'avance, morceaux toutes les 150 ms en direct).
+     Vérifie le comportement UNIQUE : toutes les cartes d'actu s'ouvrent sur l'extrait
+     avec la pastille, la première comprise ; rien ne change sans toucher ; un toucher
+     sur une carte préparée est immédiat, sinon le résumé s'écrit en direct et passe
+     devant la préparation. Et ce qui ne doit rien coûter : réglage coupé par défaut,
+     défilement rapide, Wikipédia, préparation hors Wi-Fi, stockage abîmé. */
   async resumecartes() {
     const lancer = async (storage, etat) => {
       const r = await boot({
@@ -4069,7 +4070,13 @@ ${Array.from({ length: 12 }, (_, k) => {
           window.__calls = [];
           window.__drops = [];
           window.__releases = 0;
+          window.__echec = new Set();
           const enVol = new Map();
+          let morceau = null;
+          const texte = (o) =>
+            window.__echec.has(o.title)
+              ? ""
+              : "Résumé simulé de « " + o.title + " », en deux phrases courtes. Voilà.";
           window.Capacitor = {
             isNativePlatform: () => true,
             Plugins: {
@@ -4088,26 +4095,47 @@ ${Array.from({ length: 12 }, (_, k) => {
               },
               InAppBrowser: {
                 open: () => Promise.resolve(),
+                addListener: (nom, f) => {
+                  if (nom === "cardSummaryPiece") morceau = f;
+                  return Promise.resolve({ remove() {} });
+                },
                 cardSummaryStatus: () => Promise.resolve(etat),
                 cardSummarize: (o) =>
                   new Promise((res) => {
                     window.__calls.push(o);
+                    const fin = {
+                      key: o.key,
+                      dropped: false,
+                      waitMs: 5,
+                      fetchMs: 400,
+                      genMs: 200,
+                      source: "page",
+                    };
+                    if (o.stream) {
+                      // Passe devant : la préparation en cours est abandonnée.
+                      for (const [k, r] of [...enVol]) {
+                        enVol.delete(k);
+                        r({ key: k, text: "", dropped: true });
+                      }
+                      const t = texte(o);
+                      const bouts = t ? t.match(/.{1,20}/g) : [];
+                      bouts.forEach((b, i) =>
+                        setTimeout(
+                          () => morceau && morceau({ key: o.key, piece: b }),
+                          150 * (i + 1)
+                        )
+                      );
+                      setTimeout(
+                        () => res(Object.assign(fin, { text: t })),
+                        150 * (bouts.length + 1)
+                      );
+                      return;
+                    }
                     enVol.set(o.key, res);
                     setTimeout(() => {
                       if (!enVol.has(o.key)) return;
                       enVol.delete(o.key);
-                      res({
-                        key: o.key,
-                        text:
-                          "Résumé simulé de « " +
-                          o.title +
-                          " », en deux phrases courtes.",
-                        dropped: false,
-                        waitMs: 5,
-                        fetchMs: 400,
-                        genMs: 200,
-                        source: "page",
-                      });
+                      res(Object.assign(fin, { text: texte(o) }));
                     }, 600);
                   }),
                 cardSummaryDrop: (o) => {
@@ -4145,84 +4173,156 @@ ${Array.from({ length: 12 }, (_, k) => {
         feedEl.scrollTop = feedEl.children[i].offsetTop;
         onCardChange(true);
       }, i);
+    const etatCartes = (page) =>
+      page.evaluate(() =>
+        [...feedEl.children]
+          .filter((el) => el.classList.contains("card") && el.dataset.id)
+          .map((el) => {
+            const it = cardReg.get(+el.dataset.id);
+            const d = el.querySelector(".card__desc");
+            return {
+              wiki: el.classList.contains("card--learn"),
+              ai: el.dataset.ai || "",
+              pastille: !!el.querySelector(".card__ai"),
+              extrait: !!it && (d ? d.textContent : "") === (it.desc || ""),
+            };
+          })
+      );
 
-    // 1. Par défaut : rien.
+    // 1. Par défaut : rien, ni demande ni pastille.
     {
       const { browser, page, errors } = await lancer({}, OK);
       await page.waitForTimeout(2500);
       const n = await page.evaluate(() => window.__calls.length);
+      const p = (await etatCartes(page)).filter((c) => c.pastille).length;
       console.log(
-        `réglage par défaut (${await page.evaluate(() => cardAiPref)}) : ${n} demande(s)`
+        `réglage par défaut (${await page.evaluate(() => cardAiPref)}) : ${n} demande(s), ${p} pastille(s)`
       );
       console.log(`erreurs : ${JSON.stringify(errors)}`);
       await browser.close();
     }
-    // 2. Activé : la suivante résumée, la courante intouchée.
+    // 2. Activé.
     {
       const { browser, page, errors } = await lancer({ "fluxswipe.cardai.v1": "on" }, OK);
-      const desc0 = await page.evaluate(
-        () => (feedEl.children[0].querySelector(".card__desc") || {}).textContent || ""
-      );
       await page.waitForTimeout(1500);
-      const r = await page.evaluate(() => {
-        const kids = [...feedEl.children];
-        const info = (el) => ({
-          ai: el.dataset.ai || "",
-          desc: (el.querySelector(".card__desc") || {}).textContent || "",
-          pastille: !!el.querySelector(".card__ai"),
-          wiki: el.classList.contains("card--learn"),
-        });
-        return {
-          titres: window.__calls.map((c) => c.title),
-          c0: info(kids[0]),
-          c1: info(kids[1]),
-          wikiDemandes: window.__calls.filter((c) => /wikipedia/.test(c.link)).length,
-          mesures: texteMesures(),
+      const cartes = await etatCartes(page);
+      const actus = cartes.filter((c) => !c.wiki),
+        wikis = cartes.filter((c) => c.wiki);
+      console.log(
+        `après préparation : demandes ${JSON.stringify(await page.evaluate(() => window.__calls.map((c) => c.title + (c.stream ? " (direct)" : ""))))}`
+      );
+      console.log(
+        `actus avec pastille ${actus.filter((c) => c.pastille).length}/${actus.length} (1re comprise : ${cartes[0].pastille}) · toutes sur l'extrait ${cartes.every((c) => c.extrait)} · Wikipédia avec pastille ${wikis.filter((c) => c.pastille).length}`
+      );
+      // Carte 1, préparée : toucher immédiat, puis retour à l'extrait.
+      await aller(page, 1);
+      const imm = await page.evaluate(() => {
+        const el = feedEl.children[1],
+          b = el.querySelector(".card__ai"),
+          d = () => el.querySelector(".card__desc").textContent;
+        b.click();
+        const a = {
+          ai: el.dataset.ai,
+          resume: /^Résumé simulé/.test(d()),
+          presse: b.getAttribute("aria-pressed"),
         };
-      });
-      console.log(`demandes après séjour : ${JSON.stringify(r.titres)}`);
-      console.log(
-        `carte visible : data-ai=${r.c0.ai}, texte inchangé ${r.c0.desc === desc0}, pastille ${r.c0.pastille}`
-      );
-      console.log(
-        `carte suivante : data-ai=${r.c1.ai}, résumé posé ${/^Résumé simulé/.test(r.c1.desc)}, wiki=${r.c1.wiki}`
-      );
-      console.log(`cartes Wikipédia demandées : ${r.wikiDemandes}`);
-      console.log(`mesures : ${r.mesures}`);
-      // Pastille de la carte visible : bascule résumé ↔ extrait.
-      const bascule = await page.evaluate(() => {
-        const el = feedEl.children[0],
-          b = el.querySelector(".card__ai");
-        if (!b) return "pas de pastille";
         b.click();
-        const a = el.querySelector(".card__desc").textContent;
-        b.click();
-        const c = el.querySelector(".card__desc").textContent;
-        return `après 1 toucher résumé=${/^Résumé simulé/.test(a)}, après 2 extrait=${!/^Résumé simulé/.test(c)}`;
+        return Object.assign(a, {
+          retour: el.dataset.ai,
+          extrait: !/^Résumé simulé/.test(d()),
+        });
       });
-      console.log(`bascule : ${bascule}`);
-      // Défilement rapide : aucune demande pour les cartes à peine effleurées.
+      console.log(
+        `carte préparée, toucher : état ${imm.ai}, résumé affiché ${imm.resume}, pastille enfoncée ${imm.presse} · 2e toucher : état ${imm.retour}, extrait ${imm.extrait}`
+      );
+      // Défilement rapide : aucune préparation pour les cartes effleurées.
       const n0 = await page.evaluate(() => window.__calls.length);
-      for (let i = 2; i <= 7; i++) {
+      for (let i = 2; i <= 6; i++) {
         await aller(page, i);
         await page.waitForTimeout(200);
       }
-      const n1 = await page.evaluate(() => window.__calls.length);
-      console.log(`défilement rapide sur 6 cartes : ${n1 - n0} demande(s)`);
-      await page.waitForTimeout(1800);
-      const apres = await page.evaluate(() => ({
-        n: window.__calls.length,
-        drops: window.__drops.length,
-      }));
       console.log(
-        `arrêt sur la carte 7 : ${apres.n - n1} demande(s), ${apres.drops} abandon(s) envoyé(s)`
+        `défilement rapide sur 5 cartes : ${(await page.evaluate(() => window.__calls.length)) - n0} demande(s)`
       );
-      // Ouverture d'un article : le modèle est libéré.
+      // Carte non préparée : toucher → écriture en direct.
+      const idx = await page.evaluate(() => {
+        for (let i = currentIndex(); i < feedEl.children.length; i++) {
+          const it = carteResumable(feedEl.children[i]);
+          if (it && !cardAiCache.has(newsKey(it))) return i;
+        }
+        return -1;
+      });
+      await aller(page, idx);
+      await page.evaluate(
+        (i) => feedEl.children[i].querySelector(".card__ai").click(),
+        idx
+      );
+      await page.waitForTimeout(420);
+      const pendant = await page.evaluate((i) => {
+        const el = feedEl.children[i],
+          d = el.querySelector(".card__desc");
+        return {
+          ai: el.dataset.ai,
+          txt: d.textContent,
+          minH: d.style.minHeight,
+          lib: el.querySelector(".card__ai").textContent,
+        };
+      }, idx);
+      await page.waitForTimeout(2000);
+      const apres = await page.evaluate((i) => {
+        const el = feedEl.children[i],
+          d = el.querySelector(".card__desc");
+        const direct = window.__calls.filter((c) => c.stream);
+        return {
+          ai: el.dataset.ai,
+          resume: /^Résumé simulé.*Voilà\.$/.test(d.textContent),
+          minH: d.style.minHeight,
+          direct: direct.length,
+          mesures: texteMesures(),
+        };
+      }, idx);
+      console.log(
+        `carte non préparée, pendant l'écriture : état ${pendant.ai}, « ${pendant.txt} », libellé « ${pendant.lib} », hauteur tenue ${!!pendant.minH}`
+      );
+      console.log(
+        `  à la fin : état ${apres.ai}, résumé complet ${apres.resume}, hauteur relâchée ${!apres.minH}, demandes en direct ${apres.direct}`
+      );
+      console.log(`mesures : ${apres.mesures}`);
+      // Échec : la pastille le dit et ne se touche plus.
+      const idx2 = await page.evaluate(() => {
+        for (let i = currentIndex() + 1; i < feedEl.children.length; i++) {
+          const it = carteResumable(feedEl.children[i]);
+          if (it && !cardAiCache.has(newsKey(it))) {
+            window.__echec.add(it.title);
+            return i;
+          }
+        }
+        return -1;
+      });
+      await aller(page, idx2);
+      await page.evaluate(
+        (i) => feedEl.children[i].querySelector(".card__ai").click(),
+        idx2
+      );
+      await page.waitForTimeout(600);
+      const ech = await page.evaluate((i) => {
+        const el = feedEl.children[i],
+          b = el.querySelector(".card__ai"),
+          it = cardReg.get(+el.dataset.id);
+        return {
+          ai: el.dataset.ai,
+          off: b.disabled,
+          lib: b.textContent,
+          extrait: el.querySelector(".card__desc").textContent === it.desc,
+        };
+      }, idx2);
+      console.log(
+        `article impossible à résumer : état ${ech.ai}, « ${ech.lib} », désactivée ${ech.off}, extrait remis ${ech.extrait}`
+      );
       await page.evaluate(() => openArticle("https://ex.test/a1", "x"));
       console.log(
         `libérations après ouverture d'un article : ${await page.evaluate(() => window.__releases)}`
       );
-      // Réglage coupé : les cartes retrouvent l'extrait.
       const coupe = await page.evaluate(() => {
         setCardAiPref("off");
         return [...feedEl.children].filter(
@@ -4233,26 +4333,42 @@ ${Array.from({ length: 12 }, (_, k) => {
       console.log(`erreurs : ${JSON.stringify(errors)}`);
       await browser.close();
     }
-    // 3. « Wi-Fi et en charge » sur réseau facturé : rien.
+    // 3. « Wi-Fi et en charge » sur réseau facturé : pas de préparation, mais la pastille.
     {
       const { browser, page, errors } = await lancer(
         { "fluxswipe.cardai.v1": "wifi" },
         Object.assign({}, OK, { unmetered: false })
       );
       await page.waitForTimeout(2500);
+      const p = (await etatCartes(page)).filter((c) => c.pastille).length;
       console.log(
-        `Wi-Fi et en charge, réseau facturé : ${await page.evaluate(() => window.__calls.length)} demande(s)`
+        `Wi-Fi et en charge, réseau facturé : ${await page.evaluate(() => window.__calls.length)} préparation(s), ${p} pastille(s)`
       );
       console.log(`erreurs : ${JSON.stringify(errors)}`);
       await browser.close();
     }
-    // 4. Stockage abîmé.
+    // 4. Modèle absent : aucune pastille.
+    {
+      const { browser, page, errors } = await lancer(
+        { "fluxswipe.cardai.v1": "on" },
+        Object.assign({}, OK, { installed: false })
+      );
+      await page.waitForTimeout(2000);
+      const p = (await etatCartes(page)).filter((c) => c.pastille).length;
+      console.log(
+        `modèle absent : ${p} pastille(s), ${await page.evaluate(() => window.__calls.length)} demande(s)`
+      );
+      console.log(`erreurs : ${JSON.stringify(errors)}`);
+      await browser.close();
+    }
+    // 5. Stockage abîmé.
     {
       const { browser, page, errors } = await lancer(
         {
           "fluxswipe.cardai.v1": "{x",
           "fluxswipe.cardai.cache.v1": "[1,2",
           "fluxswipe.cardai.mesures.v1": '{"a":1}',
+          "fluxswipe.cardai.touchers.v1": "null",
         },
         OK
       );

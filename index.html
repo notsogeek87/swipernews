@@ -381,6 +381,9 @@
   .card__ai{display:inline-flex;align-items:center;gap:6px;font:inherit;color:var(--ink);
     background:rgba(var(--redline-rgb),.16);border:1px solid var(--redline);border-radius:999px;padding:4px 11px;cursor:pointer}
   .card__ai svg{width:14px;height:14px;flex:0 0 auto}
+  .card__ai[aria-pressed="true"]{background:linear-gradient(135deg,var(--surface),var(--molten));color:var(--flare)}
+  .card__ai--flux{opacity:.75}
+  .card__ai:disabled{opacity:.55;cursor:default}
   .card__desc--ai{border-left:2px solid var(--redline);padding-left:10px}
   .card__desc[hidden]{display:none}
   .card__sujet svg{width:14px;height:14px;flex:0 0 auto}
@@ -2151,7 +2154,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=335"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=336"></script>
+<script src="src/i18n.js?v=337"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -4153,7 +4156,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="336";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="337";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4164,8 +4167,8 @@ const APP_VERSION="336";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
-  {v:336,date:"2026-11-23",items:[
-    "changelog.v336.item1"]},
+  {v:337,date:"2026-11-23",items:[
+    "changelog.v337.item1"]},
   {v:335,date:"2026-11-22",items:[
     "changelog.v335.item1"]},
   {v:334,date:"2026-11-22",items:[
@@ -4799,41 +4802,45 @@ async function dropBlocklist(){
    virgules ; "" si l'une n'est pas un hexadécimal à 6 chiffres — le natif
    retombe alors sur Flamme. */
 /* ---------- ESSAI : RÉSUMÉ IA SUR LES CARTES (APK) ----------
-   Pendant qu'on lit une carte, la SUIVANTE est résumée en deux phrases par le modèle
-   LOCAL (le même que le ✨ du lecteur et que le flash info : InAppBrowserPlugin.cardSummarize
-   → FlashSummarizer, page de l'article puis repli sur l'extrait du flux).
-   Règle d'or, la même que celle de la tête du fil : le texte qu'on a SOUS LES YEUX ne
-   change jamais tout seul. Une carte hors écran reçoit le résumé à la place de son
-   extrait ; la carte visible ne reçoit qu'une pastille « ✨ Voir le résumé », touchée
-   ou non. Dans les deux cas la pastille rebascule sur l'extrait de la source : un
-   petit modèle peut se tromper, le texte d'origine reste à un toucher.
-   Désactivé par défaut (batterie, données : la page de l'article est téléchargée).
-   Rien n'est demandé tant qu'on n'est pas resté CARD_AI_DWELL_MS sur une carte : un
-   défilement rapide ne coûte rien. Cartes concernées : une seule actu (ni Wikipédia,
-   dont l'extrait est déjà un résumé, ni vidéo, ni carte à parts égales, ni article
-   confirmé payant). Le drapeau d'annulation du moteur natif est GLOBAL : jamais pendant
-   l'écoute, et le modèle est libéré à l'ouverture du lecteur et en arrière-plan.
-   Chaque résumé rend ses MESURES (cardAiMes, affichées sous le réglage) : c'est
-   l'objet de l'essai — savoir si le résumé est prêt AVANT qu'on arrive sur la carte. */
+   UN SEUL comportement, sur toutes les cartes : chaque carte d'actu s'ouvre sur l'extrait
+   de SA SOURCE, avec la pastille « Résumé IA ». La toucher affiche le résumé — tout de
+   suite s'il est prêt, sinon il s'écrit au fil de l'eau dans la carte, comme dans le
+   lecteur. Le texte ne change donc jamais sans geste (règle de la tête du fil), et la
+   première carte se comporte comme les autres.
+   L'automatique est dans la PRÉPARATION, invisible : après CARD_AI_DWELL_MS sur une carte,
+   la SUIVANTE puis la courante sont résumées d'avance par le modèle LOCAL
+   (InAppBrowserPlugin.cardSummarize → FlashSummarizer : page de l'article, repli sur
+   l'extrait), pour que le toucher soit immédiat. Un défilement rapide ne coûte rien.
+   Préparation en Wi-Fi et en charge, ou toujours (réglage) ; le toucher, lui, est une
+   demande explicite et passe partout — il passe aussi DEVANT les préparations
+   (stream:true côté natif, l'événement cardSummaryPiece porte les morceaux).
+   Cartes concernées : une seule actu (ni Wikipédia, ni vidéo, ni parts égales, ni payant
+   confirmé). Annulation native GLOBALE : rien pendant l'écoute, modèle libéré à
+   l'ouverture du lecteur, en arrière-plan et après 90 s sans demande.
+   Mesures (objet de l'essai) : durées de chaque résumé, et part des touchers servis
+   IMMÉDIATEMENT (cardAiTaps), avec le délai du premier mot sinon. */
 const CARD_AI_MODES=["off","wifi","on"];
-const LS_CARDAI="fluxswipe.cardai.v1",LS_CARDAI_CACHE="fluxswipe.cardai.cache.v1",LS_CARDAI_MES="fluxswipe.cardai.mesures.v1";
+const LS_CARDAI="fluxswipe.cardai.v1",LS_CARDAI_CACHE="fluxswipe.cardai.cache.v1",LS_CARDAI_MES="fluxswipe.cardai.mesures.v1",LS_CARDAI_TAPS="fluxswipe.cardai.touchers.v1";
 const CARD_AI_DWELL_MS=1500,CARD_AI_AHEAD=1,CARD_AI_CACHE_MAX=150,CARD_AI_MES_MAX=40;
 let cardAiPref=(()=>{try{const v=localStorage.getItem(LS_CARDAI);return CARD_AI_MODES.includes(v)?v:"off";}catch(e){return "off";}})();
 const cardAiCache=new Map(Object.entries(readObject(LS_CARDAI_CACHE)).filter(([k,v])=>k&&typeof v==="string"&&v.length>=30&&v.length<=800));
-let cardAiMes=(()=>{try{const v=JSON.parse(localStorage.getItem(LS_CARDAI_MES)||"[]");
-  return Array.isArray(v)?v.filter(m=>m&&typeof m==="object"&&Number.isFinite(m.f)&&Number.isFinite(m.g)).slice(-CARD_AI_MES_MAX):[];}catch(e){return [];}})();
+function lireListe(cle,ok){try{const v=JSON.parse(localStorage.getItem(cle)||"[]");return Array.isArray(v)?v.filter(m=>m&&typeof m==="object"&&ok(m)).slice(-CARD_AI_MES_MAX):[];}catch(e){return [];}}
+let cardAiMes=lireListe(LS_CARDAI_MES,m=>Number.isFinite(m.f)&&Number.isFinite(m.g));
+let cardAiTaps=lireListe(LS_CARDAI_TAPS,m=>Number.isFinite(m.p));
 const cardAiEchecs=new Set(),cardAiEnVol=new Set();
-let cardAiT=null,cardAiCarte=null,cardAiEtat=null,cardAiEtatAt=0,cardAiUtilise=false;
+let cardAiT=null,cardAiCarte=null,cardAiEtat=null,cardAiEtatAt=0,cardAiEtatEnCours=null,cardAiUtilise=false,cardAiEcoute=false;
+let cardAiFlux=null;   // résumé écrit EN DIRECT : {k,el,txt,t0,p1}
 function pontResume(){
   const p=isNativeApp&&window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
   return p&&typeof p.cardSummarize==="function"?p:null;
 }
+function cardAiDispo(){return cardAiPref!=="off"&&!!pontResume()&&!!cardAiEtat&&cardAiEtat.engine&&cardAiEtat.installed;}
 function setCardAiPref(v){
   if(!CARD_AI_MODES.includes(v)||v===cardAiPref)return;
   cardAiPref=v;
   try{localStorage.setItem(LS_CARDAI,v);}catch(e){warn("save cardai",e);}
   if(v==="off"){libererResumesCartes();retirerResumesCartes();}
-  else{cardAiEtatAt=0;majResumesCartes();cardAiCarte=null;planifierResumes(currentCardEl());}
+  else{cardAiEtatAt=0;etatResume().then(()=>{majResumesCartes();renderReadPref();});cardAiCarte=null;planifierResumes(currentCardEl());}
   renderReadPref();
 }
 /* L'article d'une carte, si elle peut recevoir un résumé ; sinon null. */
@@ -4843,29 +4850,33 @@ function carteResumable(el){
   if(!it||it.kind==="learn"||videoIdOf(it)||!it.link||el.querySelector(".card__paywall"))return null;
   return it;
 }
-async function etatResume(){
+function etatResume(){
   const p=pontResume();
-  if(!p||typeof p.cardSummaryStatus!=="function")return null;
-  if(cardAiEtat&&Date.now()-cardAiEtatAt<30000)return cardAiEtat;
-  try{cardAiEtat=await p.cardSummaryStatus();cardAiEtatAt=Date.now();}catch(e){cardAiEtat=null;}
-  return cardAiEtat;
+  if(!p||typeof p.cardSummaryStatus!=="function")return Promise.resolve(null);
+  if(cardAiEtat&&Date.now()-cardAiEtatAt<30000)return Promise.resolve(cardAiEtat);
+  if(!cardAiEtatEnCours)cardAiEtatEnCours=p.cardSummaryStatus()
+    .then(e=>{cardAiEtat=e;cardAiEtatAt=Date.now();return e;})
+    .catch(()=>{cardAiEtat=null;return null;})
+    .finally(()=>{cardAiEtatEnCours=null;});
+  return cardAiEtatEnCours;
 }
 /* Appelé par onCardChange à CHAQUE frame : ne fait quelque chose qu'à l'arrivée sur une carte. */
 function planifierResumes(card){
   if(card===cardAiCarte)return;
   cardAiCarte=card;clearTimeout(cardAiT);
   if(cardAiPref==="off"||!pontResume()||!card)return;
-  cardAiT=setTimeout(lancerResumes,CARD_AI_DWELL_MS);
+  cardAiT=setTimeout(preparerResumes,CARD_AI_DWELL_MS);
 }
-async function lancerResumes(){
+/* La préparation d'avance : rien d'affiché, seulement le cache rempli. */
+async function preparerResumes(){
   const p=pontResume();
-  if(!p||cardAiPref==="off"||ecouteActive||document.visibilityState!=="visible")return;
+  if(!p||cardAiPref==="off"||ecouteActive||cardAiFlux||document.visibilityState!=="visible")return;
   const etat=await etatResume();
   if(!etat||!(etat.engine&&etat.installed)||etat.powerSave)return;
   if(cardAiPref==="wifi"&&!(etat.unmetered&&etat.charging))return;
   const i=currentIndex();
-  if(i<0||feedEl.children[i]!==cardAiCarte)return;   // on a bougé pendant la question au natif
-  // La SUIVANTE d'abord (c'est elle qu'on veut prête à l'arrivée), puis la courante (pastille).
+  if(i<0||feedEl.children[i]!==cardAiCarte||cardAiFlux)return;   // on a bougé (ou touché) entre-temps
+  // La SUIVANTE d'abord : c'est elle qu'on touchera bientôt. Puis la courante.
   const suite=[];
   for(let k=i+1;k<feedEl.children.length&&k<=i+4&&suite.length<CARD_AI_AHEAD;k++){
     const it=carteResumable(feedEl.children[k]);if(it)suite.push(it);
@@ -4876,89 +4887,138 @@ async function lancerResumes(){
   for(const it of cibles){
     const k=newsKey(it);
     if(!k||cardAiCache.has(k)||cardAiEchecs.has(k)||cardAiEnVol.has(k))continue;
-    demanderResume(p,it,k,it!==cur);
-  }
-}
-function demanderResume(p,it,k,suivante){
-  cardAiEnVol.add(k);cardAiUtilise=true;
-  p.cardSummarize({key:k,title:it.title||"",link:it.link,excerpt:(it.desc||"").slice(0,3000),lang:LANG==="en"?"en":"fr"})
-    .then(r=>{
+    cardAiEnVol.add(k);cardAiUtilise=true;
+    demanderResume(p,it,k,false).then(r=>{
       if(!r||r.dropped)return;
       const t=typeof r.text==="string"?r.text.trim():"";
-      noterMesure(r,k,t.length>=30,suivante);
-      if(t.length>=30){memoResume(k,t);majResumesCartes();}else cardAiEchecs.add(k);
-    })
-    .catch(e=>{cardAiEchecs.add(k);warn("résumé carte",e);})
-    .finally(()=>cardAiEnVol.delete(k));
+      if(t.length>=30)memoResume(k,t);else cardAiEchecs.add(k);
+    }).catch(e=>{cardAiEchecs.add(k);warn("résumé carte",e);})
+      .finally(()=>cardAiEnVol.delete(k));
+  }
+}
+function demanderResume(p,it,k,direct){
+  return p.cardSummarize({key:k,title:it.title||"",link:it.link,excerpt:(it.desc||"").slice(0,3000),lang:LANG==="en"?"en":"fr",stream:direct})
+    .then(r=>{if(r&&!r.dropped)noterMesure(r,typeof r.text==="string"&&r.text.trim().length>=30,direct);return r;});
 }
 function memoResume(k,t){
   cardAiCache.delete(k);cardAiCache.set(k,t);
   while(cardAiCache.size>CARD_AI_CACHE_MAX)cardAiCache.delete(cardAiCache.keys().next().value);
   try{localStorage.setItem(LS_CARDAI_CACHE,JSON.stringify(Object.fromEntries(cardAiCache)));}catch(e){warn("save cardai cache",e);}
 }
-/* « À temps » = le résumé d'une carte SUIVANTE est arrivé alors qu'elle était encore
-   DEVANT nous. Celui de la carte visible (pastille) n'entre pas dans ce compte. */
-function noterMesure(r,k,ok,suivante){
-  const cur=currentIndex();
-  let idx=-1;
-  for(let j=0;j<feedEl.children.length;j++){const it=carteResumable(feedEl.children[j]);if(it&&newsKey(it)===k){idx=j;break;}}
-  const m={t:Date.now(),w:+r.waitMs||0,f:+r.fetchMs||0,g:+r.genMs||0,s:String(r.source||""),ok:ok?1:0,n:suivante?1:0,a:ok&&suivante&&idx>cur?1:0};
+function noterMesure(r,ok,direct){
+  const m={t:Date.now(),w:+r.waitMs||0,f:+r.fetchMs||0,g:+r.genMs||0,s:String(r.source||""),ok:ok?1:0,d:direct?1:0};
   cardAiMes.push(m);
   if(cardAiMes.length>CARD_AI_MES_MAX)cardAiMes=cardAiMes.slice(-CARD_AI_MES_MAX);
   try{localStorage.setItem(LS_CARDAI_MES,JSON.stringify(cardAiMes));}catch(e){warn("save cardai mesures",e);}
-  console.info(`[résumé carte] ${m.s} attente ${m.w} ms · page ${m.f} ms · génération ${m.g} ms · ${!ok?"échec":!m.n?"carte visible":m.a?"à temps":"en retard"}`);
-  document.querySelectorAll("[data-cardaimes]").forEach(el=>{el.textContent=texteMesures();});
+  console.info(`[résumé carte] ${direct?"au toucher":"d'avance"} ${m.s} · attente ${m.w} ms · page ${m.f} ms · génération ${m.g} ms · ${ok?"ok":"échec"}`);
+  majMesures();
 }
+/* Un toucher : servi immédiatement (p=0) ou après p ms jusqu'au premier mot. */
+function noterToucher(p){
+  cardAiTaps.push({t:Date.now(),p:Math.max(0,Math.round(p))});
+  if(cardAiTaps.length>CARD_AI_MES_MAX)cardAiTaps=cardAiTaps.slice(-CARD_AI_MES_MAX);
+  try{localStorage.setItem(LS_CARDAI_TAPS,JSON.stringify(cardAiTaps));}catch(e){warn("save cardai touchers",e);}
+  majMesures();
+}
+function majMesures(){document.querySelectorAll("[data-cardaimes]").forEach(el=>{el.textContent=texteMesures();});}
 function texteMesures(){
-  const ok=cardAiMes.filter(m=>m.ok);
-  if(!cardAiMes.length)return T("cardai.mes.none");
+  if(!cardAiMes.length&&!cardAiTaps.length)return T("cardai.mes.none");
   const med=a=>{if(!a.length)return 0;const b=[...a].sort((x,y)=>x-y);return b[Math.floor(b.length/2)];};
   const sec=ms=>{const v=(ms/1000).toFixed(1);return LANG==="fr"?v.replace(".",","):v;};
-  return T("cardai.mes",{n:cardAiMes.length,ok:ok.length,a:ok.filter(m=>m.a).length,s:ok.filter(m=>m.n).length,
-    f:sec(med(ok.map(m=>m.f))),g:sec(med(ok.map(m=>m.g)))});
+  const ok=cardAiMes.filter(m=>m.ok);
+  let t=cardAiMes.length?T("cardai.mes",{n:cardAiMes.length,ok:ok.length,f:sec(med(ok.map(m=>m.f))),g:sec(med(ok.map(m=>m.g)))}):"";
+  if(cardAiTaps.length){
+    const lents=cardAiTaps.filter(m=>m.p>0);
+    t+=(t?" ":"")+T(lents.length?"cardai.taps":"cardai.taps.all",{t:cardAiTaps.length,i:cardAiTaps.length-lents.length,p:sec(med(lents.map(m=>m.p)))});
+  }
+  return t;
 }
-/* Pose les résumés connus sur les cartes du fil. Appelé après chaque render() (une carte
-   réutilisée n'est jamais réécrite, comme pour la pastille « N sources ») et à chaque
-   résumé reçu. Une carte déjà décidée (data-ai) n'est plus touchée. */
+/* Pose la pastille sur chaque carte éligible qui ne l'a pas encore. Appelé après chaque
+   render() (une carte réutilisée n'est jamais réécrite, comme pour « N sources »). Ne
+   touche JAMAIS au texte : la carte reste sur l'extrait tant qu'on n'a pas touché. */
 function majResumesCartes(){
-  if(cardAiPref==="off"||!cardAiCache.size)return;
-  const cur=currentCardEl();
+  if(cardAiPref==="off"||!pontResume())return;
+  if(!cardAiEtat){etatResume().then(e=>{if(e&&e.engine&&e.installed)majResumesCartes();});return;}
+  if(!cardAiDispo())return;
   for(const el of feedEl.children){
     if(el.dataset.ai)continue;
     const it=carteResumable(el);if(!it)continue;
-    const s=cardAiCache.get(newsKey(it));if(!s)continue;
-    poserResume(el,it,el===cur?"orig":"sum");
+    const meta=el.querySelector(".card__body .card__meta");if(!meta)continue;
+    const b=document.createElement("button");
+    b.type="button";b.className="card__ai";b.setAttribute("data-aitoggle","");
+    meta.appendChild(b);
+    el.dataset.ai="orig";
+    afficherResume(el,it);
   }
 }
-function poserResume(el,it,mode){
-  const body=el.querySelector(".card__body"),meta=body&&body.querySelector(".card__meta");
-  if(!meta)return;
-  let p=body.querySelector(".card__desc");
-  if(!p){p=document.createElement("p");p.className="card__desc";const h=body.querySelector(".card__title");if(h)h.after(p);else meta.before(p);}
-  let b=meta.querySelector(".card__ai");
-  if(!b){b=document.createElement("button");b.type="button";b.className="card__ai";b.setAttribute("data-aitoggle","");meta.appendChild(b);}
-  el.dataset.ai=mode;
-  afficherResume(el,it);
-}
+/* Texte et pastille d'une carte selon son état : orig (extrait), flux (en écriture), sum
+   (résumé), echec (pas de résumé possible pour cet article). */
 function afficherResume(el,it){
-  const p=el.querySelector(".card__desc"),b=el.querySelector(".card__ai");
-  const s=cardAiCache.get(newsKey(it));
-  if(!p||!b)return;
-  const sum=el.dataset.ai==="sum"&&!!s;
-  p.textContent=sum?s:(it.desc||"");
-  p.hidden=!p.textContent;
-  p.classList.toggle("card__desc--ai",sum);
-  b.innerHTML=`${ICON_SPARK}<span>${esc(T(sum?"card.ai.sum":"card.ai.orig"))}</span>`;
-  b.setAttribute("aria-label",T(sum?"card.ai.sumAria":"card.ai.origAria"));
-  b.setAttribute("aria-pressed",String(sum));
+  const body=el.querySelector(".card__body"),b=el.querySelector(".card__ai");
+  if(!body||!b)return;
+  let p=body.querySelector(".card__desc");
+  if(!p){p=document.createElement("p");p.className="card__desc";const h=body.querySelector(".card__title");if(h)h.after(p);else body.querySelector(".card__meta").before(p);}
+  const etat=el.dataset.ai,k=newsKey(it);
+  const txt=etat==="sum"?cardAiCache.get(k)||it.desc||"":etat==="flux"?(cardAiFlux&&cardAiFlux.k===k&&cardAiFlux.txt)||it.desc||"":it.desc||"";
+  p.textContent=txt;
+  p.hidden=!txt;
+  p.classList.toggle("card__desc--ai",etat==="sum"||(etat==="flux"&&!!(cardAiFlux&&cardAiFlux.txt)));
+  const lib=etat==="sum"?"card.ai.sum":etat==="flux"?"card.ai.flux":etat==="echec"?"card.ai.echec":"card.ai.orig";
+  b.innerHTML=`${ICON_SPARK}<span>${esc(T(lib))}</span>`;
+  b.setAttribute("aria-label",T(lib+"Aria"));
+  b.setAttribute("aria-pressed",String(etat==="sum"));
+  b.disabled=etat==="echec";
+  b.classList.toggle("card__ai--flux",etat==="flux");
+  if(etat==="flux")b.setAttribute("aria-busy","true");else b.removeAttribute("aria-busy");
 }
 function basculerResume(btn){
   const el=btn.closest(".card"),it=el&&cardReg.get(+el.dataset.id);
   if(!it)return;
-  el.dataset.ai=el.dataset.ai==="sum"?"orig":"sum";
-  afficherResume(el,it);
+  const etat=el.dataset.ai;
+  if(etat==="flux"||etat==="echec")return;
+  if(etat==="sum"){el.dataset.ai="orig";afficherResume(el,it);return;}
+  const k=newsKey(it);
+  if(cardAiCache.has(k)){el.dataset.ai="sum";afficherResume(el,it);noterToucher(0);return;}
+  resumerEnDirect(el,it,k);
 }
-/* Réglage coupé : chaque carte retrouve l'extrait de sa source. */
+/* Le résumé n'est pas prêt : on le demande en PRIORITÉ et il s'écrit dans la carte. La zone
+   de texte garde la hauteur de l'extrait pendant l'écriture (le titre, calé au-dessus, ne
+   remonte pas ligne après ligne) ; elle s'ajuste en une fois à la fin. */
+async function resumerEnDirect(el,it,k){
+  const p=pontResume();
+  if(!p||cardAiFlux)return;
+  if(!cardAiEcoute&&typeof p.addListener==="function"){
+    cardAiEcoute=true;
+    try{p.addListener("cardSummaryPiece",surMorceau);}catch(e){warn("résumé carte",e);}
+  }
+  const t0=Date.now();
+  cardAiFlux={k,el,txt:"",t0,p1:0};
+  clearTimeout(cardAiT);
+  el.dataset.ai="flux";afficherResume(el,it);
+  const desc=el.querySelector(".card__desc");
+  if(desc&&!desc.hidden)desc.style.minHeight=desc.offsetHeight+"px";
+  // La préparation éventuelle de CET article est abandonnée : la demande en direct la remplace.
+  if(cardAiUtilise)try{await p.cardSummaryDrop({keep:[...cardAiEnVol].filter(x=>x!==k)});}catch(e){}
+  cardAiUtilise=true;
+  let r=null;
+  try{r=await demanderResume(p,it,k,true);}catch(e){warn("résumé carte",e);}
+  const f=cardAiFlux;cardAiFlux=null;
+  const t=r&&typeof r.text==="string"?r.text.trim():"";
+  if(desc)desc.style.minHeight="";
+  if(r&&r.dropped){el.dataset.ai="orig";}                     // lecteur ouvert, arrière-plan… : rien de raté
+  else if(t.length>=30){memoResume(k,t);el.dataset.ai="sum";noterToucher(f&&f.p1?f.p1-t0:Date.now()-t0);}
+  else{cardAiEchecs.add(k);el.dataset.ai="echec";}
+  afficherResume(el,it);
+  cardAiCarte=null;planifierResumes(currentCardEl());   // reprendre la préparation d'avance
+}
+function surMorceau(e){
+  const f=cardAiFlux;
+  if(!f||!e||e.key!==f.k||typeof e.piece!=="string")return;
+  if(!f.txt){f.p1=Date.now();f.txt=e.piece.replace(/^\s+/,"");}else f.txt+=e.piece;
+  const it=cardReg.get(+f.el.dataset.id);
+  if(it&&f.el.isConnected&&f.el.dataset.ai==="flux")afficherResume(f.el,it);
+}
+/* Réglage coupé : chaque carte perd sa pastille et retrouve l'extrait de sa source. */
 function retirerResumesCartes(){
   for(const el of feedEl.children){
     if(!el.dataset.ai)continue;
@@ -4980,7 +5040,7 @@ function cardAiRow(){
   if(cardAiPref!=="off"&&!cardAiEtat)etatResume().then(e=>{if(e)renderReadPref();});
   return prefRow("cardai",T("cardai.label"),T(manque?"cardai.desc.missing":"cardai.desc."+cardAiPref),
       CARD_AI_MODES.map(v=>({v,t:T("cardai.opt."+v)})),cardAiPref)
-    +(cardAiPref!=="off"||cardAiMes.length?`<div class="prefsub"><span class="prefsub__state" data-cardaimes>${esc(texteMesures())}</span></div>`:"");
+    +(cardAiPref!=="off"||cardAiMes.length||cardAiTaps.length?`<div class="prefsub"><span class="prefsub__state" data-cardaimes>${esc(texteMesures())}</span></div>`:"");
 }
 function themePalette(){
   try{

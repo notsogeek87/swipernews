@@ -759,24 +759,31 @@
       "cardai.opt.off": "Non",
       "cardai.opt.wifi": "Wi-Fi et en charge",
       "cardai.opt.on": "Toujours",
-      "cardai.desc.off": "Les cartes gardent l'extrait de la source.",
+      "cardai.desc.off": "Pas de bouton « Résumé IA » sur les cartes.",
       "cardai.desc.wifi":
-        "Pendant que vous lisez une carte, la suivante est résumée sur le téléphone, seulement en Wi-Fi et en charge.",
+        "Un bouton « Résumé IA » sur chaque carte d'actu. En Wi-Fi et en charge, la carte suivante est résumée d'avance sur le téléphone pendant que vous lisez : le résumé s'affiche alors tout de suite.",
       "cardai.desc.on":
-        "Pendant que vous lisez une carte, la suivante est résumée sur le téléphone. Consomme batterie et données : la page de l'article est téléchargée.",
+        "Un bouton « Résumé IA » sur chaque carte d'actu. La carte suivante est toujours résumée d'avance sur le téléphone pendant que vous lisez. Consomme batterie et données : la page de l'article est téléchargée.",
       "cardai.desc.missing":
         "Aucun modèle de résumé installé : installez-le depuis le bouton ✨ du lecteur d'article.",
       "cardai.mes.none":
         "Aucune mesure pour l'instant : restez quelques secondes sur une carte d'actu.",
       "cardai.mes":
-        "Mesures : {ok} résumés réussis sur {n}, cartes suivantes prêtes à temps : {a} sur {s} · page {f} s · génération {g} s (médianes).",
+        "Mesures : {ok} résumés réussis sur {n} · page {f} s · génération {g} s (médianes).",
+      "cardai.taps":
+        "Au toucher : {i} fois sur {t} immédiat, sinon premier mot en {p} s (médiane).",
+      "cardai.taps.all": "Au toucher : immédiat {t} fois sur {t}.",
+      "card.ai.orig": "Résumé IA",
+      "card.ai.origAria": "Afficher un résumé généré sur le téléphone",
+      "card.ai.flux": "Résumé en cours…",
+      "card.ai.fluxAria": "Résumé en cours d'écriture sur le téléphone",
       "card.ai.sum": "Résumé IA",
       "card.ai.sumAria":
-        "Résumé généré sur le téléphone. Toucher pour revoir l'extrait de la source.",
-      "card.ai.orig": "Voir le résumé",
-      "card.ai.origAria": "Afficher le résumé généré sur le téléphone",
-      "changelog.v336.item1":
-        "Essai : le résumé IA peut préparer la carte suivante pendant que vous lisez (Réglages › Lecture, désactivé par défaut).",
+        "Résumé généré sur le téléphone affiché. Toucher pour revoir l'extrait de la source.",
+      "card.ai.echec": "Résumé indisponible",
+      "card.ai.echecAria": "Impossible de résumer cet article",
+      "changelog.v337.item1":
+        "Essai : un bouton « Résumé IA » sur les cartes d'actu, préparé d'avance pendant que vous lisez (Réglages › Lecture, désactivé par défaut).",
       "card.paywall.title": "Accès payant probable",
     },
     en: {
@@ -1489,23 +1496,30 @@
       "cardai.opt.off": "Off",
       "cardai.opt.wifi": "Wi-Fi and charging",
       "cardai.opt.on": "Always",
-      "cardai.desc.off": "Cards keep the source's excerpt.",
+      "cardai.desc.off": "No “AI summary” button on cards.",
       "cardai.desc.wifi":
-        "While you read a card, the next one is summarized on your phone, only on Wi-Fi and while charging.",
+        "An “AI summary” button on every news card. On Wi-Fi and while charging, the next card is summarized ahead on your phone while you read, so the summary shows instantly.",
       "cardai.desc.on":
-        "While you read a card, the next one is summarized on your phone. Uses battery and data: the article page is downloaded.",
+        "An “AI summary” button on every news card. The next card is always summarized ahead on your phone while you read. Uses battery and data: the article page is downloaded.",
       "cardai.desc.missing":
         "No summary model installed: install it from the ✨ button of the article reader.",
       "cardai.mes.none": "No measurement yet: stay a few seconds on a news card.",
       "cardai.mes":
-        "Measurements: {ok} successful summaries out of {n}, next cards ready in time: {a} of {s} · page {f} s · generation {g} s (medians).",
+        "Measurements: {ok} successful summaries out of {n} · page {f} s · generation {g} s (medians).",
+      "cardai.taps":
+        "On tap: instant {i} times out of {t}, otherwise first word after {p} s (median).",
+      "cardai.taps.all": "On tap: instant {t} times out of {t}.",
+      "card.ai.orig": "AI summary",
+      "card.ai.origAria": "Show a summary generated on your phone",
+      "card.ai.flux": "Summarizing…",
+      "card.ai.fluxAria": "Summary being written on your phone",
       "card.ai.sum": "AI summary",
       "card.ai.sumAria":
-        "Summary generated on your phone. Tap to see the source's excerpt again.",
-      "card.ai.orig": "See summary",
-      "card.ai.origAria": "Show the summary generated on your phone",
-      "changelog.v336.item1":
-        "Trial: the AI summary can prepare the next card while you read (Settings › Reading, off by default).",
+        "Summary generated on your phone shown. Tap to see the source's excerpt again.",
+      "card.ai.echec": "No summary",
+      "card.ai.echecAria": "This article could not be summarized",
+      "changelog.v337.item1":
+        "Trial: an “AI summary” button on news cards, prepared ahead while you read (Settings › Reading, off by default).",
       "card.paywall.title": "Likely paywalled",
 
       // Libellés des centres d'intérêt (clés définies dans src/learn-core.js) :

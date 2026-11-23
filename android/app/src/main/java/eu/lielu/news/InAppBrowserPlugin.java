@@ -1098,7 +1098,22 @@ public class InAppBrowserPlugin extends Plugin {
         final int i = ++cardAiSeq;
         cardAiCalls.put(i, call);
         cardAiKeys.put(i, key);
-        cardAi.request(i, call.getString("title", ""), call.getString("link", ""), call.getString("excerpt", ""));
+        final String title = call.getString("title", ""), link = call.getString("link", ""),
+            excerpt = call.getString("excerpt", "");
+        if (Boolean.TRUE.equals(call.getBoolean("stream", false))) {
+            // Toucher sur une carte : passe devant, écrit en direct (événement cardSummaryPiece).
+            // Le travail préparé d'avance qu'il interrompt est rendu comme ABANDONNÉ, pas raté.
+            final int busyIdx = cardAi.currentIndex();
+            if (busyIdx >= 0) cardAiDropped.add(busyIdx);
+            cardAi.requestNow(i, title, link, excerpt, (index, piece) -> {
+                JSObject ev = new JSObject();
+                ev.put("key", cardAiKeys.get(index));
+                ev.put("piece", piece);
+                notifyListeners("cardSummaryPiece", ev);
+            });
+        } else {
+            cardAi.request(i, title, link, excerpt);
+        }
     }
 
     /** Abandonne les demandes dont la clé n'est pas dans {@code keep} (cartes dépassées). */

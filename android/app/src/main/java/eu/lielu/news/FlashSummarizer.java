@@ -36,6 +36,11 @@ final class FlashSummarizer {
         void onResult(int index, List<String> chunks);
     }
 
+    /** Reçoit le résumé AU FIL DE L'ÉCRITURE (fil principal) : morceaux à ajouter bout à bout. */
+    interface Piece {
+        void onPiece(int index, String piece);
+    }
+
     private static final int FETCH_TIMEOUT_MS = 5000;
     /** Au-delà, on lit l'extrait sans résumé et on passe à l'article suivant. */
     static final long JOB_TIMEOUT_MS = 45_000;
@@ -54,6 +59,8 @@ final class FlashSummarizer {
         long startedAt, fetchedAt;
         /** D'où vient le texte résumé : "page", "extrait" ou "aucun". */
         String source = "aucun";
+        /** Non nul : le résumé est demandé EN DIRECT (essai des cartes), morceau par morceau. */
+        Piece piece;
 
         Job(int index, String title, String link, String excerpt) {
             this.index = index;
@@ -115,6 +122,29 @@ final class FlashSummarizer {
             if (summarizer != null) summarizer.cancel();
             finish(current, null, token);
         }
+    }
+
+    /**
+     * Demande PRIORITAIRE, écrite au fil de l'eau : passe devant la file et interrompt le
+     * travail en cours (qui revient par le rappel avec un résultat nul). Sert au toucher sur
+     * une carte du fil : quelqu'un attend, les résumés préparés d'avance passent après.
+     */
+    void requestNow(int index, String title, String link, String excerpt, Piece piece) {
+        if (released) return;
+        final Job j = new Job(index, title, link, excerpt);
+        j.piece = piece;
+        queue.addFirst(j);
+        if (busy && current != null) {
+            if (summarizer != null) summarizer.cancel();
+            finish(current, null, token);
+        } else {
+            pump();
+        }
+    }
+
+    /** Indice du travail en cours, ou -1. */
+    int currentIndex() {
+        return busy && current != null ? current.index : -1;
     }
 
     /** Garde seulement les demandes dont l'indice est dans {@code keep} ; abandonne les autres, en cours compris. */
@@ -186,6 +216,7 @@ final class FlashSummarizer {
             @Override
             public void onText(String piece) {
                 acc.append(piece);
+                if (j.piece != null && my == token && !released) j.piece.onPiece(j.index, piece);
             }
 
             @Override
