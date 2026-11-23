@@ -499,7 +499,7 @@ hors du dépôt, jamais dans `package.json`.
   est coupé après la dernière phrase complète, côté natif
   (`FlashSummarizer.completeSentences`, qui vaut aussi pour l'écoute) et côté page
   (`phrasesCompletes`, cache compris). FORMAT : une carte a sa PROPRE consigne
-  (`Summarizer.cardSystemPrompt`, `summarizeCard`, 190 jetons au plus) — trois ou quatre
+  (`Summarizer.cardSystemPrompt`, `summarizeCard`, 260 jetons au plus — un filet : à 190 le modèle butait au milieu de sa dernière phrase, que la coupe faisait ensuite disparaître sous les yeux ; l'arrêt après la 4e phrase garde la longueur) — trois ou quatre
   phrases, ~70 mots, l'essentiel puis le contexte, noms et chiffres gardés — distincte de
   celle du flash info parlé (deux phrases), jugée « un peu courte » à l'essai ; d'où le
   cache `fluxswipe.cardai.cache.v2` (les résumés v1 sont refaits). VITESSE : le modèle est

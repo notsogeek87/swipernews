@@ -76,8 +76,15 @@ public final class Summarizer {
     static final int MAX_NEW_TOKENS_BRIEF = 140;
     /** Plafond du résumé d'un flash info : deux phrases d'une quarantaine de mots, lues à voix haute. */
     static final int MAX_NEW_TOKENS_FLASH = 100;
-    /** Plafond du résumé d'une CARTE du fil : trois ou quatre phrases, environ 70 mots. */
-    static final int MAX_NEW_TOKENS_CARD = 190;
+    /**
+     * Plafond du résumé d'une CARTE du fil : trois ou quatre phrases, environ 70 mots.
+     * C'est un FILET, pas la longueur visée : le modèle est arrêté après sa 4e phrase
+     * (FlashSummarizer.countSentences). À 190, il butait souvent sur le plafond au milieu
+     * d'une phrase, que la coupe à la dernière phrase complète faisait ensuite disparaître
+     * de la carte (retour d'essai : « le résumé va au bout puis retire quelques mots »).
+     * La place à l'écran ne change pas : la carte réserve 12 lignes dès le départ.
+     */
+    static final int MAX_NEW_TOKENS_CARD = 260;
     /**
      * Fenêtre de contexte demandée (jetons) : prompt + résumé. 4000 caractères de
      * français font environ 1200 jetons, plus le prompt système et 320 jetons de
