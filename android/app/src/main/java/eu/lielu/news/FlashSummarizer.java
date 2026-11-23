@@ -53,6 +53,21 @@ final class FlashSummarizer {
     private static final int MIN_EXCERPT_CHARS = 200;
     private static final int MIN_SUMMARY_CHARS = 30;
     private static final int MAX_SUMMARY_CHARS = 700;
+    /** Cartes : plafond de sécurité plus large, la vraie borne est {@link #budget}. */
+    private static final int MAX_SUMMARY_CHARS_CARD = 1200;
+    /** Longueur d'une phrase type : sous cette marge, on n'en commence pas une de plus. */
+    private static final int SENTENCE_RESERVE = 130;
+    /**
+     * Cartes : caractères que la zone de texte de la carte peut afficher (calculé par la
+     * page, 0 = inconnu). Le modèle s'arrête après une phrase COMPLÈTE quand il ne reste plus
+     * la place d'en écrire une autre : sinon la dernière phrase débordait, et la page la
+     * retirait sous les yeux (retour d'essai : « la dernière phrase s'enlève parfois »).
+     */
+    private volatile int budget = 0;
+
+    void setBudget(int chars) {
+        budget = Math.max(0, chars);
+    }
 
     private static final class Job {
         final int index;
@@ -244,6 +259,7 @@ final class FlashSummarizer {
         }
         if (summarizer == null) summarizer = new Summarizer();
         final StringBuilder acc = new StringBuilder();
+        final int[] phrases = {0};
         final Summarizer.Listener ecoute = new Summarizer.Listener() {
             @Override
             public void onText(String piece) {
@@ -253,7 +269,16 @@ final class FlashSummarizer {
                 // Deux phrases écrites : on arrête le modèle au lieu de le laisser
                 // continuer pour rien (il en écrit souvent quatre, coupées ensuite) —
                 // c'est autant de temps de génération gagné.
-                if (countSentences(acc) >= (card ? MAX_SENTENCES_CARD : MAX_SENTENCES)) {
+                final int n = countSentences(acc);
+                final boolean nouvelle = n > phrases[0];
+                phrases[0] = n;
+                final int place = budget;
+                // Carte : une phrase vient de se terminer et la suivante ne tiendrait plus.
+                // acc contient déjà le début de la suivante (la fin d'une phrase ne se voit
+                // qu'au morceau d'après) : on mesure jusqu'à la dernière fin de phrase.
+                final boolean pleine = card && nouvelle && place > 0
+                    && completeSentences(acc.toString().trim()).length() + SENTENCE_RESERVE > place;
+                if (n >= (card ? MAX_SENTENCES_CARD : MAX_SENTENCES) || pleine) {
                     if (summarizer != null) summarizer.cancel();   // plus aucun rappel de cette génération
                     conclude(j, acc, my);
                 }
@@ -279,7 +304,8 @@ final class FlashSummarizer {
 
     private void conclude(Job j, StringBuilder acc, int my) {
         String s = acc.toString().trim();
-        if (s.length() > MAX_SUMMARY_CHARS) s = s.substring(0, MAX_SUMMARY_CHARS);
+        final int max = card ? MAX_SUMMARY_CHARS_CARD : MAX_SUMMARY_CHARS;
+        if (s.length() > max) s = s.substring(0, max);
         s = completeSentences(s);
         final List<String> chunks = s.length() < MIN_SUMMARY_CHARS
             ? null : ArticleText.speechChunks(s, 200);

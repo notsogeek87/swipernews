@@ -1091,6 +1091,8 @@ public class InAppBrowserPlugin extends Plugin {
             call.reject("indisponible");
             return;
         }
+        final Integer place = call.getInt("maxChars");
+        if (place != null && place > 0) cardAi.setBudget(place);
         final int i = ++cardAiSeq;
         cardAiCalls.put(i, call);
         cardAiKeys.put(i, key);

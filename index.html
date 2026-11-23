@@ -4164,7 +4164,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="348";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="349";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4942,8 +4942,26 @@ async function preparerResumes(){
     cardAiPrep.set(k,pr);
   }
 }
+/* Caractères que la zone d'un résumé peut afficher (12 lignes à la taille normale), envoyés
+   au natif pour qu'il arrête le modèle avant de déborder. Mesuré sur une carte d'actu du fil. */
+let cardAiPlace=0,cardAiPlaceL=0;
+function placeResume(){
+  const W=feedEl.clientWidth;
+  if(cardAiPlace&&W===cardAiPlaceL)return cardAiPlace;
+  try{
+    const d=[...feedEl.querySelectorAll(".card__desc")].find(x=>x.clientWidth>0);
+    if(!d)return 0;
+    const cs=getComputedStyle(d),c=document.createElement("canvas").getContext("2d");
+    c.font=cs.font||(cs.fontSize+" sans-serif");
+    const ex="Les prix moyens du diesel sont passés de 2,39 à 2,13 euros le litre, selon le ministère.";
+    const car=c.measureText(ex).width/ex.length||7.5;
+    const larg=d.clientWidth-12;   // liseré et retrait du texte résumé
+    cardAiPlace=Math.floor(Math.floor(larg/car)*12*0.9);cardAiPlaceL=W;
+    return cardAiPlace;
+  }catch(e){return 0;}
+}
 function demanderResume(p,it,k,direct){
-  return p.cardSummarize({key:k,title:it.title||"",link:it.link,excerpt:(it.desc||"").slice(0,3000),lang:LANG==="en"?"en":"fr",stream:direct})
+  return p.cardSummarize({key:k,title:it.title||"",link:it.link,excerpt:(it.desc||"").slice(0,3000),lang:LANG==="en"?"en":"fr",stream:direct,maxChars:placeResume()})
     .then(r=>{if(r&&!r.dropped)noterMesure(r,typeof r.text==="string"&&r.text.trim().length>=30,direct);return r;});
 }
 function memoResume(k,t){
@@ -5133,7 +5151,18 @@ const cardAiVu=new Map();
    d'essai : « les phrases ne se terminent pas »). On retire les phrases de la FIN jusqu'à
    ce que le texte tienne ; la première est toujours gardée. */
 function tenirDansCoupe(p){
+  p.style.fontSize="";p.style.webkitLineClamp="";
   if(p.scrollHeight<=p.clientHeight+2)return;
+  // D'abord RÉTRÉCIR le texte dans la même zone (hauteur gardée, plus de lignes) : retirer
+  // une phrase déjà lue la faisait disparaître sous les yeux (« la dernière phrase
+  // s'enlève »). Le natif arrête le modèle avant de déborder (maxChars) ; ceci est le filet.
+  const cs=getComputedStyle(p),fs=parseFloat(cs.fontSize)||15,lh=parseFloat(cs.lineHeight)||fs*1.5;
+  const lignes=parseInt(cs.webkitLineClamp||cs.getPropertyValue("-webkit-line-clamp"),10)||12;
+  const h=Math.max(p.clientHeight,lh*lignes);
+  for(let t=fs-0.5;t>=12.5;t-=0.5){
+    p.style.fontSize=t+"px";p.style.webkitLineClamp=String(Math.floor(h/(lh*t/fs)));
+    if(p.scrollHeight<=p.clientHeight+2)return;
+  }
   const t=p.textContent,coupes=[];
   const re=/[.!?…]["»”)]?(?=\s)/g;let m;
   while((m=re.exec(t)))coupes.push(m.index+m[0].length);
@@ -5170,6 +5199,7 @@ function afficherResume(el,it){
   p.classList.toggle("card__desc--ai",ia);
   p.classList.toggle("card__desc--attente",attente);
   if(ia&&!attente&&!p.hidden)tenirDansCoupe(p);
+  else{p.style.fontSize="";p.style.webkitLineClamp="";}
   lbl.innerHTML=ia?`${ICON_SPARK}<span>${esc(T("card.ai.label"))}</span>`:"";
   lbl.hidden=!ia;
   if(el===currentCardEl())majBoutonResume(el);
