@@ -495,7 +495,13 @@ hors du dépôt, jamais dans `package.json`.
   souvent les deux phrases demandées et bute sur sa limite au milieu d'un mot : le texte
   est coupé après la dernière phrase complète, côté natif
   (`FlashSummarizer.completeSentences`, qui vaut aussi pour l'écoute) et côté page
-  (`phrasesCompletes`, cache compris). Quitter une carte en cours d'écriture : la
+  (`phrasesCompletes`, cache compris). VITESSE : le modèle est ARRÊTÉ dès sa 2e phrase
+  terminée (`FlashSummarizer.countSentences`, qui ignore « M. », « Mme. » et les
+  initiales — vaut aussi pour l'écoute) au lieu d'écrire pour rien des phrases coupées
+  ensuite ; les cartes ne lui donnent que 2 200 caractères de la page
+  (`CARD_AI_ARTICLE_CHARS`, l'écoute garde 3 500) ; en mode résumé le modèle est chargé
+  d'avance (`cardSummaryWarm`, à l'activation, au démarrage, au retour au premier plan)
+  et gardé 5 min au lieu de 90 s. Quitter une carte en cours d'écriture : la
   suivante passe devant, l'ancienne retrouve son extrait et sera reprise au retour. Un
   nouvel ✨ sur une carte d'actu coupe le mode (extraits partout) ; ✨ enfoncé = mode
   actif. Le ✨ garde la feuille du lecteur sur Wikipédia, les vidéos, et quand le mode

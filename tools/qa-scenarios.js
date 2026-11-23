@@ -4153,6 +4153,10 @@ ${Array.from({ length: 12 }, (_, k) => {
                   return Promise.resolve();
                 },
                 cardSummaryRelease: () => (window.__releases++, Promise.resolve()),
+                cardSummaryWarm: (o) => (
+                  (window.__warms = (window.__warms || 0) + 1),
+                  Promise.resolve()
+                ),
               },
             },
           };
@@ -4265,7 +4269,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       await aller(page, 1);
       const a = await etincelle(page, 1);
       console.log(
-        `✨ sur une carte préparée : état ${a.ai}, résumé ${a.resume}, étiquette ${a.etiquette}, ✨ enfoncé ${a.on}, feuille ${a.feuille} · mode mémorisé ${await page.evaluate(() => localStorage.getItem("fluxswipe.cardai.mode.v1"))}`
+        `✨ sur une carte préparée : état ${a.ai}, résumé ${a.resume}, étiquette ${a.etiquette}, ✨ enfoncé ${a.on}, feuille ${a.feuille} · mode mémorisé ${await page.evaluate(() => localStorage.getItem("fluxswipe.cardai.mode.v1"))} · modèle préchargé ${await page.evaluate(() => window.__warms || 0)} fois`
       );
       // Swipe vers une carte NON préparée : elle se résume toute seule.
       const i2 = await premiere(page, "neuve");

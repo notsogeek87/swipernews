@@ -45,6 +45,8 @@ final class FlashSummarizer {
     /** Au-delà, on lit l'extrait sans résumé et on passe à l'article suivant. */
     static final long JOB_TIMEOUT_MS = 45_000;
     private static final int ARTICLE_CHARS = 3500;
+    /** Phrases au-delà desquelles on arrête le modèle : la consigne en demande deux. */
+    private static final int MAX_SENTENCES = 2;
     /** Un extrait plus court tient déjà dans le flash tel quel : le résumer n'ajouterait rien. */
     private static final int MIN_EXCERPT_CHARS = 200;
     private static final int MIN_SUMMARY_CHARS = 30;
@@ -94,7 +96,20 @@ final class FlashSummarizer {
     private int token;
     private final Runnable watchdog = this::timedOut;
 
+    /** Texte de l'article donné au modèle (caractères) : moins il en lit, plus il démarre vite. */
+    private final int articleChars;
+
     FlashSummarizer(Context ctx, String lang, Result callback) {
+        this(ctx, lang, callback, ARTICLE_CHARS);
+    }
+
+    /**
+     * @param articleChars longueur lue sur la page. Les cartes du fil demandent moins
+     *                     (le début d'un article de presse en dit l'essentiel) pour que
+     *                     le résumé arrive plus vite ; l'écoute garde ARTICLE_CHARS.
+     */
+    FlashSummarizer(Context ctx, String lang, Result callback, int articleChars) {
+        this.articleChars = articleChars;
         this.model = new SummaryModelStore(ctx).activeFile();
         this.lang = "en".equals(lang) ? "en" : "fr";
         this.callback = callback;
@@ -188,7 +203,7 @@ final class FlashSummarizer {
             fetcher.execute(() -> {
                 String text = "";
                 if (j.link != null && !j.link.isEmpty()) {
-                    text = ArticleText.extract(ArticleText.fetch(j.link, FETCH_TIMEOUT_MS), ARTICLE_CHARS);
+                    text = ArticleText.extract(ArticleText.fetch(j.link, FETCH_TIMEOUT_MS), articleChars);
                 }
                 if (!text.isEmpty()) j.source = "page";
                 if (text.isEmpty() && j.excerpt != null && j.excerpt.length() >= MIN_EXCERPT_CHARS) {
@@ -215,8 +230,16 @@ final class FlashSummarizer {
         summarizer.summarizeFlash(model, j.title, text, lang, new Summarizer.Listener() {
             @Override
             public void onText(String piece) {
+                if (my != token || released) return;
                 acc.append(piece);
-                if (j.piece != null && my == token && !released) j.piece.onPiece(j.index, piece);
+                if (j.piece != null) j.piece.onPiece(j.index, piece);
+                // Deux phrases écrites : on arrête le modèle au lieu de le laisser
+                // continuer pour rien (il en écrit souvent quatre, coupées ensuite) —
+                // c'est autant de temps de génération gagné.
+                if (countSentences(acc) >= MAX_SENTENCES) {
+                    if (summarizer != null) summarizer.cancel();   // plus aucun rappel de cette génération
+                    conclude(j, acc, my);
+                }
             }
 
             @Override
@@ -225,12 +248,7 @@ final class FlashSummarizer {
                     finish(j, null, my);
                     return;
                 }
-                String s = acc.toString().trim();
-                if (s.length() > MAX_SUMMARY_CHARS) s = s.substring(0, MAX_SUMMARY_CHARS);
-                s = completeSentences(s);
-                final List<String> chunks = s.length() < MIN_SUMMARY_CHARS
-                    ? null : ArticleText.speechChunks(s, 200);
-                finish(j, chunks == null || chunks.isEmpty() ? null : chunks, my);
+                conclude(j, acc, my);
             }
 
             @Override
@@ -238,6 +256,44 @@ final class FlashSummarizer {
                 finish(j, null, my);
             }
         });
+    }
+
+    private void conclude(Job j, StringBuilder acc, int my) {
+        String s = acc.toString().trim();
+        if (s.length() > MAX_SUMMARY_CHARS) s = s.substring(0, MAX_SUMMARY_CHARS);
+        s = completeSentences(s);
+        final List<String> chunks = s.length() < MIN_SUMMARY_CHARS
+            ? null : ArticleText.speechChunks(s, 200);
+        finish(j, chunks == null || chunks.isEmpty() ? null : chunks, my);
+    }
+
+    /**
+     * Phrases TERMINÉES dans {@code t} : une ponctuation finale suivie d'un blanc (la fin de
+     * la phrase n'est donc sûre qu'au morceau suivant). Ne compte pas les abréviations et
+     * initiales courtes à majuscule (« M. », « Mme. », « J. ») : couper le modèle sur
+     * « le président M. » donnerait une phrase sans fin.
+     */
+    static int countSentences(CharSequence t) {
+        int n = 0;
+        for (int i = 0; i + 1 < t.length(); i++) {
+            final char c = t.charAt(i);
+            if ((c == '.' || c == '!' || c == '?' || c == '…') && Character.isWhitespace(t.charAt(i + 1))) {
+                if (c == '.') {
+                    int w = i;
+                    while (w > 0 && !Character.isWhitespace(t.charAt(w - 1))) w--;
+                    if (i - w <= 3 && i > w && Character.isUpperCase(t.charAt(w))) continue;
+                }
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /** Charge le modèle d'avance, sans rien générer (voir Summarizer.warmUp). */
+    void warm() {
+        if (released || model == null) return;
+        if (summarizer == null) summarizer = new Summarizer();
+        summarizer.warmUp(model);
     }
 
     /**

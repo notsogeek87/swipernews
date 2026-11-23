@@ -1038,6 +1038,10 @@ public class InAppBrowserPlugin extends Plugin {
      * jamais faire tourner ces résumés en même temps que ceux du lecteur ou de l'écoute.
      */
     private static final long CARD_AI_IDLE_MS = 90_000;
+    /** Le début de l'article suffit pour deux phrases, et se lit plus vite (voir FlashSummarizer). */
+    private static final int CARD_AI_ARTICLE_CHARS = 2200;
+    /** Délai avant libération du modèle ; allongé par cardSummaryWarm en mode résumé. */
+    private long cardAiIdleMs = CARD_AI_IDLE_MS;
     private FlashSummarizer cardAi;
     private String cardAiLang = "";
     private int cardAiSeq = 0;
@@ -1082,19 +1086,10 @@ public class InAppBrowserPlugin extends Plugin {
     public void cardSummarize(PluginCall call) {
         final String key = call.getString("key", "");
         final String lang = "en".equals(call.getString("lang", "fr")) ? "en" : "fr";
-        if (cardAi != null && !lang.equals(cardAiLang)) releaseCardAi();
-        if (cardAi == null) {
-            final FlashSummarizer fs = new FlashSummarizer(getContext(), lang, this::cardAiResult);
-            if (!fs.ready()) {
-                fs.release();
-                call.reject("indisponible");
-                return;
-            }
-            cardAi = fs;
-            cardAiLang = lang;
+        if (!ensureCardAi(lang)) {
+            call.reject("indisponible");
+            return;
         }
-        cardAiMain.removeCallbacks(cardAiIdle);
-        cardAiMain.postDelayed(cardAiIdle, CARD_AI_IDLE_MS);
         final int i = ++cardAiSeq;
         cardAiCalls.put(i, call);
         cardAiKeys.put(i, key);
@@ -1114,6 +1109,36 @@ public class InAppBrowserPlugin extends Plugin {
         } else {
             cardAi.request(i, title, link, excerpt);
         }
+    }
+
+    private boolean ensureCardAi(String lang) {
+        if (cardAi != null && !lang.equals(cardAiLang)) releaseCardAi();
+        if (cardAi == null) {
+            final FlashSummarizer fs =
+                new FlashSummarizer(getContext(), lang, this::cardAiResult, CARD_AI_ARTICLE_CHARS);
+            if (!fs.ready()) {
+                fs.release();
+                return false;
+            }
+            cardAi = fs;
+            cardAiLang = lang;
+        }
+        cardAiMain.removeCallbacks(cardAiIdle);
+        cardAiMain.postDelayed(cardAiIdle, cardAiIdleMs);
+        return true;
+    }
+
+    /**
+     * Mode résumé : charge le modèle d'avance (le chargement, des centaines de Mo, est la
+     * part la plus lente du premier résumé) et le garde plus longtemps entre deux demandes.
+     */
+    @PluginMethod
+    public void cardSummaryWarm(PluginCall call) {
+        final String lang = "en".equals(call.getString("lang", "fr")) ? "en" : "fr";
+        final long keep = call.getLong("keepMs", CARD_AI_IDLE_MS);
+        cardAiIdleMs = Math.max(CARD_AI_IDLE_MS, Math.min(keep, 10 * 60_000L));
+        if (ensureCardAi(lang)) cardAi.warm();
+        call.resolve();
     }
 
     /** Abandonne les demandes dont la clé n'est pas dans {@code keep} (cartes dépassées). */

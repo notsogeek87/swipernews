@@ -4160,7 +4160,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="341";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="342";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4855,7 +4855,7 @@ function pontResume(){
 function cardAiDispo(){return cardAiPref!=="off"&&!!pontResume()&&!!cardAiEtat&&cardAiEtat.engine&&cardAiEtat.installed;}
 // L'état du moteur se demande une fois au démarrage : sans lui, le premier ✨ ne saurait pas
 // encore qu'il peut résumer dans la carte (et ouvrirait la feuille du lecteur).
-if(cardAiPref!=="off")setTimeout(()=>etatResume().then(()=>{try{updateRail();appliquerMode(currentCardEl(),false);}catch(e){}}),0);
+if(cardAiPref!=="off")setTimeout(()=>etatResume().then(()=>{try{updateRail();rechaufferModele();appliquerMode(currentCardEl(),false);}catch(e){}}),0);
 function setCardAiPref(v){
   if(!CARD_AI_MODES.includes(v)||v===cardAiPref)return;
   cardAiPref=v;
@@ -4988,6 +4988,16 @@ function modeResumeActif(){return cardAiMode&&cardAiDispo()&&!ecouteActive;}
 function setCardAiMode(on){
   cardAiMode=on;
   try{localStorage.setItem(LS_CARDAI_MODE,on?"1":"0");}catch(e){warn("save cardai mode",e);}
+  if(on)rechaufferModele();
+}
+/* Mode résumé : le modèle est chargé D'AVANCE (son chargement est la part la plus lente du
+   premier résumé, et il était libéré après 90 s sans demande) et gardé 5 min entre deux
+   demandes. Appelé à l'activation du mode, au démarrage et au retour au premier plan. */
+function rechaufferModele(){
+  const p=pontResume();
+  if(!p||typeof p.cardSummaryWarm!=="function"||!modeResumeActif())return;
+  cardAiUtilise=true;   // il y a désormais un modèle à libérer (lecteur, arrière-plan)
+  p.cardSummaryWarm({lang:LANG==="en"?"en":"fr",keepMs:300000}).catch(()=>{});
 }
 function resumeDansCarte(){
   // Chaque sortie dit POURQUOI (noterDiag, affiché sous le réglage) : sur téléphone il n'y a
@@ -5292,7 +5302,7 @@ function onRetourPremierPlan(){
   reprendreVideo();   // après la barre : une vidéo relancée la masque (hideTop)
   maybeShowNotifNudge();
   refreshIfStale();
-  cardAiCarte=null;planifierResumes(currentCardEl());   // reprendre les résumés là où on lit
+  cardAiCarte=null;rechaufferModele();planifierResumes(currentCardEl());   // reprendre les résumés là où on lit
 }
 document.addEventListener("visibilitychange",()=>{
   if(document.visibilityState==="hidden"){
