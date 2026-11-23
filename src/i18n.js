@@ -763,21 +763,12 @@
         "Aucune mesure pour l'instant : restez quelques secondes sur une carte d'actu.",
       "cardai.mes":
         "Mesures : {ok} résumés réussis sur {n} · page {f} s · génération {g} s (médianes).",
-      "cardai.taps":
-        "Au toucher : {i} fois sur {t} immédiat, sinon premier mot en {p} s (médiane).",
-      "cardai.taps.all": "Au toucher : immédiat {t} fois sur {t}.",
       "cardai.desc.off": "Le bouton ✨ ouvre le résumé de l'article dans une feuille.",
-      "cardai.desc.wifi":
-        "Le bouton ✨ affiche le résumé directement dans la carte. En Wi-Fi et en charge, la carte suivante est résumée d'avance sur le téléphone pendant que vous lisez : le résumé apparaît alors tout de suite.",
-      "cardai.desc.on":
-        "Le bouton ✨ affiche le résumé directement dans la carte. La carte suivante est toujours résumée d'avance sur le téléphone pendant que vous lisez. Consomme batterie et données : la page de l'article est téléchargée.",
       "cardai.desc.missing":
         "Aucun modèle de résumé installé : installez-le depuis le bouton ✨ du lecteur d'article.",
       "card.ai.label": "Résumé IA",
       "card.ai.echec":
         "Pas de résumé possible depuis la carte. ✨ l'ouvre dans le lecteur.",
-      "rail.sum.card": "Afficher un résumé IA dans la carte",
-      "rail.sum.back": "Revenir à l'extrait de la source",
       "rail.sum.busy": "Résumé en cours d'écriture",
       "changelog.v338.item1":
         "Essai : le bouton ✨ peut afficher le résumé IA directement dans la carte, préparé d'avance pendant que vous lisez (Réglages › Lecture, désactivé par défaut).",
@@ -797,6 +788,21 @@
       "cardai.diag.delai": "aucune réponse en 60 s",
       "cardai.diag.erreur": "erreur du pont : {e}",
       "cardai.diag.vide": "rien à résumer (source : {s})",
+      "cardai.desc.wifi":
+        "Un appui sur ✨ passe le fil en mode résumé : chaque carte d'actu s'affiche alors sur son résumé, jusqu'au prochain ✨. En Wi-Fi et en charge, la carte suivante est résumée d'avance pendant que vous lisez, pour qu'il apparaisse tout de suite.",
+      "cardai.desc.on":
+        "Un appui sur ✨ passe le fil en mode résumé : chaque carte d'actu s'affiche alors sur son résumé, jusqu'au prochain ✨. La carte suivante est toujours résumée d'avance pendant que vous lisez. Consomme batterie et données : la page de l'article est téléchargée.",
+      "cardai.taps":
+        "Résumés affichés : {i} sur {t} immédiats, sinon premier mot en {p} s (médiane).",
+      "cardai.taps.all": "Résumés affichés : {t} sur {t} immédiats.",
+      "cardai.diag.modeon": "mode résumé activé",
+      "cardai.diag.modeoff": "mode résumé désactivé, retour aux extraits",
+      "card.ai.echecMode":
+        "Pas de résumé possible pour cet article : son extrait reste affiché.",
+      "rail.sum.card": "Passer le fil en mode résumé IA",
+      "rail.sum.back": "Quitter le mode résumé (revenir aux extraits)",
+      "changelog.v340.item1":
+        "Essai du résumé IA : un appui sur ✨ passe tout le fil en mode résumé, gardé d'une ouverture à l'autre ; un nouvel appui revient aux extraits.",
       "card.paywall.title": "Accès payant probable",
     },
     en: {
@@ -1512,20 +1518,11 @@
       "cardai.mes.none": "No measurement yet: stay a few seconds on a news card.",
       "cardai.mes":
         "Measurements: {ok} successful summaries out of {n} · page {f} s · generation {g} s (medians).",
-      "cardai.taps":
-        "On tap: instant {i} times out of {t}, otherwise first word after {p} s (median).",
-      "cardai.taps.all": "On tap: instant {t} times out of {t}.",
       "cardai.desc.off": "The ✨ button opens the article summary in a sheet.",
-      "cardai.desc.wifi":
-        "The ✨ button shows the summary right in the card. On Wi-Fi and while charging, the next card is summarized ahead on your phone while you read, so the summary shows instantly.",
-      "cardai.desc.on":
-        "The ✨ button shows the summary right in the card. The next card is always summarized ahead on your phone while you read. Uses battery and data: the article page is downloaded.",
       "cardai.desc.missing":
         "No summary model installed: install it from the ✨ button of the article reader.",
       "card.ai.label": "AI summary",
       "card.ai.echec": "No summary possible from the card. ✨ opens it in the reader.",
-      "rail.sum.card": "Show an AI summary in the card",
-      "rail.sum.back": "Back to the source's excerpt",
       "rail.sum.busy": "Summary being written",
       "changelog.v338.item1":
         "Trial: the ✨ button can show the AI summary right in the card, prepared ahead while you read (Settings › Reading, off by default).",
@@ -1544,6 +1541,20 @@
       "cardai.diag.delai": "no answer within 60 s",
       "cardai.diag.erreur": "bridge error: {e}",
       "cardai.diag.vide": "nothing to summarize (source: {s})",
+      "cardai.desc.wifi":
+        "Tap ✨ to switch the feed to summary mode: every news card then shows its summary, until the next ✨. On Wi-Fi and while charging, the next card is summarized ahead while you read, so it shows instantly.",
+      "cardai.desc.on":
+        "Tap ✨ to switch the feed to summary mode: every news card then shows its summary, until the next ✨. The next card is always summarized ahead while you read. Uses battery and data: the article page is downloaded.",
+      "cardai.taps":
+        "Summaries shown: {i} of {t} instantly, otherwise first word after {p} s (median).",
+      "cardai.taps.all": "Summaries shown: {t} of {t} instantly.",
+      "cardai.diag.modeon": "summary mode on",
+      "cardai.diag.modeoff": "summary mode off, back to excerpts",
+      "card.ai.echecMode": "No summary possible for this article: its excerpt stays.",
+      "rail.sum.card": "Switch the feed to AI summary mode",
+      "rail.sum.back": "Leave summary mode (back to excerpts)",
+      "changelog.v340.item1":
+        "AI summary trial: one ✨ tap switches the whole feed to summary mode, kept between launches; tap again to go back to excerpts.",
       "card.paywall.title": "Likely paywalled",
 
       // Libellés des centres d'intérêt (clés définies dans src/learn-core.js) :

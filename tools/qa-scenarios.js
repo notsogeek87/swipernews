@@ -4053,10 +4053,11 @@ ${Array.from({ length: 12 }, (_, k) => {
 
   /* ESSAI « résumé IA sur les cartes » (voir resumeDansCarte, index.html), pont natif
      simulé : un faux résumeur (600 ms d'avance, morceaux toutes les 150 ms en direct).
-     Vérifie le comportement UNIQUE : toutes les cartes d'actu s'ouvrent sur l'extrait,
-     la première comprise ; rien ne change sans geste ; le ✨ du rail affiche le résumé
-     dans la carte, immédiat s'il est préparé, sinon écrit en direct et devant la
-     préparation ; il garde la feuille du lecteur partout où la carte ne s'y prête pas. Et ce qui ne doit rien coûter : réglage coupé par défaut,
+     Vérifie le MODE résumé : rien ne change sans geste ; le ✨ du rail passe tout le fil
+     en mode résumé (gardé au relancement) — chaque carte d'actu s'affiche alors sur son
+     résumé, immédiat s'il est préparé, sinon écrit en direct à l'arrivée, sans rien
+     lancer pour une carte effleurée ; un nouvel ✨ revient aux extraits ; Wikipédia et
+     la feuille du lecteur restent comme avant. Et ce qui ne doit rien coûter : réglage coupé par défaut,
      défilement rapide, Wikipédia, préparation hors Wi-Fi, stockage abîmé. */
   async resumecartes() {
     const lancer = async (storage, etat) => {
@@ -4236,99 +4237,68 @@ ${Array.from({ length: 12 }, (_, k) => {
       console.log(`erreurs : ${JSON.stringify(errors)}`);
       await browser.close();
     }
-    // 2. Activé.
+    // 2. Activé : le ✨ est l'interrupteur du MODE résumé, pour tout le fil.
     {
       const { browser, page, errors } = await lancer({ "fluxswipe.cardai.v1": "on" }, OK);
       await page.waitForTimeout(1500);
       const cartes = await etatCartes(page);
       console.log(
-        `après préparation : demandes ${JSON.stringify(await page.evaluate(() => window.__calls.map((c) => c.title + (c.stream ? " (direct)" : ""))))}`
+        `après préparation : demandes ${JSON.stringify(await page.evaluate(() => window.__calls.map((c) => c.title + (c.stream ? " (direct)" : ""))))} · toutes sur l'extrait ${cartes.every((c) => c.extrait)} · pastille ${cartes.filter((c) => c.pastille).length} (attendu 0)`
       );
-      console.log(
-        `toutes les cartes sur l'extrait ${cartes.every((c) => c.extrait)} · pastille dans une carte ${cartes.filter((c) => c.pastille).length} (attendu 0)`
-      );
-      // Carte 1, préparée : ✨ immédiat, puis retour à l'extrait.
+      const carte = (i) =>
+        page.evaluate((i) => {
+          const el = feedEl.children[i];
+          const d = el.querySelector(".card__desc");
+          return {
+            ai: el.dataset.ai || "",
+            txt: d ? d.textContent : "",
+            resume: /^Résumé simulé.*Voilà\.$/.test(d ? d.textContent : ""),
+            on: sumBtn.classList.contains("on"),
+            busy: sumBtn.classList.contains("busy"),
+            minH: d ? d.style.minHeight : "",
+          };
+        }, i);
+      // Carte 1, préparée : ✨ active le mode, résumé immédiat.
       await aller(page, 1);
       const a = await etincelle(page, 1);
-      const b = await etincelle(page, 1);
       console.log(
-        `carte préparée, ✨ : état ${a.ai}, résumé ${a.resume}, étiquette « Résumé IA » ${a.etiquette}, ✨ enfoncé ${a.on}/${a.presse}, feuille ouverte ${a.feuille} · 2e ✨ : état ${b.ai}, étiquette ${b.etiquette}, ✨ relâché ${!b.on}`
+        `✨ sur une carte préparée : état ${a.ai}, résumé ${a.resume}, étiquette ${a.etiquette}, ✨ enfoncé ${a.on}, feuille ${a.feuille} · mode mémorisé ${await page.evaluate(() => localStorage.getItem("fluxswipe.cardai.mode.v1"))}`
       );
-      // Le ✨ suit la carte visible : on part et on revient sur une carte résumée.
-      await page.evaluate(() => sumBtn.click());
-      await aller(page, 2);
-      const ailleurs = await page.evaluate(() => sumBtn.classList.contains("on"));
+      // Swipe vers une carte NON préparée : elle se résume toute seule.
+      const i2 = await premiere(page, "neuve");
+      await aller(page, i2);
+      const tout = await carte(i2);
+      await page.waitForTimeout(450);
+      const pendant = await carte(i2);
+      await page.waitForTimeout(2200);
+      const fin = await carte(i2);
+      console.log(
+        `swipe en mode résumé, carte non préparée : à l'arrivée « ${tout.txt.slice(0, 30)} » (${tout.ai || "extrait"}) · après 450 ms : ${pendant.ai}, « ${pendant.txt.slice(0, 30)} », hauteur tenue ${!!pendant.minH}, ✨ respire ${pendant.busy} · à la fin : ${fin.ai}, résumé complet ${fin.resume}, ✨ enfoncé ${fin.on}`
+      );
+      // Retour sur la carte 1 : toujours son résumé.
       await aller(page, 1);
-      const retour = await page.evaluate(() => sumBtn.classList.contains("on"));
-      console.log(
-        `✨ enfoncé sur une autre carte ${ailleurs} (attendu false), au retour ${retour} (attendu true)`
-      );
-      // Défilement rapide : aucune préparation pour les cartes effleurées.
-      const n0 = await page.evaluate(() => window.__calls.length);
-      for (let i = 2; i <= 6; i++) {
+      const retour = await carte(1);
+      console.log(`retour sur la carte 1 : ${retour.ai}, résumé ${retour.resume}`);
+      // Défilement rapide en mode : aucune écriture lancée pour les cartes effleurées.
+      const n0 = await page.evaluate(() => window.__calls.filter((c) => c.stream).length);
+      const debut = await premiere(page, "neuve");
+      for (let i = debut; i < debut + 5; i++) {
         await aller(page, i);
-        await page.waitForTimeout(200);
+        await page.waitForTimeout(150);
       }
+      const n1 = await page.evaluate(() => window.__calls.filter((c) => c.stream).length);
       console.log(
-        `défilement rapide sur 5 cartes : ${(await page.evaluate(() => window.__calls.length)) - n0} demande(s)`
+        `défilement rapide sur 5 cartes en mode résumé : ${n1 - n0} écriture(s) lancée(s) (attendu 0)`
       );
-      // Carte non préparée : ✨ → écriture en direct.
-      const idx = await premiere(page, "neuve");
-      await aller(page, idx);
-      const d0 = await etincelle(page, idx);
-      const tout = await page.evaluate((i) => {
-        const el = feedEl.children[i];
-        const lbl = el.querySelector(".card__ailbl");
-        return {
-          txt: el.querySelector(".card__desc").textContent,
-          etiquette: !!lbl && !lbl.hidden,
-          diag: texteMesures(),
-        };
-      }, idx);
-      console.log(
-        `  tout de suite après ✨ : « ${tout.txt} », étiquette ${tout.etiquette} · ${tout.diag.replace(/^.*(Dernier ✨)/, "$1")}`
-      );
-      await page.waitForTimeout(420);
-      const pendant = await page.evaluate((i) => {
-        const el = feedEl.children[i],
-          d = el.querySelector(".card__desc");
-        return {
-          ai: el.dataset.ai,
-          txt: d.textContent,
-          minH: d.style.minHeight,
-          busy: sumBtn.classList.contains("busy"),
-        };
-      }, idx);
-      await page.waitForTimeout(2000);
-      const apres = await page.evaluate((i) => {
-        const el = feedEl.children[i],
-          d = el.querySelector(".card__desc");
-        return {
-          ai: el.dataset.ai,
-          resume: /^Résumé simulé.*Voilà\.$/.test(d.textContent),
-          minH: d.style.minHeight,
-          on: sumBtn.classList.contains("on"),
-          busy: sumBtn.classList.contains("busy"),
-          direct: window.__calls.filter((c) => c.stream).length,
-          mesures: texteMesures(),
-        };
-      }, idx);
-      console.log(
-        `carte non préparée, ✨ : feuille ouverte ${d0.feuille} · pendant l'écriture : état ${pendant.ai}, « ${pendant.txt} », hauteur tenue ${!!pendant.minH}, ✨ qui respire ${pendant.busy}`
-      );
-      console.log(
-        `  à la fin : état ${apres.ai}, résumé complet ${apres.resume}, hauteur relâchée ${!apres.minH}, ✨ enfoncé ${apres.on} et calme ${!apres.busy}, demandes en direct ${apres.direct}`
-      );
-      console.log(`mesures : ${apres.mesures}`);
-      // Échec : la carte garde son extrait, et le ✨ suivant ouvre la feuille du lecteur.
-      const idx2 = await premiere(page, "neuve");
+      await page.waitForTimeout(2500);
+      // Échec en mode : extrait gardé, message, le mode reste actif.
+      const i3 = await premiere(page, "neuve");
       await page.evaluate(
         (i) => window.__echec.add(cardReg.get(+feedEl.children[i].dataset.id).title),
-        idx2
+        i3
       );
-      await aller(page, idx2);
-      await etincelle(page, idx2);
-      await page.waitForTimeout(600);
+      await aller(page, i3);
+      await page.waitForTimeout(1200);
       const ech = await page.evaluate((i) => {
         const el = feedEl.children[i],
           it = cardReg.get(+el.dataset.id);
@@ -4336,35 +4306,53 @@ ${Array.from({ length: 12 }, (_, k) => {
           ai: el.dataset.ai,
           extrait: el.querySelector(".card__desc").textContent === it.desc,
           toast: document.getElementById("toast").textContent,
+          mode: cardAiMode,
+          on: sumBtn.classList.contains("on"),
         };
-      }, idx2);
-      const ech2 = await etincelle(page, idx2);
+      }, i3);
       console.log(
-        `article impossible à résumer : état ${ech.ai}, extrait remis ${ech.extrait}, message « ${ech.toast} » · ✨ suivant → feuille du lecteur ${ech2.feuille}`
+        `article impossible à résumer en mode : état ${ech.ai}, extrait ${ech.extrait}, message « ${ech.toast} », mode toujours actif ${ech.mode}, ✨ enfoncé ${ech.on}`
       );
-      // Wikipédia : ✨ garde la feuille du lecteur.
+      // Wikipédia : ✨ garde la feuille du lecteur, le mode n'est pas touché.
       const iw = await premiere(page, "wiki");
       await aller(page, iw);
       const w = await etincelle(page, iw);
       console.log(
-        `carte Wikipédia, ✨ → feuille du lecteur ${w.feuille}, carte inchangée ${!w.ai}`
+        `carte Wikipédia, ✨ → feuille du lecteur ${w.feuille}, carte inchangée ${!w.ai}, mode toujours actif ${await page.evaluate(() => cardAiMode)}`
+      );
+      // Relancement : le mode est gardé, la carte affichée se résume.
+      await page.reload();
+      await page.waitForTimeout(4000);
+      // La reprise de lecture ramène sur la dernière carte lue (ici Wikipédia) : on va sur
+      // une carte d'actu, comme le ferait le doigt.
+      const ia = await page.evaluate(() =>
+        [...feedEl.children].findIndex((el) => carteResumable(el))
+      );
+      await aller(page, ia);
+      await page.waitForTimeout(2000);
+      const apres = await page.evaluate(() => {
+        const el = currentCardEl();
+        return {
+          mode: cardAiMode,
+          ai: el.dataset.ai || "",
+          on: sumBtn.classList.contains("on"),
+        };
+      });
+      console.log(
+        `après relancement : mode ${apres.mode}, carte affichée ${apres.ai}, ✨ enfoncé ${apres.on}`
+      );
+      // ✨ sur une carte d'actu : mode coupé, tout revient à l'extrait.
+      await aller(page, 1);
+      const off = await etincelle(page, 1);
+      const reste = (await etatCartes(page)).filter((c) => c.ai && c.ai !== "").length;
+      console.log(
+        `✨ pour quitter le mode : état ${off.ai || "extrait"}, ✨ relâché ${!off.on}, cartes encore résumées ${reste}, mode mémorisé ${await page.evaluate(() => localStorage.getItem("fluxswipe.cardai.mode.v1"))}`
       );
       await page.evaluate(() => openArticle("https://ex.test/a1", "x"));
       console.log(
         `libérations après ouverture d'un article : ${await page.evaluate(() => window.__releases)}`
       );
-      const coupe = await page.evaluate(() => {
-        setCardAiPref("off");
-        return {
-          n: [...feedEl.children].filter(
-            (el) => el.dataset.ai || el.querySelector(".card__desc--ai")
-          ).length,
-          on: sumBtn.classList.contains("on"),
-        };
-      });
-      console.log(
-        `réglage coupé : ${coupe.n} carte(s) encore résumée(s), ✨ enfoncé ${coupe.on}`
-      );
+      console.log(`mesures : ${await page.evaluate(() => texteMesures())}`);
       console.log(`erreurs : ${JSON.stringify(errors)}`);
       await browser.close();
     }
