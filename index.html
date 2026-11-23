@@ -4164,7 +4164,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="349";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="350";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4839,6 +4839,13 @@ let cardAiPref=(()=>{try{const v=localStorage.getItem(LS_CARDAI);return CARD_AI_
 /* Même coupe que FlashSummarizer.completeSentences (natif) : le modèle dépasse souvent les
    deux phrases demandées et bute sur sa limite au milieu d'un mot. Appliquée aussi ici
    pour les résumés déjà mis en cache par un APK qui ne coupait pas encore. */
+/* Même compte que FlashSummarizer.countSentences : fin de phrase suivie d'un blanc, sans
+   les abréviations courtes à majuscule (« M. », « Mme. », initiales). */
+function phrasesFinies(t){
+  let n=0;const re=/(\S*)[.!?…](?=\s)/g;let m;
+  while((m=re.exec(t))){const w=m[1];if(m[0].endsWith(".")&&w.length&&w.length<=3&&/^[A-ZÀ-Ý]/.test(w))continue;n++;}
+  return n;
+}
 function phrasesCompletes(t){
   t=String(t||"").trim();
   if(!t||/[.!?…»"]$/.test(t))return t;
@@ -5128,13 +5135,29 @@ function noterDiag(k,vars){
    ici avec les résumés de quatre phrases. La réserve reste posée tant qu'on est sur la
    carte (libererHauteurs) : la mise en page ne bouge donc pas sous les yeux, même à la
    fin de l'écriture. */
+/* La réserve n'est PAS posée sur le paragraphe (son liseré descendait alors dans le vide
+   quand le résumé fait moins de 12 lignes — retour d'essai « ça ne prend pas l'espace ») :
+   une cale invisible juste après lui (`.card__aires`) comble l'écart, recalculée à chaque
+   affichage (majReserve). Paragraphe + cale = hauteur constante, le titre ne bouge pas. */
 function reserverHauteur(el){
   const d=el.querySelector(".card__desc");
-  if(!d||d.style.minHeight)return;
+  if(!d||d.dataset.res)return;
   const cs=getComputedStyle(d);
   const lh=parseFloat(cs.lineHeight)||parseFloat(cs.fontSize)*1.5||22;
   const lignes=parseInt(cs.webkitLineClamp||cs.getPropertyValue("-webkit-line-clamp"),10)||10;
-  d.style.minHeight=Math.max(d.offsetHeight,Math.round(lh*lignes))+"px";
+  d.dataset.res=String(Math.max(d.hidden?0:d.offsetHeight,Math.round(lh*lignes)));
+  majReserve(d);
+}
+function majReserve(d){
+  if(!d||!d.dataset.res)return;
+  let sp=d.nextElementSibling;
+  if(!sp||!sp.classList.contains("card__aires")){sp=document.createElement("div");sp.className="card__aires";sp.setAttribute("aria-hidden","true");d.after(sp);}
+  sp.style.height=Math.max(0,+d.dataset.res-(d.hidden?0:d.offsetHeight))+"px";
+}
+function retirerReserve(d){
+  if(!d)return;
+  delete d.dataset.res;delete d.dataset.fs;
+  const sp=d.nextElementSibling;if(sp&&sp.classList.contains("card__aires"))sp.remove();
 }
 /* Rend leur hauteur naturelle aux cartes qu'on vient de QUITTER (jamais à celle sous les
    yeux) : le changement de hauteur se fait hors écran. */
@@ -5142,7 +5165,7 @@ function libererHauteurs(saufEl){
   for(const el of feedEl.children){
     if(el===saufEl)continue;
     const d=el.querySelector(".card__desc");
-    if(d&&d.style.minHeight&&el.dataset.ai!=="flux")d.style.minHeight="";
+    if(d&&d.dataset.res&&el.dataset.ai!=="flux")retirerReserve(d);
   }
 }
 /* Texte affiché pendant l'écriture, par article : il ne recule jamais (voir afficherResume). */
@@ -5151,17 +5174,21 @@ const cardAiVu=new Map();
    d'essai : « les phrases ne se terminent pas »). On retire les phrases de la FIN jusqu'à
    ce que le texte tienne ; la première est toujours gardée. */
 function tenirDansCoupe(p){
+  // La taille ne REMONTE jamais tant que la carte garde son résumé (p.dataset.fs) : à la fin
+  // de l'écriture, la coupe du morceau de phrase final raccourcit le texte, et repasser de
+  // 14 à 15 px à ce moment-là se voyait comme un sursaut.
+  const deja=+p.dataset.fs||0;
   p.style.fontSize="";p.style.webkitLineClamp="";
-  if(p.scrollHeight<=p.clientHeight+2)return;
+  if(!deja&&p.scrollHeight<=p.clientHeight+2)return;
   // D'abord RÉTRÉCIR le texte dans la même zone (hauteur gardée, plus de lignes) : retirer
   // une phrase déjà lue la faisait disparaître sous les yeux (« la dernière phrase
   // s'enlève »). Le natif arrête le modèle avant de déborder (maxChars) ; ceci est le filet.
   const cs=getComputedStyle(p),fs=parseFloat(cs.fontSize)||15,lh=parseFloat(cs.lineHeight)||fs*1.5;
   const lignes=parseInt(cs.webkitLineClamp||cs.getPropertyValue("-webkit-line-clamp"),10)||12;
   const h=Math.max(p.clientHeight,lh*lignes);
-  for(let t=fs-0.5;t>=12.5;t-=0.5){
+  for(let t=deja?Math.min(deja,fs):fs-0.5;t>=12.5;t-=0.5){
     p.style.fontSize=t+"px";p.style.webkitLineClamp=String(Math.floor(h/(lh*t/fs)));
-    if(p.scrollHeight<=p.clientHeight+2)return;
+    if(p.scrollHeight<=p.clientHeight+2){if(t<fs)p.dataset.fs=String(t);return;}
   }
   const t=p.textContent,coupes=[];
   const re=/[.!?…]["»”)]?(?=\s)/g;let m;
@@ -5186,6 +5213,9 @@ function afficherResume(el,it){
   // n'efface pas ce qu'on lit (retour d'essai : « ça affiche un début, ça l'efface, ça remet »).
   // La mémoire est tenue PAR ARTICLE, pas par élément : une carte reconstruite, ou une
   // écriture relancée sur le même article, repart de ce qui était déjà à l'écran.
+  // Quatre phrases finies : le natif arrête le modèle, mais le début de la 5e (un mot ou deux)
+  // est déjà arrivé et repartirait à la coupe finale — on ne le montre pas.
+  if(etat==="flux"&&phrasesFinies(flux)>=4)flux=phrasesCompletes(flux);
   if(etat==="flux"){const vu=cardAiVu.get(k)||"";if(flux.length<vu.length)flux=vu;else if(flux)cardAiVu.set(k,flux);}
   else cardAiVu.delete(k);
   const txt=etat==="sum"?cardAiCache.get(k)||it.desc||"":flux||it.desc||"";
@@ -5199,9 +5229,13 @@ function afficherResume(el,it){
   p.classList.toggle("card__desc--ai",ia);
   p.classList.toggle("card__desc--attente",attente);
   if(ia&&!attente&&!p.hidden)tenirDansCoupe(p);
-  else{p.style.fontSize="";p.style.webkitLineClamp="";}
-  lbl.innerHTML=ia?`${ICON_SPARK}<span>${esc(T("card.ai.label"))}</span>`:"";
+  else{p.style.fontSize="";p.style.webkitLineClamp="";delete p.dataset.fs;}
+  // Réécrit seulement s'il change : refaire l'innerHTML à CHAQUE morceau recréait l'icône
+  // (clignotement de l'étiquette pendant l'écriture).
+  const lblHtml=ia?`${ICON_SPARK}<span>${esc(T("card.ai.label"))}</span>`:"";
+  if(lbl.dataset.h!==lblHtml){lbl.innerHTML=lblHtml;lbl.dataset.h=lblHtml;}
   lbl.hidden=!ia;
+  majReserve(p);
   if(el===currentCardEl())majBoutonResume(el);
 }
 /* L'état du ✨ suit la carte visible : enfoncé quand elle montre son résumé, qui respire
@@ -5236,7 +5270,7 @@ async function resumerEnDirect(el,it,k,deja,essai){
   if(cardAiFlux){
     if(cardAiFlux.el===el)return;
     const v=cardAiFlux.el,vit=cardReg.get(+v.dataset.id);
-    delete v.dataset.ai;const vd=v.querySelector(".card__desc");if(vd)vd.style.minHeight="";
+    delete v.dataset.ai;retirerReserve(v.querySelector(".card__desc"));
     if(vit)afficherResume(v,vit);
   }
   ecouterMorceaux(p);
@@ -5319,7 +5353,7 @@ function retirerResumesCartes(){
   for(const el of feedEl.children){
     if(!el.dataset.ai)continue;
     const it=cardReg.get(+el.dataset.id);
-    const d=el.querySelector(".card__desc");if(d)d.style.minHeight="";
+    retirerReserve(el.querySelector(".card__desc"));
     el.dataset.ai="orig";if(it)afficherResume(el,it);
     delete el.dataset.ai;
   }

@@ -4471,7 +4471,9 @@ ${Array.from({ length: 12 }, (_, k) => {
             resume: /^Résumé simulé.*Voilà\.$/.test(d ? d.textContent : ""),
             on: sumBtn.classList.contains("on"),
             busy: sumBtn.classList.contains("busy"),
-            minH: d ? d.style.minHeight : "",
+            minH: d ? d.dataset.res || "" : "",
+            // Le liseré (bord du paragraphe) n'occupe que la hauteur du texte, jamais la réserve.
+            lisere: d ? d.offsetHeight <= d.scrollHeight + 2 : true,
             titre: Math.round(
               el.querySelector(".card__title").getBoundingClientRect().top
             ),
@@ -4492,7 +4494,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       await page.waitForTimeout(2200);
       const fin = await carte(i2);
       console.log(
-        `swipe en mode résumé, carte non préparée : à l'arrivée « ${tout.txt.slice(0, 30)} » (${tout.ai || "extrait"}) · après 450 ms : ${pendant.ai}, « ${pendant.txt.slice(0, 30)} », hauteur tenue ${!!pendant.minH}, ✨ respire ${pendant.busy} · à la fin : ${fin.ai}, résumé complet ${fin.resume}, ✨ enfoncé ${fin.on} · titre immobile pendant l'écriture ${pendant.titre === fin.titre} (${pendant.titre} → ${fin.titre} px)`
+        `swipe en mode résumé, carte non préparée : à l'arrivée « ${tout.txt.slice(0, 30)} » (${tout.ai || "extrait"}) · après 450 ms : ${pendant.ai}, « ${pendant.txt.slice(0, 30)} », hauteur tenue ${!!pendant.minH}, liseré à la hauteur du texte ${pendant.lisere && fin.lisere}, ✨ respire ${pendant.busy} · à la fin : ${fin.ai}, résumé complet ${fin.resume}, ✨ enfoncé ${fin.on} · titre immobile pendant l'écriture ${pendant.titre === fin.titre} (${pendant.titre} → ${fin.titre} px)`
       );
       // Arrivée sur une carte dont la préparation est EN COURS : on l'attend, sans la relancer.
       const ip = await premiere(page, "neuve");
