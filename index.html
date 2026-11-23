@@ -383,6 +383,7 @@
   .card__ailbl{display:inline-flex;align-items:center;gap:5px;font-weight:600;color:var(--ink)}
   .card__ailbl svg{width:13px;height:13px;flex:0 0 auto;color:var(--redline)}
   .card__ailbl[hidden]{display:none}
+  .card__desc--attente{opacity:.65;font-style:italic}
   .card__desc--ai{border-left:2px solid var(--redline);padding-left:10px}
   .card__desc[hidden]{display:none}
   .card__sujet svg{width:14px;height:14px;flex:0 0 auto}
@@ -2157,7 +2158,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=335"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=338"></script>
+<script src="src/i18n.js?v=339"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -4159,7 +4160,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="338";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="339";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4930,6 +4931,10 @@ function noterToucher(p){
 }
 function majMesures(){document.querySelectorAll("[data-cardaimes]").forEach(el=>{el.textContent=texteMesures();});}
 function texteMesures(){
+  const dern=cardAiDiag?" "+T("cardai.diag",{m:T("cardai."+cardAiDiag.k,cardAiDiag.v)}):"";
+  return texteMesuresSeules()+dern;
+}
+function texteMesuresSeules(){
   if(!cardAiMes.length&&!cardAiTaps.length)return T("cardai.mes.none");
   const med=a=>{if(!a.length)return 0;const b=[...a].sort((x,y)=>x-y);return b[Math.floor(b.length/2)];};
   const sec=ms=>{const v=(ms/1000).toFixed(1);return LANG==="fr"?v.replace(".",","):v;};
@@ -4946,16 +4951,31 @@ function texteMesures(){
    (réglage coupé, modèle absent, Wikipédia, vidéo, payant, échec déjà constaté) :
    le ✨ garde alors son comportement d'origine. */
 function resumeDansCarte(){
-  if(!cardAiDispo()||ecouteActive)return false;   // écoute : son propre moteur (annulation globale)
+  // Chaque sortie dit POURQUOI (noterDiag, affiché sous le réglage) : sur téléphone il n'y a
+  // pas de console, et « rien ne se passe » ne dit pas laquelle des branches a été prise.
+  if(cardAiPref==="off")return false;
+  if(!pontResume()){noterDiag("diag.nobridge");return false;}
+  if(!cardAiEtat){noterDiag("diag.nostate");etatResume().then(()=>updateRail());return false;}
+  if(!cardAiDispo()){noterDiag("diag.nomodel");return false;}
+  if(ecouteActive){noterDiag("diag.ecoute");return false;}   // écoute : son propre moteur (annulation globale)
   const el=currentCardEl(),it=carteResumable(el);
-  if(!it||el.dataset.ai==="echec")return false;
+  if(!it){noterDiag("diag.carte");return false;}
+  if(el.dataset.ai==="echec"){noterDiag("diag.echec");return false;}
   const etat=el.dataset.ai||"orig";
   if(etat==="flux")return true;                       // il s'écrit déjà : rien à faire
   if(etat==="sum"){el.dataset.ai="orig";afficherResume(el,it);return true;}
   const k=newsKey(it);
-  if(cardAiCache.has(k)){el.dataset.ai="sum";afficherResume(el,it);noterToucher(0);return true;}
+  if(cardAiCache.has(k)){el.dataset.ai="sum";afficherResume(el,it);noterToucher(0);noterDiag("diag.immediat");return true;}
   resumerEnDirect(el,it,k);
   return true;
+}
+/* Ce qu'a fait le dernier ✨ (clé i18n + valeurs), gardé et affiché sous le réglage. */
+let cardAiDiag=(()=>{try{const v=JSON.parse(localStorage.getItem("fluxswipe.cardai.diag.v1")||"null");return v&&typeof v.k==="string"&&/^diag\./.test(v.k)?v:null;}catch(e){return null;}})();
+function noterDiag(k,vars){
+  cardAiDiag={k,v:vars||{},t:Date.now()};
+  try{localStorage.setItem("fluxswipe.cardai.diag.v1",JSON.stringify(cardAiDiag));}catch(e){}
+  console.info("[résumé carte] ✨ "+T("cardai."+k,cardAiDiag.v));
+  majMesures();
 }
 /* Texte d'une carte selon son état : orig (extrait), flux (en écriture), sum (résumé). */
 function afficherResume(el,it){
@@ -4968,10 +4988,15 @@ function afficherResume(el,it){
   const etat=el.dataset.ai,k=newsKey(it);
   const flux=etat==="flux"&&cardAiFlux&&cardAiFlux.k===k?cardAiFlux.txt:"";
   const txt=etat==="sum"?cardAiCache.get(k)||it.desc||"":flux||it.desc||"";
-  const ia=etat==="sum"||!!flux;
-  p.textContent=txt;
-  p.hidden=!txt;
+  // Avant le premier mot (page à lire, modèle à charger : plusieurs secondes), la carte
+  // DIT qu'elle prépare le résumé : l'extrait laissé en place faisait croire que le ✨
+  // n'avait rien fait (retour « rien ne se passe »).
+  const attente=etat==="flux"&&!flux;
+  const ia=etat==="sum"||etat==="flux";
+  p.textContent=attente?T("card.ai.prep"):txt;
+  p.hidden=!p.textContent;
   p.classList.toggle("card__desc--ai",ia);
+  p.classList.toggle("card__desc--attente",attente);
   lbl.innerHTML=ia?`${ICON_SPARK}<span>${esc(T("card.ai.label"))}</span>`:"";
   lbl.hidden=!ia;
   if(el===currentCardEl())majBoutonResume(el);
@@ -5006,6 +5031,7 @@ async function resumerEnDirect(el,it,k){
   }
   const t0=Date.now();
   cardAiFlux={k,el,txt:"",t0,p1:0};
+  noterDiag("diag.encours");
   clearTimeout(cardAiT);
   const desc=el.querySelector(".card__desc");
   if(desc&&!desc.hidden)desc.style.minHeight=desc.offsetHeight+"px";
@@ -5013,14 +5039,20 @@ async function resumerEnDirect(el,it,k){
   // La préparation éventuelle de CET article est abandonnée : la demande en direct la remplace.
   if(cardAiUtilise)try{await p.cardSummaryDrop({keep:[...cardAiEnVol].filter(x=>x!==k)});}catch(e){}
   cardAiUtilise=true;
-  let r=null;
-  try{r=await demanderResume(p,it,k,true);}catch(e){warn("résumé carte",e);}
+  let r=null,raison="";
+  // Filet côté page : le natif abandonne déjà à 45 s (JOB_TIMEOUT_MS), mais une réponse
+  // qui ne reviendrait jamais laisserait la carte « en préparation » pour toujours.
+  const filet=new Promise(res=>setTimeout(()=>res({key:k,text:"",dropped:false,filet:true}),60000));
+  try{r=await Promise.race([demanderResume(p,it,k,true),filet]);}catch(e){raison=String((e&&e.message)||e);warn("résumé carte",e);}
   const f=cardAiFlux;cardAiFlux=null;
   const t=r&&typeof r.text==="string"?r.text.trim():"";
   const d=el.querySelector(".card__desc");if(d)d.style.minHeight="";
-  if(r&&r.dropped){el.dataset.ai="orig";}                     // lecteur ouvert, arrière-plan… : rien de raté
-  else if(t.length>=30){memoResume(k,t);el.dataset.ai="sum";noterToucher(f&&f.p1?f.p1-t0:Date.now()-t0);}
-  else{cardAiEchecs.add(k);el.dataset.ai="echec";if(el===currentCardEl())toast(T("card.ai.echec"));}
+  const sec=ms=>{const v=(ms/1000).toFixed(1);return LANG==="fr"?v.replace(".",","):v;};
+  if(r&&r.dropped){el.dataset.ai="orig";noterDiag("diag.interrompu");}   // lecteur ouvert, arrière-plan… : rien de raté
+  else if(t.length>=30){memoResume(k,t);el.dataset.ai="sum";noterToucher(f&&f.p1?f.p1-t0:Date.now()-t0);
+    noterDiag("diag.direct",{p:sec((f&&f.p1?f.p1:Date.now())-t0),d:sec(Date.now()-t0)});}
+  else{cardAiEchecs.add(k);el.dataset.ai="echec";if(el===currentCardEl())toast(T("card.ai.echec"));
+    noterDiag(r&&r.filet?"diag.delai":raison?"diag.erreur":"diag.vide",{e:raison.slice(0,80),s:String((r&&r.source)||"")});}
   afficherResume(el,it);
   cardAiCarte=null;planifierResumes(currentCardEl());   // reprendre la préparation d'avance
 }
@@ -5053,7 +5085,7 @@ function cardAiRow(){
   if(cardAiPref!=="off"&&!cardAiEtat)etatResume().then(e=>{if(e)renderReadPref();});
   return prefRow("cardai",T("cardai.label"),T(manque?"cardai.desc.missing":"cardai.desc."+cardAiPref),
       CARD_AI_MODES.map(v=>({v,t:T("cardai.opt."+v)})),cardAiPref)
-    +(cardAiPref!=="off"||cardAiMes.length||cardAiTaps.length?`<div class="prefsub"><span class="prefsub__state" data-cardaimes>${esc(texteMesures())}</span></div>`:"");
+    +(cardAiPref!=="off"||cardAiMes.length||cardAiTaps.length||cardAiDiag?`<div class="prefsub"><span class="prefsub__state" data-cardaimes>${esc(texteMesures())}</span></div>`:"");
 }
 function themePalette(){
   try{

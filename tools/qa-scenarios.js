@@ -4276,6 +4276,18 @@ ${Array.from({ length: 12 }, (_, k) => {
       const idx = await premiere(page, "neuve");
       await aller(page, idx);
       const d0 = await etincelle(page, idx);
+      const tout = await page.evaluate((i) => {
+        const el = feedEl.children[i];
+        const lbl = el.querySelector(".card__ailbl");
+        return {
+          txt: el.querySelector(".card__desc").textContent,
+          etiquette: !!lbl && !lbl.hidden,
+          diag: texteMesures(),
+        };
+      }, idx);
+      console.log(
+        `  tout de suite après ✨ : « ${tout.txt} », étiquette ${tout.etiquette} · ${tout.diag.replace(/^.*(Dernier ✨)/, "$1")}`
+      );
       await page.waitForTimeout(420);
       const pendant = await page.evaluate((i) => {
         const el = feedEl.children[i],
