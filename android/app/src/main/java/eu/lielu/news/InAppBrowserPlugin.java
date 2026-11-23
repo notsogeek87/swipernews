@@ -1039,7 +1039,7 @@ public class InAppBrowserPlugin extends Plugin {
      */
     private static final long CARD_AI_IDLE_MS = 90_000;
     /** Le début de l'article suffit pour deux phrases, et se lit plus vite (voir FlashSummarizer). */
-    private static final int CARD_AI_ARTICLE_CHARS = 2200;
+    private static final int CARD_AI_ARTICLE_CHARS = 3000;
     /** Délai avant libération du modèle ; allongé par cardSummaryWarm en mode résumé. */
     private long cardAiIdleMs = CARD_AI_IDLE_MS;
     private FlashSummarizer cardAi;
@@ -1116,7 +1116,7 @@ public class InAppBrowserPlugin extends Plugin {
         if (cardAi != null && !lang.equals(cardAiLang)) releaseCardAi("langue");
         if (cardAi == null) {
             final FlashSummarizer fs =
-                new FlashSummarizer(getContext(), lang, this::cardAiResult, CARD_AI_ARTICLE_CHARS);
+                new FlashSummarizer(getContext(), lang, this::cardAiResult, CARD_AI_ARTICLE_CHARS, true);
             if (!fs.ready()) {
                 fs.release();
                 return false;

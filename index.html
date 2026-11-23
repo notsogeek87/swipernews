@@ -4161,7 +4161,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="343";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="344";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4829,7 +4829,8 @@ async function dropBlocklist(){
    Mesures (objet de l'essai) : durées de chaque résumé, et part des touchers servis
    IMMÉDIATEMENT (cardAiTaps), avec le délai du premier mot sinon. */
 const CARD_AI_MODES=["off","wifi","on"];
-const LS_CARDAI="fluxswipe.cardai.v1",LS_CARDAI_CACHE="fluxswipe.cardai.cache.v1",LS_CARDAI_MES="fluxswipe.cardai.mesures.v1",LS_CARDAI_TAPS="fluxswipe.cardai.touchers.v1";
+// Cache v2 : les résumés v1 (deux phrases, format du flash info) sont refaits au format carte.
+const LS_CARDAI="fluxswipe.cardai.v1",LS_CARDAI_CACHE="fluxswipe.cardai.cache.v2",LS_CARDAI_MES="fluxswipe.cardai.mesures.v1",LS_CARDAI_TAPS="fluxswipe.cardai.touchers.v1";
 const CARD_AI_DWELL_MS=1500,CARD_AI_AHEAD=1,CARD_AI_CACHE_MAX=150,CARD_AI_MES_MAX=40;
 let cardAiPref=(()=>{try{const v=localStorage.getItem(LS_CARDAI);return CARD_AI_MODES.includes(v)?v:"off";}catch(e){return "off";}})();
 /* Même coupe que FlashSummarizer.completeSentences (natif) : le modèle dépasse souvent les
@@ -4841,6 +4842,7 @@ function phrasesCompletes(t){
   const m=t.match(/^[\s\S]*[.!?…](?=\s)/);
   return m&&m[0].length>=30?m[0].trim():t;
 }
+try{localStorage.removeItem("fluxswipe.cardai.cache.v1");}catch(e){}
 const cardAiCache=new Map(Object.entries(readObject(LS_CARDAI_CACHE)).filter(([k,v])=>k&&typeof v==="string"&&v.length>=30&&v.length<=800).map(([k,v])=>[k,phrasesCompletes(v)]));
 function lireListe(cle,ok){try{const v=JSON.parse(localStorage.getItem(cle)||"[]");return Array.isArray(v)?v.filter(m=>m&&typeof m==="object"&&ok(m)).slice(-CARD_AI_MES_MAX):[];}catch(e){return [];}}
 let cardAiMes=lireListe(LS_CARDAI_MES,m=>Number.isFinite(m.f)&&Number.isFinite(m.g));

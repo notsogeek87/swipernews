@@ -76,6 +76,8 @@ public final class Summarizer {
     static final int MAX_NEW_TOKENS_BRIEF = 140;
     /** Plafond du résumé d'un flash info : deux phrases d'une quarantaine de mots, lues à voix haute. */
     static final int MAX_NEW_TOKENS_FLASH = 100;
+    /** Plafond du résumé d'une CARTE du fil : trois ou quatre phrases, environ 70 mots. */
+    static final int MAX_NEW_TOKENS_CARD = 190;
     /**
      * Fenêtre de contexte demandée (jetons) : prompt + résumé. 4000 caractères de
      * français font environ 1200 jetons, plus le prompt système et 320 jetons de
@@ -176,10 +178,13 @@ public final class Summarizer {
     private static final int KIND_FULL = 0;
     private static final int KIND_BRIEF = 1;
     private static final int KIND_FLASH = 2;
+    private static final int KIND_CARD = 3;
 
     private void run(File model, String title, String text, String lang, int kind, Listener l) {
         final boolean brief = kind == KIND_BRIEF;
-        final boolean flash = kind == KIND_FLASH;
+        final boolean card = kind == KIND_CARD;
+        // Une carte, comme un flash, se résume en une passe sur le début de l'article.
+        final boolean flash = kind == KIND_FLASH || card;
         if (!LIB_OK) {
             main.post(() -> l.onError(ERR_UNAVAILABLE));
             return;
@@ -190,7 +195,7 @@ public final class Summarizer {
         // Un flash ne lit que la première partie : le début d'un article en dit l'essentiel.
         final java.util.List<String> parts = flash && all.size() > 1 ? all.subList(0, 1) : all;
         final boolean multi = parts.size() > 1 && !brief;
-        final byte[] system = (flash ? flashSystemPrompt(lang)
+        final byte[] system = (card ? cardSystemPrompt(lang) : flash ? flashSystemPrompt(lang)
             : brief ? videoSystemPrompt(lang) : multi ? partSystemPrompt(lang) : systemPrompt(lang))
             .getBytes(StandardCharsets.UTF_8);
         final String path = model.getAbsolutePath();
@@ -213,7 +218,7 @@ public final class Summarizer {
                     : userPrompt(title, parts.get(index), lang)).getBytes(StandardCharsets.UTF_8);
                 wrote[0] = false;
                 final int res = nativeGenerate(handle, system, user,
-                    flash ? MAX_NEW_TOKENS_FLASH : brief ? MAX_NEW_TOKENS_BRIEF
+                    card ? MAX_NEW_TOKENS_CARD : flash ? MAX_NEW_TOKENS_FLASH : brief ? MAX_NEW_TOKENS_BRIEF
                         : multi ? MAX_NEW_TOKENS_PART : MAX_NEW_TOKENS, bytes -> {
                         if (my != gen) return false;
                         String piece = new String(bytes, StandardCharsets.UTF_8);
@@ -252,6 +257,14 @@ public final class Summarizer {
      */
     public void summarizeFlash(File model, String title, String text, String lang, Listener l) {
         run(model, title, text, lang, KIND_FLASH, l);
+    }
+
+    /**
+     * Résumé d'une CARTE du fil (essai « résumé IA sur les cartes ») : plus de contenu qu'un
+     * flash — trois ou quatre phrases, faites pour être LUES à l'écran et non prononcées.
+     */
+    public void summarizeCard(File model, String title, String text, String lang, Listener l) {
+        run(model, title, text, lang, KIND_CARD, l);
     }
 
     /**
@@ -329,6 +342,24 @@ public final class Summarizer {
      * Consigne d'un résumé de FLASH INFO. Il sera PRONONCÉ par une synthèse vocale : phrases
      * courtes, aucune parenthèse, aucun sigle ou abréviation à épeler, aucune liste.
      */
+    /**
+     * Consigne du résumé d'une CARTE : l'essentiel d'abord, puis le contexte ou la conséquence,
+     * avec les noms et chiffres qui comptent. Retour d'essai : deux phrases, « un peu court ».
+     */
+    static String cardSystemPrompt(String lang) {
+        if ("en".equals(lang)) {
+            return "You summarize a news article for a news card read on a phone. Write three or four "
+                + "sentences in English, about 70 words: the essentials first (who, what, when), then "
+                + "the most important context or consequence, keeping the key names and figures of the "
+                + "article. No list, no title. Use only what the article says: no opinion, no added fact.";
+        }
+        return "Tu résumes un article de presse pour une carte d'actualité lue sur téléphone. Écris en "
+            + "français trois ou quatre phrases, environ soixante-dix mots : l'essentiel d'abord (qui, "
+            + "quoi, quand), puis le contexte ou la conséquence la plus importante, en gardant les noms "
+            + "et les chiffres clés de l'article. Pas de liste, pas de titre. Appuie-toi uniquement sur "
+            + "l'article : aucun avis, aucun fait ajouté.";
+    }
+
     static String flashSystemPrompt(String lang) {
         if ("en".equals(lang)) {
             return "You write a spoken news flash from a news article. Write two short sentences "

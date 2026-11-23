@@ -45,8 +45,10 @@ final class FlashSummarizer {
     /** Au-delà, on lit l'extrait sans résumé et on passe à l'article suivant. */
     static final long JOB_TIMEOUT_MS = 45_000;
     private static final int ARTICLE_CHARS = 3500;
-    /** Phrases au-delà desquelles on arrête le modèle : la consigne en demande deux. */
+    /** Phrases au-delà desquelles on arrête le modèle : la consigne du flash en demande deux. */
     private static final int MAX_SENTENCES = 2;
+    /** Idem pour une carte du fil, dont la consigne en demande trois ou quatre. */
+    private static final int MAX_SENTENCES_CARD = 4;
     /** Un extrait plus court tient déjà dans le flash tel quel : le résumer n'ajouterait rien. */
     private static final int MIN_EXCERPT_CHARS = 200;
     private static final int MIN_SUMMARY_CHARS = 30;
@@ -109,6 +111,14 @@ final class FlashSummarizer {
      *                     le résumé arrive plus vite ; l'écoute garde ARTICLE_CHARS.
      */
     FlashSummarizer(Context ctx, String lang, Result callback, int articleChars) {
+        this(ctx, lang, callback, articleChars, false);
+    }
+
+    /** Vrai : résumés de CARTE (plus longs, lus à l'écran), sinon de flash info (parlés). */
+    private final boolean card;
+
+    FlashSummarizer(Context ctx, String lang, Result callback, int articleChars, boolean card) {
+        this.card = card;
         this.articleChars = articleChars;
         this.model = new SummaryModelStore(ctx).activeFile();
         this.lang = "en".equals(lang) ? "en" : "fr";
@@ -227,7 +237,7 @@ final class FlashSummarizer {
         }
         if (summarizer == null) summarizer = new Summarizer();
         final StringBuilder acc = new StringBuilder();
-        summarizer.summarizeFlash(model, j.title, text, lang, new Summarizer.Listener() {
+        final Summarizer.Listener ecoute = new Summarizer.Listener() {
             @Override
             public void onText(String piece) {
                 if (my != token || released) return;
@@ -236,7 +246,7 @@ final class FlashSummarizer {
                 // Deux phrases écrites : on arrête le modèle au lieu de le laisser
                 // continuer pour rien (il en écrit souvent quatre, coupées ensuite) —
                 // c'est autant de temps de génération gagné.
-                if (countSentences(acc) >= MAX_SENTENCES) {
+                if (countSentences(acc) >= (card ? MAX_SENTENCES_CARD : MAX_SENTENCES)) {
                     if (summarizer != null) summarizer.cancel();   // plus aucun rappel de cette génération
                     conclude(j, acc, my);
                 }
@@ -255,7 +265,9 @@ final class FlashSummarizer {
             public void onError(int code) {
                 finish(j, null, my);
             }
-        });
+        };
+        if (card) summarizer.summarizeCard(model, j.title, text, lang, ecoute);
+        else summarizer.summarizeFlash(model, j.title, text, lang, ecoute);
     }
 
     private void conclude(Job j, StringBuilder acc, int my) {

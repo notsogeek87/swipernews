@@ -4459,7 +4459,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       const { browser, page, errors } = await lancer(
         {
           "fluxswipe.cardai.v1": "{x",
-          "fluxswipe.cardai.cache.v1": "[1,2",
+          "fluxswipe.cardai.cache.v2": "[1,2",
           "fluxswipe.cardai.mesures.v1": '{"a":1}',
           "fluxswipe.cardai.touchers.v1": "null",
         },

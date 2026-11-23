@@ -495,11 +495,15 @@ hors du dépôt, jamais dans `package.json`.
   souvent les deux phrases demandées et bute sur sa limite au milieu d'un mot : le texte
   est coupé après la dernière phrase complète, côté natif
   (`FlashSummarizer.completeSentences`, qui vaut aussi pour l'écoute) et côté page
-  (`phrasesCompletes`, cache compris). VITESSE : le modèle est ARRÊTÉ dès sa 2e phrase
-  terminée (`FlashSummarizer.countSentences`, qui ignore « M. », « Mme. » et les
-  initiales — vaut aussi pour l'écoute) au lieu d'écrire pour rien des phrases coupées
-  ensuite ; les cartes ne lui donnent que 2 200 caractères de la page
-  (`CARD_AI_ARTICLE_CHARS`, l'écoute garde 3 500) ; en mode résumé le modèle est chargé
+  (`phrasesCompletes`, cache compris). FORMAT : une carte a sa PROPRE consigne
+  (`Summarizer.cardSystemPrompt`, `summarizeCard`, 190 jetons au plus) — trois ou quatre
+  phrases, ~70 mots, l'essentiel puis le contexte, noms et chiffres gardés — distincte de
+  celle du flash info parlé (deux phrases), jugée « un peu courte » à l'essai ; d'où le
+  cache `fluxswipe.cardai.cache.v2` (les résumés v1 sont refaits). VITESSE : le modèle est
+  ARRÊTÉ dès sa dernière phrase utile (2 pour le flash, 4 pour une carte,
+  `FlashSummarizer.countSentences`, qui ignore « M. », « Mme. » et les initiales) au lieu
+  d'écrire pour rien des phrases coupées ensuite ; les cartes lui donnent 3 000 caractères
+  de la page (`CARD_AI_ARTICLE_CHARS`, l'écoute garde 3 500) ; en mode résumé le modèle est chargé
   d'avance (`cardSummaryWarm`, à l'activation, au démarrage, au retour au premier plan)
   et gardé 5 min au lieu de 90 s. Une écriture INTERROMPUE (le natif rend la raison :
   `priorite`, `abandon`, `liberation`, `inactivite`…) ne fait plus repasser la carte
