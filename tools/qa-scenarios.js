@@ -4144,10 +4144,21 @@ ${Array.from({ length: 12 }, (_, k) => {
                       return;
                     }
                     enVol.set(o.key, res);
+                    // Préparation : elle aussi s'écrit morceau par morceau (événement natif).
+                    const tp = texte(o);
+                    (tp ? tp.match(/.{1,20}/g) : []).forEach((b, i) =>
+                      setTimeout(
+                        () =>
+                          enVol.has(o.key) &&
+                          morceau &&
+                          morceau({ key: o.key, piece: b }),
+                        80 * (i + 1)
+                      )
+                    );
                     setTimeout(() => {
                       if (!enVol.has(o.key)) return;
                       enVol.delete(o.key);
-                      res(Object.assign(fin, { text: texte(o) }));
+                      res(Object.assign(fin, { text: tp }));
                     }, 600);
                   }),
                 cardSummaryDrop: (o) => {
@@ -4292,7 +4303,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       // Arrivée sur une carte dont la préparation est EN COURS : on l'attend, sans la relancer.
       const ip = await premiere(page, "neuve");
       await aller(page, ip - 1);
-      await page.waitForTimeout(700); // préparation (400 ms) lancée, pas finie (600 ms)
+      await page.waitForTimeout(650); // préparation (400 ms) lancée, à moitié écrite (600 ms)
       const enCours = await page.evaluate((i) => {
         const it = carteResumable(feedEl.children[i]);
         return it ? cardAiPrep.has(newsKey(it)) : false;
@@ -4304,7 +4315,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       const att2 = await carte(ip);
       const d1 = await page.evaluate(() => window.__calls.filter((c) => c.stream).length);
       console.log(
-        `arrivée pendant la préparation (en cours : ${enCours}) : à l'arrivée ${att.ai} « ${att.txt.slice(0, 26)} » · puis ${att2.ai}, résumé ${att2.resume} · écritures en direct relancées ${d1 - d0} (attendu 0) · ${(await page.evaluate(() => texteMesures())).replace(/^.*(Dernier ✨)/, "$1")}`
+        `arrivée pendant la préparation (en cours : ${enCours}) : à l'arrivée ${att.ai} « ${att.txt.slice(0, 40)} » (texte déjà écrit visible : ${/^Résumé simulé/.test(att.txt)}) · puis ${att2.ai}, résumé ${att2.resume} · écritures en direct relancées ${d1 - d0} (attendu 0) · ${(await page.evaluate(() => texteMesures())).replace(/^.*(Dernier ✨)/, "$1")}`
       );
       // Écriture INTERROMPUE en plein milieu (retour d'essai : « ça apparaît, puis de
       // nouveau en préparation, puis ça revient ») : la carte garde le texte déjà écrit.

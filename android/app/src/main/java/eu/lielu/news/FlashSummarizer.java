@@ -131,8 +131,15 @@ final class FlashSummarizer {
     }
 
     void request(int index, String title, String link, String excerpt) {
+        request(index, title, link, excerpt, null);
+    }
+
+    /** Demande ordinaire (dans l'ordre de la file), mais écrite au fil de l'eau si {@code piece}. */
+    void request(int index, String title, String link, String excerpt, Piece piece) {
         if (released) return;
-        queue.add(new Job(index, title, link, excerpt));
+        final Job j = new Job(index, title, link, excerpt);
+        j.piece = piece;
+        queue.add(j);
         pump();
     }
 

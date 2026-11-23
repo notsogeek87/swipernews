@@ -490,7 +490,10 @@ hors du dépôt, jamais dans `package.json`.
   préparation… » puis écrit en direct (`stream:true` → `FlashSummarizer.requestNow`,
   événement `cardSummaryPiece`), lancé seulement après `CARD_AI_MODE_MS` sur la carte
   (une carte effleurée ne coûte rien). Une carte dont la préparation est DÉJÀ en cours
-  l'attend (`attendrePrep`, `cardAiPrep`) au lieu de la jeter et de tout refaire ; en mode,
+  l'attend (`attendrePrep`, `cardAiPrep`) au lieu de la jeter et de tout refaire — et la
+  voit S'ÉCRIRE : les préparations aussi envoient leurs morceaux (`cardSummaryPiece`,
+  retenus dans `cardAiEcrit`), donc la carte montre d'emblée le texte déjà écrit puis la
+  suite, au lieu de « en préparation » puis tout d'un coup ; en mode,
   la préparation démarre après 400 ms et vise DEUX cartes d'avance. Le modèle dépasse
   souvent les deux phrases demandées et bute sur sa limite au milieu d'un mot : le texte
   est coupé après la dernière phrase complète, côté natif

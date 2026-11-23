@@ -4161,7 +4161,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="344";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="345";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4848,7 +4848,9 @@ function lireListe(cle,ok){try{const v=JSON.parse(localStorage.getItem(cle)||"[]
 let cardAiMes=lireListe(LS_CARDAI_MES,m=>Number.isFinite(m.f)&&Number.isFinite(m.g));
 let cardAiTaps=lireListe(LS_CARDAI_TAPS,m=>Number.isFinite(m.p));
 const cardAiEchecs=new Set(),cardAiEnVol=new Set();
-const cardAiPartiel=new Map();   // clé -> texte d'une écriture interrompue, repris au retour
+const cardAiPartiel=new Map();
+const cardAiEcrit=new Map();     // clé -> texte écrit jusqu'ici par une PRÉPARATION en cours
+const cardAiAttente=new Map();   // clé -> carte qui attend cette préparation (voir attendrePrep)   // clé -> texte d'une écriture interrompue, repris au retour
 const cardAiPrep=new Map();   // clé -> promesse de la préparation EN COURS (voir attendrePrep)
 let cardAiT=null,cardAiCarte=null,cardAiEtat=null,cardAiEtatAt=0,cardAiEtatEnCours=null,cardAiUtilise=false,cardAiEcoute=false;
 let cardAiFlux=null;   // résumé écrit EN DIRECT : {k,el,txt,t0,p1}
@@ -4920,13 +4922,15 @@ async function preparerResumes(){
     const k=newsKey(it);
     if(!k||cardAiCache.has(k)||cardAiEchecs.has(k)||cardAiEnVol.has(k))continue;
     cardAiEnVol.add(k);cardAiUtilise=true;
+    ecouterMorceaux(p);
     const pr=demanderResume(p,it,k,false).then(r=>{
+      if(r&&r.dropped){const e=cardAiEcrit.get(k);if(e)cardAiPartiel.set(k,e);}   // repris plus tard sans repartir de zéro
       if(!r||r.dropped)return r;
       const t=typeof r.text==="string"?r.text.trim():"";
       if(t.length>=30)memoResume(k,t);else cardAiEchecs.add(k);
       return r;
     }).catch(e=>{cardAiEchecs.add(k);warn("résumé carte",e);return null;})
-      .finally(()=>{cardAiEnVol.delete(k);cardAiPrep.delete(k);});
+      .finally(()=>{cardAiEnVol.delete(k);cardAiPrep.delete(k);cardAiEcrit.delete(k);});
     cardAiPrep.set(k,pr);
   }
 }
@@ -5055,18 +5059,27 @@ function appliquerMode(el,tout){
    ou ratée : extrait, et écriture en direct si la carte est toujours sous les yeux. */
 function attendrePrep(el,it,k){
   const t0=Date.now();
+  // La préparation s'écrit au fil de l'eau (morceaux retenus dans cardAiEcrit) : la carte
+  // montre d'emblée ce qui est déjà écrit, puis la suite, comme une écriture en direct.
+  cardAiAttente.set(k,el);
+  const desc=el.querySelector(".card__desc");
+  if(desc&&!desc.hidden)desc.style.minHeight=desc.offsetHeight+"px";
   el.dataset.ai="flux";afficherResume(el,it);
+  if(cardAiEcrit.get(k))el.dataset.p1=String(t0);
   noterDiag("diag.attente");
   cardAiPrep.get(k).then(r=>{
+    if(cardAiAttente.get(k)===el)cardAiAttente.delete(k);
+    const d=el.querySelector(".card__desc");if(d)d.style.minHeight="";
+    const p1=+el.dataset.p1||0;delete el.dataset.p1;
     if(el.dataset.ai!=="flux"||(cardAiFlux&&cardAiFlux.el===el))return;   // mode coupé, ou repris en direct
     if(cardAiCache.has(k)){
-      el.dataset.ai="sum";afficherResume(el,it);noterToucher(Date.now()-t0);
+      el.dataset.ai="sum";afficherResume(el,it);noterToucher((p1||Date.now())-t0);
       const sec=ms=>{const v=(ms/1000).toFixed(1);return LANG==="fr"?v.replace(".",","):v;};
       noterDiag("diag.prete",{d:sec(Date.now()-t0)});
       return;
     }
+    if(r&&r.dropped&&currentCardEl()===el&&modeResumeActif()){resumerEnDirect(el,it,k,cardAiPartiel.get(k));return;}
     delete el.dataset.ai;afficherResume(el,it);
-    if(r&&r.dropped&&currentCardEl()===el&&modeResumeActif())resumerEnDirect(el,it,k);
   });
 }
 /* Ce qu'a fait le dernier ✨ (clé i18n + valeurs), gardé et affiché sous le réglage. */
@@ -5090,7 +5103,7 @@ function afficherResume(el,it){
   let lbl=body.querySelector(".card__ailbl");
   if(!lbl){lbl=document.createElement("span");lbl.className="card__ailbl";body.querySelector(".card__meta").appendChild(lbl);}
   const etat=el.dataset.ai,k=newsKey(it);
-  const flux=etat==="flux"&&cardAiFlux&&cardAiFlux.k===k?cardAiFlux.txt:"";
+  const flux=etat!=="flux"?"":cardAiFlux&&cardAiFlux.k===k?cardAiFlux.txt:(cardAiAttente.has(k)&&cardAiEcrit.get(k))||"";
   const txt=etat==="sum"?cardAiCache.get(k)||it.desc||"":flux||it.desc||"";
   // Avant le premier mot (page à lire, modèle à charger : plusieurs secondes), la carte
   // DIT qu'elle prépare le résumé : l'extrait laissé en place faisait croire que le ✨
@@ -5140,10 +5153,7 @@ async function resumerEnDirect(el,it,k,deja,essai){
     delete v.dataset.ai;const vd=v.querySelector(".card__desc");if(vd)vd.style.minHeight="";
     if(vit)afficherResume(v,vit);
   }
-  if(!cardAiEcoute&&typeof p.addListener==="function"){
-    cardAiEcoute=true;
-    try{p.addListener("cardSummaryPiece",surMorceau);}catch(e){warn("résumé carte",e);}
-  }
+  ecouterMorceaux(p);
   const t0=Date.now();
   // `deja` : texte d'une écriture interrompue, gardé à l'écran tant que la reprise ne l'a
   // pas rattrapé (voir surMorceau) — la carte ne repasse pas par « en préparation ».
@@ -5188,9 +5198,26 @@ async function resumerEnDirect(el,it,k,deja,essai){
   afficherResume(el,it);
   cardAiCarte=null;planifierResumes(currentCardEl());   // reprendre la préparation d'avance
 }
+function ecouterMorceaux(p){
+  if(cardAiEcoute||!p||typeof p.addListener!=="function")return;
+  cardAiEcoute=true;
+  try{p.addListener("cardSummaryPiece",surMorceau);}catch(e){warn("résumé carte",e);}
+}
 function surMorceau(e){
+  if(!e||typeof e.key!=="string"||typeof e.piece!=="string")return;
   const f=cardAiFlux;
-  if(!f||!e||e.key!==f.k||typeof e.piece!=="string")return;
+  if(!f||e.key!==f.k){
+    // Morceau d'une PRÉPARATION : retenu, et montré si une carte l'attend sous les yeux.
+    if(!cardAiPrep.has(e.key))return;
+    const avant=cardAiEcrit.get(e.key)||"";
+    cardAiEcrit.set(e.key,avant?avant+e.piece:e.piece.replace(/^\s+/,""));
+    const el=cardAiAttente.get(e.key),it=el&&cardReg.get(+el.dataset.id);
+    if(it&&el.isConnected&&el.dataset.ai==="flux"&&!(cardAiFlux&&cardAiFlux.el===el)){
+      if(!el.dataset.p1)el.dataset.p1=String(Date.now());
+      afficherResume(el,it);
+    }
+    return;
+  }
   if(!f.acc){f.p1=Date.now();f.acc=e.piece.replace(/^\s+/,"");}else f.acc+=e.piece;
   f.txt=f.acc.length>=f.prec.length?f.acc:f.prec;   // une reprise ne recule jamais à l'écran
   const it=cardReg.get(+f.el.dataset.id);

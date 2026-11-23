@@ -1101,14 +1101,12 @@ public class InAppBrowserPlugin extends Plugin {
             // Le travail préparé d'avance qu'il interrompt est rendu comme ABANDONNÉ, pas raté.
             final int busyIdx = cardAi.currentIndex();
             if (busyIdx >= 0) cardAiDropped.put(busyIdx, "priorite");
-            cardAi.requestNow(i, title, link, excerpt, (index, piece) -> {
-                JSObject ev = new JSObject();
-                ev.put("key", cardAiKeys.get(index));
-                ev.put("piece", piece);
-                notifyListeners("cardSummaryPiece", ev);
-            });
+            cardAi.requestNow(i, title, link, excerpt, this::cardAiPiece);
         } else {
-            cardAi.request(i, title, link, excerpt);
+            // Préparation d'avance : elle aussi s'écrit au fil de l'eau. La page n'en montre
+            // rien tant qu'on n'est pas sur la carte ; si on y arrive pendant qu'elle
+            // s'écrit, on voit le texte déjà écrit puis la suite, comme en direct.
+            cardAi.request(i, title, link, excerpt, this::cardAiPiece);
         }
     }
 
@@ -1140,6 +1138,13 @@ public class InAppBrowserPlugin extends Plugin {
         cardAiIdleMs = Math.max(CARD_AI_IDLE_MS, Math.min(keep, 10 * 60_000L));
         if (ensureCardAi(lang)) cardAi.warm();
         call.resolve();
+    }
+
+    private void cardAiPiece(int index, String piece) {
+        JSObject ev = new JSObject();
+        ev.put("key", cardAiKeys.get(index));
+        ev.put("piece", piece);
+        notifyListeners("cardSummaryPiece", ev);
     }
 
     /** Abandonne les demandes dont la clé n'est pas dans {@code keep} (cartes dépassées). */
