@@ -803,6 +803,8 @@
       "rail.sum.back": "Quitter le mode résumé (revenir aux extraits)",
       "changelog.v340.item1":
         "Essai du résumé IA : un appui sur ✨ passe tout le fil en mode résumé, gardé d'une ouverture à l'autre ; un nouvel appui revient aux extraits.",
+      "cardai.diag.attente": "en attente de la préparation déjà lancée",
+      "cardai.diag.prete": "préparation terminée, affichée après {d} s d'attente",
       "card.paywall.title": "Accès payant probable",
     },
     en: {
@@ -1555,6 +1557,8 @@
       "rail.sum.back": "Leave summary mode (back to excerpts)",
       "changelog.v340.item1":
         "AI summary trial: one ✨ tap switches the whole feed to summary mode, kept between launches; tap again to go back to excerpts.",
+      "cardai.diag.attente": "waiting for the preparation already running",
+      "cardai.diag.prete": "preparation done, shown after waiting {d} s",
       "card.paywall.title": "Likely paywalled",
 
       // Libellés des centres d'intérêt (clés définies dans src/learn-core.js) :

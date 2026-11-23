@@ -2158,7 +2158,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=335"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=340"></script>
+<script src="src/i18n.js?v=341"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -4160,7 +4160,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="340";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="341";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4831,11 +4831,21 @@ const CARD_AI_MODES=["off","wifi","on"];
 const LS_CARDAI="fluxswipe.cardai.v1",LS_CARDAI_CACHE="fluxswipe.cardai.cache.v1",LS_CARDAI_MES="fluxswipe.cardai.mesures.v1",LS_CARDAI_TAPS="fluxswipe.cardai.touchers.v1";
 const CARD_AI_DWELL_MS=1500,CARD_AI_AHEAD=1,CARD_AI_CACHE_MAX=150,CARD_AI_MES_MAX=40;
 let cardAiPref=(()=>{try{const v=localStorage.getItem(LS_CARDAI);return CARD_AI_MODES.includes(v)?v:"off";}catch(e){return "off";}})();
-const cardAiCache=new Map(Object.entries(readObject(LS_CARDAI_CACHE)).filter(([k,v])=>k&&typeof v==="string"&&v.length>=30&&v.length<=800));
+/* Même coupe que FlashSummarizer.completeSentences (natif) : le modèle dépasse souvent les
+   deux phrases demandées et bute sur sa limite au milieu d'un mot. Appliquée aussi ici
+   pour les résumés déjà mis en cache par un APK qui ne coupait pas encore. */
+function phrasesCompletes(t){
+  t=String(t||"").trim();
+  if(!t||/[.!?…»"]$/.test(t))return t;
+  const m=t.match(/^[\s\S]*[.!?…](?=\s)/);
+  return m&&m[0].length>=30?m[0].trim():t;
+}
+const cardAiCache=new Map(Object.entries(readObject(LS_CARDAI_CACHE)).filter(([k,v])=>k&&typeof v==="string"&&v.length>=30&&v.length<=800).map(([k,v])=>[k,phrasesCompletes(v)]));
 function lireListe(cle,ok){try{const v=JSON.parse(localStorage.getItem(cle)||"[]");return Array.isArray(v)?v.filter(m=>m&&typeof m==="object"&&ok(m)).slice(-CARD_AI_MES_MAX):[];}catch(e){return [];}}
 let cardAiMes=lireListe(LS_CARDAI_MES,m=>Number.isFinite(m.f)&&Number.isFinite(m.g));
 let cardAiTaps=lireListe(LS_CARDAI_TAPS,m=>Number.isFinite(m.p));
 const cardAiEchecs=new Set(),cardAiEnVol=new Set();
+const cardAiPrep=new Map();   // clé -> promesse de la préparation EN COURS (voir attendrePrep)
 let cardAiT=null,cardAiCarte=null,cardAiEtat=null,cardAiEtatAt=0,cardAiEtatEnCours=null,cardAiUtilise=false,cardAiEcoute=false;
 let cardAiFlux=null;   // résumé écrit EN DIRECT : {k,el,txt,t0,p1}
 function pontResume(){
@@ -4877,7 +4887,9 @@ function planifierResumes(card){
   cardAiCarte=card;clearTimeout(cardAiT);
   appliquerMode(card,false);   // mode résumé : la carte d'arrivée s'affiche sur son résumé
   if(cardAiPref==="off"||!pontResume()||!card)return;
-  cardAiT=setTimeout(preparerResumes,CARD_AI_DWELL_MS);
+  // Mode résumé : on sait qu'un résumé sera affiché sur chaque carte, la préparation
+  // démarre donc presque tout de suite (un défilement rapide la fait abandonner).
+  cardAiT=setTimeout(preparerResumes,modeResumeActif()?400:CARD_AI_DWELL_MS);
 }
 /* La préparation d'avance : rien d'affiché, seulement le cache rempli. */
 async function preparerResumes(){
@@ -4890,22 +4902,28 @@ async function preparerResumes(){
   if(i<0||feedEl.children[i]!==cardAiCarte||cardAiFlux)return;   // on a bougé (ou touché) entre-temps
   // La SUIVANTE d'abord : c'est elle qu'on touchera bientôt. Puis la courante.
   const suite=[];
-  for(let k=i+1;k<feedEl.children.length&&k<=i+4&&suite.length<CARD_AI_AHEAD;k++){
+  // Mode résumé : DEUX cartes d'avance, la carte courante étant déjà prise en charge par
+  // appliquerMode (prête, en attente d'une préparation, ou écrite en direct).
+  const mode=modeResumeActif(),avance=mode?2:CARD_AI_AHEAD;
+  for(let k=i+1;k<feedEl.children.length&&k<=i+6&&suite.length<avance;k++){
     const it=carteResumable(feedEl.children[k]);if(it)suite.push(it);
   }
   const cur=carteResumable(feedEl.children[i]);
-  const cibles=cur?[...suite,cur]:suite;
-  if(cardAiUtilise)try{await p.cardSummaryDrop({keep:cibles.map(newsKey)});}catch(e){}
+  const cibles=cur&&!mode?[...suite,cur]:suite;
+  const garder=cibles.map(newsKey);if(cur)garder.push(newsKey(cur));   // jamais la préparation qu'attend la carte courante
+  if(cardAiUtilise)try{await p.cardSummaryDrop({keep:garder});}catch(e){}
   for(const it of cibles){
     const k=newsKey(it);
     if(!k||cardAiCache.has(k)||cardAiEchecs.has(k)||cardAiEnVol.has(k))continue;
     cardAiEnVol.add(k);cardAiUtilise=true;
-    demanderResume(p,it,k,false).then(r=>{
-      if(!r||r.dropped)return;
+    const pr=demanderResume(p,it,k,false).then(r=>{
+      if(!r||r.dropped)return r;
       const t=typeof r.text==="string"?r.text.trim():"";
       if(t.length>=30)memoResume(k,t);else cardAiEchecs.add(k);
-    }).catch(e=>{cardAiEchecs.add(k);warn("résumé carte",e);})
-      .finally(()=>cardAiEnVol.delete(k));
+      return r;
+    }).catch(e=>{cardAiEchecs.add(k);warn("résumé carte",e);return null;})
+      .finally(()=>{cardAiEnVol.delete(k);cardAiPrep.delete(k);});
+    cardAiPrep.set(k,pr);
   }
 }
 function demanderResume(p,it,k,direct){
@@ -4913,6 +4931,7 @@ function demanderResume(p,it,k,direct){
     .then(r=>{if(r&&!r.dropped)noterMesure(r,typeof r.text==="string"&&r.text.trim().length>=30,direct);return r;});
 }
 function memoResume(k,t){
+  t=phrasesCompletes(t);
   cardAiCache.delete(k);cardAiCache.set(k,t);
   while(cardAiCache.size>CARD_AI_CACHE_MAX)cardAiCache.delete(cardAiCache.keys().next().value);
   try{localStorage.setItem(LS_CARDAI_CACHE,JSON.stringify(Object.fromEntries(cardAiCache)));}catch(e){warn("save cardai cache",e);}
@@ -5004,8 +5023,30 @@ function appliquerMode(el,tout){
   const k=newsKey(it);
   if(cardAiCache.has(k)){el.dataset.ai="sum";afficherResume(el,it);noterToucher(0);if(tout)noterDiag("diag.immediat");return;}
   if(cardAiEchecs.has(k))return;
+  // Sa préparation est déjà en route : on l'attend au lieu de la jeter pour tout refaire
+  // (retour d'essai : « quand je swipe, ça lance le résumé alors qu'il devrait être prêt »).
+  if(cardAiPrep.has(k)){attendrePrep(el,it,k);return;}
   const go=()=>{if(currentCardEl()===el&&modeResumeActif())resumerEnDirect(el,it,k);};
   if(tout)go();else cardAiModeT=setTimeout(go,CARD_AI_MODE_MS);
+}
+/* La carte attend la préparation déjà en cours de SON résumé : « Résumé en préparation… »
+   puis le résumé d'un coup (la préparation ne s'écrit pas en direct). Préparation abandonnée
+   ou ratée : extrait, et écriture en direct si la carte est toujours sous les yeux. */
+function attendrePrep(el,it,k){
+  const t0=Date.now();
+  el.dataset.ai="flux";afficherResume(el,it);
+  noterDiag("diag.attente");
+  cardAiPrep.get(k).then(r=>{
+    if(el.dataset.ai!=="flux"||(cardAiFlux&&cardAiFlux.el===el))return;   // mode coupé, ou repris en direct
+    if(cardAiCache.has(k)){
+      el.dataset.ai="sum";afficherResume(el,it);noterToucher(Date.now()-t0);
+      const sec=ms=>{const v=(ms/1000).toFixed(1);return LANG==="fr"?v.replace(".",","):v;};
+      noterDiag("diag.prete",{d:sec(Date.now()-t0)});
+      return;
+    }
+    delete el.dataset.ai;afficherResume(el,it);
+    if(r&&r.dropped&&currentCardEl()===el&&modeResumeActif())resumerEnDirect(el,it,k);
+  });
 }
 /* Ce qu'a fait le dernier ✨ (clé i18n + valeurs), gardé et affiché sous le réglage. */
 let cardAiDiag=(()=>{try{const v=JSON.parse(localStorage.getItem("fluxswipe.cardai.diag.v1")||"null");return v&&typeof v.k==="string"&&/^diag\./.test(v.k)?v:null;}catch(e){return null;}})();

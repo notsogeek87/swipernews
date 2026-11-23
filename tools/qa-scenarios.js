@@ -4078,7 +4078,10 @@ ${Array.from({ length: 12 }, (_, k) => {
           const texte = (o) =>
             window.__echec.has(o.title)
               ? ""
-              : "Résumé simulé de « " + o.title + " », en deux phrases courtes. Voilà.";
+              : // Comme le vrai modèle : il dépasse et bute sur sa limite au milieu d'un mot.
+                "Résumé simulé de « " +
+                o.title +
+                " », en deux phrases courtes. Voilà. Puis une suite coup";
           window.Capacitor = {
             isNativePlatform: () => true,
             Plugins: {
@@ -4275,6 +4278,23 @@ ${Array.from({ length: 12 }, (_, k) => {
       console.log(
         `swipe en mode résumé, carte non préparée : à l'arrivée « ${tout.txt.slice(0, 30)} » (${tout.ai || "extrait"}) · après 450 ms : ${pendant.ai}, « ${pendant.txt.slice(0, 30)} », hauteur tenue ${!!pendant.minH}, ✨ respire ${pendant.busy} · à la fin : ${fin.ai}, résumé complet ${fin.resume}, ✨ enfoncé ${fin.on}`
       );
+      // Arrivée sur une carte dont la préparation est EN COURS : on l'attend, sans la relancer.
+      const ip = await premiere(page, "neuve");
+      await aller(page, ip - 1);
+      await page.waitForTimeout(700); // préparation (400 ms) lancée, pas finie (600 ms)
+      const enCours = await page.evaluate((i) => {
+        const it = carteResumable(feedEl.children[i]);
+        return it ? cardAiPrep.has(newsKey(it)) : false;
+      }, ip);
+      const d0 = await page.evaluate(() => window.__calls.filter((c) => c.stream).length);
+      await aller(page, ip);
+      const att = await carte(ip);
+      await page.waitForTimeout(900);
+      const att2 = await carte(ip);
+      const d1 = await page.evaluate(() => window.__calls.filter((c) => c.stream).length);
+      console.log(
+        `arrivée pendant la préparation (en cours : ${enCours}) : à l'arrivée ${att.ai} « ${att.txt.slice(0, 26)} » · puis ${att2.ai}, résumé ${att2.resume} · écritures en direct relancées ${d1 - d0} (attendu 0) · ${(await page.evaluate(() => texteMesures())).replace(/^.*(Dernier ✨)/, "$1")}`
+      );
       // Retour sur la carte 1 : toujours son résumé.
       await aller(page, 1);
       const retour = await carte(1);
@@ -4292,11 +4312,21 @@ ${Array.from({ length: 12 }, (_, k) => {
       );
       await page.waitForTimeout(2500);
       // Échec en mode : extrait gardé, message, le mode reste actif.
-      const i3 = await premiere(page, "neuve");
-      await page.evaluate(
-        (i) => window.__echec.add(cardReg.get(+feedEl.children[i].dataset.id).title),
-        i3
-      );
+      // Avec deux cartes d'avance, toutes les actus du banc sont déjà prêtes : on en
+      // « oublie » une plus loin, et le faux modèle ne saura pas la résumer.
+      const i3 = await page.evaluate(() => {
+        const kids = [...feedEl.children];
+        for (let i = 0; i < kids.length; i++) {
+          if (Math.abs(i - currentIndex()) < 2) continue;
+          const it = carteResumable(kids[i]);
+          if (it && !cardAiPrep.has(newsKey(it))) {
+            cardAiCache.delete(newsKey(it));
+            window.__echec.add(it.title);
+            return i;
+          }
+        }
+        return -1;
+      });
       await aller(page, i3);
       await page.waitForTimeout(1200);
       const ech = await page.evaluate((i) => {

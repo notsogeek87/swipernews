@@ -227,6 +227,7 @@ final class FlashSummarizer {
                 }
                 String s = acc.toString().trim();
                 if (s.length() > MAX_SUMMARY_CHARS) s = s.substring(0, MAX_SUMMARY_CHARS);
+                s = completeSentences(s);
                 final List<String> chunks = s.length() < MIN_SUMMARY_CHARS
                     ? null : ArticleText.speechChunks(s, 200);
                 finish(j, chunks == null || chunks.isEmpty() ? null : chunks, my);
@@ -237,6 +238,26 @@ final class FlashSummarizer {
                 finish(j, null, my);
             }
         });
+    }
+
+    /**
+     * Coupe après la dernière phrase COMPLÈTE. Le modèle écrit souvent plus que les deux
+     * phrases demandées et bute sur MAX_NEW_TOKENS_FLASH au milieu d'un mot (vu sur
+     * téléphone : « … des ports USB4 g »). Si la coupe ne laisse presque rien, on garde
+     * le texte tel quel : mieux vaut une fin abrupte qu'aucun résumé.
+     */
+    static String completeSentences(String s) {
+        if (s.isEmpty() || ".!?…»\"".indexOf(s.charAt(s.length() - 1)) >= 0) return s;
+        int cut = -1;
+        for (int i = s.length() - 2; i >= 0; i--) {
+            final char c = s.charAt(i);
+            if ((c == '.' || c == '!' || c == '?' || c == '…') && Character.isWhitespace(s.charAt(i + 1))) {
+                cut = i + 1;
+                break;
+            }
+        }
+        if (cut < MIN_SUMMARY_CHARS) return s;
+        return s.substring(0, cut).trim();
     }
 
     private void timedOut() {

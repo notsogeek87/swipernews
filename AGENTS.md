@@ -489,7 +489,13 @@ hors du dépôt, jamais dans `package.json`.
   changement de carte) — tout de suite s'il a été préparé, sinon « Résumé en
   préparation… » puis écrit en direct (`stream:true` → `FlashSummarizer.requestNow`,
   événement `cardSummaryPiece`), lancé seulement après `CARD_AI_MODE_MS` sur la carte
-  (une carte effleurée ne coûte rien). Quitter une carte en cours d'écriture : la
+  (une carte effleurée ne coûte rien). Une carte dont la préparation est DÉJÀ en cours
+  l'attend (`attendrePrep`, `cardAiPrep`) au lieu de la jeter et de tout refaire ; en mode,
+  la préparation démarre après 400 ms et vise DEUX cartes d'avance. Le modèle dépasse
+  souvent les deux phrases demandées et bute sur sa limite au milieu d'un mot : le texte
+  est coupé après la dernière phrase complète, côté natif
+  (`FlashSummarizer.completeSentences`, qui vaut aussi pour l'écoute) et côté page
+  (`phrasesCompletes`, cache compris). Quitter une carte en cours d'écriture : la
   suivante passe devant, l'ancienne retrouve son extrait et sera reprise au retour. Un
   nouvel ✨ sur une carte d'actu coupe le mode (extraits partout) ; ✨ enfoncé = mode
   actif. Le ✨ garde la feuille du lecteur sur Wikipédia, les vidéos, et quand le mode
