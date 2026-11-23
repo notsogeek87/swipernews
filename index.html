@@ -376,14 +376,13 @@
   .card__sujet{display:inline-flex;align-items:center;gap:6px;font:inherit;color:var(--ink);
     background:rgba(var(--redline-rgb),.16);border:1px solid var(--redline);border-radius:999px;padding:4px 11px;cursor:pointer}
   .card__sujet[hidden]{display:none}
-  /* Essai résumé IA sur les cartes : même pastille que « N sources », et le texte
-     résumé à peine teinté pour qu'on sache ce qu'on lit (voir majResumesCartes). */
-  .card__ai{display:inline-flex;align-items:center;gap:6px;font:inherit;color:var(--ink);
-    background:rgba(var(--redline-rgb),.16);border:1px solid var(--redline);border-radius:999px;padding:4px 11px;cursor:pointer}
-  .card__ai svg{width:14px;height:14px;flex:0 0 auto}
-  .card__ai[aria-pressed="true"]{background:linear-gradient(135deg,var(--surface),var(--molten));color:var(--flare)}
-  .card__ai--flux{opacity:.75}
-  .card__ai:disabled{opacity:.55;cursor:default}
+  /* Essai résumé IA sur les cartes (voir resumeDansCarte) : le texte résumé est
+     annoncé par une étiquette et un liseré, pour qu'on sache toujours ce qu'on lit. */
+  /* Dans la ligne de la date, pas au-dessus du texte : une ligne de plus ferait
+     remonter le titre (calé en bas) au moment où le résumé apparaît. */
+  .card__ailbl{display:inline-flex;align-items:center;gap:5px;font-weight:600;color:var(--ink)}
+  .card__ailbl svg{width:13px;height:13px;flex:0 0 auto;color:var(--redline)}
+  .card__ailbl[hidden]{display:none}
   .card__desc--ai{border-left:2px solid var(--redline);padding-left:10px}
   .card__desc[hidden]{display:none}
   .card__sujet svg{width:14px;height:14px;flex:0 0 auto}
@@ -591,6 +590,10 @@
      updateRail) qui porte l'essentiel du signal, la couleur ne fait que
      l'appuyer. */
   .rail button.on{color:var(--flare);border-color:var(--flare)}
+  /* ✨ pendant qu'un résumé s'écrit dans la carte : il respire, sans rien bloquer. */
+  .rail button.busy svg{animation:sumbusy 1.2s ease-in-out infinite}
+  @keyframes sumbusy{50%{opacity:.35}}
+  @media (prefers-reduced-motion:reduce){.rail button.busy svg{animation:none;opacity:.5}}
 
   /* Plus de jauge de progression : le fil unique est SANS FIN (quand les actus
      sont épuisées, Wikipédia prend le relais indéfiniment), donc une position
@@ -2154,7 +2157,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=335"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=337"></script>
+<script src="src/i18n.js?v=338"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -4156,7 +4159,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="337";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="338";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4167,8 +4170,8 @@ const APP_VERSION="337";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
-  {v:337,date:"2026-11-23",items:[
-    "changelog.v337.item1"]},
+  {v:338,date:"2026-11-23",items:[
+    "changelog.v338.item1"]},
   {v:335,date:"2026-11-22",items:[
     "changelog.v335.item1"]},
   {v:334,date:"2026-11-22",items:[
@@ -4803,10 +4806,12 @@ async function dropBlocklist(){
    retombe alors sur Flamme. */
 /* ---------- ESSAI : RÉSUMÉ IA SUR LES CARTES (APK) ----------
    UN SEUL comportement, sur toutes les cartes : chaque carte d'actu s'ouvre sur l'extrait
-   de SA SOURCE, avec la pastille « Résumé IA ». La toucher affiche le résumé — tout de
-   suite s'il est prêt, sinon il s'écrit au fil de l'eau dans la carte, comme dans le
-   lecteur. Le texte ne change donc jamais sans geste (règle de la tête du fil), et la
-   première carte se comporte comme les autres.
+   de SA SOURCE. Le ✨ du rail (le même bouton qui ouvrait la feuille du lecteur) affiche
+   alors le résumé DANS la carte — tout de suite s'il est prêt, sinon il s'écrit au fil
+   de l'eau, comme dans le lecteur ; un second ✨ revient à l'extrait. Le texte ne change
+   donc jamais sans geste (règle de la tête du fil), et la première carte se comporte
+   comme les autres. Une pastille dans la carte a été essayée puis retirée : elle
+   doublait le ✨ du rail sur la même carte.
    L'automatique est dans la PRÉPARATION, invisible : après CARD_AI_DWELL_MS sur une carte,
    la SUIVANTE puis la courante sont résumées d'avance par le modèle LOCAL
    (InAppBrowserPlugin.cardSummarize → FlashSummarizer : page de l'article, repli sur
@@ -4835,12 +4840,15 @@ function pontResume(){
   return p&&typeof p.cardSummarize==="function"?p:null;
 }
 function cardAiDispo(){return cardAiPref!=="off"&&!!pontResume()&&!!cardAiEtat&&cardAiEtat.engine&&cardAiEtat.installed;}
+// L'état du moteur se demande une fois au démarrage : sans lui, le premier ✨ ne saurait pas
+// encore qu'il peut résumer dans la carte (et ouvrirait la feuille du lecteur).
+if(cardAiPref!=="off")setTimeout(()=>etatResume().then(()=>{try{updateRail();}catch(e){}}),0);
 function setCardAiPref(v){
   if(!CARD_AI_MODES.includes(v)||v===cardAiPref)return;
   cardAiPref=v;
   try{localStorage.setItem(LS_CARDAI,v);}catch(e){warn("save cardai",e);}
   if(v==="off"){libererResumesCartes();retirerResumesCartes();}
-  else{cardAiEtatAt=0;etatResume().then(()=>{majResumesCartes();renderReadPref();});cardAiCarte=null;planifierResumes(currentCardEl());}
+  else{cardAiEtatAt=0;etatResume().then(()=>{updateRail();renderReadPref();});cardAiCarte=null;planifierResumes(currentCardEl());}
   renderReadPref();
 }
 /* L'article d'une carte, si elle peut recevoir un résumé ; sinon null. */
@@ -4933,57 +4941,62 @@ function texteMesures(){
   }
   return t;
 }
-/* Pose la pastille sur chaque carte éligible qui ne l'a pas encore. Appelé après chaque
-   render() (une carte réutilisée n'est jamais réécrite, comme pour « N sources »). Ne
-   touche JAMAIS au texte : la carte reste sur l'extrait tant qu'on n'a pas touché. */
-function majResumesCartes(){
-  if(cardAiPref==="off"||!pontResume())return;
-  if(!cardAiEtat){etatResume().then(e=>{if(e&&e.engine&&e.installed)majResumesCartes();});return;}
-  if(!cardAiDispo())return;
-  for(const el of feedEl.children){
-    if(el.dataset.ai)continue;
-    const it=carteResumable(el);if(!it)continue;
-    const meta=el.querySelector(".card__body .card__meta");if(!meta)continue;
-    const b=document.createElement("button");
-    b.type="button";b.className="card__ai";b.setAttribute("data-aitoggle","");
-    meta.appendChild(b);
-    el.dataset.ai="orig";
-    afficherResume(el,it);
-  }
+/* Le ✨ du rail sur une carte d'actu, essai activé : le résumé s'affiche DANS la carte
+   au lieu de la feuille du lecteur. Rend false quand la carte n'est pas concernée
+   (réglage coupé, modèle absent, Wikipédia, vidéo, payant, échec déjà constaté) :
+   le ✨ garde alors son comportement d'origine. */
+function resumeDansCarte(){
+  if(!cardAiDispo()||ecouteActive)return false;   // écoute : son propre moteur (annulation globale)
+  const el=currentCardEl(),it=carteResumable(el);
+  if(!it||el.dataset.ai==="echec")return false;
+  const etat=el.dataset.ai||"orig";
+  if(etat==="flux")return true;                       // il s'écrit déjà : rien à faire
+  if(etat==="sum"){el.dataset.ai="orig";afficherResume(el,it);return true;}
+  const k=newsKey(it);
+  if(cardAiCache.has(k)){el.dataset.ai="sum";afficherResume(el,it);noterToucher(0);return true;}
+  resumerEnDirect(el,it,k);
+  return true;
 }
-/* Texte et pastille d'une carte selon son état : orig (extrait), flux (en écriture), sum
-   (résumé), echec (pas de résumé possible pour cet article). */
+/* Texte d'une carte selon son état : orig (extrait), flux (en écriture), sum (résumé). */
 function afficherResume(el,it){
-  const body=el.querySelector(".card__body"),b=el.querySelector(".card__ai");
-  if(!body||!b)return;
+  const body=el.querySelector(".card__body");
+  if(!body)return;
   let p=body.querySelector(".card__desc");
   if(!p){p=document.createElement("p");p.className="card__desc";const h=body.querySelector(".card__title");if(h)h.after(p);else body.querySelector(".card__meta").before(p);}
+  let lbl=body.querySelector(".card__ailbl");
+  if(!lbl){lbl=document.createElement("span");lbl.className="card__ailbl";body.querySelector(".card__meta").appendChild(lbl);}
   const etat=el.dataset.ai,k=newsKey(it);
-  const txt=etat==="sum"?cardAiCache.get(k)||it.desc||"":etat==="flux"?(cardAiFlux&&cardAiFlux.k===k&&cardAiFlux.txt)||it.desc||"":it.desc||"";
+  const flux=etat==="flux"&&cardAiFlux&&cardAiFlux.k===k?cardAiFlux.txt:"";
+  const txt=etat==="sum"?cardAiCache.get(k)||it.desc||"":flux||it.desc||"";
+  const ia=etat==="sum"||!!flux;
   p.textContent=txt;
   p.hidden=!txt;
-  p.classList.toggle("card__desc--ai",etat==="sum"||(etat==="flux"&&!!(cardAiFlux&&cardAiFlux.txt)));
-  const lib=etat==="sum"?"card.ai.sum":etat==="flux"?"card.ai.flux":etat==="echec"?"card.ai.echec":"card.ai.orig";
-  b.innerHTML=`${ICON_SPARK}<span>${esc(T(lib))}</span>`;
-  b.setAttribute("aria-label",T(lib+"Aria"));
-  b.setAttribute("aria-pressed",String(etat==="sum"));
-  b.disabled=etat==="echec";
-  b.classList.toggle("card__ai--flux",etat==="flux");
-  if(etat==="flux")b.setAttribute("aria-busy","true");else b.removeAttribute("aria-busy");
+  p.classList.toggle("card__desc--ai",ia);
+  lbl.innerHTML=ia?`${ICON_SPARK}<span>${esc(T("card.ai.label"))}</span>`:"";
+  lbl.hidden=!ia;
+  if(el===currentCardEl())majBoutonResume(el);
 }
-function basculerResume(btn){
-  const el=btn.closest(".card"),it=el&&cardReg.get(+el.dataset.id);
-  if(!it)return;
-  const etat=el.dataset.ai;
-  if(etat==="flux"||etat==="echec")return;
-  if(etat==="sum"){el.dataset.ai="orig";afficherResume(el,it);return;}
-  const k=newsKey(it);
-  if(cardAiCache.has(k)){el.dataset.ai="sum";afficherResume(el,it);noterToucher(0);return;}
-  resumerEnDirect(el,it,k);
+/* L'état du ✨ suit la carte visible : enfoncé quand elle montre son résumé, qui respire
+   pendant l'écriture. Appelé par updateRail (changement de carte) et afficherResume. */
+function majBoutonResume(el){
+  const dans=cardAiDispo()&&!!carteResumable(el)&&el.dataset.ai!=="echec";
+  const etat=dans?el.dataset.ai||"orig":"";
+  sumBtn.classList.toggle("on",etat==="sum");
+  sumBtn.classList.toggle("busy",etat==="flux");
+  if(dans){
+    const lib=T(etat==="sum"?"rail.sum.back":etat==="flux"?"rail.sum.busy":"rail.sum.card");
+    sumBtn.setAttribute("aria-label",lib);sumBtn.title=lib;
+    sumBtn.setAttribute("aria-pressed",String(etat==="sum"));
+  }else{
+    sumBtn.setAttribute("aria-label",T("rail.sum.aria"));sumBtn.title=T("rail.sum.title");
+    sumBtn.removeAttribute("aria-pressed");
+  }
 }
 /* Le résumé n'est pas prêt : on le demande en PRIORITÉ et il s'écrit dans la carte. La zone
    de texte garde la hauteur de l'extrait pendant l'écriture (le titre, calé au-dessus, ne
-   remonte pas ligne après ligne) ; elle s'ajuste en une fois à la fin. */
+   remonte pas ligne après ligne) ; elle s'ajuste en une fois à la fin. Échec : la carte
+   reprend son extrait, et le ✨ suivant ouvrira la feuille du lecteur, dont le mode
+   lecture lit des pages que l'extraction native ne sait pas lire. */
 async function resumerEnDirect(el,it,k){
   const p=pontResume();
   if(!p||cardAiFlux)return;
@@ -4994,9 +5007,9 @@ async function resumerEnDirect(el,it,k){
   const t0=Date.now();
   cardAiFlux={k,el,txt:"",t0,p1:0};
   clearTimeout(cardAiT);
-  el.dataset.ai="flux";afficherResume(el,it);
   const desc=el.querySelector(".card__desc");
   if(desc&&!desc.hidden)desc.style.minHeight=desc.offsetHeight+"px";
+  el.dataset.ai="flux";afficherResume(el,it);
   // La préparation éventuelle de CET article est abandonnée : la demande en direct la remplace.
   if(cardAiUtilise)try{await p.cardSummaryDrop({keep:[...cardAiEnVol].filter(x=>x!==k)});}catch(e){}
   cardAiUtilise=true;
@@ -5004,10 +5017,10 @@ async function resumerEnDirect(el,it,k){
   try{r=await demanderResume(p,it,k,true);}catch(e){warn("résumé carte",e);}
   const f=cardAiFlux;cardAiFlux=null;
   const t=r&&typeof r.text==="string"?r.text.trim():"";
-  if(desc)desc.style.minHeight="";
+  const d=el.querySelector(".card__desc");if(d)d.style.minHeight="";
   if(r&&r.dropped){el.dataset.ai="orig";}                     // lecteur ouvert, arrière-plan… : rien de raté
   else if(t.length>=30){memoResume(k,t);el.dataset.ai="sum";noterToucher(f&&f.p1?f.p1-t0:Date.now()-t0);}
-  else{cardAiEchecs.add(k);el.dataset.ai="echec";}
+  else{cardAiEchecs.add(k);el.dataset.ai="echec";if(el===currentCardEl())toast(T("card.ai.echec"));}
   afficherResume(el,it);
   cardAiCarte=null;planifierResumes(currentCardEl());   // reprendre la préparation d'avance
 }
@@ -5018,15 +5031,15 @@ function surMorceau(e){
   const it=cardReg.get(+f.el.dataset.id);
   if(it&&f.el.isConnected&&f.el.dataset.ai==="flux")afficherResume(f.el,it);
 }
-/* Réglage coupé : chaque carte perd sa pastille et retrouve l'extrait de sa source. */
+/* Réglage coupé : chaque carte retrouve l'extrait de sa source, le ✨ son comportement d'origine. */
 function retirerResumesCartes(){
   for(const el of feedEl.children){
     if(!el.dataset.ai)continue;
     const it=cardReg.get(+el.dataset.id);
     el.dataset.ai="orig";if(it)afficherResume(el,it);
-    const b=el.querySelector(".card__ai");if(b)b.remove();
     delete el.dataset.ai;
   }
+  updateRail();
 }
 function libererResumesCartes(){
   clearTimeout(cardAiT);cardAiCarte=null;
@@ -7594,7 +7607,6 @@ function render(forceTop,altAnchor){
   if(!top)setScrollTopInstant(feedEl,0);
   observeBackgrounds();observePaywall();observeMissingImages();observeSponsor();
   majPastillesSujets();
-  majResumesCartes();
   if(DEBUG){const e=posEntry(),l=(e&&e.link)||"";const i=e?resolveResume(e):-1;
     dbg(`v${APP_VERSION}  items=${items.length} (${newsItems.length} actus / ${learnItems.length} wiki)\n`+
         `mémorisé=…${l.slice(-24)||"(rien)"}\n`+
@@ -8118,8 +8130,6 @@ feedEl.addEventListener("click",e=>{
   // deux passent par [data-play] ci-dessus, donc jamais par cette branche —
   // « vu » ne s'y acquiert que par swipe, comme pour toute carte, voir
   // markOneSeen.)
-  const aiBtn=e.target.closest("[data-aitoggle]");
-  if(aiBtn){basculerResume(aiBtn);return;}
   const sujetBtn=e.target.closest("[data-sujet]");
   if(sujetBtn){
     const card=sujetBtn.closest(".card");
@@ -8162,6 +8172,7 @@ function peutResumer(it){
 }
 sumBtn.onclick=e=>{
   e.stopPropagation();
+  if(resumeDansCarte())return;   // essai : résumé DANS la carte (voir resumeDansCarte)
   const it=currentItem();
   if(!it||!peutResumer(it))return;
   arreterEcoute();
@@ -8178,6 +8189,7 @@ function updateRail(it=currentItem()){
   if(card&&cardGroups.has(+card.dataset.id))it=null;
   railEl.classList.toggle("hidden",!it);
   sumBtn.hidden=!(it&&peutResumer(it));
+  if(card)majBoutonResume(card);
   // Icône ET libellé dépendent de l'état : contrairement à shareBtn (aria/title
   // statiques posés par data-i18n-attr), ceux-ci changent à chaque bascule.
   const on=!!(it&&isSaved(it));

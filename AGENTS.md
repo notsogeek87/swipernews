@@ -480,24 +480,30 @@ hors du dépôt, jamais dans `package.json`.
   demande ; `speak` se résout à la FIN de la phrase), et la déclaration
   `<queries>` `TTS_SERVICE` du manifeste — sans elle, Android 11+ cache le moteur.
 - `parle()` / `parlable()` (`src/lib.js`, testée) — ce qu'on PRONONCE n'est pas ce qu'on AFFICHE. Chiffres (accords du français : « quatre-vingts », « deux cents », « soixante et onze »), pourcentages, euros et centimes (« 3,50 € » → « trois euros cinquante »), unités, heures (« 14h30 »), rangs et siècles (« XIXe », « 21e », « Napoléon Ier »), rois et papes (« Louis XIV » → « Louis quatorze »), dates `12/03/2024`, plages et scores (« 2-1 » → « deux à un »), signes (« -5 °C »), abréviations (M., Mme, Dr, St, n°, etc., av. J.-C.) et URL retirées. Appliqué dans `texteDeCarte`, `teteDActu` et sur les extraits (`desc`), donc AVANT `ttsChunks` : celui-ci coupe aux points, et « M. Dupont » y serait coupé en deux. **Jamais** sur `entree.source`/`entree.title` (affichés dans la notification) ni sur `excerpt` (donné tel quel au modèle de résumé). Français seulement (`LANG==="fr"`). Choix volontaires : pas de lookbehind (vieux moteurs), les nombres qui commencent par 0 (`06 12…`) et collés à une lettre (`5G`, `G7`, `A380`) sont laissés au moteur, genre toujours masculin (« un » même devant un nom féminin), et ce que le MODÈLE de résumé écrit côté natif n'est PAS normalisé (Java, non traité). Piège de test : les fixtures du banc (`Wiki 1`) sont désormais lues « Wiki un », d'où `parle()` dans les attendus de `ecoute`.
-- `planifierResumes()` / `majResumesCartes()` / `resumerEnDirect()` / `cardAiPref` —
+- `planifierResumes()` / `resumeDansCarte()` / `resumerEnDirect()` / `cardAiPref` —
   **ESSAI** du résumé IA sur les cartes (APK, désactivé par défaut ; réglage dans
   « lecture »). UN SEUL comportement, la première carte comprise : chaque carte d'actu
-  s'ouvre sur l'EXTRAIT de sa source avec la pastille « Résumé IA » (bascule
-  `aria-pressed`) ; la toucher affiche le résumé, tout de suite s'il est prêt, sinon
-  il s'écrit en direct dans la carte (`stream:true` → `FlashSummarizer.requestNow`,
-  qui passe devant les préparations ; événement `cardSummaryPiece`), la zone de texte
-  gardant la hauteur de l'extrait pour que le titre ne remonte pas ligne à ligne. Une
-  version qui remplaçait d'elle-même le texte des cartes hors écran a été écartée :
-  selon que le résumé était prêt ou non à l'arrivée, on voyait tantôt l'un tantôt
-  l'autre, et la première carte se comportait toujours autrement. L'automatique est
+  s'ouvre sur l'EXTRAIT de sa source, et c'est le ✨ du RAIL (`sumBtn`, le bouton qui
+  ouvrait déjà la feuille du lecteur) qui affiche le résumé DANS la carte — tout de
+  suite s'il est prêt, sinon écrit en direct (`stream:true` →
+  `FlashSummarizer.requestNow`, devant les préparations ; événement
+  `cardSummaryPiece`) ; un second ✨ revient à l'extrait. Le ✨ suit la carte visible
+  (`majBoutonResume` depuis `updateRail` : enfoncé = résumé affiché, il « respire »
+  pendant l'écriture). Il garde la feuille du lecteur partout où la carte ne s'y prête
+  pas : réglage coupé, modèle absent, écoute en cours, Wikipédia, vidéo, payant, et
+  après un échec (le mode lecture du lecteur lit des pages que `ArticleText` ne sait
+  pas lire). Le texte résumé porte un liseré et l'étiquette « Résumé IA » DANS LA
+  LIGNE DE LA DATE (au-dessus du texte, elle faisait remonter le titre d'une ligne),
+  et la zone de texte garde la hauteur de l'extrait pendant l'écriture. Deux versions
+  écartées : le remplacement automatique du texte des cartes hors écran (tantôt
+  résumé, tantôt extrait selon le timing, la première carte toujours à part) et une
+  pastille dans la carte (doublon du ✨ du rail sur la même carte). L'automatique est
   dans la PRÉPARATION, invisible : après `CARD_AI_DWELL_MS`, la suivante puis la
-  courante sont résumées d'avance (en Wi-Fi et en charge, ou toujours) ; le toucher,
-  demande explicite, passe partout. Seulement les cartes d'UNE actu (ni Wikipédia, ni
-  vidéo, ni parts égales, ni payant confirmé). Annulation native GLOBALE : rien pendant
-  l'écoute, modèle libéré à l'ouverture du lecteur, en arrière-plan et après 90 s sans
-  demande. Mesures affichées sous le réglage (durées, part des touchers immédiats,
-  délai du premier mot) : c'est l'objet de l'essai. Scénario `resumecartes`.
+  courante sont résumées d'avance (en Wi-Fi et en charge, ou toujours) ; le ✨,
+  demande explicite, passe partout. Annulation native GLOBALE : rien pendant
+  l'écoute, modèle libéré à l'ouverture du lecteur, en arrière-plan et après 90 s
+  sans demande. Mesures sous le réglage (durées, part des ✨ immédiats, délai du
+  premier mot) : c'est l'objet de l'essai. Scénario `resumecartes`.
 - `pausePref` / `verifierPause()` — la pause douce. Lit le compteur de « Mon
   activité » (`cardCounter`, jamais un second), appelé au même endroit que
   `bumpCardScroll`. Jamais par-dessus un panneau, une vidéo ou l'écoute ; un
