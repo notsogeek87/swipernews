@@ -122,7 +122,7 @@ async function boot(opts = {}) {
       window.__rejections.push(String((e.reason && e.reason.message) || e.reason));
     });
   });
-  if (opts.init) await page.addInitScript(opts.init);
+  if (opts.init) await page.addInitScript(opts.init, opts.initArg);
   return { browser, ctx, page, errors };
 }
 
@@ -4049,6 +4049,221 @@ ${Array.from({ length: 12 }, (_, k) => {
     console.log(`stockage abîmé : regroupement = ${ab.r}, ${ab.c} cartes`);
     console.log(`erreurs : ${JSON.stringify(errors)}`);
     await browser.close();
+  },
+
+  /* ESSAI « résumé IA sur les cartes » (voir planifierResumes, index.html), pont natif
+     simulé : un faux résumeur qui répond en 600 ms. Vérifie la règle d'or — la carte
+     SOUS LES YEUX ne change jamais toute seule (pastille seulement), la SUIVANTE reçoit
+     le résumé — et ce qui ne doit rien coûter : réglage coupé par défaut, défilement
+     rapide, cartes Wikipédia, mode « Wi-Fi et en charge » sur réseau facturé, stockage
+     abîmé. */
+  async resumecartes() {
+    const lancer = async (storage, etat) => {
+      const r = await boot({
+        storage: Object.assign(
+          { "fluxswipe.notifnudge.answered.v1": "1" },
+          READY,
+          storage
+        ),
+        init: (etat) => {
+          window.__calls = [];
+          window.__drops = [];
+          window.__releases = 0;
+          const enVol = new Map();
+          window.Capacitor = {
+            isNativePlatform: () => true,
+            Plugins: {
+              CapacitorHttp: {
+                request: async (o) => {
+                  if (/^https:\/\/ex\.test\//.test(o.url))
+                    return {
+                      status: 200,
+                      data: "<!doctype html><title>a</title>" + "<p>texte</p>".repeat(40),
+                    };
+                  const r = await fetch(
+                    "http://localhost:8124/__qa_feed?u=" + encodeURIComponent(o.url)
+                  );
+                  return { status: 200, data: await r.text() };
+                },
+              },
+              InAppBrowser: {
+                open: () => Promise.resolve(),
+                cardSummaryStatus: () => Promise.resolve(etat),
+                cardSummarize: (o) =>
+                  new Promise((res) => {
+                    window.__calls.push(o);
+                    enVol.set(o.key, res);
+                    setTimeout(() => {
+                      if (!enVol.has(o.key)) return;
+                      enVol.delete(o.key);
+                      res({
+                        key: o.key,
+                        text:
+                          "Résumé simulé de « " +
+                          o.title +
+                          " », en deux phrases courtes.",
+                        dropped: false,
+                        waitMs: 5,
+                        fetchMs: 400,
+                        genMs: 200,
+                        source: "page",
+                      });
+                    }, 600);
+                  }),
+                cardSummaryDrop: (o) => {
+                  window.__drops.push(o.keep);
+                  for (const [k, res] of [...enVol])
+                    if (!o.keep.includes(k)) {
+                      enVol.delete(k);
+                      res({ key: k, text: "", dropped: true });
+                    }
+                  return Promise.resolve();
+                },
+                cardSummaryRelease: () => (window.__releases++, Promise.resolve()),
+              },
+            },
+          };
+        },
+        initArg: etat,
+      });
+      await r.page.route("**/__qa_feed*", (x) =>
+        x.fulfill({ status: 200, contentType: "application/xml", body: RSS_OK })
+      );
+      await r.page.goto(URL_APP);
+      await r.page.waitForTimeout(3000);
+      return r;
+    };
+    const OK = {
+      engine: true,
+      installed: true,
+      unmetered: true,
+      charging: true,
+      powerSave: false,
+    };
+    const aller = (page, i) =>
+      page.evaluate((i) => {
+        feedEl.scrollTop = feedEl.children[i].offsetTop;
+        onCardChange(true);
+      }, i);
+
+    // 1. Par défaut : rien.
+    {
+      const { browser, page, errors } = await lancer({}, OK);
+      await page.waitForTimeout(2500);
+      const n = await page.evaluate(() => window.__calls.length);
+      console.log(
+        `réglage par défaut (${await page.evaluate(() => cardAiPref)}) : ${n} demande(s)`
+      );
+      console.log(`erreurs : ${JSON.stringify(errors)}`);
+      await browser.close();
+    }
+    // 2. Activé : la suivante résumée, la courante intouchée.
+    {
+      const { browser, page, errors } = await lancer({ "fluxswipe.cardai.v1": "on" }, OK);
+      const desc0 = await page.evaluate(
+        () => (feedEl.children[0].querySelector(".card__desc") || {}).textContent || ""
+      );
+      await page.waitForTimeout(1500);
+      const r = await page.evaluate(() => {
+        const kids = [...feedEl.children];
+        const info = (el) => ({
+          ai: el.dataset.ai || "",
+          desc: (el.querySelector(".card__desc") || {}).textContent || "",
+          pastille: !!el.querySelector(".card__ai"),
+          wiki: el.classList.contains("card--learn"),
+        });
+        return {
+          titres: window.__calls.map((c) => c.title),
+          c0: info(kids[0]),
+          c1: info(kids[1]),
+          wikiDemandes: window.__calls.filter((c) => /wikipedia/.test(c.link)).length,
+          mesures: texteMesures(),
+        };
+      });
+      console.log(`demandes après séjour : ${JSON.stringify(r.titres)}`);
+      console.log(
+        `carte visible : data-ai=${r.c0.ai}, texte inchangé ${r.c0.desc === desc0}, pastille ${r.c0.pastille}`
+      );
+      console.log(
+        `carte suivante : data-ai=${r.c1.ai}, résumé posé ${/^Résumé simulé/.test(r.c1.desc)}, wiki=${r.c1.wiki}`
+      );
+      console.log(`cartes Wikipédia demandées : ${r.wikiDemandes}`);
+      console.log(`mesures : ${r.mesures}`);
+      // Pastille de la carte visible : bascule résumé ↔ extrait.
+      const bascule = await page.evaluate(() => {
+        const el = feedEl.children[0],
+          b = el.querySelector(".card__ai");
+        if (!b) return "pas de pastille";
+        b.click();
+        const a = el.querySelector(".card__desc").textContent;
+        b.click();
+        const c = el.querySelector(".card__desc").textContent;
+        return `après 1 toucher résumé=${/^Résumé simulé/.test(a)}, après 2 extrait=${!/^Résumé simulé/.test(c)}`;
+      });
+      console.log(`bascule : ${bascule}`);
+      // Défilement rapide : aucune demande pour les cartes à peine effleurées.
+      const n0 = await page.evaluate(() => window.__calls.length);
+      for (let i = 2; i <= 7; i++) {
+        await aller(page, i);
+        await page.waitForTimeout(200);
+      }
+      const n1 = await page.evaluate(() => window.__calls.length);
+      console.log(`défilement rapide sur 6 cartes : ${n1 - n0} demande(s)`);
+      await page.waitForTimeout(1800);
+      const apres = await page.evaluate(() => ({
+        n: window.__calls.length,
+        drops: window.__drops.length,
+      }));
+      console.log(
+        `arrêt sur la carte 7 : ${apres.n - n1} demande(s), ${apres.drops} abandon(s) envoyé(s)`
+      );
+      // Ouverture d'un article : le modèle est libéré.
+      await page.evaluate(() => openArticle("https://ex.test/a1", "x"));
+      console.log(
+        `libérations après ouverture d'un article : ${await page.evaluate(() => window.__releases)}`
+      );
+      // Réglage coupé : les cartes retrouvent l'extrait.
+      const coupe = await page.evaluate(() => {
+        setCardAiPref("off");
+        return [...feedEl.children].filter(
+          (el) => el.dataset.ai || el.querySelector(".card__ai")
+        ).length;
+      });
+      console.log(`réglage coupé : ${coupe} carte(s) encore marquée(s)`);
+      console.log(`erreurs : ${JSON.stringify(errors)}`);
+      await browser.close();
+    }
+    // 3. « Wi-Fi et en charge » sur réseau facturé : rien.
+    {
+      const { browser, page, errors } = await lancer(
+        { "fluxswipe.cardai.v1": "wifi" },
+        Object.assign({}, OK, { unmetered: false })
+      );
+      await page.waitForTimeout(2500);
+      console.log(
+        `Wi-Fi et en charge, réseau facturé : ${await page.evaluate(() => window.__calls.length)} demande(s)`
+      );
+      console.log(`erreurs : ${JSON.stringify(errors)}`);
+      await browser.close();
+    }
+    // 4. Stockage abîmé.
+    {
+      const { browser, page, errors } = await lancer(
+        {
+          "fluxswipe.cardai.v1": "{x",
+          "fluxswipe.cardai.cache.v1": "[1,2",
+          "fluxswipe.cardai.mesures.v1": '{"a":1}',
+        },
+        OK
+      );
+      const r = await page.evaluate(() => ({
+        pref: cardAiPref,
+        n: feedEl.children.length,
+      }));
+      console.log(`stockage abîmé : réglage=${r.pref}, ${r.n} cartes`);
+      console.log(`erreurs : ${JSON.stringify(errors)}`);
+      await browser.close();
+    }
   },
 };
 

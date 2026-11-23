@@ -1024,6 +1024,140 @@ public class InAppBrowserPlugin extends Plugin {
         call.resolve(res);
     }
 
+    // ---------- ESSAI : résumé IA sur les cartes du fil ----------
+    /*
+     * La page demande un résumé pour les une ou deux PROCHAINES cartes pendant qu'on lit
+     * la courante (voir planifierResumes, index.html). Même moteur et même consigne que
+     * le flash info (FlashSummarizer : page de l'article, deux phrases), UN article à la
+     * fois. Chaque réponse porte ses MESURES (attente, lecture de la page, génération) :
+     * c'est le but de l'essai, savoir si le résumé arrive avant le doigt.
+     *
+     * Le modèle pèse des centaines de Mo : il est libéré après CARD_AI_IDLE_MS sans
+     * demande, et à la demande de la page (lecteur ouvert, écoute, arrière-plan). Le
+     * drapeau d'annulation du moteur est GLOBAL (summarizer_jni.cpp) : la page ne doit
+     * jamais faire tourner ces résumés en même temps que ceux du lecteur ou de l'écoute.
+     */
+    private static final long CARD_AI_IDLE_MS = 90_000;
+    private FlashSummarizer cardAi;
+    private String cardAiLang = "";
+    private int cardAiSeq = 0;
+    private final Map<Integer, PluginCall> cardAiCalls = new HashMap<>();
+    private final Map<Integer, String> cardAiKeys = new HashMap<>();
+    private final java.util.Set<Integer> cardAiDropped = new java.util.HashSet<>();
+    private final android.os.Handler cardAiMain = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable cardAiIdle = this::releaseCardAi;
+
+    /** Le résumé est-il possible, et dans quelles conditions (Wi-Fi, en charge, économiseur) ? */
+    @PluginMethod
+    public void cardSummaryStatus(PluginCall call) {
+        final Context ctx = getContext();
+        JSObject res = new JSObject();
+        res.put("engine", Summarizer.isAvailable());
+        res.put("installed", new SummaryModelStore(ctx).activeFile() != null);
+        boolean unmetered = false;
+        try {
+            android.net.ConnectivityManager cm =
+                (android.net.ConnectivityManager) ctx.getSystemService(Context.CONNECTIVITY_SERVICE);
+            unmetered = cm != null && cm.getActiveNetworkInfo() != null
+                && cm.getActiveNetworkInfo().isConnected() && !cm.isActiveNetworkMetered();
+        } catch (RuntimeException e) {
+            // pas de droit ou service absent : on considère le réseau comme facturé
+        }
+        res.put("unmetered", unmetered);
+        boolean charging = false;
+        try {
+            android.os.BatteryManager bm =
+                (android.os.BatteryManager) ctx.getSystemService(Context.BATTERY_SERVICE);
+            charging = bm != null && bm.isCharging();
+        } catch (RuntimeException e) {
+            // inconnu : pas en charge
+        }
+        res.put("charging", charging);
+        PowerManager pm = (PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
+        res.put("powerSave", pm != null && pm.isPowerSaveMode());
+        call.resolve(res);
+    }
+
+    @PluginMethod
+    public void cardSummarize(PluginCall call) {
+        final String key = call.getString("key", "");
+        final String lang = "en".equals(call.getString("lang", "fr")) ? "en" : "fr";
+        if (cardAi != null && !lang.equals(cardAiLang)) releaseCardAi();
+        if (cardAi == null) {
+            final FlashSummarizer fs = new FlashSummarizer(getContext(), lang, this::cardAiResult);
+            if (!fs.ready()) {
+                fs.release();
+                call.reject("indisponible");
+                return;
+            }
+            cardAi = fs;
+            cardAiLang = lang;
+        }
+        cardAiMain.removeCallbacks(cardAiIdle);
+        cardAiMain.postDelayed(cardAiIdle, CARD_AI_IDLE_MS);
+        final int i = ++cardAiSeq;
+        cardAiCalls.put(i, call);
+        cardAiKeys.put(i, key);
+        cardAi.request(i, call.getString("title", ""), call.getString("link", ""), call.getString("excerpt", ""));
+    }
+
+    /** Abandonne les demandes dont la clé n'est pas dans {@code keep} (cartes dépassées). */
+    @PluginMethod
+    public void cardSummaryDrop(PluginCall call) {
+        final java.util.Set<String> keep = new java.util.HashSet<>();
+        final JSArray arr = call.getArray("keep");
+        if (arr != null) {
+            for (int k = 0; k < arr.length(); k++) keep.add(arr.optString(k, ""));
+        }
+        if (cardAi != null) {
+            final java.util.Set<Integer> keepIdx = new java.util.HashSet<>();
+            for (Map.Entry<Integer, String> e : cardAiKeys.entrySet()) {
+                if (keep.contains(e.getValue())) keepIdx.add(e.getKey());
+                else cardAiDropped.add(e.getKey());
+            }
+            cardAi.dropExcept(keepIdx, (index, chunks) -> settleCardAi(index, null, true));
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void cardSummaryRelease(PluginCall call) {
+        releaseCardAi();
+        call.resolve();
+    }
+
+    private void cardAiResult(int index, List<String> chunks) {
+        // Le travail EN COURS abandonné repasse par ici (finish) : ni résultat ni mesure.
+        settleCardAi(index, chunks, cardAiDropped.remove(index));
+    }
+
+    private void settleCardAi(int index, List<String> chunks, boolean dropped) {
+        if (dropped) cardAiDropped.remove(index);
+        final PluginCall c = cardAiCalls.remove(index);
+        final String key = cardAiKeys.remove(index);
+        if (c == null) return;
+        JSObject res = new JSObject();
+        res.put("key", key);
+        res.put("text", chunks == null ? "" : android.text.TextUtils.join(" ", chunks));
+        res.put("dropped", dropped);
+        if (!dropped && cardAi != null) {
+            res.put("waitMs", cardAi.lastWaitMs);
+            res.put("fetchMs", cardAi.lastFetchMs);
+            res.put("genMs", cardAi.lastGenMs);
+            res.put("source", cardAi.lastSource);
+        }
+        c.resolve(res);
+    }
+
+    private void releaseCardAi() {
+        cardAiMain.removeCallbacks(cardAiIdle);
+        if (cardAi != null) {
+            cardAi.release();
+            cardAi = null;
+        }
+        for (Integer i : new ArrayList<>(cardAiCalls.keySet())) settleCardAi(i, null, true);
+    }
+
     @PluginMethod
     public void listenStop(PluginCall call) {
         // Seulement s'il tourne : démarrer un service juste pour lui dire de
@@ -1060,6 +1194,7 @@ public class InAppBrowserPlugin extends Plugin {
         // Le service survit à l'activité (c'est son but) : on le détache seulement,
         // pour ne pas retenir un plugin détruit. Le suivant se rebranche (listenStatus).
         ListenService.setListener(null);
+        releaseCardAi();
         List<PluginCall> pending;
         synchronized (this) {
             if (tts != null) {

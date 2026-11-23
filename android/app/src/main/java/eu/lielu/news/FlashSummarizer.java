@@ -50,6 +50,10 @@ final class FlashSummarizer {
         final String title;
         final String link;
         final String excerpt;
+        final long askedAt = android.os.SystemClock.elapsedRealtime();
+        long startedAt, fetchedAt;
+        /** D'où vient le texte résumé : "page", "extrait" ou "aucun". */
+        String source = "aucun";
 
         Job(int index, String title, String link, String excerpt) {
             this.index = index;
@@ -58,6 +62,15 @@ final class FlashSummarizer {
             this.excerpt = excerpt;
         }
     }
+
+    /*
+     * MESURES du dernier travail terminé, lues par l'appelant DANS son rappel onResult
+     * (même fil, juste avant) : attente dans la file, lecture de la page, génération.
+     * C'est ce qui manquait pour savoir si un résumé est prêt à temps sur un vrai
+     * téléphone (voir l'essai « résumé IA sur les cartes », InAppBrowserPlugin).
+     */
+    long lastWaitMs, lastFetchMs, lastGenMs;
+    String lastSource = "aucun";
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService fetcher = Executors.newSingleThreadExecutor();
@@ -104,6 +117,23 @@ final class FlashSummarizer {
         }
     }
 
+    /** Garde seulement les demandes dont l'indice est dans {@code keep} ; abandonne les autres, en cours compris. */
+    void dropExcept(java.util.Set<Integer> keep, Result dropped) {
+        if (released) return;
+        final java.util.Iterator<Job> it = queue.iterator();
+        while (it.hasNext()) {
+            final Job j = it.next();
+            if (!keep.contains(j.index)) {
+                it.remove();
+                dropped.onResult(j.index, null);
+            }
+        }
+        if (busy && current != null && !keep.contains(current.index)) {
+            if (summarizer != null) summarizer.cancel();
+            finish(current, null, token);
+        }
+    }
+
     void release() {
         released = true;
         queue.clear();
@@ -123,15 +153,19 @@ final class FlashSummarizer {
         current = j;
         final int my = ++token;
         main.postDelayed(watchdog, JOB_TIMEOUT_MS);
+        j.startedAt = android.os.SystemClock.elapsedRealtime();
         try {
             fetcher.execute(() -> {
                 String text = "";
                 if (j.link != null && !j.link.isEmpty()) {
                     text = ArticleText.extract(ArticleText.fetch(j.link, FETCH_TIMEOUT_MS), ARTICLE_CHARS);
                 }
+                if (!text.isEmpty()) j.source = "page";
                 if (text.isEmpty() && j.excerpt != null && j.excerpt.length() >= MIN_EXCERPT_CHARS) {
                     text = j.excerpt;
+                    j.source = "extrait";
                 }
+                j.fetchedAt = android.os.SystemClock.elapsedRealtime();
                 final String t = text;
                 main.post(() -> summarize(j, t, my));
             });
@@ -186,6 +220,11 @@ final class FlashSummarizer {
         main.removeCallbacks(watchdog);
         busy = false;
         current = null;
+        final long now = android.os.SystemClock.elapsedRealtime();
+        lastWaitMs = j.startedAt > 0 ? j.startedAt - j.askedAt : now - j.askedAt;
+        lastFetchMs = j.fetchedAt > 0 ? j.fetchedAt - j.startedAt : 0;
+        lastGenMs = j.fetchedAt > 0 ? now - j.fetchedAt : 0;
+        lastSource = j.source;
         callback.onResult(j.index, chunks);
         pump();
     }

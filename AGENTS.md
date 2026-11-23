@@ -480,6 +480,18 @@ hors du dépôt, jamais dans `package.json`.
   demande ; `speak` se résout à la FIN de la phrase), et la déclaration
   `<queries>` `TTS_SERVICE` du manifeste — sans elle, Android 11+ cache le moteur.
 - `parle()` / `parlable()` (`src/lib.js`, testée) — ce qu'on PRONONCE n'est pas ce qu'on AFFICHE. Chiffres (accords du français : « quatre-vingts », « deux cents », « soixante et onze »), pourcentages, euros et centimes (« 3,50 € » → « trois euros cinquante »), unités, heures (« 14h30 »), rangs et siècles (« XIXe », « 21e », « Napoléon Ier »), rois et papes (« Louis XIV » → « Louis quatorze »), dates `12/03/2024`, plages et scores (« 2-1 » → « deux à un »), signes (« -5 °C »), abréviations (M., Mme, Dr, St, n°, etc., av. J.-C.) et URL retirées. Appliqué dans `texteDeCarte`, `teteDActu` et sur les extraits (`desc`), donc AVANT `ttsChunks` : celui-ci coupe aux points, et « M. Dupont » y serait coupé en deux. **Jamais** sur `entree.source`/`entree.title` (affichés dans la notification) ni sur `excerpt` (donné tel quel au modèle de résumé). Français seulement (`LANG==="fr"`). Choix volontaires : pas de lookbehind (vieux moteurs), les nombres qui commencent par 0 (`06 12…`) et collés à une lettre (`5G`, `G7`, `A380`) sont laissés au moteur, genre toujours masculin (« un » même devant un nom féminin), et ce que le MODÈLE de résumé écrit côté natif n'est PAS normalisé (Java, non traité). Piège de test : les fixtures du banc (`Wiki 1`) sont désormais lues « Wiki un », d'où `parle()` dans les attendus de `ecoute`.
+- `planifierResumes()` / `majResumesCartes()` / `cardAiPref` — **ESSAI** du résumé
+  IA sur les cartes (APK, désactivé par défaut ; réglage dans « lecture »). Après
+  `CARD_AI_DWELL_MS` sur une carte, la SUIVANTE puis la courante sont résumées par
+  `InAppBrowserPlugin.cardSummarize` (→ `FlashSummarizer`, même moteur et même consigne
+  que le flash info). Règle d'or, celle de la tête du fil : le texte SOUS LES YEUX ne
+  change jamais seul — une carte hors écran reçoit le résumé, la carte visible une
+  pastille « Voir le résumé » ; la pastille rebascule toujours sur l'extrait. Seulement
+  les cartes d'UNE actu (ni Wikipédia, ni vidéo, ni parts égales, ni payant confirmé).
+  Annulation native GLOBALE : jamais pendant l'écoute, modèle libéré à l'ouverture du
+  lecteur, en arrière-plan et après 90 s sans demande. Chaque résumé rend ses mesures
+  (attente, page, génération, « prêt à temps »), affichées sous le réglage : c'est
+  l'objet de l'essai. Scénario `resumecartes`.
 - `pausePref` / `verifierPause()` — la pause douce. Lit le compteur de « Mon
   activité » (`cardCounter`, jamais un second), appelé au même endroit que
   `bumpCardScroll`. Jamais par-dessus un panneau, une vidéo ou l'écoute ; un
@@ -1489,7 +1501,7 @@ Elles ont toutes une raison, expliquée dans le README et dans les commentaires 
 
 `npm test` ne voit que `src/` et `api/` : **tout le JS en ligne d'`index.html`
 — le fil, l'état, le stockage local — n'est couvert par aucun test**. Ce banc
-comble le trou en jouant 39 scénarios réels dans Chromium, réseau entièrement
+comble le trou en jouant 40 scénarios réels dans Chromium, réseau entièrement
 simulé (rien ne part vers une vraie source) : hors-ligne, réseau lent, coupure en
 cours de requête, API en 500, RSS vide/tronqué/HTML, contenu démesuré, doublons,
 120 sources, stockage et cache abîmés, quota saturé, actions enchaînées, retour

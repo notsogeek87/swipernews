@@ -755,6 +755,28 @@
       // quel ailleurs — seul ce texte visible devait changer.
       "card.watch": "Regarder",
       "card.demo": "Article de démo",
+      "cardai.label": "Résumé IA sur les cartes (essai)",
+      "cardai.opt.off": "Non",
+      "cardai.opt.wifi": "Wi-Fi et en charge",
+      "cardai.opt.on": "Toujours",
+      "cardai.desc.off": "Les cartes gardent l'extrait de la source.",
+      "cardai.desc.wifi":
+        "Pendant que vous lisez une carte, la suivante est résumée sur le téléphone, seulement en Wi-Fi et en charge.",
+      "cardai.desc.on":
+        "Pendant que vous lisez une carte, la suivante est résumée sur le téléphone. Consomme batterie et données : la page de l'article est téléchargée.",
+      "cardai.desc.missing":
+        "Aucun modèle de résumé installé : installez-le depuis le bouton ✨ du lecteur d'article.",
+      "cardai.mes.none":
+        "Aucune mesure pour l'instant : restez quelques secondes sur une carte d'actu.",
+      "cardai.mes":
+        "Mesures : {ok} résumés réussis sur {n}, cartes suivantes prêtes à temps : {a} sur {s} · page {f} s · génération {g} s (médianes).",
+      "card.ai.sum": "Résumé IA",
+      "card.ai.sumAria":
+        "Résumé généré sur le téléphone. Toucher pour revoir l'extrait de la source.",
+      "card.ai.orig": "Voir le résumé",
+      "card.ai.origAria": "Afficher le résumé généré sur le téléphone",
+      "changelog.v336.item1":
+        "Essai : le résumé IA peut préparer la carte suivante pendant que vous lisez (Réglages › Lecture, désactivé par défaut).",
       "card.paywall.title": "Accès payant probable",
     },
     en: {
@@ -1463,6 +1485,27 @@
       "card.closeVideo": "Close video",
       "card.watch": "Watch",
       "card.demo": "Demo article",
+      "cardai.label": "AI summary on cards (trial)",
+      "cardai.opt.off": "Off",
+      "cardai.opt.wifi": "Wi-Fi and charging",
+      "cardai.opt.on": "Always",
+      "cardai.desc.off": "Cards keep the source's excerpt.",
+      "cardai.desc.wifi":
+        "While you read a card, the next one is summarized on your phone, only on Wi-Fi and while charging.",
+      "cardai.desc.on":
+        "While you read a card, the next one is summarized on your phone. Uses battery and data: the article page is downloaded.",
+      "cardai.desc.missing":
+        "No summary model installed: install it from the ✨ button of the article reader.",
+      "cardai.mes.none": "No measurement yet: stay a few seconds on a news card.",
+      "cardai.mes":
+        "Measurements: {ok} successful summaries out of {n}, next cards ready in time: {a} of {s} · page {f} s · generation {g} s (medians).",
+      "card.ai.sum": "AI summary",
+      "card.ai.sumAria":
+        "Summary generated on your phone. Tap to see the source's excerpt again.",
+      "card.ai.orig": "See summary",
+      "card.ai.origAria": "Show the summary generated on your phone",
+      "changelog.v336.item1":
+        "Trial: the AI summary can prepare the next card while you read (Settings › Reading, off by default).",
       "card.paywall.title": "Likely paywalled",
 
       // Libellés des centres d'intérêt (clés définies dans src/learn-core.js) :

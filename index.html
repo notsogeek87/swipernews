@@ -376,6 +376,13 @@
   .card__sujet{display:inline-flex;align-items:center;gap:6px;font:inherit;color:var(--ink);
     background:rgba(var(--redline-rgb),.16);border:1px solid var(--redline);border-radius:999px;padding:4px 11px;cursor:pointer}
   .card__sujet[hidden]{display:none}
+  /* Essai résumé IA sur les cartes : même pastille que « N sources », et le texte
+     résumé à peine teinté pour qu'on sache ce qu'on lit (voir majResumesCartes). */
+  .card__ai{display:inline-flex;align-items:center;gap:6px;font:inherit;color:var(--ink);
+    background:rgba(var(--redline-rgb),.16);border:1px solid var(--redline);border-radius:999px;padding:4px 11px;cursor:pointer}
+  .card__ai svg{width:14px;height:14px;flex:0 0 auto}
+  .card__desc--ai{border-left:2px solid var(--redline);padding-left:10px}
+  .card__desc[hidden]{display:none}
   .card__sujet svg{width:14px;height:14px;flex:0 0 auto}
   /* Bouton primaire plein : dégradé cocoa -> molten et halo intérieur « braise »
      (seule ombre de tout le système), conformes à la charte au pixel près. */
@@ -2144,7 +2151,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=335"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=335"></script>
+<script src="src/i18n.js?v=336"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -3825,6 +3832,7 @@ function brancherEcoute(svc){
   try{svc.addListener("listen",surEtatEcoute);svc.addListener("voice",surEtatVoix);}catch(e){warn("écoute",e);}
 }
 function lancerService(svc,file,flash,intro,relance,ai){
+  libererResumesCartes();   // l'écoute résume avec son propre moteur
   brancherEcoute(svc);
   const gen=++ecouteGen;
   ecouteActive=true;ecouteFlash=flash;ecoutePausee=false;ecouteCle=file[0].key;
@@ -4118,6 +4126,7 @@ function onCardChange(userScroll){
     clearTimeout(ecouteRepriseT);
     ecouteRepriseT=setTimeout(()=>{if(ecouteActive&&cleDeCarte(currentCardEl())!==ecouteCle)demarrerEcoute();},450);
   }
+  planifierResumes(card);   // essai résumé IA : rien tant qu'on ne s'arrête pas sur la carte
   majVolet();     // paysage large seulement ; ailleurs, un test de media query
   if(DEBUG)dbgImage();
   return i;
@@ -4144,7 +4153,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="335";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="336";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4155,6 +4164,8 @@ const APP_VERSION="335";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:336,date:"2026-11-23",items:[
+    "changelog.v336.item1"]},
   {v:335,date:"2026-11-22",items:[
     "changelog.v335.item1"]},
   {v:334,date:"2026-11-22",items:[
@@ -4787,6 +4798,190 @@ async function dropBlocklist(){
    le <meta theme-color>, voir applyAppTheme). Sept #rrggbb séparés par des
    virgules ; "" si l'une n'est pas un hexadécimal à 6 chiffres — le natif
    retombe alors sur Flamme. */
+/* ---------- ESSAI : RÉSUMÉ IA SUR LES CARTES (APK) ----------
+   Pendant qu'on lit une carte, la SUIVANTE est résumée en deux phrases par le modèle
+   LOCAL (le même que le ✨ du lecteur et que le flash info : InAppBrowserPlugin.cardSummarize
+   → FlashSummarizer, page de l'article puis repli sur l'extrait du flux).
+   Règle d'or, la même que celle de la tête du fil : le texte qu'on a SOUS LES YEUX ne
+   change jamais tout seul. Une carte hors écran reçoit le résumé à la place de son
+   extrait ; la carte visible ne reçoit qu'une pastille « ✨ Voir le résumé », touchée
+   ou non. Dans les deux cas la pastille rebascule sur l'extrait de la source : un
+   petit modèle peut se tromper, le texte d'origine reste à un toucher.
+   Désactivé par défaut (batterie, données : la page de l'article est téléchargée).
+   Rien n'est demandé tant qu'on n'est pas resté CARD_AI_DWELL_MS sur une carte : un
+   défilement rapide ne coûte rien. Cartes concernées : une seule actu (ni Wikipédia,
+   dont l'extrait est déjà un résumé, ni vidéo, ni carte à parts égales, ni article
+   confirmé payant). Le drapeau d'annulation du moteur natif est GLOBAL : jamais pendant
+   l'écoute, et le modèle est libéré à l'ouverture du lecteur et en arrière-plan.
+   Chaque résumé rend ses MESURES (cardAiMes, affichées sous le réglage) : c'est
+   l'objet de l'essai — savoir si le résumé est prêt AVANT qu'on arrive sur la carte. */
+const CARD_AI_MODES=["off","wifi","on"];
+const LS_CARDAI="fluxswipe.cardai.v1",LS_CARDAI_CACHE="fluxswipe.cardai.cache.v1",LS_CARDAI_MES="fluxswipe.cardai.mesures.v1";
+const CARD_AI_DWELL_MS=1500,CARD_AI_AHEAD=1,CARD_AI_CACHE_MAX=150,CARD_AI_MES_MAX=40;
+let cardAiPref=(()=>{try{const v=localStorage.getItem(LS_CARDAI);return CARD_AI_MODES.includes(v)?v:"off";}catch(e){return "off";}})();
+const cardAiCache=new Map(Object.entries(readObject(LS_CARDAI_CACHE)).filter(([k,v])=>k&&typeof v==="string"&&v.length>=30&&v.length<=800));
+let cardAiMes=(()=>{try{const v=JSON.parse(localStorage.getItem(LS_CARDAI_MES)||"[]");
+  return Array.isArray(v)?v.filter(m=>m&&typeof m==="object"&&Number.isFinite(m.f)&&Number.isFinite(m.g)).slice(-CARD_AI_MES_MAX):[];}catch(e){return [];}})();
+const cardAiEchecs=new Set(),cardAiEnVol=new Set();
+let cardAiT=null,cardAiCarte=null,cardAiEtat=null,cardAiEtatAt=0,cardAiUtilise=false;
+function pontResume(){
+  const p=isNativeApp&&window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
+  return p&&typeof p.cardSummarize==="function"?p:null;
+}
+function setCardAiPref(v){
+  if(!CARD_AI_MODES.includes(v)||v===cardAiPref)return;
+  cardAiPref=v;
+  try{localStorage.setItem(LS_CARDAI,v);}catch(e){warn("save cardai",e);}
+  if(v==="off"){libererResumesCartes();retirerResumesCartes();}
+  else{cardAiEtatAt=0;majResumesCartes();cardAiCarte=null;planifierResumes(currentCardEl());}
+  renderReadPref();
+}
+/* L'article d'une carte, si elle peut recevoir un résumé ; sinon null. */
+function carteResumable(el){
+  if(!el||!el.classList||!el.classList.contains("card")||cardGroups.has(+el.dataset.id))return null;
+  const it=cardReg.get(+el.dataset.id);
+  if(!it||it.kind==="learn"||videoIdOf(it)||!it.link||el.querySelector(".card__paywall"))return null;
+  return it;
+}
+async function etatResume(){
+  const p=pontResume();
+  if(!p||typeof p.cardSummaryStatus!=="function")return null;
+  if(cardAiEtat&&Date.now()-cardAiEtatAt<30000)return cardAiEtat;
+  try{cardAiEtat=await p.cardSummaryStatus();cardAiEtatAt=Date.now();}catch(e){cardAiEtat=null;}
+  return cardAiEtat;
+}
+/* Appelé par onCardChange à CHAQUE frame : ne fait quelque chose qu'à l'arrivée sur une carte. */
+function planifierResumes(card){
+  if(card===cardAiCarte)return;
+  cardAiCarte=card;clearTimeout(cardAiT);
+  if(cardAiPref==="off"||!pontResume()||!card)return;
+  cardAiT=setTimeout(lancerResumes,CARD_AI_DWELL_MS);
+}
+async function lancerResumes(){
+  const p=pontResume();
+  if(!p||cardAiPref==="off"||ecouteActive||document.visibilityState!=="visible")return;
+  const etat=await etatResume();
+  if(!etat||!(etat.engine&&etat.installed)||etat.powerSave)return;
+  if(cardAiPref==="wifi"&&!(etat.unmetered&&etat.charging))return;
+  const i=currentIndex();
+  if(i<0||feedEl.children[i]!==cardAiCarte)return;   // on a bougé pendant la question au natif
+  // La SUIVANTE d'abord (c'est elle qu'on veut prête à l'arrivée), puis la courante (pastille).
+  const suite=[];
+  for(let k=i+1;k<feedEl.children.length&&k<=i+4&&suite.length<CARD_AI_AHEAD;k++){
+    const it=carteResumable(feedEl.children[k]);if(it)suite.push(it);
+  }
+  const cur=carteResumable(feedEl.children[i]);
+  const cibles=cur?[...suite,cur]:suite;
+  if(cardAiUtilise)try{await p.cardSummaryDrop({keep:cibles.map(newsKey)});}catch(e){}
+  for(const it of cibles){
+    const k=newsKey(it);
+    if(!k||cardAiCache.has(k)||cardAiEchecs.has(k)||cardAiEnVol.has(k))continue;
+    demanderResume(p,it,k,it!==cur);
+  }
+}
+function demanderResume(p,it,k,suivante){
+  cardAiEnVol.add(k);cardAiUtilise=true;
+  p.cardSummarize({key:k,title:it.title||"",link:it.link,excerpt:(it.desc||"").slice(0,3000),lang:LANG==="en"?"en":"fr"})
+    .then(r=>{
+      if(!r||r.dropped)return;
+      const t=typeof r.text==="string"?r.text.trim():"";
+      noterMesure(r,k,t.length>=30,suivante);
+      if(t.length>=30){memoResume(k,t);majResumesCartes();}else cardAiEchecs.add(k);
+    })
+    .catch(e=>{cardAiEchecs.add(k);warn("résumé carte",e);})
+    .finally(()=>cardAiEnVol.delete(k));
+}
+function memoResume(k,t){
+  cardAiCache.delete(k);cardAiCache.set(k,t);
+  while(cardAiCache.size>CARD_AI_CACHE_MAX)cardAiCache.delete(cardAiCache.keys().next().value);
+  try{localStorage.setItem(LS_CARDAI_CACHE,JSON.stringify(Object.fromEntries(cardAiCache)));}catch(e){warn("save cardai cache",e);}
+}
+/* « À temps » = le résumé d'une carte SUIVANTE est arrivé alors qu'elle était encore
+   DEVANT nous. Celui de la carte visible (pastille) n'entre pas dans ce compte. */
+function noterMesure(r,k,ok,suivante){
+  const cur=currentIndex();
+  let idx=-1;
+  for(let j=0;j<feedEl.children.length;j++){const it=carteResumable(feedEl.children[j]);if(it&&newsKey(it)===k){idx=j;break;}}
+  const m={t:Date.now(),w:+r.waitMs||0,f:+r.fetchMs||0,g:+r.genMs||0,s:String(r.source||""),ok:ok?1:0,n:suivante?1:0,a:ok&&suivante&&idx>cur?1:0};
+  cardAiMes.push(m);
+  if(cardAiMes.length>CARD_AI_MES_MAX)cardAiMes=cardAiMes.slice(-CARD_AI_MES_MAX);
+  try{localStorage.setItem(LS_CARDAI_MES,JSON.stringify(cardAiMes));}catch(e){warn("save cardai mesures",e);}
+  console.info(`[résumé carte] ${m.s} attente ${m.w} ms · page ${m.f} ms · génération ${m.g} ms · ${!ok?"échec":!m.n?"carte visible":m.a?"à temps":"en retard"}`);
+  document.querySelectorAll("[data-cardaimes]").forEach(el=>{el.textContent=texteMesures();});
+}
+function texteMesures(){
+  const ok=cardAiMes.filter(m=>m.ok);
+  if(!cardAiMes.length)return T("cardai.mes.none");
+  const med=a=>{if(!a.length)return 0;const b=[...a].sort((x,y)=>x-y);return b[Math.floor(b.length/2)];};
+  const sec=ms=>{const v=(ms/1000).toFixed(1);return LANG==="fr"?v.replace(".",","):v;};
+  return T("cardai.mes",{n:cardAiMes.length,ok:ok.length,a:ok.filter(m=>m.a).length,s:ok.filter(m=>m.n).length,
+    f:sec(med(ok.map(m=>m.f))),g:sec(med(ok.map(m=>m.g)))});
+}
+/* Pose les résumés connus sur les cartes du fil. Appelé après chaque render() (une carte
+   réutilisée n'est jamais réécrite, comme pour la pastille « N sources ») et à chaque
+   résumé reçu. Une carte déjà décidée (data-ai) n'est plus touchée. */
+function majResumesCartes(){
+  if(cardAiPref==="off"||!cardAiCache.size)return;
+  const cur=currentCardEl();
+  for(const el of feedEl.children){
+    if(el.dataset.ai)continue;
+    const it=carteResumable(el);if(!it)continue;
+    const s=cardAiCache.get(newsKey(it));if(!s)continue;
+    poserResume(el,it,el===cur?"orig":"sum");
+  }
+}
+function poserResume(el,it,mode){
+  const body=el.querySelector(".card__body"),meta=body&&body.querySelector(".card__meta");
+  if(!meta)return;
+  let p=body.querySelector(".card__desc");
+  if(!p){p=document.createElement("p");p.className="card__desc";const h=body.querySelector(".card__title");if(h)h.after(p);else meta.before(p);}
+  let b=meta.querySelector(".card__ai");
+  if(!b){b=document.createElement("button");b.type="button";b.className="card__ai";b.setAttribute("data-aitoggle","");meta.appendChild(b);}
+  el.dataset.ai=mode;
+  afficherResume(el,it);
+}
+function afficherResume(el,it){
+  const p=el.querySelector(".card__desc"),b=el.querySelector(".card__ai");
+  const s=cardAiCache.get(newsKey(it));
+  if(!p||!b)return;
+  const sum=el.dataset.ai==="sum"&&!!s;
+  p.textContent=sum?s:(it.desc||"");
+  p.hidden=!p.textContent;
+  p.classList.toggle("card__desc--ai",sum);
+  b.innerHTML=`${ICON_SPARK}<span>${esc(T(sum?"card.ai.sum":"card.ai.orig"))}</span>`;
+  b.setAttribute("aria-label",T(sum?"card.ai.sumAria":"card.ai.origAria"));
+  b.setAttribute("aria-pressed",String(sum));
+}
+function basculerResume(btn){
+  const el=btn.closest(".card"),it=el&&cardReg.get(+el.dataset.id);
+  if(!it)return;
+  el.dataset.ai=el.dataset.ai==="sum"?"orig":"sum";
+  afficherResume(el,it);
+}
+/* Réglage coupé : chaque carte retrouve l'extrait de sa source. */
+function retirerResumesCartes(){
+  for(const el of feedEl.children){
+    if(!el.dataset.ai)continue;
+    const it=cardReg.get(+el.dataset.id);
+    el.dataset.ai="orig";if(it)afficherResume(el,it);
+    const b=el.querySelector(".card__ai");if(b)b.remove();
+    delete el.dataset.ai;
+  }
+}
+function libererResumesCartes(){
+  clearTimeout(cardAiT);cardAiCarte=null;
+  if(!cardAiUtilise)return;
+  cardAiUtilise=false;
+  const p=pontResume();
+  if(p&&typeof p.cardSummaryRelease==="function")p.cardSummaryRelease().catch(()=>{});
+}
+function cardAiRow(){
+  const manque=cardAiPref!=="off"&&cardAiEtat&&!(cardAiEtat.engine&&cardAiEtat.installed);
+  if(cardAiPref!=="off"&&!cardAiEtat)etatResume().then(e=>{if(e)renderReadPref();});
+  return prefRow("cardai",T("cardai.label"),T(manque?"cardai.desc.missing":"cardai.desc."+cardAiPref),
+      CARD_AI_MODES.map(v=>({v,t:T("cardai.opt."+v)})),cardAiPref)
+    +(cardAiPref!=="off"||cardAiMes.length?`<div class="prefsub"><span class="prefsub__state" data-cardaimes>${esc(texteMesures())}</span></div>`:"");
+}
 function themePalette(){
   try{
     const cs=getComputedStyle(document.documentElement);
@@ -4796,6 +4991,7 @@ function themePalette(){
 }
 function openArticle(url,title,opts){
   arreterEcoute();               // on part lire : la revue de presse s'arrête
+  libererResumesCartes();        // le lecteur charge son propre modèle (annulation native globale)
   if(!isNativeApp||readPref==="browser")return false;
   if(opts&&opts.external)return false;
   const iab=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppBrowser;
@@ -4889,6 +5085,7 @@ function onRetourPremierPlan(){
   reprendreVideo();   // après la barre : une vidéo relancée la masque (hideTop)
   maybeShowNotifNudge();
   refreshIfStale();
+  cardAiCarte=null;planifierResumes(currentCardEl());   // reprendre les résumés là où on lit
 }
 document.addEventListener("visibilitychange",()=>{
   if(document.visibilityState==="hidden"){
@@ -4901,6 +5098,7 @@ document.addEventListener("visibilitychange",()=>{
     // Avec le service natif (mode radio), l'écoute DOIT survivre à l'arrière-plan :
     // c'est tout son objet, et sa notification est le moyen de l'arrêter.
     if(!ecouteService())arreterEcoute();
+    libererResumesCartes();
     persistAll();return;
   }
   onRetourPremierPlan();
@@ -7336,6 +7534,7 @@ function render(forceTop,altAnchor){
   if(!top)setScrollTopInstant(feedEl,0);
   observeBackgrounds();observePaywall();observeMissingImages();observeSponsor();
   majPastillesSujets();
+  majResumesCartes();
   if(DEBUG){const e=posEntry(),l=(e&&e.link)||"";const i=e?resolveResume(e):-1;
     dbg(`v${APP_VERSION}  items=${items.length} (${newsItems.length} actus / ${learnItems.length} wiki)\n`+
         `mémorisé=…${l.slice(-24)||"(rien)"}\n`+
@@ -7432,6 +7631,7 @@ async function loadMore(){
    thème sur les cartes, puces des listes (chaque centre d'intérêt a le sien). */
 const ICON_DISCOVER=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>`;
 // Pastille « N sources » : deux feuilles décalées, l'une derrière l'autre.
+const ICON_SPARK=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4l1.8 4.7L17.5 10.5l-4.7 1.8L11 17l-1.8-4.7L4.5 10.5l4.7-1.8z"></path><path d="M19 3v4M17 5h4"></path></svg>`;
 const ICON_SUJET=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="13" height="15" rx="2"></rect><path d="M4 7v12a2 2 0 0 0 2 2h10"></path></svg>`;
 const ICON_READ=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>`;
 // Flux RSS (la source d'une actu) et étiquette (le thème d'un article) : deux
@@ -7858,6 +8058,8 @@ feedEl.addEventListener("click",e=>{
   // deux passent par [data-play] ci-dessus, donc jamais par cette branche —
   // « vu » ne s'y acquiert que par swipe, comme pour toute carte, voir
   // markOneSeen.)
+  const aiBtn=e.target.closest("[data-aitoggle]");
+  if(aiBtn){basculerResume(aiBtn);return;}
   const sujetBtn=e.target.closest("[data-sujet]");
   if(sujetBtn){
     const card=sujetBtn.closest(".card");
@@ -8649,6 +8851,7 @@ function renderReadPref(){
         [{v:"block",t:T("ads.opt.block")},{v:"allow",t:T("ads.opt.allow")}],adsPref);
       if(adsPref==="block")html+=blocklistHTML();
     }
+    if(pontResume())html+=cardAiRow();   // essai : résumé IA sur les cartes du fil
   }
   // Notifications : natif toujours, web seulement si le navigateur sait faire
   // du Periodic Background Sync (voir webBgSyncSupported) — sinon ce bloc
@@ -8750,6 +8953,7 @@ function setPref(name,v){
   if(name==="listenvoice"){setEcouteVoix(v);return;}   // idem, voir ecouteVoix
   if(name==="sysvoice"){setSysVoix(v);return;}   // idem, voir sysVoixChoix
   if(name==="flashmode"){setFlashMode(v);return;}   // idem, voir flashMode
+  if(name==="cardai"){setCardAiPref(v);return;}   // idem, voir cardAiPref (essai)
   if(name==="flashmin"){setFlashMin(v);return;}   // idem, voir flashMin
   if(name==="listenrate"){setEcouteRate(v);return;}   // idem, voir ecouteRate
   if(name==="listensleep"){setEcouteSleep(v);return;}   // idem, voir ecouteSleep
