@@ -522,8 +522,14 @@ hors du dépôt, jamais dans `package.json`.
   ne peut pas s'appliquer (réglage coupé, modèle absent, écoute en cours). Un article
   impossible à résumer garde son extrait, sans couper le mode. Le texte résumé porte un
   liseré et l'étiquette « Résumé IA » DANS LA LIGNE DE LA DATE (au-dessus du texte,
-  elle faisait remonter le titre), et la zone de texte garde la hauteur de l'extrait
-  pendant l'écriture. Versions écartées, dans l'ordre : remplacement automatique du
+  elle faisait remonter le titre). Pendant l'écriture, la zone de texte RÉSERVE d'emblée
+  la hauteur maximale d'un résumé (`reserverHauteur` : interligne × lignes de la coupe
+  CSS), pas celle de l'extrait — la carte étant calée en bas, une zone qui grandit
+  pousse le titre vers le haut à chaque ligne (même défaut que dans la feuille de
+  résumé du lecteur, revenu avec les résumés de quatre phrases) ; la réserve n'est
+  rendue qu'aux cartes QUITTÉES (`libererHauteurs`), jamais sous les yeux. Et le texte
+  affiché pendant l'écriture ne recule jamais (`p.dataset.vu`) : retour « ça affiche un
+  début, ça l'efface, ça remet ». Versions écartées, dans l'ordre : remplacement automatique du
   texte des cartes hors écran sans geste (tantôt résumé, tantôt extrait selon le
   timing), pastille dans la carte (doublon du ✨ du rail), ✨ valable pour UNE carte
   (il fallait réappuyer à chaque swipe), et carte laissée sur son extrait pendant la

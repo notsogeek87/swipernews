@@ -4281,6 +4281,9 @@ ${Array.from({ length: 12 }, (_, k) => {
             on: sumBtn.classList.contains("on"),
             busy: sumBtn.classList.contains("busy"),
             minH: d ? d.style.minHeight : "",
+            titre: Math.round(
+              el.querySelector(".card__title").getBoundingClientRect().top
+            ),
           };
         }, i);
       // Carte 1, préparée : ✨ active le mode, résumé immédiat.
@@ -4298,7 +4301,7 @@ ${Array.from({ length: 12 }, (_, k) => {
       await page.waitForTimeout(2200);
       const fin = await carte(i2);
       console.log(
-        `swipe en mode résumé, carte non préparée : à l'arrivée « ${tout.txt.slice(0, 30)} » (${tout.ai || "extrait"}) · après 450 ms : ${pendant.ai}, « ${pendant.txt.slice(0, 30)} », hauteur tenue ${!!pendant.minH}, ✨ respire ${pendant.busy} · à la fin : ${fin.ai}, résumé complet ${fin.resume}, ✨ enfoncé ${fin.on}`
+        `swipe en mode résumé, carte non préparée : à l'arrivée « ${tout.txt.slice(0, 30)} » (${tout.ai || "extrait"}) · après 450 ms : ${pendant.ai}, « ${pendant.txt.slice(0, 30)} », hauteur tenue ${!!pendant.minH}, ✨ respire ${pendant.busy} · à la fin : ${fin.ai}, résumé complet ${fin.resume}, ✨ enfoncé ${fin.on} · titre immobile pendant l'écriture ${pendant.titre === fin.titre} (${pendant.titre} → ${fin.titre} px)`
       );
       // Arrivée sur une carte dont la préparation est EN COURS : on l'attend, sans la relancer.
       const ip = await premiere(page, "neuve");
