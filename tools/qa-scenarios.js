@@ -4122,16 +4122,23 @@ ${Array.from({ length: 12 }, (_, k) => {
                         enVol.delete(k);
                         r({ key: k, text: "", dropped: true });
                       }
+                      // Le banc peut interrompre l'écriture en cours, comme le natif le fait
+                      // (lecteur ouvert, priorité à une autre carte…).
+                      let coupe = false;
+                      window.__couperDirect = (reason) => {
+                        coupe = true;
+                        res({ key: o.key, text: "", dropped: true, reason });
+                      };
                       const t = texte(o);
                       const bouts = t ? t.match(/.{1,20}/g) : [];
                       bouts.forEach((b, i) =>
                         setTimeout(
-                          () => morceau && morceau({ key: o.key, piece: b }),
+                          () => !coupe && morceau && morceau({ key: o.key, piece: b }),
                           150 * (i + 1)
                         )
                       );
                       setTimeout(
-                        () => res(Object.assign(fin, { text: t })),
+                        () => !coupe && res(Object.assign(fin, { text: t })),
                         150 * (bouts.length + 1)
                       );
                       return;
@@ -4299,6 +4306,34 @@ ${Array.from({ length: 12 }, (_, k) => {
       console.log(
         `arrivée pendant la préparation (en cours : ${enCours}) : à l'arrivée ${att.ai} « ${att.txt.slice(0, 26)} » · puis ${att2.ai}, résumé ${att2.resume} · écritures en direct relancées ${d1 - d0} (attendu 0) · ${(await page.evaluate(() => texteMesures())).replace(/^.*(Dernier ✨)/, "$1")}`
       );
+      // Écriture INTERROMPUE en plein milieu (retour d'essai : « ça apparaît, puis de
+      // nouveau en préparation, puis ça revient ») : la carte garde le texte déjà écrit.
+      const ic = await page.evaluate(() => {
+        for (let i = currentIndex() + 1; i < feedEl.children.length; i++) {
+          const it = carteResumable(feedEl.children[i]);
+          if (it && !cardAiCache.has(newsKey(it)) && !cardAiPrep.has(newsKey(it)))
+            return i;
+        }
+        return -1;
+      });
+      if (ic >= 0) {
+        await aller(page, ic);
+        await page.waitForTimeout(800); // 350 ms d'attente + quelques morceaux écrits
+        const avant = await carte(ic);
+        await page.evaluate(
+          () => window.__couperDirect && window.__couperDirect("priorite")
+        );
+        await page.waitForTimeout(60);
+        const juste = await carte(ic);
+        await page.waitForTimeout(2500);
+        const ensuite = await carte(ic);
+        console.log(
+          `écriture interrompue : avant « ${avant.txt.slice(0, 24)} » · juste après « ${juste.txt.slice(0, 24)} » (${juste.ai}) · jamais repassée par « en préparation » ${!/préparation/.test(juste.txt)} · à la fin ${ensuite.ai}, résumé ${ensuite.resume}`
+        );
+        console.log(
+          `  historique : ${(await page.evaluate(() => texteHistorique())).split("\n").slice(0, 3).join(" | ")}`
+        );
+      } else console.log("écriture interrompue : aucune carte libre pour le test");
       // Retour sur la carte 1 : toujours son résumé.
       await aller(page, 1);
       const retour = await carte(1);

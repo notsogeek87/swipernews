@@ -501,7 +501,14 @@ hors du dépôt, jamais dans `package.json`.
   ensuite ; les cartes ne lui donnent que 2 200 caractères de la page
   (`CARD_AI_ARTICLE_CHARS`, l'écoute garde 3 500) ; en mode résumé le modèle est chargé
   d'avance (`cardSummaryWarm`, à l'activation, au démarrage, au retour au premier plan)
-  et gardé 5 min au lieu de 90 s. Quitter une carte en cours d'écriture : la
+  et gardé 5 min au lieu de 90 s. Une écriture INTERROMPUE (le natif rend la raison :
+  `priorite`, `abandon`, `liberation`, `inactivite`…) ne fait plus repasser la carte
+  par « en préparation » : si elle est toujours sous les yeux, la reprise part aussitôt
+  en gardant le texte déjà écrit à l'écran (`deja`/`prec`, jamais de recul, deux
+  reprises au plus) ; sinon le texte est gardé dans `cardAiPartiel` pour le retour.
+  Retour d'essai qui l'a montré : « ça apparaît, puis de nouveau en préparation, puis
+  ça revient ». Sous le réglage, `cardAiHist` garde les six derniers événements avec
+  leur cause. Quitter une carte en cours d'écriture : la
   suivante passe devant, l'ancienne retrouve son extrait et sera reprise au retour. Un
   nouvel ✨ sur une carte d'actu coupe le mode (extraits partout) ; ✨ enfoncé = mode
   actif. Le ✨ garde la feuille du lecteur sur Wikipédia, les vidéos, et quand le mode

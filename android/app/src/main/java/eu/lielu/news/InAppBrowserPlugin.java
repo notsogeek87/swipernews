@@ -1047,9 +1047,10 @@ public class InAppBrowserPlugin extends Plugin {
     private int cardAiSeq = 0;
     private final Map<Integer, PluginCall> cardAiCalls = new HashMap<>();
     private final Map<Integer, String> cardAiKeys = new HashMap<>();
-    private final java.util.Set<Integer> cardAiDropped = new java.util.HashSet<>();
+    /** Travaux abandonnés -> POURQUOI (rendu à la page, qui l'affiche dans son diagnostic). */
+    private final Map<Integer, String> cardAiDropped = new HashMap<>();
     private final android.os.Handler cardAiMain = new android.os.Handler(android.os.Looper.getMainLooper());
-    private final Runnable cardAiIdle = this::releaseCardAi;
+    private final Runnable cardAiIdle = () -> releaseCardAi("inactivite");
 
     /** Le résumé est-il possible, et dans quelles conditions (Wi-Fi, en charge, économiseur) ? */
     @PluginMethod
@@ -1099,7 +1100,7 @@ public class InAppBrowserPlugin extends Plugin {
             // Toucher sur une carte : passe devant, écrit en direct (événement cardSummaryPiece).
             // Le travail préparé d'avance qu'il interrompt est rendu comme ABANDONNÉ, pas raté.
             final int busyIdx = cardAi.currentIndex();
-            if (busyIdx >= 0) cardAiDropped.add(busyIdx);
+            if (busyIdx >= 0) cardAiDropped.put(busyIdx, "priorite");
             cardAi.requestNow(i, title, link, excerpt, (index, piece) -> {
                 JSObject ev = new JSObject();
                 ev.put("key", cardAiKeys.get(index));
@@ -1112,7 +1113,7 @@ public class InAppBrowserPlugin extends Plugin {
     }
 
     private boolean ensureCardAi(String lang) {
-        if (cardAi != null && !lang.equals(cardAiLang)) releaseCardAi();
+        if (cardAi != null && !lang.equals(cardAiLang)) releaseCardAi("langue");
         if (cardAi == null) {
             final FlashSummarizer fs =
                 new FlashSummarizer(getContext(), lang, this::cardAiResult, CARD_AI_ARTICLE_CHARS);
@@ -1153,16 +1154,16 @@ public class InAppBrowserPlugin extends Plugin {
             final java.util.Set<Integer> keepIdx = new java.util.HashSet<>();
             for (Map.Entry<Integer, String> e : cardAiKeys.entrySet()) {
                 if (keep.contains(e.getValue())) keepIdx.add(e.getKey());
-                else cardAiDropped.add(e.getKey());
+                else cardAiDropped.put(e.getKey(), "abandon");
             }
-            cardAi.dropExcept(keepIdx, (index, chunks) -> settleCardAi(index, null, true));
+            cardAi.dropExcept(keepIdx, (index, chunks) -> settleCardAi(index, null, "abandon"));
         }
         call.resolve();
     }
 
     @PluginMethod
     public void cardSummaryRelease(PluginCall call) {
-        releaseCardAi();
+        releaseCardAi("liberation");
         call.resolve();
     }
 
@@ -1171,16 +1172,18 @@ public class InAppBrowserPlugin extends Plugin {
         settleCardAi(index, chunks, cardAiDropped.remove(index));
     }
 
-    private void settleCardAi(int index, List<String> chunks, boolean dropped) {
-        if (dropped) cardAiDropped.remove(index);
+    /** @param dropped raison de l'abandon, ou null pour un travail mené à son terme */
+    private void settleCardAi(int index, List<String> chunks, String dropped) {
+        if (dropped != null) cardAiDropped.remove(index);
         final PluginCall c = cardAiCalls.remove(index);
         final String key = cardAiKeys.remove(index);
         if (c == null) return;
         JSObject res = new JSObject();
         res.put("key", key);
         res.put("text", chunks == null ? "" : android.text.TextUtils.join(" ", chunks));
-        res.put("dropped", dropped);
-        if (!dropped && cardAi != null) {
+        res.put("dropped", dropped != null);
+        if (dropped != null) res.put("reason", dropped);
+        if (dropped == null && cardAi != null) {
             res.put("waitMs", cardAi.lastWaitMs);
             res.put("fetchMs", cardAi.lastFetchMs);
             res.put("genMs", cardAi.lastGenMs);
@@ -1189,13 +1192,13 @@ public class InAppBrowserPlugin extends Plugin {
         c.resolve(res);
     }
 
-    private void releaseCardAi() {
+    private void releaseCardAi(String reason) {
         cardAiMain.removeCallbacks(cardAiIdle);
         if (cardAi != null) {
             cardAi.release();
             cardAi = null;
         }
-        for (Integer i : new ArrayList<>(cardAiCalls.keySet())) settleCardAi(i, null, true);
+        for (Integer i : new ArrayList<>(cardAiCalls.keySet())) settleCardAi(i, null, reason);
     }
 
     @PluginMethod
@@ -1234,7 +1237,7 @@ public class InAppBrowserPlugin extends Plugin {
         // Le service survit à l'activité (c'est son but) : on le détache seulement,
         // pour ne pas retenir un plugin détruit. Le suivant se rebranche (listenStatus).
         ListenService.setListener(null);
-        releaseCardAi();
+        releaseCardAi("fin");
         List<PluginCall> pending;
         synchronized (this) {
             if (tts != null) {
