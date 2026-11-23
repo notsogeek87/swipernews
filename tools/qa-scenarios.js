@@ -4491,10 +4491,16 @@ ${Array.from({ length: 12 }, (_, k) => {
       const tout = await carte(i2);
       await page.waitForTimeout(450);
       const pendant = await carte(i2);
-      await page.waitForTimeout(2200);
+      await page.waitForTimeout(600);
+      const pendant2 = await carte(i2); // toujours en écriture
+      await page.waitForTimeout(1600);
       const fin = await carte(i2);
+      const cale = await page.evaluate(
+        (i) => !!feedEl.children[i].querySelector(".card__aires"),
+        i2
+      );
       console.log(
-        `swipe en mode résumé, carte non préparée : à l'arrivée « ${tout.txt.slice(0, 30)} » (${tout.ai || "extrait"}) · après 450 ms : ${pendant.ai}, « ${pendant.txt.slice(0, 30)} », hauteur tenue ${!!pendant.minH}, liseré à la hauteur du texte ${pendant.lisere && fin.lisere}, ✨ respire ${pendant.busy} · à la fin : ${fin.ai}, résumé complet ${fin.resume}, ✨ enfoncé ${fin.on} · titre immobile pendant l'écriture ${pendant.titre === fin.titre} (${pendant.titre} → ${fin.titre} px)`
+        `swipe en mode résumé, carte non préparée : à l'arrivée « ${tout.txt.slice(0, 30)} » (${tout.ai || "extrait"}) · après 450 ms : ${pendant.ai}, « ${pendant.txt.slice(0, 30)} », hauteur tenue ${!!pendant.minH}, liseré à la hauteur du texte ${pendant.lisere && fin.lisere}, ✨ respire ${pendant.busy} · à la fin : ${fin.ai}, résumé complet ${fin.resume}, ✨ enfoncé ${fin.on} · titre immobile pendant l'écriture ${pendant.titre === pendant2.titre} (${pendant.titre} → ${pendant2.titre} px, ${pendant2.ai}) · réserve refermée à la fin ${!cale}`
       );
       // Arrivée sur une carte dont la préparation est EN COURS : on l'attend, sans la relancer.
       const ip = await premiere(page, "neuve");

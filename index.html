@@ -4164,7 +4164,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="350";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="351";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -5106,7 +5106,7 @@ function attendrePrep(el,it,k){
     const p1=+el.dataset.p1||0;delete el.dataset.p1;
     if(el.dataset.ai!=="flux"||(cardAiFlux&&cardAiFlux.el===el))return;   // mode coupé, ou repris en direct
     if(cardAiCache.has(k)){
-      el.dataset.ai="sum";afficherResume(el,it);noterToucher((p1||Date.now())-t0);
+      el.dataset.ai="sum";afficherResume(el,it);relacherReserve(el);noterToucher((p1||Date.now())-t0);
       const sec=ms=>{const v=(ms/1000).toFixed(1);return LANG==="fr"?v.replace(".",","):v;};
       noterDiag("diag.prete",{d:sec(Date.now()-t0)});
       return;
@@ -5154,6 +5154,19 @@ function majReserve(d){
   if(!sp||!sp.classList.contains("card__aires")){sp=document.createElement("div");sp.className="card__aires";sp.setAttribute("aria-hidden","true");d.after(sp);}
   sp.style.height=Math.max(0,+d.dataset.res-(d.hidden?0:d.offsetHeight))+"px";
 }
+/* Écriture FINIE : la place gardée vide sous un résumé plus court que la réserve se
+   referme en douceur, en un seul mouvement (retour d'essai : en revenant sur la carte, la
+   réserve rendue, « le style est de nouveau clean » — autant le rendre tout de suite). */
+function relacherReserve(el){
+  const d=el&&el.querySelector(".card__desc");
+  if(!d||!d.dataset.res)return;
+  delete d.dataset.res;
+  const sp=d.nextElementSibling;
+  if(!sp||!sp.classList.contains("card__aires"))return;
+  sp.style.transition="height .45s ease";
+  requestAnimationFrame(()=>{sp.style.height="0px";});
+  setTimeout(()=>{if(!d.dataset.res&&sp.isConnected)sp.remove();},700);
+}
 function retirerReserve(d){
   if(!d)return;
   delete d.dataset.res;delete d.dataset.fs;
@@ -5186,7 +5199,7 @@ function tenirDansCoupe(p){
   const cs=getComputedStyle(p),fs=parseFloat(cs.fontSize)||15,lh=parseFloat(cs.lineHeight)||fs*1.5;
   const lignes=parseInt(cs.webkitLineClamp||cs.getPropertyValue("-webkit-line-clamp"),10)||12;
   const h=Math.max(p.clientHeight,lh*lignes);
-  for(let t=deja?Math.min(deja,fs):fs-0.5;t>=12.5;t-=0.5){
+  for(let t=deja?Math.min(deja,fs):fs-0.5;t>=13.5;t-=0.5){
     p.style.fontSize=t+"px";p.style.webkitLineClamp=String(Math.floor(h/(lh*t/fs)));
     if(p.scrollHeight<=p.clientHeight+2){if(t<fs)p.dataset.fs=String(t);return;}
   }
@@ -5315,6 +5328,7 @@ async function resumerEnDirect(el,it,k,deja,essai){
   else{cardAiEchecs.add(k);el.dataset.ai="echec";if(el===currentCardEl())toast(T(cardAiMode?"card.ai.echecMode":"card.ai.echec"));
     noterDiag(r&&r.filet?"diag.delai":raison?"diag.erreur":"diag.vide",{e:raison.slice(0,80),s:String((r&&r.source)||"")});}
   afficherResume(el,it);
+  if(el.dataset.ai==="sum")relacherReserve(el);
   cardAiCarte=null;planifierResumes(currentCardEl());   // reprendre la préparation d'avance
 }
 function ecouterMorceaux(p){
