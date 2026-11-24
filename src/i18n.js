@@ -481,9 +481,11 @@
       "apptheme.desc.bleu": "Même vivacité que Flamme, en bleu plutôt qu'en corail.",
       "apptheme.desc.sobre":
         "Mêmes contrastes, en couleurs éteintes — sans l'accent vif.",
+      "apptheme.desc.noel": "Vert sapin, rouge et touches dorées.",
       "apptheme.opt.flamme": "Flamme",
       "apptheme.opt.bleu": "Bleuté",
       "apptheme.opt.sobre": "Sobre",
+      "apptheme.opt.noel": "Noël",
 
       "sheet.mix.title": "🎚️ Dose d'apprentissage",
       "dose.title": "Dose d'apprentissage",
@@ -800,6 +802,8 @@
         "Pas de résumé possible pour cet article : son extrait reste affiché.",
       "rail.sum.card": "Passer le fil en mode résumé IA",
       "rail.sum.back": "Quitter le mode résumé (revenir aux extraits)",
+      "changelog.v352.item1":
+        "🎄 Le thème Noël est disponible dans les réglages, en clair et en sombre.",
       "changelog.v340.item1":
         "Essai du résumé IA : un appui sur ✨ passe tout le fil en mode résumé, gardé d'une ouverture à l'autre ; un nouvel appui revient aux extraits.",
       "cardai.diag.attente": "en attente de la préparation déjà lancée",
@@ -1261,9 +1265,11 @@
       "apptheme.desc.flamme": "The original look: embers on black, a vivid coral accent.",
       "apptheme.desc.bleu": "Same intensity as Flamme, in blue instead of coral.",
       "apptheme.desc.sobre": "Same contrast, muted colors — no vivid accent.",
+      "apptheme.desc.noel": "Pine green, red and touches of gold.",
       "apptheme.opt.flamme": "Flamme",
       "apptheme.opt.bleu": "Blue",
       "apptheme.opt.sobre": "Plain",
+      "apptheme.opt.noel": "Christmas",
 
       "sheet.mix.title": "🎚️ Learning dose",
       "dose.title": "Learning dose",
@@ -1566,6 +1572,8 @@
       "card.ai.echecMode": "No summary possible for this article: its excerpt stays.",
       "rail.sum.card": "Switch the feed to AI summary mode",
       "rail.sum.back": "Leave summary mode (back to excerpts)",
+      "changelog.v352.item1":
+        "🎄 The Christmas theme is available in Settings, in light and dark mode.",
       "changelog.v340.item1":
         "AI summary trial: one ✨ tap switches the whole feed to summary mode, kept between launches; tap again to go back to excerpts.",
       "cardai.diag.attente": "waiting for the preparation already running",
