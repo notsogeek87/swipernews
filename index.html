@@ -92,18 +92,8 @@
       'SFMono-Regular',Consolas,'Liberation Mono',monospace;
   }
   /* Habillages alternatifs, réglables dans Réglages ⚙ (voir
-     renderThemePref/setAppTheme). Même structure que Flamme ci-dessus dans les
-     deux cas (fond quasi noir, un seul accent, coins techniques) — tout le
-     reste de la page est déjà bâti sur ces mêmes variables, donc rien d'autre
-     à toucher. Spécificité de `[data-apptheme]` sur `:root` volontairement
-     plus élevée que `:root` seul, pour ne pas dépendre de l'ordre des règles.
-     « Bleuté » garde la même vivacité que Flamme (accent saturé, fond très
-     sombre mais teinté plutôt que neutre) — seule la teinte change, du corail
-     au bleu — quand « Sobre », plus loin, désature complètement l'accent :
-     les trois habillages forment un dégradé d'intensité, pas juste un
-     nuancier, l'entre-deux répondant à qui trouve Flamme trop vif mais Sobre
-     trop éteint. Aucun des deux ne retire rien à qui préfère l'habillage
-     d'origine, qui reste le défaut. */
+     renderThemePref/setAppTheme). La spécificité de [data-apptheme] sur
+     :root permet à chaque palette de remplacer celle de Flamme. */
   :root[data-apptheme="bleu"]{
     --bg:#050b16;--surface:#0d1b30;--molten:#12294a;--redline:#1f4a7a;
     --flare:#4da3ff;--blush:#a8d4ff;--ink:#f2f7ff;--ash:#7f93ab;
@@ -116,12 +106,19 @@
     --redline-rgb:67,69,77;--blush-rgb:195,204,214;--bg-rgb:21,22,26;
     --shadow-ember:inset 0 0 20px rgba(51,53,60,.6);
   }
+  :root[data-apptheme="noel"]{
+    --bg:#0b2018;--surface:#133126;--molten:#20503d;--redline:#44765d;
+    --flare:#ff9c9f;--blush:#f4d399;--ink:#fff9ec;--ash:#bacec0;
+    --redline-rgb:68,118,93;--blush-rgb:244,211,153;--bg-rgb:11,32,24;
+    --shadow-ember:inset 0 0 20px rgba(32,80,61,.7);
+    --snow:#f4d399;
+  }
   /* Schéma CLAIR (réglage « Apparence », voir applyAppTheme) : posé par
      `data-scheme="light"` sur <html>, le sombre n'ayant pas d'attribut (comme
      « flamme » pour le thème). Un jeu de variables par habillage, de même
      teinte que son pendant sombre : --flare y est assombri (il sert de couleur
      de TEXTE sur fond clair, ≥ 4,5:1) et --redline éclairci (ce n'est qu'un
-     liseré). Spécificité (0,3,0) pour « bleu »/« sobre », volontairement au-dessus
+     liseré). Spécificité (0,3,0) pour les variantes, volontairement au-dessus
      des habillages sombres, indépendante de l'ordre des règles. */
   :root[data-scheme="light"]{
     --bg:#fbf4f1;--surface:#f3e2dc;--molten:#e8c9be;--redline:#e3b3a5;
@@ -140,6 +137,13 @@
     --flare:#4a5d72;--blush:#2f3a47;--ink:#15171b;--ash:#5d626c;
     --redline-rgb:191,195,203;--blush-rgb:47,58,71;--bg-rgb:244,245,247;
     --shadow-ember:inset 0 0 20px rgba(211,214,220,.8);
+  }
+  :root[data-scheme="light"][data-apptheme="noel"]{
+    --bg:#f6f8ee;--surface:#e5eedf;--molten:#c9deca;--redline:#a1bca5;
+    --flare:#97253b;--blush:#745017;--ink:#16271d;--ash:#435d4e;
+    --redline-rgb:161,188,165;--blush-rgb:116,80,23;--bg-rgb:246,248,238;
+    --shadow-ember:inset 0 0 20px rgba(201,222,202,.8);
+    --snow:#745017;
   }
   /* Tout ce qui se pose SUR une photo garde sa palette SOMBRE même en schéma
      clair : la carte avec image (dégradé et halos de lettres noirs en dur), la
@@ -171,6 +175,14 @@
     --flare:#8fa3b8;--blush:#c3ccd6;--ink:#eef0f3;--ash:#9296a1;
     --redline-rgb:67,69,77;--blush-rgb:195,204,214;--bg-rgb:21,22,26;
     --shadow-ember:inset 0 0 20px rgba(51,53,60,.6);
+  }
+  :root[data-scheme="light"][data-apptheme="noel"] .card--img,
+  :root[data-scheme="light"][data-apptheme="noel"] .top,
+  :root[data-scheme="light"][data-apptheme="noel"] .rail{
+    --bg:#0b2018;--surface:#133126;--molten:#20503d;--redline:#44765d;
+    --flare:#ff9c9f;--blush:#f4d399;--ink:#fff9ec;--ash:#bacec0;
+    --redline-rgb:68,118,93;--blush-rgb:244,211,153;--bg-rgb:11,32,24;
+    --shadow-ember:inset 0 0 20px rgba(32,80,61,.7);
   }
   /* Ce qui reste codé en dur et ne suit pas les variables. Le rail flotte sur
      des photos ET sur des cartes claires : un verre sombre lui donne un support
@@ -225,6 +237,15 @@
     background-image:repeating-linear-gradient(90deg,var(--flare) 0 5px,transparent 5px 17px);
     -webkit-mask-image:linear-gradient(to top,transparent 0%,#000 50%,transparent 100%);
     mask-image:linear-gradient(to top,transparent 0%,#000 50%,transparent 100%);opacity:.3}
+
+  :root[data-apptheme="noel"] .card__bg::after{
+    background:linear-gradient(to top,rgba(var(--bg-rgb),.96) 0%,rgba(var(--bg-rgb),.82) 28%,rgba(var(--bg-rgb),.25) 60%,rgba(var(--bg-rgb),.55) 100%)}
+  /* Points de neige statiques sur les cartes sans photo. */
+  :root[data-apptheme="noel"] .card__noimg::after{
+    background-image:radial-gradient(circle at 16px 22px,var(--snow) 1px,transparent 2px),
+      radial-gradient(circle at 67px 44px,var(--snow) 2px,transparent 3px),
+      radial-gradient(circle at 39px 73px,var(--snow) 1px,transparent 2px);
+    background-size:89px 97px,131px 113px,157px 137px}
 
   /* Carte vidéo. Le ▶ couvre TOUTE la carte pour que n'importe où sur l'image
      lance la lecture, mais il reste en z-index 1 : .card__body est en 2 et plus
@@ -2162,7 +2183,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=335"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=343"></script>
+<script src="src/i18n.js?v=352"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -2464,9 +2485,9 @@ applyI18n();
    sélecteur additionnel, d'où retirer l'attribut plutôt que le poser à
    "flamme" dans applyAppTheme(). */
 const LS_APPTHEME="fluxswipe.apptheme.v1";
-const APP_THEMES=["flamme","bleu","sobre"];
+const APP_THEMES=["flamme","bleu","sobre","noel"];
 /* Apparence : clair / sombre / « auto » (suit le système, défaut). Indépendante
-   de l'habillage ci-dessus — chacun des trois existe dans les deux schémas.
+   de l'habillage ci-dessus — chaque thème existe dans les deux schémas.
    Le sombre n'a pas d'attribut sur <html>, le clair pose data-scheme="light". */
 const LS_APPSCHEME="fluxswipe.appscheme.v1";
 const APP_SCHEMES=["auto","light","dark"];
@@ -4164,7 +4185,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="351";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="352";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4175,6 +4196,7 @@ const APP_VERSION="351";   // doit correspondre au ?v= des <script> et à CACHE 
    bas). `items` sont des clés i18n (T()), jamais du texte en dur : une
    « nouveauté » est un texte d'interface comme un autre. */
 const CHANGELOG=[
+  {v:352,date:"2026-11-24",items:["changelog.v352.item1"]},
   {v:340,date:"2026-11-23",items:[
     "changelog.v340.item1"]},
   {v:338,date:"2026-11-23",items:[
@@ -4804,7 +4826,7 @@ async function dropBlocklist(){
    YouTube installée, sinon le navigateur système) — voir le piège `blob:`/
    `data:` documenté dans CLAUDE.md, qui décrit le même `Bridge.launchIntent`
    pour tout le reste, http(s) compris. */
-/* Palette de l'habillage ACTIF (Flamme, Bleuté, Sobre ; sombre ou clair), lue dans
+/* Palette de l'habillage ACTIF (en sombre ou en clair), lue dans
    les variables CSS calculées de :root et transmise au lecteur natif, dont la
    feuille de résumé s'habille comme l'app. Jamais recopiée côté natif : la
    couleur exacte de chaque thème ne vit que dans le <style> (même principe que
