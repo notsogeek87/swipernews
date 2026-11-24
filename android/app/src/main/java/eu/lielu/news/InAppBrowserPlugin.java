@@ -1091,6 +1091,7 @@ public class InAppBrowserPlugin extends Plugin {
             call.reject("indisponible");
             return;
         }
+        final String videoId = call.getString("videoId", "");
         final Integer place = call.getInt("maxChars");
         if (place != null && place > 0) cardAi.setBudget(place);
         final int i = ++cardAiSeq;
@@ -1103,12 +1104,12 @@ public class InAppBrowserPlugin extends Plugin {
             // Le travail préparé d'avance qu'il interrompt est rendu comme ABANDONNÉ, pas raté.
             final int busyIdx = cardAi.currentIndex();
             if (busyIdx >= 0) cardAiDropped.put(busyIdx, "priorite");
-            cardAi.requestNow(i, title, link, excerpt, this::cardAiPiece);
+            cardAi.requestNow(i, title, link, excerpt, videoId, this::cardAiPiece);
         } else {
             // Préparation d'avance : elle aussi s'écrit au fil de l'eau. La page n'en montre
             // rien tant qu'on n'est pas sur la carte ; si on y arrive pendant qu'elle
             // s'écrit, on voit le texte déjà écrit puis la suite, comme en direct.
-            cardAi.request(i, title, link, excerpt, this::cardAiPiece);
+            cardAi.request(i, title, link, excerpt, videoId, this::cardAiPiece);
         }
     }
 

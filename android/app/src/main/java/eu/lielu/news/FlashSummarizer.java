@@ -74,6 +74,7 @@ final class FlashSummarizer {
         final String title;
         final String link;
         final String excerpt;
+        final String videoId;
         final long askedAt = android.os.SystemClock.elapsedRealtime();
         long startedAt, fetchedAt;
         /** D'où vient le texte résumé : "page", "extrait" ou "aucun". */
@@ -81,11 +82,12 @@ final class FlashSummarizer {
         /** Non nul : le résumé est demandé EN DIRECT (essai des cartes), morceau par morceau. */
         Piece piece;
 
-        Job(int index, String title, String link, String excerpt) {
+        Job(int index, String title, String link, String excerpt, String videoId) {
             this.index = index;
             this.title = title;
             this.link = link;
             this.excerpt = excerpt;
+            this.videoId = videoId;
         }
     }
 
@@ -146,13 +148,13 @@ final class FlashSummarizer {
     }
 
     void request(int index, String title, String link, String excerpt) {
-        request(index, title, link, excerpt, null);
+        request(index, title, link, excerpt, "", null);
     }
 
     /** Demande ordinaire (dans l'ordre de la file), mais écrite au fil de l'eau si {@code piece}. */
-    void request(int index, String title, String link, String excerpt, Piece piece) {
+    void request(int index, String title, String link, String excerpt, String videoId, Piece piece) {
         if (released) return;
-        final Job j = new Job(index, title, link, excerpt);
+        final Job j = new Job(index, title, link, excerpt, videoId);
         j.piece = piece;
         queue.add(j);
         pump();
@@ -176,9 +178,9 @@ final class FlashSummarizer {
      * travail en cours (qui revient par le rappel avec un résultat nul). Sert au toucher sur
      * une carte du fil : quelqu'un attend, les résumés préparés d'avance passent après.
      */
-    void requestNow(int index, String title, String link, String excerpt, Piece piece) {
+    void requestNow(int index, String title, String link, String excerpt, String videoId, Piece piece) {
         if (released) return;
-        final Job j = new Job(index, title, link, excerpt);
+        final Job j = new Job(index, title, link, excerpt, videoId);
         j.piece = piece;
         queue.addFirst(j);
         if (busy && current != null) {
@@ -234,11 +236,17 @@ final class FlashSummarizer {
         try {
             fetcher.execute(() -> {
                 String text = "";
-                if (j.link != null && !j.link.isEmpty()) {
+                if (YoutubeTranscript.isVideoId(j.videoId)) {
+                    String transcript = YoutubeTranscript.fetch(j.videoId, lang);
+                    if (transcript != null) {
+                        text = transcript;
+                        j.source = "transcription";
+                    }
+                } else if (j.link != null && !j.link.isEmpty()) {
                     text = ArticleText.extract(ArticleText.fetch(j.link, FETCH_TIMEOUT_MS), articleChars);
+                    if (!text.isEmpty()) j.source = "page";
                 }
-                if (!text.isEmpty()) j.source = "page";
-                if (text.isEmpty() && j.excerpt != null && j.excerpt.length() >= MIN_EXCERPT_CHARS) {
+                if (text.isEmpty() && !YoutubeTranscript.isVideoId(j.videoId) && j.excerpt != null && j.excerpt.length() >= MIN_EXCERPT_CHARS) {
                     text = j.excerpt;
                     j.source = "extrait";
                 }

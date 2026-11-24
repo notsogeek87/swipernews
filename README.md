@@ -21,6 +21,8 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
 **navigateur intégré** pour lire les articles sans quitter l'app — voir
 [Navigateur intégré](#navigateur-intégré-app-android).
 
+Sur Android, le mode IA du fil résume aussi les vidéos YouTube à partir de leurs sous-titres disponibles. Le bouton ✨ d’une vidéo ouvre son résumé dans le lecteur.
+
 ## Fonctionnalités
 
 - Navigation par swipe vertical plein écran (flèches ↑↓ / espace au clavier aussi)

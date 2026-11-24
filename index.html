@@ -4185,7 +4185,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="352";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="353";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4848,7 +4848,7 @@ async function dropBlocklist(){
    Préparation en Wi-Fi et en charge, ou toujours (réglage) ; le toucher, lui, est une
    demande explicite et passe partout — il passe aussi DEVANT les préparations
    (stream:true côté natif, l'événement cardSummaryPiece porte les morceaux).
-   Cartes concernées : une seule actu (ni Wikipédia, ni vidéo, ni parts égales, ni payant
+   Cartes concernées : une seule actu (ni Wikipédia, ni parts égales, ni payant
    confirmé). Annulation native GLOBALE : rien pendant l'écoute, modèle libéré à
    l'ouverture du lecteur, en arrière-plan et après 90 s sans demande.
    Mesures (objet de l'essai) : durées de chaque résumé, et part des touchers servis
@@ -4906,7 +4906,7 @@ function setCardAiPref(v){
 function carteResumable(el){
   if(!el||!el.classList||!el.classList.contains("card")||cardGroups.has(+el.dataset.id))return null;
   const it=cardReg.get(+el.dataset.id);
-  if(!it||it.kind==="learn"||videoIdOf(it)||!it.link||el.querySelector(".card__paywall"))return null;
+  if(!it||it.kind==="learn"||!it.link||el.querySelector(".card__paywall"))return null;
   return it;
 }
 function etatResume(){
@@ -4990,7 +4990,7 @@ function placeResume(){
   }catch(e){return 0;}
 }
 function demanderResume(p,it,k,direct){
-  return p.cardSummarize({key:k,title:it.title||"",link:it.link,excerpt:(it.desc||"").slice(0,3000),lang:LANG==="en"?"en":"fr",stream:direct,maxChars:placeResume()})
+  return p.cardSummarize({key:k,title:it.title||"",link:it.link,videoId:videoIdOf(it)||"",excerpt:(it.desc||"").slice(0,3000),lang:LANG==="en"?"en":"fr",stream:direct,maxChars:placeResume()})
     .then(r=>{if(r&&!r.dropped)noterMesure(r,typeof r.text==="string"&&r.text.trim().length>=30,direct);return r;});
 }
 function memoResume(k,t){
@@ -5276,7 +5276,7 @@ function afficherResume(el,it){
 /* L'état du ✨ suit la carte visible : enfoncé quand elle montre son résumé, qui respire
    pendant l'écriture. Appelé par updateRail (changement de carte) et afficherResume. */
 function majBoutonResume(el){
-  const dans=cardAiDispo()&&!ecouteActive&&!!carteResumable(el)&&(cardAiMode||el.dataset.ai!=="echec");
+  const dans=cardAiDispo()&&!ecouteActive&&!!carteResumable(el)&&!videoIdOf(currentItem())&&(cardAiMode||el.dataset.ai!=="echec");
   const etat=dans?el.dataset.ai||"orig":"";
   // Enfoncé = MODE actif (pas seulement « cette carte montre son résumé ») : c'est ce que
   // le prochain appui va défaire.
@@ -8521,14 +8521,14 @@ const sumBtn=document.getElementById("sumBtn");
 /* Résumer depuis la carte : le texte à résumer est celui de la PAGE de l'article
    (le mode lecture l'isole côté natif), pas l'extrait du flux, souvent trop court.
    APK seulement. Pour une vidéo, il n'y a pas de page à lire : le natif résume sa
-   TRANSCRIPTION (sous-titres), demandée à YouTube au tap seulement. */
+   TRANSCRIPTION (sous-titres), récupérée auprès de YouTube. */
 function peutResumer(it){
   const iab=iabPlugin();
   return !!(isNativeApp&&iab&&iab.open&&/^https?:/i.test(it.link||""));
 }
 sumBtn.onclick=e=>{
   e.stopPropagation();
-  if(resumeDansCarte())return;   // essai : résumé DANS la carte (voir resumeDansCarte)
+  if(!videoIdOf(currentItem())&&resumeDansCarte())return;   // essai : résumé DANS la carte (voir resumeDansCarte)
   const it=currentItem();
   if(!it||!peutResumer(it))return;
   arreterEcoute();
