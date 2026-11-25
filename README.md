@@ -21,7 +21,7 @@ Sur Android, l'app est empaquetée avec Capacitor et embarque son propre
 **navigateur intégré** pour lire les articles sans quitter l'app — voir
 [Navigateur intégré](#navigateur-intégré-app-android).
 
-Sur Android, le mode IA du fil résume aussi les vidéos YouTube à partir de leurs sous-titres disponibles. Le bouton ✨ d’une vidéo ouvre son résumé dans le lecteur.
+Sur Android, le mode IA du fil résume aussi les vidéos YouTube à partir de leurs sous-titres disponibles. Avec le réglage « Résumé IA sur les cartes » activé et le modèle installé, ✨ bascule le mode résumé du fil aussi bien depuis une carte YouTube que depuis un article. Si le réglage est désactivé, ✨ ouvre le résumé dans le lecteur.
 
 ## Fonctionnalités
 

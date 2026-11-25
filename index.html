@@ -4185,7 +4185,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="353";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="354";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -5048,8 +5048,8 @@ function texteMesuresSeules(){
    préparé, sinon « Résumé en préparation… » puis écrit en direct ; un nouvel ✨ revient
    aux extraits partout. Toutes les cartes se comportent donc pareil, et le texte ne
    change sous les yeux qu'APRÈS le geste qui a choisi ce mode. Gardé d'une ouverture
-   de l'app à l'autre (LS_CARDAI_MODE). Wikipédia et vidéos ne sont pas concernées :
-   leur ✨ ouvre toujours la feuille du lecteur. */
+   de l'app à l'autre (LS_CARDAI_MODE). Les vidéos YouTube suivent ce mode.
+   Pour Wikipédia, ✨ ouvre la feuille du lecteur. */
 const LS_CARDAI_MODE="fluxswipe.cardai.mode.v1";
 let cardAiMode=(()=>{try{return localStorage.getItem(LS_CARDAI_MODE)==="1";}catch(e){return false;}})();
 let cardAiModeT=null;
@@ -5276,7 +5276,7 @@ function afficherResume(el,it){
 /* L'état du ✨ suit la carte visible : enfoncé quand elle montre son résumé, qui respire
    pendant l'écriture. Appelé par updateRail (changement de carte) et afficherResume. */
 function majBoutonResume(el){
-  const dans=cardAiDispo()&&!ecouteActive&&!!carteResumable(el)&&!videoIdOf(currentItem())&&(cardAiMode||el.dataset.ai!=="echec");
+  const dans=cardAiDispo()&&!ecouteActive&&!!carteResumable(el)&&(cardAiMode||el.dataset.ai!=="echec");
   const etat=dans?el.dataset.ai||"orig":"";
   // Enfoncé = MODE actif (pas seulement « cette carte montre son résumé ») : c'est ce que
   // le prochain appui va défaire.
@@ -8528,7 +8528,7 @@ function peutResumer(it){
 }
 sumBtn.onclick=e=>{
   e.stopPropagation();
-  if(!videoIdOf(currentItem())&&resumeDansCarte())return;   // essai : résumé DANS la carte (voir resumeDansCarte)
+  if(resumeDansCarte())return;   // essai : résumé DANS la carte (voir resumeDansCarte)
   const it=currentItem();
   if(!it||!peutResumer(it))return;
   arreterEcoute();

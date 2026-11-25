@@ -4060,7 +4060,7 @@ ${Array.from({ length: 12 }, (_, k) => {
      la feuille du lecteur restent comme avant. Et ce qui ne doit rien coûter : réglage coupé par défaut,
      défilement rapide, Wikipédia, préparation hors Wi-Fi, stockage abîmé. */
   async resumecartes() {
-    const lancer = async (storage, etat) => {
+    const lancer = async (storage, etat, rss = RSS_OK) => {
       const r = await boot({
         storage: Object.assign(
           { "fluxswipe.notifnudge.answered.v1": "1" },
@@ -4209,7 +4209,7 @@ ${Array.from({ length: 12 }, (_, k) => {
         initArg: etat,
       });
       await r.page.route("**/__qa_feed*", (x) =>
-        x.fulfill({ status: 200, contentType: "application/xml", body: RSS_OK })
+        x.fulfill({ status: 200, contentType: "application/xml", body: rss })
       );
       await r.page.goto(URL_APP);
       await r.page.waitForTimeout(3000);
@@ -4452,6 +4452,47 @@ ${Array.from({ length: 12 }, (_, k) => {
       );
       console.log(`erreurs : ${JSON.stringify(errors)}`);
       await browser.close();
+    }
+    // Le bouton d'une vidéo pilote aussi le mode du fil, y compris après un swipe.
+    {
+      const ids = ["abcdefghijk", "lmnopqrstuv"];
+      const rss = RSS_OK.replace(
+        /https:\/\/ex\.test\/a([01])<\/link>/g,
+        (_, i) => `https://www.youtube.com/watch?v=${ids[i]}</link>`
+      );
+      const { browser, page } = await lancer({ "fluxswipe.cardai.v1": "on" }, OK, rss);
+      try {
+        await page.waitForFunction((id) => videoIdOf(currentItem()) === id, ids[0]);
+        await page.locator("#sumBtn").click();
+        await page.waitForFunction(() => currentCardEl().dataset.ai === "sum");
+        const seconde = await page.evaluate((id) => {
+          return [...feedEl.children].findIndex(
+            (el) => videoIdOf(cardReg.get(+el.dataset.id)) === id
+          );
+        }, ids[1]);
+        if (seconde < 0) throw new Error("Seconde carte YouTube absente du fil");
+        await aller(page, seconde);
+        await page.waitForFunction(
+          (id) => videoIdOf(currentItem()) === id && currentCardEl().dataset.ai === "sum",
+          ids[1]
+        );
+        await page.locator("#sumBtn").click();
+        const correct = await page.evaluate((ids) => {
+          return (
+            !window.__opens.length &&
+            ids.every((id) => window.__calls.some((c) => c.videoId === id)) &&
+            sumBtn.getAttribute("aria-pressed") === "false" &&
+            currentCardEl().dataset.ai !== "sum"
+          );
+        }, ids);
+        if (!correct)
+          throw new Error("Le bouton YouTube ne pilote pas le résumé sur la carte");
+        console.log(
+          "YouTube : activation, résumé automatique au swipe et retour aux extraits"
+        );
+      } finally {
+        await browser.close();
+      }
     }
     // 2. Activé : le ✨ est l'interrupteur du MODE résumé, pour tout le fil.
     {
