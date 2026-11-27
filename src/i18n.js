@@ -751,7 +751,6 @@
       // pastille, qui reste le chemin vers les commentaires et la chaîne.
       "card.playVideo": "Lire la vidéo",
       "card.openYoutube": "Ouvrir sur YouTube",
-      "card.closeVideo": "Fermer la vidéo",
       // Libellé de la pastille (card__open) d'une carte vidéo : distinct de
       // card.playVideo (aria-label du ▶, titre de l'iframe), qui reste tel
       // quel ailleurs — seul ce texte visible devait changer.
@@ -1528,7 +1527,6 @@
       "card.readArticle": "Read article",
       "card.playVideo": "Play video",
       "card.openYoutube": "Open on YouTube",
-      "card.closeVideo": "Close video",
       "card.watch": "Watch",
       "card.demo": "Demo article",
       "cardai.label": "AI summary on cards (trial)",

@@ -296,29 +296,6 @@
   .card--playing.card--peek .card__body::before{display:none}
   .card--playing.card--peek .card__body{padding-bottom:calc(44px + var(--vidctl) + max(env(safe-area-inset-bottom),var(--sysbot,0px)))}
   .rail.rail--vid{bottom:calc(44px + var(--vidctl) + max(env(safe-area-inset-bottom),var(--sysbot,0px)))}
-  /* Échappatoire posée par startVideo()/retirée par stopVideo() — voir son
-     commentaire : YouTube bloque parfois la lecture derrière un mur « confirmez
-     que vous n'êtes pas un robot » (réputation de l'IP, rien que l'app puisse
-     lever) où le lien « Se connecter » ne fait jamais rien : Google refuse par
-     principe qu'un formulaire de connexion s'affiche dans un cadre tiers.
-     Sans bouton distinct, la seule sortie était le retour (matériel/geste), que
-     le lecteur intégré de YouTube peut lui-même intercepter. z-index au-dessus
-     de .card__video (1) et .card__body (2) : un sibling, jamais un enfant de
-     .card__body, sinon la règle ci-dessus l'éteindrait avec le reste. */
-  .card__vclose{position:absolute;
-    top:calc(12px + max(env(safe-area-inset-top),var(--systop,0px),var(--systop-min,0px)));
-    right:16px;z-index:3;width:40px;height:40px;border-radius:50%;
-    background:rgba(0,0,0,.55);border:0;color:#fff;font-size:18px;line-height:1;
-    display:flex;align-items:center;justify-content:center;cursor:pointer;
-    -webkit-tap-highlight-color:transparent;transition:opacity .4s ease}
-  .card__vclose:active{transform:scale(.92)}
-  /* Posée par startVideo() après un court délai : l'immense majorité des
-     lectures se déroulent SANS ce mur, et un rond plein posé sur la vidéo
-     pendant toute sa durée gênait la vue pour rien. L'opacité baisse, jamais
-     `pointer-events` : la cible reste entière, seul son rendu s'estompe — un
-     iframe cross-origin n'expose aucun clic à la page qui l'englobe (voir plus
-     haut), donc rien ne peut fiablement la faire réapparaître au toucher. */
-  .card__vclose.dim{opacity:.32}
   .card__body{position:relative;z-index:2;padding:28px 22px calc(44px + max(env(safe-area-inset-bottom),var(--sysbot,0px)));
     transition:opacity .18s ease}
   /* Flou LOCAL derrière le texte, solidaire du bloc : il couvre exactement le
@@ -917,25 +894,6 @@
   .hint .arrow{font-size:20px}
   @keyframes float{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,-8px)}}
 
-  /* Rappel du retour de la barre du haut. Une fois masquée par le swipe, plus
-     rien n'indiquait comment la rappeler : un appui n'importe où suffit, mais
-     personne ne le devine. Ce chevron est l'invitation.
-     Il ne capte AUCUN geste (pointer-events:none, comme .hint) : l'appui le
-     traverse jusqu'au fil, qui le traite déjà. En faire une vraie cible tactile
-     aurait avalé les swipes verticaux commencés en haut de l'écran — le geste
-     central de l'app — pour ne rien gagner.
-     Il s'anime tant que la barre n'est jamais revenue, puis reste, immobile et
-     plus discret, comme simple repère. Pas de fond ni de bordure : un simple
-     glyphe, dans l'esprit dépouillé du système (pas de « surface » pour un
-     élément qui n'est même pas une cible). */
-  /* Au centre du bord haut, donc pile où se loge un poinçon de caméra : il
-     descend avec la barre (voir « systop »). */
-  .peek{position:fixed;top:calc(7px + max(env(safe-area-inset-top),var(--systop,0px),var(--systop-min,0px)));left:50%;transform:translate(-50%,0);z-index:14;
-    width:46px;height:21px;display:grid;place-items:center;pointer-events:none;
-    color:var(--ash);font-size:14px;line-height:1;opacity:0;transition:opacity .32s ease}
-  body.top-away .peek{opacity:.4}
-  body.top-away .peek--new{opacity:.85;color:var(--flare);animation:peekbob 2.4s ease-in-out infinite}
-  @keyframes peekbob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,3px)}}
 
   /* Panneaux (feuilles, menu de partage…) : fond « surface » distinct du
      canevas, coins arrondis en haut, liseré signal-red — jamais d'ombre
@@ -1499,7 +1457,7 @@
     html.paysagelarge .top,html.paysagelarge .state{left:var(--volet)}
     /* Tout ce qui se centre se centre sur le FIL, pas sur l'écran : centré sur
        l'écran, un toast tombe à cheval sur le volet. */
-    html.paysagelarge .hint,html.paysagelarge .peek,html.paysagelarge .toast,html.paysagelarge .demobadge{left:calc(50% + var(--volet)/2)}
+    html.paysagelarge .hint,html.paysagelarge .toast,html.paysagelarge .demobadge{left:calc(50% + var(--volet)/2)}
     /* ---------- La carte, recomposée en HERO PAYSAGE ----------
        Une carte est dessinée pour le PORTRAIT : image plein cadre, texte
        ancré en BAS, dégradé qui monte du bas. Couchée, cette composition ne
@@ -1614,7 +1572,6 @@
     *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
       transition-duration:.001ms!important;scroll-behavior:auto!important}
     .hint{animation:none}
-    .peek{animation:none}
     /* Le nom s'affiche d'emblée, sans curseur : la règle générale ci-dessus
        n'annule pas les `animation-delay`, le curseur resterait sinon posé
        quelques secondes après un texte pourtant déjà complet. */
@@ -1745,7 +1702,6 @@
 <div class="hint" id="hint"><span class="arrow">⌃</span><span data-i18n="hint.swipe">Swipe</span></div>
 <!-- Invitation à retrouver la barre du haut. Décoratif (aria-hidden) : le geste
      est « appuyer n'importe où », déjà accessible sans lui. -->
-<div class="peek" id="peek" aria-hidden="true">⌄</div>
 
 <div class="state hidden" id="loading" role="status">
   <div class="spinner"></div>
@@ -2183,7 +2139,7 @@
      dans CACHE (sw.js), en gardant les deux numéros alignés. -->
 <script src="src/lib.js?v=335"></script>
 <script src="src/learn-core.js?v=281"></script>
-<script src="src/i18n.js?v=352"></script>
+<script src="src/i18n.js?v=355"></script>
 
 <script>
 /* Filet de sécurité : si les modules partagés manquent ou sont d'une autre
@@ -4185,7 +4141,7 @@ function dbgImage(){
   probe.src=url;
 }
 // Diagnostic optionnel : ouvrir l'app avec ?debug=1 pour afficher l'état de la reprise
-const APP_VERSION="354";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
+const APP_VERSION="355";   // doit correspondre au ?v= des <script> et à CACHE (sw.js)
 /* Nouveautés (changelogSheet) : une entrée par mise à jour qui vaut la peine
    d'être annoncée — PAS une par bump d'APP_VERSION, la plupart ne changent
    rien de visible (correctifs, robustesse). `v` porte l'APP_VERSION à
@@ -4819,8 +4775,8 @@ async function dropBlocklist(){
    (protection anti-hameçonnage documentée côté Google — seuls un vrai
    navigateur ou l'appli officielle passent), donc le mur « confirmez que vous
    n'êtes pas un robot » y resterait bloqué à vie, « Se connecter » ne menant
-   jamais nulle part (voir aussi la garde du même mur dans startVideo/CSS
-   .card__vclose, pour la lecture SUR la carte — même origine, même impasse).
+   jamais nulle part (même origine, même impasse pour la lecture SUR la carte,
+   dont on sort alors par le retour arrière).
    On laisse alors le lien garder son comportement natif : `target="_blank"`
    dans la WebView du pont Capacitor est déjà confié à l'appareil (appli
    YouTube installée, sinon le navigateur système) — voir le piège `blob:`/
@@ -8245,10 +8201,6 @@ function pushVideoState(){
 function popVideoState(){
   try{if(history.state&&history.state.snVideo)history.back();}catch(e){warn("history back",e);}
 }
-// Minuterie du fondu de .card__vclose (voir son commentaire CSS) : posée par
-// startVideo(), annulée par stopVideo() pour ne jamais courir après une carte
-// qui a déjà quitté la lecture.
-let vcloseDimTimer=null;
 /* Aperçu pendant la lecture. L'iframe (autre origine) ne laisse remonter
    AUCUN clic à la page — mais un toucher lui donne le FOCUS, donc la page
    reçoit `blur` avec l'iframe pour activeElement : c'est le seul signal
@@ -8330,13 +8282,10 @@ addEventListener("blur",()=>{
 let entreeVideoLibre=false;
 function stopVideo(relais){
   if(!playingCard)return;
-  clearTimeout(vcloseDimTimer);
   clearTimeout(peekT);peekT=null;
   playingCard.classList.remove("card--peek");
   const f=playingCard.querySelector(".card__video");
   if(f){clearTimeout(f._revealT);f.remove();}              // retirer l'iframe suffit à couper l'image ET le son
-  const c=playingCard.querySelector(".card__vclose");
-  if(c)c.remove();
   railEl.classList.remove("rail--away","rail--vid");   // le prochain rail (autre carte) repart visible
   playingCard.classList.remove("card--playing");
   playingCard=null;
@@ -8390,27 +8339,6 @@ function startVideo(card,depuis){
   // postMessage explicite (voir disableCaptions) éteint vraiment le module.
   f.src="https://www.youtube-nocookie.com/embed/"+id+"?autoplay=1&playsinline=1&rel=0&modestbranding=1&cc_load_policy=0&enablejsapi=1"+(depuis>=1?"&start="+Math.floor(depuis):"");
   card.insertBefore(f,card.firstChild);
-  // Voir le commentaire de .card__vclose (CSS) : seule échappatoire garantie
-  // quand YouTube bloque la lecture derrière son mur anti-robot, où « Se
-  // connecter » ne fait jamais rien dans un cadre tiers.
-  const closeBtn=document.createElement("button");
-  closeBtn.type="button";
-  closeBtn.className="card__vclose";
-  closeBtn.setAttribute("aria-label",T("card.closeVideo"));
-  closeBtn.textContent="✕";
-  // showTop() explicite : l'iframe cross-origin (youtube-nocookie.com) avale
-  // tous ses clics et ne les laisse jamais remonter à feedEl, seul déclencheur
-  // ordinaire du retour de la barre (voir plus bas) — sans cet appel, fermer
-  // une vidéo pendant que la barre est masquée (swipe juste avant ▶) la
-  // laissait invisible pour de bon, aucun tap sur l'iframe ne pouvant plus la
-  // ramener.
-  // card--stopped : vidéo fermée à la main, son ▶ doit revenir même à 0 s.
-  closeBtn.onclick=e=>{e.stopPropagation();e.preventDefault();card.classList.add("card--stopped");stopVideo();showTop();};
-  card.appendChild(closeBtn);
-  // Estompé après un court délai (voir .card__vclose.dim en CSS) : la cible
-  // reste entière, seule sa présence visuelle s'efface le temps d'une lecture
-  // qui se passe bien.
-  vcloseDimTimer=setTimeout(()=>closeBtn.classList.add("dim"),2200);
   card.classList.add("card--playing");
   playingCard=card;
   garderFocusPage();
@@ -8856,16 +8784,6 @@ const topEl=document.querySelector(".top");
    `lastScrollY`, le repère qui sert à reconnaître ce swipe, est déclaré plus
    haut (à côté de setScrollTopInstant, qui doit pouvoir l'écrire sans risquer
    de tomber sur une déclaration pas encore initialisée). */
-/* Repère « appuie pour retrouver la barre » (.peek) : visible seulement quand
-   la barre est masquée, d'où la classe posée sur <body> plutôt que sur .top —
-   le repère n'en est pas un descendant.
-   Il s'anime tant que l'utilisateur n'a jamais fait revenir la barre. Dès qu'il
-   y arrive, la leçon est apprise : l'animation s'arrête pour de bon (mémorisé),
-   et le repère reste en très discret pour qui l'aurait oublié. */
-const LS_PEEK="fluxswipe.peek.v1";
-const peekEl=document.getElementById("peek");
-try{if(localStorage.getItem(LS_PEEK)!=="1")peekEl.classList.add("peek--new");}
-catch(e){peekEl.classList.add("peek--new");}
 /* Signature du wordmark : le nom se réécrit à CHAQUE retour de la barre, pas
    seulement au lancement. Reconstruire les <span> relance les animations CSS —
    un nœud neuf n'a rien joué —, ce qui évite le retrait/remise de classe et le
@@ -8893,10 +8811,6 @@ function showTop(){
   placerPilule();
   armerRetraitBarre();   // elle repartira seule, voir plus bas
   if(revenait)typeBrand();
-  if(peekEl.classList.contains("peek--new")){
-    peekEl.classList.remove("peek--new");
-    try{localStorage.setItem(LS_PEEK,"1");}catch(e){warn("save peek",e);}
-  }
 }
 function hideTop(){clearTimeout(topAwayTimer);topEl.classList.add("top--away");document.body.classList.add("top-away");placerPilule();}
 /* Retrait AUTOMATIQUE de la barre du haut. Elle ne partait jusqu'ici que sur
@@ -9127,9 +9041,8 @@ function popDialogState(){
    pour que popDialogState ne croie jamais avoir une entrée à consommer. */
 try{if(history.state&&history.state.snSheet)history.replaceState(null,"");}catch(e){}
 addEventListener("popstate",()=>{
-  // Vidéo en lecture : le retour la ferme et revient à la carte. showTop() pour
-  // la même raison que card__vclose ci-dessus (voir son commentaire) : sans
-  // lui, une barre masquée avant la lecture restait invisible après ce retour.
+  // Vidéo en lecture : le retour la ferme et revient à la carte. showTop() : l'iframe
+  // avale les touchers et ne les laisse pas remonter au fil — sans lui, une barre masquée avant la lecture restait invisible après ce retour.
   if(playingCard){stopVideo();showTop();return;}
   const s=document.querySelector(".sheet.open");
   if(s){if(s===pickSheet)closePicker(true);else closeDialog(s,true);return;}
